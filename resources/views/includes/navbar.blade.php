@@ -15,7 +15,11 @@
                                 <li class="nav-item dropdown me-3">
                                     <a class="nav-link active dropdown-toggle text-gray-600" href="#"
                                         data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
-                                        <i class='bi bi-bell bi-sub fs-4'></i>
+                                        {{-- <i class='bi bi-bell bi-sub fs-4'></i> --}}
+                                        {{-- <i class="fa-light fa-bell"></i> --}}
+                                        <i class="fa-light fa-bell fa-shake fa-xl"></i>
+                                        {{-- <i class="fa-duotone fa-light fa-bell fa-beat fa-xl"></i> --}}
+                                        {{-- <i class="fa-duotone fa-regular fa-bell fa-shake fa-xl"></i> --}}
                                         <span class="badge badge-notification bg-danger">7</span>
                                     </a>
                                     <ul class="dropdown-menu dropdown-menu-end notification-dropdown"

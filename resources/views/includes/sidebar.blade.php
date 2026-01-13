@@ -3,7 +3,7 @@
                 <div class="sidebar-header position-relative">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="logo">
-                            <a href="{{ route('dashboard') }}"><img src="./assets/images/SPFI_Logo.png" alt="Logo" srcset=""></a>
+                            <a href="{{ route('dashboard') }}"><img src="{{ url('assets/images/logo.png') }}" alt="Logo" srcset=""></a>
                         </div>
                         <div class="theme-toggle d-flex gap-2  align-items-center mt-2">
                             <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -79,11 +79,22 @@
                             </a>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('adfasjf;saflksa;fdjsal;') ? 'active' : '' }}">
-                            <a href="{{ route('dashboard') }}" class='sidebar-link'>
+                        <li class="sidebar-item {{ Request::is('production/prs') ? 'active' : '' }} has-sub">
+                            <a href="#" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-conveyor-belt-arm {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
                                 <span>Production</span>
                             </a>
+                            <ul class="submenu {{ Request::is('production/prs') ? 'active' : '' }}">
+                                <li class="submenu-item {{ Request::is('production/prs') ? 'active' : '' }}">
+                                    <a href="{{ route('dashboard') }}" class="submenu-link">PRS</a>
+                                </li>
+                                <li class="submenu-item  ">
+                                    <a href="{{ route('dashboard') }}" class="submenu-link">RR</a>
+                                </li>
+                                <li class="submenu-item  ">
+                                    <a href="{{ route('dashboard') }}" class="submenu-link">TS</a>
+                                </li>
+                            </ul>
                         </li>
 
                         <li class="sidebar-item {{ Request::is('adfasjf;saflksa;fdjsal;') ? 'active' : '' }}">
@@ -107,14 +118,14 @@
                             </a>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('im/prs') ? 'active' : '' }} has-sub">
+                        <li class="sidebar-item {{ Request::is('im/*') ? 'active' : '' }} has-sub">
                             <a href="#" class='sidebar-link'>
-                                <i class="fa-duotone fa-solid fa-list-check {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
+                                <i class="fa-duotone fa-solid fa-list-check {{ Request::is('im/*') ? 'fa-fade' : '' }}"></i>
                                 <span>IM</span>
                             </a>
                             <ul class="submenu {{ Request::is('im/prs') ? 'active' : '' }}">
                                 <li class="submenu-item {{ Request::is('im/prs') ? 'active' : '' }}">
-                                    <a href="{{ route('dashboard') }}" class="submenu-link">PRS</a>
+                                    <a href="{{ route('prs.index') }}" class="submenu-link">PRS</a>
                                 </li>
                                 <li class="submenu-item  ">
                                     <a href="{{ route('dashboard') }}" class="submenu-link">RR</a>

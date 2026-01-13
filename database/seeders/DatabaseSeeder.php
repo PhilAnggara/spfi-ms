@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             DepartmentSeeder::class,
             UserSeeder::class,
+            ItemSeeder::class,
+            PrsSeeder::class,
+            PrsItemSeeder::class,
         ]);
     }
 }
