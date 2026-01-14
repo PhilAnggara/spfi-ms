@@ -40,3 +40,12 @@ if (! function_exists('tgl')) {
         return Carbon::parse($date)->isoFormat('D MMM YYYY');
     }
 }
+
+if (! function_exists('itemOrItems')) {
+    function itemOrItems($count)
+    {
+        return $count.' '.($count > 1 ? 'Items' : 'Item');
+    }
+}
+
+

@@ -46,7 +46,7 @@
 
 <div class="modal fade text-left modal-borderless" id="detail-modal-{{ $item->id }}" tabindex="-1"
     role="dialog" aria-labelledby="myModalLabel1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable" role="document">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Detail PRS - ({{ $item->prs_number }})</h5>
@@ -56,9 +56,82 @@
                 </button>
             </div>
             <div class="modal-body">
+
                 <div class="progress progress-primary my-4">
                     <div class="progress-bar progress-label" role="progressbar" style="width: 35%" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <tbody>
+                            <tr>
+                                <th>Progress</th>
+                                <td><span class="badge bg-light-info">{{ $item->status }}</span></td>
+                            </tr>
+                            <tr>
+                                <th>Submitted by</th>
+                                <td><i class="fa-duotone fa-solid fa-circle-user text-secondary"></i> {{ $item->user->name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Department</th>
+                                <td><i class="fa-duotone fa-solid fa-building-user text-secondary"></i> {{ $item->department->name }}</td>
+                            </tr>
+                            <tr>
+                                <th>PRS Date</th>
+                                <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
+                            </tr>
+                            <tr>
+                                <th>Date Needed</th>
+                                <td>
+                                    <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i>
+                                    {{ tgl($item->date_needed) }}
+                                    @if (!Carbon\Carbon::parse($item->date_needed)->isPast())
+                                        <small class="text-muted"> - ({{ Carbon\Carbon::parse($item->date_needed)->diffForHumans() }})</small>
+                                    @else
+                                        <span class="badge bg-light-danger ms-2">Overdue</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Remarks</th>
+                                <td><i class="fa-duotone fa-solid fa-circle-info text-secondary"></i> {{ $item->remarks ? $item->remarks : '-' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="divider">
+                    <div class="divider-text fw-bold">Items</div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered mb-0 text-center">
+                        <thead>
+                            <tr>
+                                <th>Item Code</th>
+                                <th>Item Name</th>
+                                <th>Stock on Hand</th>
+                                <th>Quantity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($item->items as $itemInfo)
+                                <tr>
+                                    <td>
+                                        <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $itemInfo->item->code }}')">
+                                            <i class="fa-solid fa-regular fa-clipboard"></i>
+                                            {{ $itemInfo->item->code }}
+                                        </button>
+                                    </td>
+                                    <td>{{ $itemInfo->item->name }}</td>
+                                    <td>{{ $itemInfo->item->stock_on_hand }}</td>
+                                    <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
             </div>
         </div>
     </div>
@@ -82,11 +155,11 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-light-primary" data-bs-dismiss="modal">
                     <i class="bx bx-x d-block d-sm-none"></i>
-                    <span class="d-none d-sm-block">Close</span>
+                    <span class="d-none d-sm-block">Cancel</span>
                 </button>
                 <button type="button" class="btn btn-primary ms-1" data-bs-dismiss="modal">
                     <i class="bx bx-check d-block d-sm-none"></i>
-                    <span class="d-none d-sm-block">Accept</span>
+                    <span class="d-none d-sm-block">Save</span>
                 </button>
             </div>
         </div>

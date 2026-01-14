@@ -4,10 +4,9 @@
 @section('content')
 <div class="page-heading">
     <div class="page-title">
-        <div class="row">
+        <div class="row mb-4">
             <div class="col-12 col-md-6 order-md-1 order-last">
                 <h3>Purchase Requisition Slip</h3>
-                <p class="text-subtitle text-muted">Ini halaman Dashboard</p>
             </div>
             <div class="col-12 col-md-6 order-md-2 order-first">
                 <div class="float-end">
@@ -27,16 +26,16 @@
                 </h5>
             </div> --}}
             <div class="card-body">
-                <table class="table table-striped" id="table1">
+                <table class="table table-striped text-center" id="table1">
                     <thead>
                         <tr>
-                            <th>PRS Number</th>
-                            <th>Charged to Department</th>
-                            <th>PRS Date</th>
-                            <th>Date Needed</th>
-                            <th>No. of Items</th>
-                            <th>Remarks</th>
-                            <th>Action</th>
+                            <th class="text-center">PRS Number</th>
+                            <th class="text-center">Charged to Department</th>
+                            <th class="text-center">PRS Date</th>
+                            <th class="text-center">Date Needed</th>
+                            <th class="text-center">No. of Items</th>
+                            <th class="text-center">Remarks</th>
+                            <th class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -51,8 +50,10 @@
                                 <td>{{ $item->department->name }}</td>
                                 <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
                                 <td><i class="fa-duotone fa-solid fa-calendar-star text-primary"></i> {{ tgl($item->date_needed) }}</td>
-                                <td>{{ $item->items->count() }}</td>
-                                <td>{{ $item->remarks }}</td>
+                                <td>
+                                    <span class="badge bg-light-secondary">{{ $item->items->count() }}</span>
+                                </td>
+                                <td>{{ $item->remarks ?? '-' }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
                                         <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
