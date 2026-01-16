@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', '- PRS')
+@section('title', ' | PRS')
 
 @section('content')
 <div class="page-heading">

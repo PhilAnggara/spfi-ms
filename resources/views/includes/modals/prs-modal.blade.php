@@ -1,7 +1,7 @@
 
 <div class="modal fade text-left modal-borderless" id="create-modal" tabindex="-1"
     role="dialog" aria-labelledby="myModalLabel1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Create PRS</h5>
@@ -23,7 +23,7 @@
                                     <select class="form-select" id="department" name="department_id" required>
                                         <option value="" selected disabled>-- Select Department --</option>
                                         @foreach ($departments as $department)
-                                            <option value="{{ $department->id }}">{{ $department->name }}</option>
+                                            <option value="{{ $department->id }}" {{ auth()->user()->department_id == $department->id ? 'selected' : '' }}>{{ $department->name }}</option>
                                         @endforeach
                                     </select>
                                 </fieldset>
@@ -32,7 +32,7 @@
                         <div class="col-md-6 col-12">
                             <div class="form-group">
                                 <label for="date-needed">Date Needed</label>
-                                <input type="date" id="date-needed" class="form-control" placeholder="Date Needed" name="date_needed" required>
+                                <input type="date" id="date-needed" class="form-control" placeholder="Date Needed" name="date_needed" value="{{ \Carbon\Carbon::now()->addDays(7)->format('Y-m-d') }}" required>
                             </div>
                         </div>
                         <div class="col-12">
@@ -51,15 +51,17 @@
                         </div> --}}
                     </div>
 
+                    <livewire:prs-item/>
+
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light-primary" data-bs-dismiss="modal">
-                        <i class="bx bx-x d-block d-sm-none"></i>
-                        <span class="d-none d-sm-block">Cancel</span>
+                    <button type="button" class="btn icon icon-left btn-light-primary" data-bs-dismiss="modal">
+                        <i class="fa-thin fa-xmark"></i>
+                        Cancel
                     </button>
-                    <button type="submit" class="btn btn-primary ms-1">
-                        <i class="bx bx-check d-block d-sm-none"></i>
-                        <span class="d-none d-sm-block">Save</span>
+                    <button type="submit" class="btn icon icon-left btn-primary ms-1">
+                        <i class="fa-thin fa-file-plus"></i>
+                        Save
                     </button>
                 </div>
 

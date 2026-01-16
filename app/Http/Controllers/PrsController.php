@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Models\Prs;
+use App\Models\PrsItem;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
@@ -40,8 +41,17 @@ class PrsController extends Controller
         $data['user_id'] = Auth::id();
         $data['prs_date'] = date('Y-m-d');
 
-        // dd($data);
-        Prs::create($data);
+        dd($data);
+        $newPrs = Prs::create($data);
+
+        foreach($data['prsItems'] as $prsItem) {
+            PrsItem::create([
+                'prs_id'       => $newPrs->id,
+                'item_id'      => $prsItem['item_id'],
+                'quantity'     => $prsItem['quantity'],
+            ]);
+        }
+
         return redirect()->back()->with('success', 'New PRS has been created successfully.');
     }
 
