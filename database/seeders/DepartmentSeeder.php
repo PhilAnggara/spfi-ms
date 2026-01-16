@@ -30,26 +30,26 @@ class DepartmentSeeder extends Seeder
 
         DB::table('departments')->insert([
             [
-                'name' => 'IT',
-                'code' => 'IT01',
+                'name' => 'Information Technology',
+                'code' => 'IT',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
-                'name' => 'HR',
-                'code' => 'HR01',
+                'name' => 'Human Resource',
+                'code' => 'HR',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
                 'name' => 'Marketing',
-                'code' => 'MKT01',
+                'code' => 'MKT',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
                 'name' => 'Finance',
-                'code' => 'FIN01',
+                'code' => 'FIN',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],

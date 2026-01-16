@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Department;
 use App\Models\Prs;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
 class PrsController extends Controller
@@ -13,8 +15,10 @@ class PrsController extends Controller
     public function index()
     {
         $items = Prs::all()->sortDesc();
+        $depatments = Department::all();
         return view('pages.prs', [
-            'items' => $items
+            'items' => $items,
+            'departments' => $depatments,
         ]);
     }
 
@@ -31,7 +35,14 @@ class PrsController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $data = $request->all();
+        $data['prs_number'] = $this->generatePrsNumber();
+        $data['user_id'] = Auth::id();
+        $data['prs_date'] = date('Y-m-d');
+
+        // dd($data);
+        Prs::create($data);
+        return redirect()->back()->with('success', 'New PRS has been created successfully.');
     }
 
     /**
@@ -68,5 +79,25 @@ class PrsController extends Controller
         $item->delete();
         // session()->flash('delete', 'PRS ' . $tile . ' has been deleted successfully.');
         return redirect()->back()->with('success', 'PRS ' . $tile . ' has been deleted successfully.');
+    }
+
+    // fungsi untuk genearate PRS Number
+    private function generatePrsNumber()
+    {
+        $user = Auth::user(); // ambil user yang sedang terautentikasi
+        $departmentCode = $user->department->code; // ambil kode departemen dari relasi user->department
+        $departmentID = $user->department->id; // ambil ID departemen dari relasi user->department
+        $year = date('y'); // ambil dua digit tahun saat ini (mis. "26")
+        $month = date('m'); // ambil bulan saat ini dengan dua digit (mis. "01".."12")
+        $day = date('d'); // ambil hari saat ini dengan dua digit (mis. "01".."31")
+        $lastPrs = Prs::where('department_id', $departmentID) // mulai query untuk mencari PRS terakhir berdasarkan department
+            // ->whereMonth('created_at', date('m')) // (dinonaktifkan) filter berdasarkan bulan pembuatan jika diperlukan
+            ->whereYear('created_at', date('Y')) // batasi hasil pada tahun berjalan
+            ->orderBy('id', 'desc') // urutkan menurun berdasarkan id untuk mendapatkan entri terbaru
+            ->first(); // ambil satu hasil pertama (terbaru)
+        $lastNumber = $lastPrs ? (int) substr($lastPrs->prs_number, -3) : 0; // jika ada PRS terakhir, ambil 3 digit terakhir dari prs_number sebagai integer, jika tidak set 0
+        $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT); // tambahkan 1 dan pad dengan nol di kiri hingga panjang 3 (mis. "001")
+
+        return $departmentCode . '-' . $day . $month . $year . '-' . $newNumber; // bangun dan kembalikan format nomor PRS: DEPT-ddmmyy-###
     }
 }

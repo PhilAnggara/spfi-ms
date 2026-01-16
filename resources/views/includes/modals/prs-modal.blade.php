@@ -1,7 +1,7 @@
 
 <div class="modal fade text-left modal-borderless" id="create-modal" tabindex="-1"
     role="dialog" aria-labelledby="myModalLabel1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable" role="document">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Create PRS</h5>
@@ -10,32 +10,61 @@
                     <i data-feather="x"></i>
                 </button>
             </div>
-            <div class="modal-body">
-                <p>
-                    Bonbon caramels muffin. Chocolate bar oat cake cookie pastry dragée
-                    pastry. Carrot cake
-                    chocolate tootsie roll chocolate bar candy canes biscuit.
-                    Gummies bonbon apple pie fruitcake icing biscuit apple pie jelly-o sweet
-                    roll. Toffee sugar
-                    plum sugar plum jelly-o jujubes bonbon dessert carrot cake. Cookie
-                    dessert tart muffin topping
-                    donut icing fruitcake. Sweet roll cotton candy dragée danish Candy canes
-                    chocolate bar cookie.
-                    Gingerbread apple pie oat cake. Carrot cake fruitcake bear claw. Pastry
-                    gummi bears
-                    marshmallow jelly-o.
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light-primary" data-bs-dismiss="modal">
-                    <i class="bx bx-x d-block d-sm-none"></i>
-                    <span class="d-none d-sm-block">Cancel</span>
-                </button>
-                <button type="button" class="btn btn-primary ms-1" data-bs-dismiss="modal">
-                    <i class="bx bx-check d-block d-sm-none"></i>
-                    <span class="d-none d-sm-block">Save</span>
-                </button>
-            </div>
+
+            <form action="{{ route('prs.store') }}" class="form" method="post">
+                @csrf
+                <div class="modal-body">
+
+                    <div class="row">
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="department">Charged to Department</label>
+                                <fieldset class="form-group">
+                                    <select class="form-select" id="department" name="department_id" required>
+                                        <option value="" selected disabled>-- Select Department --</option>
+                                        @foreach ($departments as $department)
+                                            <option value="{{ $department->id }}">{{ $department->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </fieldset>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="date-needed">Date Needed</label>
+                                <input type="date" id="date-needed" class="form-control" placeholder="Date Needed" name="date_needed" required>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-floating">
+                                <textarea class="form-control" placeholder="Leave a comment here"
+                                    id="floatingTextarea" name="remarks"></textarea>
+                                <label for="floatingTextarea">Remarks</label>
+                            </div>
+                        </div>
+                        {{-- <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="country-floating">Country</label>
+                                <input type="text" id="country-floating" class="form-control"
+                                    name="country-floating" placeholder="Country">
+                            </div>
+                        </div> --}}
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-primary" data-bs-dismiss="modal">
+                        <i class="bx bx-x d-block d-sm-none"></i>
+                        <span class="d-none d-sm-block">Cancel</span>
+                    </button>
+                    <button type="submit" class="btn btn-primary ms-1">
+                        <i class="bx bx-check d-block d-sm-none"></i>
+                        <span class="d-none d-sm-block">Save</span>
+                    </button>
+                </div>
+
+            </form>
+
         </div>
     </div>
 </div>
@@ -86,7 +115,7 @@
                                     <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i>
                                     {{ tgl($item->date_needed) }}
                                     @if (!Carbon\Carbon::parse($item->date_needed)->isPast())
-                                        <small class="text-muted"> - ({{ Carbon\Carbon::parse($item->date_needed)->diffForHumans() }})</small>
+                                        <small class="text-muted"> - ({{ human_time($item->date_needed) }})</small>
                                     @else
                                         <span class="badge bg-light-danger ms-2">Overdue</span>
                                     @endif

@@ -34,13 +34,6 @@ if (! function_exists('slugify')) {
     }
 }
 
-if (! function_exists('tgl')) {
-    function tgl($date)
-    {
-        return Carbon::parse($date)->isoFormat('D MMM YYYY');
-    }
-}
-
 if (! function_exists('itemOrItems')) {
     function itemOrItems($count)
     {
@@ -48,4 +41,16 @@ if (! function_exists('itemOrItems')) {
     }
 }
 
+if (! function_exists('tgl')) {
+    function tgl($date)
+    {
+        return Carbon::parse($date)->isoFormat('D MMM YYYY');
+    }
+}
 
+if (! function_exists('human_time')) {
+    function human_time($date)
+    {
+        return Carbon::parse($date)->diffForHumans();
+    }
+}
