@@ -6,6 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>{{ config('app.name', 'SPFI') }}@yield('title')</title>
     @include('includes.style')
+    @livewireStyles
 </head>
 <body>
     <script src="{{ url('assets/static/js/initTheme.js') }}"></script>
@@ -22,6 +23,7 @@
         </div>
     </div>
     @include('includes.script')
+    @livewireScripts
 
 </body>
 </html>

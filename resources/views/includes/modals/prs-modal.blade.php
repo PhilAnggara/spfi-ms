@@ -51,6 +51,10 @@
                         </div> --}}
                     </div>
 
+                    <div class="divider">
+                        <div class="divider-text">PRS Items</div>
+                    </div>
+
                     <livewire:prs-item/>
 
                 </div>

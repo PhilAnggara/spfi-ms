@@ -1,11 +1,28 @@
 <div>
     @foreach ($prsItems as $prsItem)
-        <div class="card shadow mt-4">
+        <div wire:loading.class="opacity-50" wire:target="removePrsItem({{ $loop->index }})" class="card shadow mt-2">
             <div class="card-content">
                 <div class="card-body position-relative">
-                    <div class="position-absolute top-0 end-0 p-2">
-                        <button type="button" class="btn btn-sm btn-outline-light" wire:click="removePrsItem({{ $loop->index }})">&times; Remove</button>
-                    </div>
+                    @if ($loop->count > 1)
+                        <div class="position-absolute top-0 end-0 p-2">
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-light d-inline-flex align-items-center"
+                                wire:click="removePrsItem({{ $loop->index }})"
+                                wire:loading.attr="disabled"
+                                wire:target="removePrsItem({{ $loop->index }})"
+                            >
+                                <span wire:loading.remove wire:target="removePrsItem({{ $loop->index }})">&times; Remove</span>
+                                <span
+                                    wire:loading.class.remove="d-none"
+                                    wire:target="removePrsItem({{ $loop->index }})"
+                                    class="spinner-border spinner-border-sm d-none"
+                                    role="status"
+                                    aria-hidden="true">
+                                </span>
+                            </button>
+                        </div>
+                    @endif
                     <div class="row">
                         <div class="col-md-6 col-12">
                             <div class="form-group">
@@ -44,7 +61,7 @@
         <input type="hidden" name="prsItems[{{ $loop->index }}][item_id]" value="{{ rand(1, 3) }}">
     @endforeach
 
-    <div wire:loading class="card shadow mt-4 w-100">
+    <div wire:loading.class.remove="d-none" wire:target="addPrsItem" class="card shadow mt-2 w-100 d-none">
         <div class="card-content">
             <div class="card-body">
                 <div class="d-flex justify-content-center align-items-center">
@@ -58,7 +75,7 @@
     </div>
 
     <div class="d-flex justify-content-center">
-        <button type="button" class="btn icon icon-left btn-outline-secondary btn-sm" wire:click="addPrsItem">
+        <button wire:loading.remove wire:target="addPrsItem" type="button" class="btn icon icon-left btn-outline-secondary btn-sm" wire:click="addPrsItem">
             <i class="fa-duotone fa-solid fa-layer-plus"></i>
             Add Item
         </button>
