@@ -17,7 +17,7 @@ class ItemSeeder extends Seeder
             [
                 'code' => 'ELC0001',
                 'name' => 'Kompter PC ASUS',
-                'unit' => 'PCS',
+                'unit' => 'SET',
                 'stock_on_hand' => 2,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -41,7 +41,7 @@ class ItemSeeder extends Seeder
             [
                 'code' => 'FUR0002',
                 'name' => 'Meja Kantor Kayu',
-                'unit' => 'PCS',
+                'unit' => 'SET',
                 'stock_on_hand' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),

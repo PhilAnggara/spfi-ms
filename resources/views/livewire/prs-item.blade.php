@@ -1,6 +1,6 @@
 <div>
     @foreach ($prsItems as $prsItem)
-        <div wire:loading.class="opacity-50" wire:target="removePrsItem({{ $loop->index }})" class="card shadow mt-2">
+        <div wire:loading.class="opacity-50" wire:target="removePrsItem({{ $loop->index }})" class="card shadow mt-2" wire:key="prs-item-{{ $prsItem['row_id'] ?? $loop->index }}">
             <div class="card-content">
                 <div class="card-body position-relative">
                     @if ($loop->count > 1)
@@ -27,21 +27,31 @@
                         <div class="col-md-6 col-12">
                             <div class="form-group">
                                 <label for="item-code-{{ $loop->index }}">Item Code</label>
-                                <input type="text" id="item-code-{{ $loop->index }}" class="form-control" placeholder="Item Code" wire:model.debounce.500ms="prsItems.{{ $loop->index }}.item_code">
+                                <select class="choices form-select prs-item-select" id="item-code-{{ $loop->index }}" data-index="{{ $loop->index }}" required>
+                                    <option value="" @selected(!$prsItem['item_id'])>-- Search Item Code --</option>
+                                    @foreach ($this->getAvailableItems($loop->index) as $item)
+                                        <option value="{{ $item->id }}" @selected($prsItem['item_id'] == $item->id)>{{ $item->code }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </div>
                         <div class="col-md-6 col-12">
                             <div class="form-group">
                                 <label for="item-name-{{ $loop->index }}">Item Name</label>
-                                <input type="text" id="item-name-{{ $loop->index }}" class="form-control" placeholder="Item Name" wire:model.debounce.500ms="prsItems.{{ $loop->index }}.item_name">
+                                <select class="choices form-select prs-item-select" id="item-name-{{ $loop->index }}" data-index="{{ $loop->index }}" required>
+                                    <option value="" @selected(!$prsItem['item_id'])>-- Search Item Name --</option>
+                                    @foreach ($this->getAvailableItems($loop->index) as $item)
+                                        <option value="{{ $item->id }}" @selected($prsItem['item_id'] == $item->id)>{{ $item->name }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </div>
                         <div class="col-md-6 col-12">
                             <div class="form-group">
                                 <label for="stock-on-hand-{{ $loop->index }}">Stock on Hand</label>
                                 <div class="input-group">
-                                    <input type="number" id="stock-on-hand-{{ $loop->index }}" class="form-control" placeholder="Stock on Hand" min="0" wire:model.debounce.500ms="prsItems.{{ $loop->index }}.stock_on_hand">
-                                    <span class="input-group-text" id="basic-addon2">PCS</span>
+                                    <input type="number" id="stock-on-hand-{{ $loop->index }}" class="form-control" placeholder="Stock on Hand" min="0" wire:model.debounce.500ms="prsItems.{{ $loop->index }}.stock_on_hand" readonly required>
+                                    <span class="input-group-text" id="basic-addon2">{{ $prsItem['unit'] ?? 'PCS' }}</span>
                                 </div>
                             </div>
                         </div>
@@ -49,8 +59,8 @@
                             <div class="form-group">
                                 <label for="quantity-{{ $loop->index }}">Quantity</label>
                                 <div class="input-group">
-                                    <input type="number" id="quantity-{{ $loop->index }}" class="form-control" name="prsItems[{{ $loop->index }}][quantity]" placeholder="Quantity" min="1" wire:model.debounce.500ms="prsItems.{{ $loop->index }}.quantity">
-                                    <span class="input-group-text" id="basic-addon2">PCS</span>
+                                    <input type="number" id="quantity-{{ $loop->index }}" class="form-control" name="prsItems[{{ $loop->index }}][quantity]" placeholder="Quantity" min="1" wire:model.debounce.500ms="prsItems.{{ $loop->index }}.quantity" required>
+                                    <span class="input-group-text" id="basic-addon2">{{ $prsItem['unit'] ?? 'PCS' }}</span>
                                 </div>
                             </div>
                         </div>
@@ -58,7 +68,7 @@
                 </div>
             </div>
         </div>
-        <input type="hidden" name="prsItems[{{ $loop->index }}][item_id]" value="{{ rand(1, 3) }}">
+        <input type="hidden" name="prsItems[{{ $loop->index }}][item_id]" value="{{ is_array($prsItem['item_id'] ?? '') ? '' : ($prsItem['item_id'] ?? '') }}">
     @endforeach
 
     <div wire:loading.class.remove="d-none" wire:target="addPrsItem" class="card shadow mt-2 w-100 d-none">
@@ -81,3 +91,46 @@
         </button>
     </div>
 </div>
+
+<script>
+    if (!window.__prsChoicesInit) {
+        window.__prsChoicesInit = true;
+
+        const initChoices = () => {
+            document.querySelectorAll('.prs-item-select').forEach((el) => {
+                if (el.Choices) {
+                    el.Choices.destroy();
+                }
+
+                const choices = new Choices(el, {
+                    allowHTML: true,
+                    searchEnabled: true
+                });
+
+                el.Choices = choices;
+
+                // Listen for item selection
+                el.addEventListener('change', function(e) {
+                    const index = this.getAttribute('data-index');
+                    const itemId = e.target.value;
+
+                    if (itemId && index !== null) {
+                        @this.call('updateItemSelect', parseInt(index), parseInt(itemId));
+                    }
+                });
+            });
+        };
+
+        window.addEventListener('choices:refresh', () => {
+            setTimeout(initChoices, 100);
+        });
+
+        document.addEventListener('DOMContentLoaded', initChoices);
+
+        // Also init when Livewire finishes updating
+        document.addEventListener('livewire:navigated', initChoices);
+        Livewire.hook('morph.updated', () => {
+            setTimeout(initChoices, 100);
+        });
+    }
+</script>

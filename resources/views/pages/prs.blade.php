@@ -53,7 +53,7 @@
                                 <td>
                                     <span class="badge bg-light-secondary">{{ $item->items->count() }}</span>
                                 </td>
-                                <td>{{ $item->remarks ?? '-' }}</td>
+                                <td>{{ Str::limit($item->remarks, 20, '...') ?? '-' }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
                                         <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
@@ -83,6 +83,9 @@
 @include('includes.modals.prs-modal')
 @endsection
 
+@push('prepend-style')
+    <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
+@endpush
 @push('addon-style')
     <link rel="stylesheet" href="{{ url('assets/extensions/simple-datatables/style.css') }}">
     <link rel="stylesheet" href="{{ url('assets/compiled/css/table-datatable.css') }}">
@@ -90,6 +93,8 @@
 @push('addon-script')
     <script src="{{ url('assets/extensions/simple-datatables/umd/simple-datatables.js') }}"></script>
     <script src="{{ url('assets/static/js/pages/simple-datatables.js') }}"></script>
+    <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
+    <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
 @endpush
 
 {{-- New Version DataTables --}}

@@ -37,11 +37,11 @@ class PrsController extends Controller
     public function store(Request $request)
     {
         $data = $request->all();
-        $data['prs_number'] = $this->generatePrsNumber();
+        $data['prs_number'] = $this->generatePrsNumber($data['department_id']);
         $data['user_id'] = Auth::id();
         $data['prs_date'] = date('Y-m-d');
 
-        dd($data);
+        // dd($data);
         $newPrs = Prs::create($data);
 
         foreach($data['prsItems'] as $prsItem) {
@@ -92,15 +92,15 @@ class PrsController extends Controller
     }
 
     // fungsi untuk genearate PRS Number
-    private function generatePrsNumber()
+    private function generatePrsNumber($departmentID)
     {
         $user = Auth::user(); // ambil user yang sedang terautentikasi
-        $departmentCode = $user->department->code; // ambil kode departemen dari relasi user->department
-        $departmentID = $user->department->id; // ambil ID departemen dari relasi user->department
+        $departmentCode = Department::find($departmentID)->code; // ambil kode departemen dari relasi user->department
+        // $departmentID = $user->department->id; // ambil ID departemen dari relasi user->department
         $year = date('y'); // ambil dua digit tahun saat ini (mis. "26")
         $month = date('m'); // ambil bulan saat ini dengan dua digit (mis. "01".."12")
         $day = date('d'); // ambil hari saat ini dengan dua digit (mis. "01".."31")
-        $lastPrs = Prs::where('department_id', $departmentID) // mulai query untuk mencari PRS terakhir berdasarkan department
+        $lastPrs = Prs::withTrashed()->where('department_id', $departmentID) // mulai query untuk mencari PRS terakhir berdasarkan department
             // ->whereMonth('created_at', date('m')) // (dinonaktifkan) filter berdasarkan bulan pembuatan jika diperlukan
             ->whereYear('created_at', date('Y')) // batasi hasil pada tahun berjalan
             ->orderBy('id', 'desc') // urutkan menurun berdasarkan id untuk mendapatkan entri terbaru
