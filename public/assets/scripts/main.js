@@ -1,3 +1,9 @@
+AOS.init({
+  once: true,
+  delay: 50,
+  // duration: 600
+});
+
 document.addEventListener('DOMContentLoaded', function () {
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bstooltip-toggle="tooltip"]'))
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {

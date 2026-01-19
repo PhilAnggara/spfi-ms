@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', '- Dashboard')
+@section('title', ' | Dashboard')
 
 @section('content')
 <div class="page-heading">
@@ -8,61 +8,187 @@
             <div class="col-12 col-md-6 order-md-1 order-last">
                 <h3>Dashboard</h3>
             </div>
-            {{-- <div class="col-12 col-md-6 order-md-2 order-first">
-                <nav aria-label="breadcrumb" class="breadcrumb-header float-start float-lg-end">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="index.html">Dashboard</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">Layout Vertical Navbar
-                        </li>
-                    </ol>
-                </nav>
-            </div> --}}
         </div>
     </div>
-    <section class="section">
-        <div class="card shadow-sm">
-            <div class="card-header">
-                <h4 class="card-title">Dummy Text</h4>
+</div>
+<div class="page-content">
+    <section class="row">
+        <div class="col-12 col-lg-9">
+            <div class="row">
+                <div class="col-6 col-lg-3 col-md-6">
+                    <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="0">
+                        <div class="card-body px-4 py-4-5">
+                            <div class="row">
+                                <div class="col-md-4 col-lg-12 col-xl-12 col-xxl-5 d-flex justify-content-start ">
+                                    <div class="stats-icon purple mb-2">
+                                        <i class="fa-regular fa-users"></i>
+                                    </div>
+                                </div>
+                                <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
+                                    <h6 class="text-muted font-semibold">User Accounts</h6>
+                                    <h6 class="font-extrabold mb-0">35</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3 col-md-6">
+                    <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="100">
+                        <div class="card-body px-4 py-4-5">
+                            <div class="row">
+                                <div class="col-md-4 col-lg-12 col-xl-12 col-xxl-5 d-flex justify-content-start ">
+                                    <div class="stats-icon blue mb-2">
+                                        <i class="fa-regular fa-cart-shopping"></i>
+                                    </div>
+                                </div>
+                                <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
+                                    <h6 class="text-muted font-semibold">PRS This Month</h6>
+                                    <h6 class="font-extrabold mb-0">21</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3 col-md-6">
+                    <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="200">
+                        <div class="card-body px-4 py-4-5">
+                            <div class="row">
+                                <div class="col-md-4 col-lg-12 col-xl-12 col-xxl-5 d-flex justify-content-start ">
+                                    <div class="stats-icon green mb-2">
+                                        <i class="fa-regular fa-conveyor-belt-arm"></i>
+                                    </div>
+                                </div>
+                                <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
+                                    <h6 class="text-muted font-semibold">Production</h6>
+                                    <h6 class="font-extrabold mb-0">80.000</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3 col-md-6">
+                    <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="300">
+                        <div class="card-body px-4 py-4-5">
+                            <div class="row">
+                                <div class="col-md-4 col-lg-12 col-xl-12 col-xxl-5 d-flex justify-content-start ">
+                                    <div class="stats-icon red mb-2">
+                                        <i class="fa-regular fa-ship"></i>
+                                    </div>
+                                </div>
+                                <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
+                                    <h6 class="text-muted font-semibold">Exports</h6>
+                                    <h6 class="font-extrabold mb-0">60.000</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <p>
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. In mollis tincidunt tempus.
-                    Duis vitae facilisis enim, at rutrum lacus. Nam at nisl ut ex egestas placerat
-                    sodales id quam. Aenean sit amet nibh quis lacus pellentesque venenatis vitae at
-                    justo. Orci varius natoque penatibus et magnis dis parturient montes, nascetur
-                    ridiculus mus. Suspendisse venenatis tincidunt odio ut rutrum. Maecenas ut urna
-                    venenatis, dapibus tortor sed, ultrices justo. Phasellus scelerisque, nibh quis
-                    gravida venenatis, nibh mi lacinia est, et porta purus nisi eget nibh. Fusce pretium
-                    vestibulum sagittis. Donec sodales velit cursus convallis sollicitudin. Nunc vel
-                    scelerisque elit, eget facilisis tellus. Donec id molestie ipsum. Nunc tincidunt
-                    tellus sed felis vulputate euismod.
-                </p>
-                <p>
-                    Proin accumsan nec arcu sit amet volutpat. Proin non risus luctus, tempus quam quis,
-                    volutpat orci. Phasellus commodo arcu dui, ut convallis quam sodales maximus. Aenean
-                    sollicitudin massa a quam fermentum, et efficitur metus convallis. Curabitur nec
-                    laoreet ipsum, eu congue sem. Nunc pellentesque quis erat at gravida. Vestibulum
-                    dapibus efficitur felis, vel luctus libero congue eget. Donec mollis pellentesque
-                    arcu, eu commodo nunc porta sit amet. In commodo augue id mauris tempor, sed
-                    dignissim nulla facilisis. Ut non mattis justo, ut placerat justo. Vestibulum
-                    scelerisque cursus facilisis. Suspendisse velit justo, scelerisque ac ultrices eu,
-                    consectetur ac odio.
-                </p>
-                <p>
-                    In pharetra quam vel lobortis fermentum. Nulla vel risus ut sapien porttitor
-                    volutpat eu ac lorem. Vestibulum porta elit magna, ut ultrices sem fermentum ut.
-                    Vestibulum blandit eros ut imperdiet porttitor. Pellentesque tempus nunc sed augue
-                    auctor eleifend. Sed nisi sem, lobortis eget faucibus placerat, hendrerit vitae
-                    elit. Vestibulum elit orci, pretium vel libero at, imperdiet congue lectus. Praesent
-                    rutrum id turpis non aliquam. Cras dignissim, metus vitae aliquam faucibus, elit
-                    augue dignissim nulla, bibendum consectetur leo libero a tortor. Vestibulum non
-                    tincidunt nibh. Ut imperdiet elit vel vehicula ultricies. Nulla maximus justo sit
-                    amet fringilla laoreet. Aliquam malesuada diam in augue mattis aliquam. Pellentesque
-                    id eros dignissim, dapibus sem ac, molestie dolor. Mauris purus lacus, tempor sit
-                    amet vestibulum vitae, ultrices eu urna.
-                </p>
+            <div class="row">
+                <div class="col-12">
+                    <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="700">
+                        <div class="card-header">
+                            <h4>Monthly Production</h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="chart-profile-visit"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-3">
+            <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="500">
+                <div class="card-header">
+                    <h4>Shipments this Month</h4>
+                </div>
+                <div class="card-body">
+                    <div id="chart-visitors-profile"></div>
+                </div>
             </div>
         </div>
     </section>
 </div>
 @endsection
+
+@push('prepend-style')
+@endpush
+@push('addon-style')
+    <link rel="stylesheet" href="{{ url('assets/compiled/css/iconly.css') }}">
+@endpush
+@push('addon-script')
+<script src="{{ url('assets/extensions/apexcharts/apexcharts.min.js') }}"></script>
+{{-- <script src="{{ url('assets/static/js/pages/dashboard.js') }}"></script> --}}
+<script>
+var optionsProfileVisit = {
+  annotations: {
+    position: "back",
+  },
+  dataLabels: {
+    enabled: false,
+  },
+  chart: {
+    type: "bar",
+    height: 300,
+  },
+  fill: {
+    opacity: 1,
+  },
+  plotOptions: {},
+  series: [
+    {
+      name: "sales",
+      data: [9, 20, 30, 20, 10, 20, 30, 20, 10, 20, 30, 20],
+    },
+  ],
+  colors: "#435ebe",
+  xaxis: {
+    categories: [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ],
+  },
+}
+let optionsVisitorsProfile = {
+  series: [70, 30],
+  labels: ["Export", "Domestic"],
+  colors: ["#435ebe", "#55c6e8"],
+  chart: {
+    type: "donut",
+    width: "100%",
+    height: "350px",
+  },
+  legend: {
+    position: "bottom",
+  },
+  plotOptions: {
+    pie: {
+      donut: {
+        size: "30%",
+      },
+    },
+  },
+}
+var chartProfileVisit = new ApexCharts(
+  document.querySelector("#chart-profile-visit"),
+  optionsProfileVisit
+)
+var chartVisitorsProfile = new ApexCharts(
+  document.getElementById("chart-visitors-profile"),
+  optionsVisitorsProfile
+)
+chartProfileVisit.render()
+chartVisitorsProfile.render()
+
+</script>
+@endpush
