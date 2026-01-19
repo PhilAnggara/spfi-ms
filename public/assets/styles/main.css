@@ -5,7 +5,7 @@
 
 /* auth */
 #auth #auth-right {
-    background: url(../images/sinar.png), linear-gradient(90deg, #cfdbff, #edf2ff);
+    background: url(../images/auth-img.png), linear-gradient(90deg, #cfdbff, #edf2ff);
     background-position: center;
     background-repeat: no-repeat;
     background-size: contain;

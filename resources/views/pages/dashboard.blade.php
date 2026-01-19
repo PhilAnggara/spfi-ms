@@ -20,7 +20,7 @@
         </div>
     </div>
     <section class="section">
-        <div class="card">
+        <div class="card shadow-sm">
             <div class="card-header">
                 <h4 class="card-title">Dummy Text</h4>
             </div>

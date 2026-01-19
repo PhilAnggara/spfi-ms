@@ -22,7 +22,7 @@
                                         {{-- <i class="fa-duotone fa-regular fa-bell fa-shake fa-xl"></i> --}}
                                         <span class="badge badge-notification bg-danger">7</span>
                                     </a>
-                                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown"
+                                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown shadow"
                                         aria-labelledby="dropdownMenuButton">
                                         <li class="dropdown-header">
                                             <h6>Notifications</h6>
@@ -69,7 +69,7 @@
                                         </div>
                                     </div>
                                 </a>
-                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton"
+                                <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="dropdownMenuButton"
                                     style="min-width: 11rem;">
                                     <li>
                                         <h6 class="dropdown-header">Hello, {{ Str::before(auth()->user()->name, ' ') }}!</h6>
