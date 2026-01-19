@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use App\Models\Prs;
 use App\Models\PrsItem;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
@@ -123,6 +125,38 @@ class PrsController extends Controller
         $item->delete();
         // session()->flash('delete', 'PRS ' . $tile . ' has been deleted successfully.');
         return redirect()->back()->with('success', 'PRS ' . $tile . ' has been deleted successfully.');
+    }
+
+    /**
+     * Export PRS list to PDF by month range.
+     */
+    public function export(Request $request)
+    {
+        $validated = $request->validate([
+            'start_month' => ['required', 'date_format:Y-m'],
+            'end_month'   => ['required', 'date_format:Y-m', 'after_or_equal:start_month'],
+        ]);
+
+        $start = Carbon::createFromFormat('Y-m', $validated['start_month'])->startOfMonth();
+        $end   = Carbon::createFromFormat('Y-m', $validated['end_month'])->endOfMonth();
+
+        $prs = Prs::with(['department', 'items.item'])
+            ->whereBetween('prs_date', [$start, $end])
+            ->orderByDesc('prs_date')
+            ->get();
+
+        $data = [
+            'prsList'      => $prs,
+            'start'        => $start,
+            'end'          => $end,
+            'generated_at' => now(),
+        ];
+
+        $filename = sprintf('prs-%s-to-%s.pdf', $start->format('Ym'), $end->format('Ym'));
+
+        return Pdf::loadView('pdf.prs-report', $data)
+            ->setPaper('a4', 'portrait')
+            ->stream($filename);
     }
 
     // fungsi untuk genearate PRS Number

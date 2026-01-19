@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
         // Route::resource('prs', PrsController::class);
     });
     Route::resource('prs', PrsController::class);
+    Route::post('prs/export', [PrsController::class, 'export'])->name('prs.export');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

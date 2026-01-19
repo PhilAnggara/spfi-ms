@@ -10,6 +10,10 @@
             </div>
             <div class="col-12 col-md-6 order-md-2 order-first">
                 <div class="float-end">
+                    <button type="button" class="btn btn-sm icon icon-left btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#export-modal">
+                        <i class="fa-duotone fa-solid fa-file-pdf"></i>
+                        Export PDF
+                    </button>
                     <button type="button" class="btn btn-sm icon icon-left btn-outline-success" data-bs-toggle="modal" data-bs-target="#create-modal">
                         <i class="fa-duotone fa-solid fa-plus"></i>
                         Create PRS
@@ -81,6 +85,7 @@
     </section>
 </div>
 @include('includes.modals.prs-modal')
+@include('includes.modals.prs-export')
 @endsection
 
 @push('prepend-style')
