@@ -5,5 +5,6 @@
 
     <link rel="stylesheet" href="{{ url('assets/compiled/css/app.css') }}">
     <link rel="stylesheet" href="{{ url('assets/compiled/css/app-dark.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/styles/main.css') }}">
 
     @stack('addon-style')
