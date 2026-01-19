@@ -1,3 +1,51 @@
 #sidebar .sidebar-wrapper .sidebar-header .logo a img {
     height: 28px;
 }
+
+
+/* auth */
+#auth #auth-right {
+    background: url(../images/sinar.png), linear-gradient(90deg, #cfdbff, #edf2ff);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+html[data-bs-theme="dark"] #auth #auth-right {
+    background: url(../images/logo.png), linear-gradient(90deg, #2d499d, #3f5491);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+#auth #auth-left {
+    padding: 5rem;
+}
+#auth #auth-left .auth-title {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+#auth #auth-left .auth-subtitle {
+    font-size: 1.2rem;
+    line-height: 1.8rem;
+    color: #a8aebb;
+}
+#auth #auth-left .auth-logo {
+    margin-bottom: 7rem;
+}
+#auth #auth-left .auth-logo img {
+    height: 3rem;
+}
+@media screen and (max-width: 1399.9px) {
+    #auth #auth-left {
+        padding: 2rem;
+    }
+}
+@media screen and (max-width: 767px) {
+    #auth #auth-left {
+        padding: 4rem;
+    }
+}
+@media screen and (max-width: 576px) {
+    #auth #auth-left {
+        padding: 5rem 2rem;
+    }
+}
