@@ -98,6 +98,11 @@
 
         const initChoices = () => {
             document.querySelectorAll('.prs-item-select').forEach((el) => {
+                // Skip if already initialized with event listener
+                if (el.dataset.choicesInitialized) {
+                    return;
+                }
+
                 if (el.Choices) {
                     el.Choices.destroy();
                 }
@@ -109,13 +114,24 @@
 
                 el.Choices = choices;
 
+                // Mark as initialized
+                el.dataset.choicesInitialized = 'true';
+
                 // Listen for item selection
                 el.addEventListener('change', function(e) {
                     const index = this.getAttribute('data-index');
                     const itemId = e.target.value;
 
                     if (itemId && index !== null) {
-                        @this.call('updateItemSelect', parseInt(index), parseInt(itemId));
+                        // Find the closest Livewire component
+                        const livewireElement = this.closest('[wire\\:id]');
+                        if (livewireElement) {
+                            const componentId = livewireElement.getAttribute('wire:id');
+                            const component = Livewire.find(componentId);
+                            if (component) {
+                                component.call('updateItemSelect', parseInt(index), parseInt(itemId));
+                            }
+                        }
                     }
                 });
             });
@@ -131,6 +147,11 @@
         document.addEventListener('livewire:navigated', initChoices);
         Livewire.hook('morph.updated', () => {
             setTimeout(initChoices, 100);
+        });
+
+        // Init when modal is shown
+        document.addEventListener('shown.bs.modal', () => {
+            setTimeout(initChoices, 150);
         });
     }
 </script>

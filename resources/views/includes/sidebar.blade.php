@@ -51,28 +51,28 @@
                             </a>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('adfasjf;saflksa;fdjsal;') ? 'active' : '' }}">
+                        <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
                             <a href="{{ route('dashboard') }}" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-users {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
                                 <span>HR</span>
                             </a>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('adfasjf;saflksa;fdjsal;') ? 'active' : '' }}">
+                        <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
                             <a href="{{ route('dashboard') }}" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-money-check-dollar-pen {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
                                 <span>Purchasing</span>
                             </a>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('adfasjf;saflksa;fdjsal;') ? 'active' : '' }}">
+                        <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
                             <a href="{{ route('dashboard') }}" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-warehouse-full {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
                                 <span>Warehouse</span>
                             </a>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('adfasjf;saflksa;fdjsal;') ? 'active' : '' }}">
+                        <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
                             <a href="{{ route('dashboard') }}" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-file-export {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
                                 <span>Export Document</span>
@@ -97,21 +97,21 @@
                             </ul>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('adfasjf;saflksa;fdjsal;') ? 'active' : '' }}">
+                        <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
                             <a href="{{ route('dashboard') }}" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-calculator {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
                                 <span>Accounting</span>
                             </a>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('adfasjf;saflksa;fdjsal;') ? 'active' : '' }}">
+                        <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
                             <a href="{{ route('dashboard') }}" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-fish {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
                                 <span>Tunaviand</span>
                             </a>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('adfasjf;saflksa;fdjsal;') ? 'active' : '' }}">
+                        <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
                             <a href="{{ route('dashboard') }}" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-user-police {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
                                 <span>Customs</span>
@@ -124,14 +124,39 @@
                                 <span>IM</span>
                             </a>
                             <ul class="submenu {{ Request::is('im/prs') ? 'active' : '' }}">
-                                <li class="submenu-item {{ Request::is('im/prs') ? 'active' : '' }}">
+                                {{-- <li class="submenu-item {{ Request::is('im/prs') ? 'active' : '' }}">
                                     <a href="{{ route('prs.index') }}" class="submenu-link">PRS</a>
-                                </li>
-                                <li class="submenu-item  ">
+                                </li> --}}
+                                <li class="submenu-item {{ Request::is('im/rr') ? 'active' : '' }}">
                                     <a href="{{ route('dashboard') }}" class="submenu-link">RR</a>
                                 </li>
-                                <li class="submenu-item  ">
+                                <li class="submenu-item {{ Request::is('im/ts') ? 'active' : '' }}">
                                     <a href="{{ route('dashboard') }}" class="submenu-link">TS</a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <li class="sidebar-item {{ Request::is('prs') ? 'active' : '' }}">
+                            <a href="{{ route('prs.index') }}" class='sidebar-link'>
+                                <i class="fa-duotone fa-solid fa-cart-shopping {{ Request::is('prs') ? 'fa-fade' : '' }}"></i>
+                                <span>PRS</span>
+                            </a>
+                        </li>
+
+                        <li class="sidebar-item {{ Request::is('master/*') ? 'active' : '' }} has-sub">
+                            <a href="#" class='sidebar-link'>
+                                <i class="fa-duotone fa-solid fa-user-tie {{ Request::is('master/*') ? 'fa-fade' : '' }}"></i>
+                                <span>Master</span>
+                            </a>
+                            <ul class="submenu {{ Request::is('master/user') ? 'active' : '' }}">
+                                <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
+                                    <a href="{{ route('dashboard') }}" class="submenu-link">User</a>
+                                </li>
+                                <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
+                                    <a href="{{ route('dashboard') }}" class="submenu-link">PRS Items</a>
+                                </li>
+                                <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
+                                    <a href="{{ route('dashboard') }}" class="submenu-link">Department</a>
                                 </li>
                             </ul>
                         </li>

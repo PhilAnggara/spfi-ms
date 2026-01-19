@@ -76,7 +76,41 @@ class PrsController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $prs = Prs::findOrFail($id);
+
+        $validated = $request->validate([
+            'department_id' => ['required', 'exists:departments,id'],
+            'date_needed'   => ['required', 'date'],
+            'remarks'       => ['nullable', 'string'],
+            'prsItems'      => ['required', 'array', 'min:1'],
+            'prsItems.*.item_id'  => ['required', 'exists:items,id'],
+            'prsItems.*.quantity' => ['required', 'numeric', 'min:1'],
+        ]);
+
+        $shouldRegenerate = $prs->department_id != $validated['department_id'];
+
+        $prs->department_id = $validated['department_id'];
+        $prs->date_needed   = $validated['date_needed'];
+        $prs->remarks       = $validated['remarks'] ?? null;
+
+        if ($shouldRegenerate) {
+            $prs->prs_number = $this->generatePrsNumber($validated['department_id']);
+        }
+
+        $prs->save();
+
+        // Reset items then re-create based on submitted rows
+        PrsItem::where('prs_id', $prs->id)->delete();
+
+        foreach ($validated['prsItems'] as $itemRow) {
+            PrsItem::create([
+                'prs_id'   => $prs->id,
+                'item_id'  => $itemRow['item_id'],
+                'quantity' => $itemRow['quantity'],
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'PRS has been updated successfully.');
     }
 
     /**

@@ -64,7 +64,7 @@
                         Cancel
                     </button>
                     <button type="submit" class="btn icon icon-left btn-primary ms-1">
-                        <i class="fa-thin fa-file-plus"></i>
+                        <i class="fa-thin fa-file-plus me-1"></i>
                         Save
                     </button>
                 </div>
@@ -175,7 +175,7 @@
 
 <div class="modal fade text-left modal-borderless" id="edit-modal-{{ $item->id }}" tabindex="-1"
     role="dialog" aria-labelledby="myModalLabel1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Edit PRS - ({{ $item->prs_number }})</h5>
@@ -184,19 +184,58 @@
                     <i data-feather="x"></i>
                 </button>
             </div>
-            <div class="modal-body">
-                ------
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light-primary" data-bs-dismiss="modal">
-                    <i class="bx bx-x d-block d-sm-none"></i>
-                    <span class="d-none d-sm-block">Cancel</span>
-                </button>
-                <button type="button" class="btn btn-primary ms-1" data-bs-dismiss="modal">
-                    <i class="bx bx-check d-block d-sm-none"></i>
-                    <span class="d-none d-sm-block">Save</span>
-                </button>
-            </div>
+            <form action="{{ route('prs.update', $item->id) }}" method="post" class="form">
+                @csrf
+                @method('PUT')
+                <div class="modal-body">
+
+                    <div class="row">
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="edit-department-{{ $item->id }}">Charged to Department</label>
+                                <fieldset class="form-group">
+                                    <select class="form-select" id="edit-department-{{ $item->id }}" name="department_id" required>
+                                        <option value="" disabled>-- Select Department --</option>
+                                        @foreach ($departments as $department)
+                                            <option value="{{ $department->id }}" {{ $item->department_id == $department->id ? 'selected' : '' }}>{{ $department->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </fieldset>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="edit-date-needed-{{ $item->id }}">Date Needed</label>
+                                <input type="date" id="edit-date-needed-{{ $item->id }}" class="form-control" placeholder="Date Needed" name="date_needed" value="{{ $item->date_needed }}" required>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-floating">
+                                <textarea class="form-control" placeholder="Leave a comment here"
+                                    id="edit-remarks-{{ $item->id }}" name="remarks">{{ $item->remarks }}</textarea>
+                                <label for="edit-remarks-{{ $item->id }}">Remarks</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="divider">
+                        <div class="divider-text">PRS Items</div>
+                    </div>
+
+                    <livewire:prs-item :existing-items="$item->items" wire:key="prs-item-edit-{{ $item->id }}" />
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn icon icon-left btn-light-primary" data-bs-dismiss="modal">
+                        <i class="fa-thin fa-xmark"></i>
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn icon icon-left btn-primary ms-1">
+                        <i class="fa-thin fa-file-pen me-1"></i>
+                        Update
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

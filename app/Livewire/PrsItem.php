@@ -11,10 +11,30 @@ class PrsItem extends Component
 {
     public $prsItems = [];
 
-    public function mount()
+    public function mount($existingItems = [])
     {
-        // Seed the form with a single empty row
-        $this->addPrsItem();
+        // When editing, seed with existing PRS items; otherwise start with one empty row
+        if ($existingItems instanceof \Illuminate\Support\Collection) {
+            $existingItems = $existingItems->load('item');
+        }
+
+        if (!empty($existingItems)) {
+            foreach ($existingItems as $existing) {
+                $itemModel = $existing->item ?? null;
+
+                $this->prsItems[] = [
+                    'row_id'        => $existing->id ?? (string) Str::uuid(),
+                    'item_id'       => $existing->item_id ?? null,
+                    'item_code'     => $itemModel->code ?? '',
+                    'item_name'     => $itemModel->name ?? '',
+                    'stock_on_hand' => $itemModel->stock_on_hand ?? 0,
+                    'unit'          => $itemModel->unit ?? 'PCS',
+                    'quantity'      => $existing->quantity ?? 1,
+                ];
+            }
+        } else {
+            $this->addPrsItem();
+        }
     }
 
     public function addPrsItem()

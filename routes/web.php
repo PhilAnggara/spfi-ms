@@ -19,8 +19,9 @@ Route::middleware('auth')->group(function () {
     })->name('dashboard');
 
     Route::prefix('im')->group(function () {
-        Route::resource('prs', PrsController::class);
+        // Route::resource('prs', PrsController::class);
     });
+    Route::resource('prs', PrsController::class);
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
