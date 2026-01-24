@@ -18,10 +18,10 @@ class PrsController extends Controller
     public function index()
     {
         $items = Prs::all()->sortDesc();
-        $depatments = Department::all();
+        $departments = Department::all();
         return view('pages.prs', [
             'items' => $items,
-            'departments' => $depatments,
+            'departments' => $departments,
         ]);
     }
 

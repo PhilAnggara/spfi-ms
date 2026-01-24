@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules;
 
 class UserController extends Controller
 {
@@ -15,8 +18,10 @@ class UserController extends Controller
     {
         // $users = User::where('id', '!=', Auth::id())->get();
         $users = User::all();
+        $departments = Department::all();
         return view('pages.user', [
             'users' => $users,
+            'departments' => $departments,
         ]);
     }
 
@@ -33,7 +38,25 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'unique:users'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'department_id' => ['required', 'exists:departments,id'],
+            'role' => ['required'],
+        ]);
+
+        $user = User::create([
+            'name' => $request->name,
+            'username' => $request->username,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'department_id' => $request->department_id,
+            'role' => $request->role,
+        ]);
+
+        return redirect()->back()->with('success', 'New user has been created successfully.');
     }
 
     /**

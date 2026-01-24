@@ -18,7 +18,7 @@
                     <div class="card-body d-flex justify-content-center align-items-center">
                         <i class="fa-duotone fa-regular fa-user-circle-plus fa-5x text-primary"></i>
                     </div>
-                    <a href="#" data-bs-toggle="modal" data-bs-target="#tambah" class="stretched-link"></a>
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#create-modal" class="stretched-link"></a>
                 </div>
             </div>
             @foreach ($users as $user)
@@ -33,8 +33,8 @@
                             @endif
                         </div>
                         <div class="card-body">
-                            <h5 class="card-title">{{ $user->name }}</h5>
-                            <small class="text-muted">({{ $user->username }})</small>
+                            <h5 class="card-title mb-0">{{ $user->name }}</h5>
+                            <small class="text-muted">{{ $user->username }}</small>
                             <p class="card-text my-2"><i class="fa-light fa-envelope"></i> {{ $user->email }}</p>
                             <p class="card-text my-2">
                                 <i class="fa-light fa-building-user"></i>
@@ -47,6 +47,9 @@
                             @endif
                         </div>
                         <div class="card-footer text-body-secondary py-1">
+                            <button class="btn icon icon-left">
+                                <i class="fal fa-user-pen"></i> Edit {{ auth()->user()->id == $user->id ? 'Profile' : 'User' }}
+                            </button>
                             @if (auth()->check() && auth()->user()->id !== $user->id)
                                 <button class="btn icon icon-left" onclick="hapusData({{ $user->id }}, 'Delete User', 'Are you sure you want to delete {{ $user->name }}?')">
                                     <i class="fal fa-trash-alt"></i> Delete User
@@ -63,6 +66,7 @@
         </div>
     </section>
 </div>
+@include('includes.modals.user-modal')
 @endsection
 
 @push('prepend-style')
@@ -70,4 +74,12 @@
 @push('addon-style')
 @endpush
 @push('addon-script')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        @if ($errors->any())
+            const modal = new bootstrap.Modal(document.getElementById('create-modal'));
+            modal.show();
+        @endif
+    });
+</script>
 @endpush
