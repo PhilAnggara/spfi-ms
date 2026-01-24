@@ -15,20 +15,44 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         User::create([
-            'name' => 'Phil Anggara',
+            'name' => 'Phil Bawole',
             'username' => 'philanggara',
-            'email' => 'philanggara@gmail.com',
-            'role' => 'Super Admin',
+            'email' => 'phil.bawole@ptsinarpurefoods.com',
+            'role' => 'Administrator',
             'password' => Hash::make('Admin123'),
             'department_id' => 1,
         ]);
         User::create([
-            'name' => 'Example Admin',
-            'username' => 'exampleadmin',
-            'email' => 'exampleadmin@gmail.com',
-            'role' => 'Admin',
+            'name' => 'Wasis Wiyono',
+            'username' => 'wasiswiyono',
+            'email' => 'wasis.wiyono@ptsinarpurefoods.com',
+            'role' => 'Administrator',
             'password' => bcrypt('Admin123'),
-            'department_id' => 2,
+            'department_id' => 1,
+        ]);
+        User::create([
+            'name' => 'Denny Tuhatelu',
+            'username' => 'dennytuhatelu',
+            'email' => 'denny.tuhatelu@ptsinarpurefoods.com',
+            'role' => 'Purchasing Manager',
+            'password' => bcrypt('Admin123'),
+            'department_id' => 4,
+        ]);
+        User::create([
+            'name' => 'Purchasing Staff 1',
+            'username' => 'purchasingstaff1',
+            'email' => 'purchasing.staff1@ptsinarpurefoods.com',
+            'role' => 'Purchasing Staff',
+            'password' => bcrypt('Admin123'),
+            'department_id' => 4,
+        ]);
+        User::create([
+            'name' => 'Purchasing Staff 2',
+            'username' => 'purchasingstaff2',
+            'email' => 'purchasing.staff2@ptsinarpurefoods.com',
+            'role' => 'Purchasing Staff',
+            'password' => bcrypt('Admin123'),
+            'department_id' => 4,
         ]);
     }
 }

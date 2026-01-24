@@ -150,12 +150,12 @@
                             </a>
                             <ul class="submenu {{ Request::is('master/user') ? 'active' : '' }}">
                                 <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
-                                    <a href="{{ route('dashboard') }}" class="submenu-link">User</a>
+                                    <a href="{{ route('user.index') }}" class="submenu-link">User</a>
                                 </li>
-                                <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
+                                <li class="submenu-item {{ Request::is('master/prs-item') ? 'active' : '' }}">
                                     <a href="{{ route('dashboard') }}" class="submenu-link">PRS Items</a>
                                 </li>
-                                <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
+                                <li class="submenu-item {{ Request::is('master/department') ? 'active' : '' }}">
                                     <a href="{{ route('dashboard') }}" class="submenu-link">Department</a>
                                 </li>
                             </ul>

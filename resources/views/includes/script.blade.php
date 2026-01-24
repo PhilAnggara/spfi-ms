@@ -12,20 +12,27 @@
 
     @if (session('success'))
     <script>
-        const Toast = Swal.mixin({
-            toast: true,
-            position: "top",
-            showConfirmButton: false,
-            timer: 5000,
-            timerProgressBar: true,
-            didOpen: (toast) => {
-                toast.onmouseenter = Swal.stopTimer;
-                toast.onmouseleave = Swal.resumeTimer;
-            }
-        });
-        Toast.fire({
+        // const Toast = Swal.mixin({
+        //     toast: true,
+        //     position: "top",
+        //     showConfirmButton: false,
+        //     timer: 5000,
+        //     timerProgressBar: true,
+        //     didOpen: (toast) => {
+        //         toast.onmouseenter = Swal.stopTimer;
+        //         toast.onmouseleave = Swal.resumeTimer;
+        //     }
+        // });
+        // Toast.fire({
+        //     icon: "success",
+        //     title: "{{ session('success') }}"
+        // });
+        Swal.fire({
+            // title: "Success!",
+            // text: "{{ session('success') }}",
+            title: "{{ session('success') }}",
             icon: "success",
-            title: "{{ session('success') }}"
+            timer: 5000,
         });
     </script>
     @endif

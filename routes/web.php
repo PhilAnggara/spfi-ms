@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/', function () {
@@ -18,8 +19,8 @@ Route::middleware('auth')->group(function () {
         return view('pages.dashboard');
     })->name('dashboard');
 
-    Route::prefix('im')->group(function () {
-        // Route::resource('prs', PrsController::class);
+    Route::prefix('master')->group(function () {
+        Route::resource('user', UserController::class);
     });
     Route::resource('prs', PrsController::class);
     Route::post('prs/export', [PrsController::class, 'export'])->name('prs.export');

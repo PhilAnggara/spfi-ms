@@ -2,10 +2,33 @@
     height: 28px;
 }
 
+.card-add {
+    transition: all 0.2s !important;
+    &:hover {
+        background-color: #cfdbff;
+        transform: translateY(-2px) scale(1.03) !important;
+        transition: all 0.2s !important;
+    }
+}
+
+.hover-shadow {
+    &:hover {
+        box-shadow: 0 .5rem .70rem rgba(0, 0, 0, 0.25) !important;
+        /* transition: all 0.3s ease-in-out; */
+    }
+    & img {
+        transition: all 0.2s;
+    }
+    &:hover img {
+        transform: scale(1.1);
+        transition: all 0.2s;
+    }
+}
+
 
 /* auth */
 #auth #auth-right {
-    background: url(../images/auth-img.png), linear-gradient(90deg, #cfdbff, #edf2ff);
+    background: url(../images/auth-img.png), linear-gradient(90deg, #, #edf2ff);
     background-position: center;
     background-repeat: no-repeat;
     background-size: contain;
