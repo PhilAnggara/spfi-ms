@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('master')->group(function () {
         Route::resource('user', UserController::class);
     });
+    Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
     Route::resource('prs', PrsController::class);
     Route::post('prs/export', [PrsController::class, 'export'])->name('prs.export');
 

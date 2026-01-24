@@ -118,6 +118,26 @@ class UserController extends Controller
     }
 
     /**
+     * Update the authenticated user's password.
+     */
+    public function changePassword(Request $request)
+    {
+        // Flag so the correct modal opens and errors stay scoped
+        $request->session()->flash('change_password', true);
+
+        $request->validate([
+            'current_password' => ['required', 'current_password'],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        ]);
+
+        $user = $request->user();
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        return back()->with('success', 'Password updated successfully.');
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(string $id)
