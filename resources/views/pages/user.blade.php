@@ -47,7 +47,7 @@
                             @endif
                         </div>
                         <div class="card-footer text-body-secondary py-1">
-                            <button class="btn icon icon-left">
+                            <button class="btn icon icon-left" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $user->id }}">
                                 <i class="fal fa-user-pen"></i> Edit {{ auth()->user()->id == $user->id ? 'Profile' : 'User' }}
                             </button>
                             @if (auth()->check() && auth()->user()->id !== $user->id)
@@ -77,8 +77,15 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         @if ($errors->any())
-            const modal = new bootstrap.Modal(document.getElementById('create-modal'));
-            modal.show();
+            @if (session('editing_user_id'))
+                // Show edit modal if we were editing a user
+                const editModal = new bootstrap.Modal(document.getElementById('edit-modal-{{ session("editing_user_id") }}'));
+                editModal.show();
+            @else
+                // Show create modal if we were creating a user
+                const createModal = new bootstrap.Modal(document.getElementById('create-modal'));
+                createModal.show();
+            @endif
         @endif
     });
 </script>

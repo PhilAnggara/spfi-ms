@@ -80,7 +80,41 @@ class UserController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $user = User::findOrFail($id);
+
+        // Store editing user id in session BEFORE validation for error handling
+        $request->session()->flash('editing_user_id', $id);
+
+        $rules = [
+            'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'unique:users,username,'.$id],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,'.$id],
+            'department_id' => ['required', 'exists:departments,id'],
+            'role' => ['required'],
+        ];
+
+        // Add password validation only if password field is filled
+        if ($request->filled('password')) {
+            $rules['password'] = ['required', 'confirmed', Rules\Password::defaults()];
+        }
+
+        $request->validate($rules);
+
+        // Update user data
+        $user->name = $request->name;
+        $user->username = $request->username;
+        $user->email = $request->email;
+        $user->department_id = $request->department_id;
+        $user->role = $request->role;
+
+        // Update password only if provided
+        if ($request->filled('password')) {
+            $user->password = Hash::make($request->password);
+        }
+
+        $user->save();
+
+        return redirect()->back()->with('success', "User {$user->name} has been updated successfully.");
     }
 
     /**
