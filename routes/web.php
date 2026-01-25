@@ -19,8 +19,8 @@ Route::middleware('auth')->group(function () {
         return view('pages.dashboard');
     })->name('dashboard');
 
-    Route::prefix('master')->group(function () {
-        Route::resource('user', UserController::class);
+    Route::middleware('role:Administrator|Purchasing Manager')->prefix('master')->group(function () {
+        Route::resource('user', UserController::class)->middleware('role:Administrator');
     });
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
     Route::resource('prs', PrsController::class);

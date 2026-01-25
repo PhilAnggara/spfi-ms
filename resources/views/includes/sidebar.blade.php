@@ -149,9 +149,11 @@
                                 <span>Master</span>
                             </a>
                             <ul class="submenu {{ Request::is('master/user') ? 'active' : '' }}">
-                                <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
-                                    <a href="{{ route('user.index') }}" class="submenu-link">User</a>
-                                </li>
+                                @role('Administrator')
+                                    <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
+                                        <a href="{{ route('user.index') }}" class="submenu-link">User</a>
+                                    </li>
+                                @endrole
                                 <li class="submenu-item {{ Request::is('master/prs-item') ? 'active' : '' }}">
                                     <a href="{{ route('dashboard') }}" class="submenu-link">PRS Items</a>
                                 </li>

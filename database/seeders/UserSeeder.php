@@ -21,7 +21,10 @@ class UserSeeder extends Seeder
             'role' => 'Administrator',
             'password' => Hash::make('Admin123'),
             'department_id' => 1,
-        ]);
+        ])->assignRole(
+            'Administrator',
+        );
+
         User::create([
             'name' => 'Wasis Wiyono',
             'username' => 'wasiswiyono',
@@ -29,7 +32,8 @@ class UserSeeder extends Seeder
             'role' => 'Administrator',
             'password' => bcrypt('Admin123'),
             'department_id' => 1,
-        ]);
+        ])->assignRole('Administrator');
+
         User::create([
             'name' => 'Samuel Calamba',
             'username' => 'samcalamba',
@@ -37,7 +41,8 @@ class UserSeeder extends Seeder
             'role' => 'General Manager',
             'password' => bcrypt('Admin123'),
             'department_id' => 2,
-        ]);
+        ])->assignRole('General Manager');
+
         User::create([
             'name' => 'Denny Tuhatelu',
             'username' => 'dennytuhatelu',
@@ -45,7 +50,8 @@ class UserSeeder extends Seeder
             'role' => 'Purchasing Manager',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
-        ]);
+        ])->assignRole('Purchasing Manager');
+
         User::create([
             'name' => 'Purchasing Staff 1',
             'username' => 'purchasingstaff1',
@@ -53,7 +59,8 @@ class UserSeeder extends Seeder
             'role' => 'Purchasing Staff',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
-        ]);
+        ])->assignRole('Purchasing Staff');
+
         User::create([
             'name' => 'Purchasing Staff 2',
             'username' => 'purchasingstaff2',
@@ -61,6 +68,6 @@ class UserSeeder extends Seeder
             'role' => 'Purchasing Staff',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
-        ]);
+        ])->assignRole('Purchasing Staff');
     }
 }
