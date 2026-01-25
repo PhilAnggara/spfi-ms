@@ -18,7 +18,7 @@ class UserSeeder extends Seeder
             'name' => 'Phil Bawole',
             'username' => 'philanggara',
             'email' => 'phil.bawole@ptsinarpurefoods.com',
-            'role' => 'Administrator',
+            'role' => 'Programmer',
             'password' => Hash::make('Admin123'),
             'department_id' => 1,
         ])->assignRole(
@@ -29,7 +29,7 @@ class UserSeeder extends Seeder
             'name' => 'Wasis Wiyono',
             'username' => 'wasiswiyono',
             'email' => 'wasis.wiyono@ptsinarpurefoods.com',
-            'role' => 'Administrator',
+            'role' => 'Manager',
             'password' => bcrypt('Admin123'),
             'department_id' => 1,
         ])->assignRole('Administrator');
@@ -47,7 +47,7 @@ class UserSeeder extends Seeder
             'name' => 'Denny Tuhatelu',
             'username' => 'dennytuhatelu',
             'email' => 'denny.tuhatelu@ptsinarpurefoods.com',
-            'role' => 'Purchasing Manager',
+            'role' => 'Manager',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
         ])->assignRole('Purchasing Manager');
@@ -56,7 +56,7 @@ class UserSeeder extends Seeder
             'name' => 'Purchasing Staff 1',
             'username' => 'purchasingstaff1',
             'email' => 'purchasing.staff1@ptsinarpurefoods.com',
-            'role' => 'Purchasing Staff',
+            'role' => 'Staff',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
         ])->assignRole('Purchasing Staff');
@@ -65,7 +65,7 @@ class UserSeeder extends Seeder
             'name' => 'Purchasing Staff 2',
             'username' => 'purchasingstaff2',
             'email' => 'purchasing.staff2@ptsinarpurefoods.com',
-            'role' => 'Purchasing Staff',
+            'role' => 'Staff',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
         ])->assignRole('Purchasing Staff');

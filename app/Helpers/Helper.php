@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 if (! function_exists('toast')) {
@@ -60,5 +61,19 @@ if (! function_exists('get_gm_name')) {
     function get_gm_name()
     {
         return User::where('role', 'General Manager')->first()->name;
+    }
+}
+
+if (! function_exists('get_job_title')) {
+    function get_job_title($user)
+    {
+
+        $dept = $user->department->name;
+        // jika nama department lebih dari 12 karakter maka singkat $dept menggunakan code
+        if (strlen($dept) > 12) {
+            $dept = $user->department->code;
+        }
+
+        return $dept . ' ' . $user->role;
     }
 }

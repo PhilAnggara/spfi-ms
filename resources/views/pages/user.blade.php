@@ -33,15 +33,26 @@
                             @endif
                         </div>
                         <div class="card-body">
-                            <h5 class="card-title mb-0">{{ $user->name }}</h5>
+                            <h5 class="card-title mb-0">
+                                {{ $user->name }}
+                                @if ($user->hasRole('Administrator'))
+                                    <span data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Administrator">
+                                        <i class="fa-light fa-folder-gear fa-sm" style="color: #001861;"></i>
+                                    </span>
+                                @endif
+                            </h5>
                             <small class="text-muted">{{ $user->username }}</small>
                             <p class="card-text my-2"><i class="fa-light fa-envelope"></i> {{ $user->email }}</p>
                             <p class="card-text my-2">
                                 <i class="fa-light fa-building-user"></i>
                                 {{ $user->department->name }} ({{ $user->department->code }})
                             </p>
-                            @if ($user->role === 'Administrator')
+                            @if ($user->role === 'General Manager')
+                                <span class="badge bg-primary">{{ $user->role }}</span>
+                            @elseif ($user->role === 'Manager')
                                 <span class="badge bg-light-primary">{{ $user->role }}</span>
+                            @elseif ($user->role === 'Programmer')
+                                <span class="badge bg-light-info">{{ $user->role }}</span>
                             @else
                                 <span class="badge bg-light-secondary">{{ $user->role }}</span>
                             @endif

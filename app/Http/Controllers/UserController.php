@@ -90,7 +90,7 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:255', 'unique:users,username,'.$id],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,'.$id],
             'department_id' => ['required', 'exists:departments,id'],
-            'role' => ['required'],
+            // 'role' => ['required'],
         ];
 
         // Add password validation only if password field is filled
@@ -105,11 +105,15 @@ class UserController extends Controller
         $user->username = $request->username;
         $user->email = $request->email;
         $user->department_id = $request->department_id;
-        $user->role = $request->role;
+        // $user->role = $request->role;
 
         // Update password only if provided
         if ($request->filled('password')) {
             $user->password = Hash::make($request->password);
+        }
+
+        if ($request->filled('role')) {
+            $user->role = $request->role;
         }
 
         $user->save();

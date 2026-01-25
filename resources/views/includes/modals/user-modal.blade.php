@@ -83,9 +83,9 @@
                             <div class="col-md-8 form-group">
                                 <select class="choices form-select {{ ($errors->any() && !session('editing_user_id')) ? ($errors->has('role') ? 'is-invalid' : '') : '' }}" id="role" name="role" required>
                                     <option value="" {{ ($errors->any() && !session('editing_user_id') && old('role')) ? '' : 'selected' }} disabled>-- Select Role --</option>
-                                    <option value="Administrator" {{ ($errors->any() && !session('editing_user_id') && old('role') == 'Administrator') ? 'selected' : '' }}>Administrator</option>
-                                    <option value="Purchasing Manager" {{ ($errors->any() && !session('editing_user_id') && old('role') == 'Purchasing Manager') ? 'selected' : '' }}>Purchasing Manager</option>
-                                    <option value="Purchasing Staff" {{ ($errors->any() && !session('editing_user_id') && old('role') == 'Purchasing Staff') ? 'selected' : '' }}>Purchasing Staff</option>
+                                    <option value="Manager" {{ ($errors->any() && !session('editing_user_id') && old('role') == 'Manager') ? 'selected' : '' }}>Manager</option>
+                                    <option value="Supervisor" {{ ($errors->any() && !session('editing_user_id') && old('role') == 'Supervisor') ? 'selected' : '' }}>Supervisor</option>
+                                    <option value="Staff" {{ ($errors->any() && !session('editing_user_id') && old('role') == 'Staff') ? 'selected' : '' }}>Staff</option>
                                 </select>
                                 @if ($errors->any() && !session('editing_user_id'))
                                     @error('role')
@@ -223,24 +223,28 @@
                                 @endif
                             </div>
 
-                            <div class="col-md-4">
-                                <label for="edit-role-{{ $user->id }}">Role</label>
-                            </div>
-                            <div class="col-md-8 form-group">
-                                <select class="choices form-select {{ ($errors->any() && session('editing_user_id') == $user->id) ? ($errors->has('role') ? 'is-invalid' : '') : '' }}" id="edit-role-{{ $user->id }}" name="role" required>
-                                    <option value="" disabled>-- Select Role --</option>
-                                    <option value="Administrator" {{ (($errors->any() && session('editing_user_id') == $user->id) ? old('role') : $user->role) == 'Administrator' ? 'selected' : '' }}>Administrator</option>
-                                    <option value="Purchasing Manager" {{ (($errors->any() && session('editing_user_id') == $user->id) ? old('role') : $user->role) == 'Purchasing Manager' ? 'selected' : '' }}>Purchasing Manager</option>
-                                    <option value="Purchasing Staff" {{ (($errors->any() && session('editing_user_id') == $user->id) ? old('role') : $user->role) == 'Purchasing Staff' ? 'selected' : '' }}>Purchasing Staff</option>
-                                </select>
-                                @if ($errors->any() && session('editing_user_id') == $user->id)
-                                    @error('role')
-                                        <div class="invalid-feedback">
-                                            {{ $message }}
-                                        </div>
-                                    @enderror
-                                @endif
-                            </div>
+                            @if ($user->role !== 'Programmer' && $user->role !== 'General Manager')
+
+                                <div class="col-md-4">
+                                    <label for="edit-role-{{ $user->id }}">Role</label>
+                                </div>
+                                <div class="col-md-8 form-group">
+                                    <select class="choices form-select {{ ($errors->any() && session('editing_user_id') == $user->id) ? ($errors->has('role') ? 'is-invalid' : '') : '' }}" id="edit-role-{{ $user->id }}" name="role" required>
+                                        <option value="" disabled>-- Select Role --</option>
+                                        <option value="Manager" {{ (($errors->any() && session('editing_user_id') == $user->id) ? old('role') : $user->role) == 'Manager' ? 'selected' : '' }}>Manager</option>
+                                        <option value="Supervisor" {{ (($errors->any() && session('editing_user_id') == $user->id) ? old('role') : $user->role) == 'Supervisor' ? 'selected' : '' }}>Supervisor</option>
+                                        <option value="Staff" {{ (($errors->any() && session('editing_user_id') == $user->id) ? old('role') : $user->role) == 'Staff' ? 'selected' : '' }}>Staff</option>
+                                    </select>
+                                    @if ($errors->any() && session('editing_user_id') == $user->id)
+                                        @error('role')
+                                            <div class="invalid-feedback">
+                                                {{ $message }}
+                                            </div>
+                                        @enderror
+                                    @endif
+                                </div>
+
+                            @endif
 
                             <div class="col-md-4">
                                 <label for="edit-password-{{ $user->id }}">Password</label>
