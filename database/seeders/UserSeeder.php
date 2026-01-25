@@ -31,12 +31,20 @@ class UserSeeder extends Seeder
             'department_id' => 1,
         ]);
         User::create([
+            'name' => 'Samuel Calamba',
+            'username' => 'samcalamba',
+            'email' => 'sam.calamba@ptsinarpurefoods.com',
+            'role' => 'General Manager',
+            'password' => bcrypt('Admin123'),
+            'department_id' => 2,
+        ]);
+        User::create([
             'name' => 'Denny Tuhatelu',
             'username' => 'dennytuhatelu',
             'email' => 'denny.tuhatelu@ptsinarpurefoods.com',
             'role' => 'Purchasing Manager',
             'password' => bcrypt('Admin123'),
-            'department_id' => 4,
+            'department_id' => 5,
         ]);
         User::create([
             'name' => 'Purchasing Staff 1',
@@ -44,7 +52,7 @@ class UserSeeder extends Seeder
             'email' => 'purchasing.staff1@ptsinarpurefoods.com',
             'role' => 'Purchasing Staff',
             'password' => bcrypt('Admin123'),
-            'department_id' => 4,
+            'department_id' => 5,
         ]);
         User::create([
             'name' => 'Purchasing Staff 2',
@@ -52,7 +60,7 @@ class UserSeeder extends Seeder
             'email' => 'purchasing.staff2@ptsinarpurefoods.com',
             'role' => 'Purchasing Staff',
             'password' => bcrypt('Admin123'),
-            'department_id' => 4,
+            'department_id' => 5,
         ]);
     }
 }

@@ -128,6 +128,34 @@ class PrsController extends Controller
     }
 
     /**
+     * Print PRS document untuk diajukan ke GM untuk approval (tanda tangan)
+     * Menghasilkan PDF yang siap dicetak dan ditandatangani
+     */
+    public function print(string $id)
+    {
+        // Ambil data PRS beserta relasi yang diperlukan
+        $prs = Prs::with(['user', 'department', 'items.item'])->findOrFail($id);
+
+        // Data yang dikirim ke view PDF
+        $data = [
+            'prs' => $prs,
+        ];
+
+        // Generate nama file dengan format: PRS-NOMOR-TANGGAL.pdf
+        // Contoh: PRS-PRD-250125-001-2025-01-25.pdf
+        $filename = sprintf(
+            'PRS-%s-%s.pdf',
+            $prs->prs_number,
+            now()->format('Y-m-d')
+        );
+
+        // Generate dan stream PDF untuk dicetak
+        return Pdf::loadView('pdf.prs-for-approval', $data)
+            ->setPaper('a4', 'portrait')
+            ->stream($filename);
+    }
+
+    /**
      * Export PRS list to PDF by month range.
      */
     public function export(Request $request)

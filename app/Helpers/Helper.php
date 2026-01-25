@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -52,5 +53,12 @@ if (! function_exists('human_time')) {
     function human_time($date)
     {
         return Carbon::parse($date)->diffForHumans();
+    }
+}
+
+if (! function_exists('get_gm_name')) {
+    function get_gm_name()
+    {
+        return User::where('role', 'General Manager')->first()->name;
     }
 }

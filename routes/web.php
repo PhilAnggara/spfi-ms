@@ -25,6 +25,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
     Route::resource('prs', PrsController::class);
     Route::post('prs/export', [PrsController::class, 'export'])->name('prs.export');
+    Route::get('prs/{prs}/print', [PrsController::class, 'print'])->name('prs.print');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

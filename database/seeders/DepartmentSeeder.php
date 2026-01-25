@@ -36,6 +36,12 @@ class DepartmentSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
+                'name' => 'Management',
+                'code' => 'MGT',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
                 'name' => 'Human Resource',
                 'code' => 'HR',
                 'created_at' => now(),
