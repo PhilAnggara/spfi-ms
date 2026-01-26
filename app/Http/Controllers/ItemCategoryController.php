@@ -13,7 +13,7 @@ class ItemCategoryController extends Controller
      */
     public function index()
     {
-        $categories = ItemCategory::all();
+        $categories = ItemCategory::all()->sortDesc();
         return view('pages.category', [
             'categories' => $categories,
         ]);

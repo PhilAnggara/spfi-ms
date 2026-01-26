@@ -70,15 +70,12 @@
                                         <a href="{{ route('product-category.index') }}" class="submenu-link">Product Category</a>
                                     </li>
                                     <li class="submenu-item {{ Request::is('master/unit-of-measurement') ? 'active' : '' }}">
-                                        <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">Unit of Measurement</a>
+                                        <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">UoM</a>
+                                    </li>
+                                    <li class="submenu-item {{ Request::is('master/supplier') ? 'active' : '' }}">
+                                        <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">Supplier</a>
                                     </li>
                                 @endrole
-                                <li class="submenu-item {{ Request::is('master/prs-item') ? 'active' : '' }}">
-                                    <a href="{{ route('dashboard') }}" class="submenu-link">PRS Items</a>
-                                </li>
-                                <li class="submenu-item {{ Request::is('master/department') ? 'active' : '' }}">
-                                    <a href="{{ route('dashboard') }}" class="submenu-link">Department</a>
-                                </li>
                             </ul>
                         </li>
 

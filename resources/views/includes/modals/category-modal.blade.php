@@ -1,6 +1,6 @@
 <!-- Create Category Modal -->
 <div class="modal fade text-left modal-borderless" id="create-modal" tabindex="-1" role="dialog" aria-labelledby="createCategoryLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createCategoryLabel">Add Category</h5>
@@ -58,7 +58,7 @@
 <!-- Edit Category Modals -->
 @foreach ($categories as $category)
 <div class="modal fade text-left modal-borderless" id="edit-modal-{{ $category->id }}" tabindex="-1" role="dialog" aria-labelledby="editCategoryLabel-{{ $category->id }}" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="editCategoryLabel-{{ $category->id }}">Edit Category - {{ $category->name }}</h5>

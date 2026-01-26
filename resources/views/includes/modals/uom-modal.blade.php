@@ -1,6 +1,6 @@
 <!-- Create Unit of Measurement Modal -->
 <div class="modal fade text-left modal-borderless" id="create-modal" tabindex="-1" role="dialog" aria-labelledby="createUomLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createUomLabel">Create Unit of Measurement</h5>
@@ -70,7 +70,7 @@
 <!-- Edit Modals -->
 @foreach ($units as $unit)
 <div class="modal fade text-left modal-borderless" id="edit-modal-{{ $unit->id }}" tabindex="-1" role="dialog" aria-labelledby="edit-modal-label-{{ $unit->id }}" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="edit-modal-label-{{ $unit->id }}">Edit Unit of Measurement - {{ $unit->name }}</h5>

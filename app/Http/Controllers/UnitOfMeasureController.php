@@ -13,7 +13,7 @@ class UnitOfMeasureController extends Controller
      */
     public function index()
     {
-        $units = UnitOfMeasure::all();
+        $units = UnitOfMeasure::all()->sortDesc();
         return view('pages.uom', [
             'units' => $units,
         ]);

@@ -18,7 +18,7 @@
                                 <label for="code">Code</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <input type="text" id="code" name="code" placeholder="ABCDE" minlength="5" maxlength="5" pattern="[A-Za-z0-9]{5}"
+                                <input type="text" id="code" name="code" placeholder="ABCDE" minlength="7" maxlength="7" pattern="[A-Za-z0-9]{7}"
                                     class="form-control {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('code') ? 'is-invalid' : '') : '' }}"
                                     value="{{ ($errors->any() && !session('editing_product_id')) ? old('code') : '' }}" required>
                                 @if ($errors->any() && !session('editing_product_id'))
@@ -132,7 +132,7 @@
                                 <label for="code-{{ $item->id }}">Code</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <input type="text" id="code-{{ $item->id }}" name="code" placeholder="ABCDE" minlength="5" maxlength="5" pattern="[A-Za-z0-9]{5}"
+                                <input type="text" id="code-{{ $item->id }}" name="code" placeholder="ABCDE" minlength="7" maxlength="7" pattern="[A-Za-z0-9]{7}"
                                     class="form-control {{ ($errors->any() && session('editing_product_id') == $item->id) ? ($errors->has('code') ? 'is-invalid' : '') : '' }}"
                                     value="{{ ($errors->any() && session('editing_product_id') == $item->id) ? old('code') : $item->code }}" required>
                                 @if ($errors->any() && session('editing_product_id') == $item->id)

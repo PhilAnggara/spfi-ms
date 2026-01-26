@@ -20,7 +20,7 @@ class ProductController extends Controller
         $itemCategories = ItemCategory::query()->pluck('name');
         $itemUnits = UnitOfMeasure::query()->pluck('name');
         $types = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
-        $items = Item::all();
+        $items = Item::all()->sortDesc();
         return view('pages.product', [
             'items' => $items,
             'itemCategories' => $itemCategories,
@@ -48,7 +48,7 @@ class ProductController extends Controller
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
         $request->validate([
-            'code' => ['required', 'string', 'alpha_num', 'size:5', Rule::unique('items', 'code')],
+            'code' => ['required', 'string', 'alpha_num', 'size:7', Rule::unique('items', 'code')],
             'name' => ['required', 'string'],
             'unit' => ['required', 'string', Rule::in($allowedUnits)],
             'category' => ['required', 'string', Rule::in($allowedCategories)],
@@ -98,7 +98,7 @@ class ProductController extends Controller
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
         $request->validate([
-            'code' => ['required', 'string', 'alpha_num', 'size:5', Rule::unique('items', 'code')->ignore($id)],
+            'code' => ['required', 'string', 'alpha_num', 'size:7', Rule::unique('items', 'code')->ignore($id)],
             'name' => ['required', 'string'],
             'unit' => ['required', 'string', Rule::in($allowedUnits)],
             'category' => ['required', 'string', Rule::in($allowedCategories)],
