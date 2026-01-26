@@ -66,6 +66,12 @@
                                     <li class="submenu-item {{ Request::is('master/product') ? 'active' : '' }}">
                                         <a href="{{ route('product.index') }}" class="submenu-link">Product</a>
                                     </li>
+                                    <li class="submenu-item {{ Request::is('master/product-category') ? 'active' : '' }}">
+                                        <a href="{{ route('product-category.index') }}" class="submenu-link">Product Category</a>
+                                    </li>
+                                    <li class="submenu-item {{ Request::is('master/unit-of-measurement') ? 'active' : '' }}">
+                                        <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">Unit of Measurement</a>
+                                    </li>
                                 @endrole
                                 <li class="submenu-item {{ Request::is('master/prs-item') ? 'active' : '' }}">
                                     <a href="{{ route('dashboard') }}" class="submenu-link">PRS Items</a>

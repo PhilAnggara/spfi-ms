@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ItemCategoryController;
+use App\Http\Controllers\UnitOfMeasureController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
@@ -24,6 +26,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('auth')->prefix('master')->group(function () {
         Route::resource('user', UserController::class)->middleware('role:administrator');
         Route::resource('product', ProductController::class);
+        Route::resource('product-category', ItemCategoryController::class);
+        Route::resource('unit-of-measurement', UnitOfMeasureController::class);
     });
     Route::middleware('role:administrator|purchasing-manager')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');
