@@ -35,7 +35,7 @@
                         <div class="card-body">
                             <h5 class="card-title mb-0">
                                 {{ $user->name }}
-                                @if ($user->hasRole('Administrator'))
+                                @if ($user->hasRole('administrator'))
                                     <span data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Administrator">
                                         <i class="fa-light fa-folder-gear fa-sm" style="color: #001861;"></i>
                                     </span>

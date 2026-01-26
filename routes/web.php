@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -19,8 +20,14 @@ Route::middleware('auth')->group(function () {
         return view('pages.dashboard');
     })->name('dashboard');
 
-    Route::middleware('role:Administrator|Purchasing Manager')->prefix('master')->group(function () {
-        Route::resource('user', UserController::class)->middleware('role:Administrator');
+    Route::middleware('auth')->prefix('master')->group(function () {
+        Route::resource('user', UserController::class)->middleware('role:administrator');
+    });
+    Route::middleware('role:administrator|purchasing-manager')->prefix('procurement')->group(function () {
+        Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');
+        Route::get('/approval/{prs}', [PrsApprovalController::class, 'show'])->name('prs.approval.show');
+        Route::post('/approval/{prs}/approve', [PrsApprovalController::class, 'approve'])->name('prs.approve');
+        Route::post('/approval/{prs}/reject', [PrsApprovalController::class, 'reject'])->name('prs.reject');
     });
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
     Route::resource('prs', PrsController::class);
