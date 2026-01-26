@@ -62,6 +62,11 @@
                                         <a href="{{ route('user.index') }}" class="submenu-link">User</a>
                                     </li>
                                 @endrole
+                                @role('administrator')
+                                    <li class="submenu-item {{ Request::is('master/product') ? 'active' : '' }}">
+                                        <a href="{{ route('product.index') }}" class="submenu-link">Product</a>
+                                    </li>
+                                @endrole
                                 <li class="submenu-item {{ Request::is('master/prs-item') ? 'active' : '' }}">
                                     <a href="{{ route('dashboard') }}" class="submenu-link">PRS Items</a>
                                 </li>

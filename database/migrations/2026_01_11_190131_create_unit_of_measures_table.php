@@ -11,15 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('items', function (Blueprint $table) {
+        Schema::create('unit_of_measures', function (Blueprint $table) {
             $table->id();
             $table->string('code')->unique();
-            $table->string('name');
-            $table->string('unit');
-            $table->string('category');
-            $table->string('type');
-            $table->integer('stock_on_hand')->default(0);
-            $table->boolean('is_active')->default(true);
+            $table->string('name')->index();
+            $table->text('remarks')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
@@ -30,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('items');
+        Schema::dropIfExists('unit_of_measures');
     }
 };

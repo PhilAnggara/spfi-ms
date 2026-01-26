@@ -38,9 +38,9 @@ class PrsSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'prs_number' => 'HR-010126-001',
-                'user_id' => 2,
-                'department_id' => 2,
+                'prs_number' => 'PUR-010126-001',
+                'user_id' => 5,
+                'department_id' => 5,
                 'prs_date' => Carbon::now(),
                 'date_needed' => Carbon::now()->addDays(2),
                 'remarks' => 'Penting',
