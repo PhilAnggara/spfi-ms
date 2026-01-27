@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ItemCategoryController;
+use App\Http\Controllers\MainController;
 use App\Http\Controllers\UnitOfMeasureController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
@@ -21,9 +23,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
 
-    Route::get('/', function () {
-        return view('pages.dashboard');
-    })->name('dashboard');
+    Route::get('/', [MainController::class, 'dashboard'])->name('dashboard');
 
     Route::middleware('role:administrator')->prefix('master')->group(function () {
         Route::resource('user', UserController::class);
@@ -31,6 +31,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('product-category', ItemCategoryController::class);
         Route::resource('unit-of-measurement', UnitOfMeasureController::class);
         Route::resource('supplier', SupplierController::class);
+        Route::resource('buyer', BuyerController::class);
         Route::resource('currency', CurrencyController::class);
     });
     Route::middleware('role:administrator|purchasing-manager')->prefix('procurement')->group(function () {

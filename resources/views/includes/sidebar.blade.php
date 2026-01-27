@@ -52,30 +52,46 @@
                         </li>
 
                         @role('administrator')
-                            <li class="sidebar-item {{ Request::is('master/*') ? 'active' : '' }} has-sub">
+                            <li class="sidebar-item {{ is_active_menu(['master/*']) }} has-sub">
                                 <a href="#" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-user-tie {{ Request::is('master/*') ? 'fa-fade' : '' }}"></i>
                                     <span>Master</span>
                                 </a>
-                                <ul class="submenu {{ Request::is('master/user') ? 'active' : '' }}">
-                                    <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
-                                        <a href="{{ route('user.index') }}" class="submenu-link">User</a>
+                                <ul class="submenu ">
+
+                                    <li class="submenu-item {{ is_active_menu(['master/user']) }} has-sub">
+                                        <a href="#" class="submenu-link">Management</a>
+                                        <ul class="submenu submenu-level-2 ">
+                                            <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
+                                                <a href="{{ route('user.index') }}" class="submenu-link">User</a>
+                                            </li>
+                                        </ul>
                                     </li>
-                                    <li class="submenu-item {{ Request::is('master/product') ? 'active' : '' }}">
-                                        <a href="{{ route('product.index') }}" class="submenu-link">Product</a>
+
+                                    <li class="submenu-item {{ is_active_menu(['master/product', 'master/product-category', 'master/unit-of-measurement', 'master/supplier', 'master/buyer', 'master/currency']) }} has-sub">
+                                        <a href="#" class="submenu-link">Inventory</a>
+                                        <ul class="submenu submenu-level-2 ">
+                                            <li class="submenu-item {{ Request::is('master/product') ? 'active' : '' }}">
+                                                <a href="{{ route('product.index') }}" class="submenu-link">Product</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/product-category') ? 'active' : '' }}">
+                                                <a href="{{ route('product-category.index') }}" class="submenu-link">Product Category</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/unit-of-measurement') ? 'active' : '' }}">
+                                                <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">UoM</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/supplier') ? 'active' : '' }}">
+                                                <a href="{{ route('supplier.index') }}" class="submenu-link">Supplier</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/buyer') ? 'active' : '' }}">
+                                                <a href="{{ route('buyer.index') }}" class="submenu-link">Buyer</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/currency') ? 'active' : '' }}">
+                                                <a href="{{ route('currency.index') }}" class="submenu-link">Currency</a>
+                                            </li>
+                                        </ul>
                                     </li>
-                                    <li class="submenu-item {{ Request::is('master/product-category') ? 'active' : '' }}">
-                                        <a href="{{ route('product-category.index') }}" class="submenu-link">Product Category</a>
-                                    </li>
-                                    <li class="submenu-item {{ Request::is('master/unit-of-measurement') ? 'active' : '' }}">
-                                        <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">UoM</a>
-                                    </li>
-                                    <li class="submenu-item {{ Request::is('master/supplier') ? 'active' : '' }}">
-                                        <a href="{{ route('supplier.index') }}" class="submenu-link">Supplier</a>
-                                    </li>
-                                    <li class="submenu-item {{ Request::is('master/currency') ? 'active' : '' }}">
-                                        <a href="{{ route('currency.index') }}" class="submenu-link">Currency</a>
-                                    </li>
+
                                 </ul>
                             </li>
                         @endrole

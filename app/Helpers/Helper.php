@@ -77,3 +77,16 @@ if (! function_exists('get_job_title')) {
         return $dept . ' ' . $user->role;
     }
 }
+
+// fungsi untuk menentukan menu aktif berdasarkan route saat ini
+if (! function_exists('is_active_menu')) {
+    function is_active_menu(array $routes): string
+    {
+        foreach ($routes as $route) {
+            if (request()->is($route)) {
+                return 'active';
+            }
+        }
+        return '';
+    }
+}

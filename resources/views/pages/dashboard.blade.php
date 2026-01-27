@@ -86,7 +86,7 @@
             </div>
             <div class="row">
                 <div class="col-12">
-                    <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="700">
+                    <div class="card shadow-sm" data-aos="zoom-in" data-aos-delay="500">
                         <div class="card-header">
                             <h4>Monthly Production</h4>
                         </div>
@@ -98,7 +98,7 @@
             </div>
         </div>
         <div class="col-12 col-lg-3">
-            <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="500">
+            <div class="card shadow-sm" data-aos="fade-left" data-aos-delay="700">
                 <div class="card-header">
                     <h4>Shipments this Month</h4>
                 </div>
