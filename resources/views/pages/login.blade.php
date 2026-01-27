@@ -64,5 +64,16 @@
 
     </div>
 
+    <script>
+        function setFontSize(percent) {
+            document.documentElement.style.fontSize = percent + '%';
+        }
+        if (window.innerWidth <= 1600) {
+            setFontSize(90);
+        }
+        if (window.innerWidth <= 1440) {
+            setFontSize(85);
+        }
+    </script>
 </body>
 </html>

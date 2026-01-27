@@ -1,3 +1,15 @@
+function setFontSize(percent) {
+  document.documentElement.style.fontSize = percent + '%';
+}
+// console.log('Window width:', window.innerWidth);
+// jika resolusi monitor kurang dari sama dengan 1600px, set font size ke 90% dan jika kurang dari sama dengan 1440px set font size ke 85%
+if (window.innerWidth <= 1600) {
+    setFontSize(90);
+}
+if (window.innerWidth <= 1440) {
+    setFontSize(85);
+}
+
 AOS.init({
   once: true,
   delay: 50,

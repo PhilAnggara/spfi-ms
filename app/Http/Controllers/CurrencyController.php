@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Currency;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class CurrencyController extends Controller
 {
@@ -13,7 +15,10 @@ class CurrencyController extends Controller
      */
     public function index()
     {
-        //
+        $currencies = Currency::all()->sortDesc();
+        return view('pages.currency', [
+            'currencies' => $currencies,
+        ]);
     }
 
     /**
@@ -29,7 +34,20 @@ class CurrencyController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'code' => ['required', 'string', Rule::unique('currencies', 'code')],
+            'name' => ['required', 'string'],
+            'symbol' => ['nullable', 'string'],
+        ]);
+
+        Currency::create([
+            'code' => $request->code,
+            'name' => $request->name,
+            'symbol' => $request->symbol,
+            'created_by' => Auth::id(),
+        ]);
+
+        return redirect()->back()->with('success', 'Currency has been created successfully.');
     }
 
     /**
@@ -51,9 +69,27 @@ class CurrencyController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Currency $currency)
+    public function update(Request $request, string $id)
     {
-        //
+        $currency = Currency::findOrFail($id);
+
+        // Flag for error-handling to reopen the correct modal
+        $request->session()->flash('editing_currency_id', $id);
+
+        $request->validate([
+            'code' => ['required', 'string', Rule::unique('currencies', 'code')->ignore($id)],
+            'name' => ['required', 'string'],
+            'symbol' => ['nullable', 'string'],
+        ]);
+
+        $currency->update([
+            'code' => $request->code,
+            'name' => $request->name,
+            'symbol' => $request->symbol,
+            'updated_by' => Auth::id(),
+        ]);
+
+        return redirect()->back()->with('success', 'Currency has been updated successfully.');
     }
 
     /**
@@ -61,6 +97,9 @@ class CurrencyController extends Controller
      */
     public function destroy(Currency $currency)
     {
-        //
+        $name = $currency->name;
+        $currency->delete();
+
+        return redirect()->back()->with('success', 'Currency ' . $name . ' has been deleted successfully.');
     }
 }
