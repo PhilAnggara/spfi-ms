@@ -34,10 +34,7 @@
                         @foreach ($units as $uom)
                             <tr>
                                 <td>
-                                    <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $uom->code }}')">
-                                        <i class="fa-solid fa-regular fa-clipboard"></i>
-                                        {{ $uom->code }}
-                                    </button>
+                                    <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $uom->code }}')">{{ $uom->code }}</span>
                                 </td>
                                 <td>{{ $uom->name }}</td>
                                 <td>{{ $uom->remarks ?? '-' }}</td>

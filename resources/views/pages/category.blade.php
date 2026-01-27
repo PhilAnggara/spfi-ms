@@ -33,10 +33,7 @@
                         @foreach ($categories as $category)
                             <tr>
                                 <td>
-                                    <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $category->code }}')">
-                                        <i class="fa-solid fa-regular fa-clipboard"></i>
-                                        {{ $category->code }}
-                                    </button>
+                                    <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $category->code }}')">{{ $category->code }}</span>
                                 </td>
                                 <td class="text-start">{{ $category->name }}</td>
                                 <td>

@@ -51,18 +51,16 @@
                             </a>
                         </li>
 
-                        <li class="sidebar-item {{ Request::is('master/*') ? 'active' : '' }} has-sub">
-                            <a href="#" class='sidebar-link'>
-                                <i class="fa-duotone fa-solid fa-user-tie {{ Request::is('master/*') ? 'fa-fade' : '' }}"></i>
-                                <span>Master</span>
-                            </a>
-                            <ul class="submenu {{ Request::is('master/user') ? 'active' : '' }}">
-                                @role('administrator')
+                        @role('administrator')
+                            <li class="sidebar-item {{ Request::is('master/*') ? 'active' : '' }} has-sub">
+                                <a href="#" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-user-tie {{ Request::is('master/*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Master</span>
+                                </a>
+                                <ul class="submenu {{ Request::is('master/user') ? 'active' : '' }}">
                                     <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
                                         <a href="{{ route('user.index') }}" class="submenu-link">User</a>
                                     </li>
-                                @endrole
-                                @role('administrator')
                                     <li class="submenu-item {{ Request::is('master/product') ? 'active' : '' }}">
                                         <a href="{{ route('product.index') }}" class="submenu-link">Product</a>
                                     </li>
@@ -73,11 +71,11 @@
                                         <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">UoM</a>
                                     </li>
                                     <li class="submenu-item {{ Request::is('master/supplier') ? 'active' : '' }}">
-                                        <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">Supplier</a>
+                                        <a href="{{ route('supplier.index') }}" class="submenu-link">Supplier</a>
                                     </li>
-                                @endrole
-                            </ul>
-                        </li>
+                                </ul>
+                            </li>
+                        @endrole
 
                         @role('administrator')
                             <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">

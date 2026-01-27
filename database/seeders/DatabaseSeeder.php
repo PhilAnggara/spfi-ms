@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             UnitOfMeasureSeeder::class,
             ItemCategorySeeder::class,
             ItemSeeder::class,
+            SupplierSeeder::class,
             PrsSeeder::class,
             PrsItemSeeder::class,
         ]);

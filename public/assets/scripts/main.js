@@ -45,14 +45,72 @@ function hapusData(id, title, text) {
   })
 }
 
+// function copyToClipboard(text) {
+//   navigator.clipboard.writeText(text);
+//   Swal.fire({
+//     toast: true,
+//     position: 'top',
+//     showConfirmButton: false,
+//     timer: 3000,
+//     icon: 'success',
+//     title: 'Copied to clipboard!',
+//   })
+// }
+
+// ...existing code...
+
 function copyToClipboard(text) {
-  navigator.clipboard.writeText(text);
-  Swal.fire({
-    toast: true,
-    position: 'top',
-    showConfirmButton: false,
-    timer: 3000,
-    icon: 'success',
-    title: 'Copied to clipboard!',
-  })
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        Swal.fire({
+          toast: true,
+          position: 'top',
+          showConfirmButton: false,
+          timer: 3000,
+          icon: 'success',
+          title: 'Copied to clipboard!',
+        });
+      })
+      .catch(() => {
+        Swal.fire({
+          toast: true,
+          position: 'top',
+          showConfirmButton: false,
+          timer: 3000,
+          icon: 'error',
+          title: 'Failed to copy!',
+        });
+      });
+  } else {
+    // Fallback untuk HTTP/non-secure context
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      Swal.fire({
+        toast: true,
+        position: 'top',
+        showConfirmButton: false,
+        timer: 3000,
+        icon: 'success',
+        title: 'Copied to clipboard!',
+      });
+    } catch (err) {
+      Swal.fire({
+        toast: true,
+        position: 'top',
+        showConfirmButton: false,
+        timer: 3000,
+        icon: 'error',
+        title: 'Failed to copy!',
+      });
+    }
+    document.body.removeChild(textarea);
+  }
 }
+// ...existing code...

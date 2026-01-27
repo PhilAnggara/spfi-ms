@@ -6,6 +6,7 @@ use App\Http\Controllers\UnitOfMeasureController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,11 +24,12 @@ Route::middleware('auth')->group(function () {
         return view('pages.dashboard');
     })->name('dashboard');
 
-    Route::middleware('auth')->prefix('master')->group(function () {
-        Route::resource('user', UserController::class)->middleware('role:administrator');
+    Route::middleware('role:administrator')->prefix('master')->group(function () {
+        Route::resource('user', UserController::class);
         Route::resource('product', ProductController::class);
         Route::resource('product-category', ItemCategoryController::class);
         Route::resource('unit-of-measurement', UnitOfMeasureController::class);
+        Route::resource('supplier', SupplierController::class);
     });
     Route::middleware('role:administrator|purchasing-manager')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');
