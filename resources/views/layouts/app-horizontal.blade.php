@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{{ config('app.name', 'SPFI') }}@yield('title')</title>
+    @include('includes.style')
+    @livewireStyles
+</head>
+<body>
+    <script src="{{ url('assets/static/js/initTheme.js') }}"></script>
+    <div id="app">
+        <div id="main" class='layout-horizontal'>
+            @include('includes.navbar-horizontal')
+            <div id="main-content">
+
+                @yield('content')
+
+            </div>
+            @include('includes.footer')
+        </div>
+    </div>
+    <script src="{{ url('assets/static/js/pages/horizontal-layout.js') }}"></script>
+    @include('includes.script')
+    @livewireScripts
+
+</body>
+</html>

@@ -27,8 +27,8 @@ class CurrencySeeder extends Seeder
         $data = [];
         foreach ($items as $item) {
             $data[] = [
-                'name' => $item[0],
-                'code' => $item[1],
+                'code' => $item[0],
+                'name' => $item[1],
                 'symbol' => $item[2],
                 'created_by' => 1, // Assuming the admin user has ID 1
                 'created_at' => now(),
