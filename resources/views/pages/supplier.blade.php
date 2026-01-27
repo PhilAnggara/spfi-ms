@@ -31,6 +31,7 @@
                             <th class="text-center">Phone</th>
                             <th class="text-center">Email</th>
                             <th class="text-center">Contact Person</th>
+                            <th class="text-center">Created By</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -38,9 +39,6 @@
                             <tr>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $supplier->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
-                                            <i class="fa-light fa-eye text-primary"></i>
-                                        </button>
                                         <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $supplier->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                             <i class="fa-light fa-edit text-primary"></i>
                                         </button>
@@ -77,6 +75,12 @@
                                         {{ $supplier->contact_person }}
                                     @endif
                                 </td>
+                                <td>
+                                    <small>
+                                        <i class="fa-duotone fa-light fa-user"></i>
+                                        {{ $supplier->creator->name ?? '-' }}
+                                    </small>
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -101,4 +105,20 @@
     <script src="{{ url('assets/scripts/simple-datatables.js') }}"></script>
     <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
     <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
+@endpush
+
+@push('addon-script')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        @if ($errors->any())
+            @if (session('editing_supplier_id'))
+                const editModal = new bootstrap.Modal(document.getElementById('edit-modal-{{ session("editing_supplier_id") }}'));
+                editModal.show();
+            @else
+                const createModal = new bootstrap.Modal(document.getElementById('create-modal'));
+                createModal.show();
+            @endif
+        @endif
+    });
+</script>
 @endpush

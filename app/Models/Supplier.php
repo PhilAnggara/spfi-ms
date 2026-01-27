@@ -18,4 +18,13 @@ class Supplier extends Model
     protected $hidden = [
 
     ];
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by', 'id');
+    }
 }
