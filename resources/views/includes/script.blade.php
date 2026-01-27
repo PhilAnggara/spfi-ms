@@ -6,6 +6,7 @@
     <script src="{{ url('assets/vendors/sweetalert/sweetalert2.js') }}"></script>
     <script src="{{ url('assets/vendors/aos/aos.js') }}"></script>
 
+    <script src="{{ url('assets/scripts/set-font-size.js') }}"></script>
     <script src="{{ url('assets/scripts/main.js') }}"></script>
 
     @stack('addon-script')
