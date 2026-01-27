@@ -59,6 +59,8 @@
                                 <td>
                                     @if ($supplier->phone)
                                         <i class="fa-light fa-phone"></i> {{ $supplier->phone }}
+                                    @else
+                                        -
                                     @endif
                                 </td>
                                 <td>
@@ -67,17 +69,21 @@
                                             <i class="far fa-envelope text-danger"></i>
                                             {{ $supplier->email }}
                                         </a>
+                                    @else
+                                        -
                                     @endif
                                 </td>
                                 <td>
                                     @if ($supplier->contact_person)
                                         <i class="fa-duotone fa-light fa-address-card"></i>
                                         {{ $supplier->contact_person }}
+                                    @else
+                                        -
                                     @endif
                                 </td>
                                 <td>
                                     <small>
-                                        <i class="fa-duotone fa-light fa-user"></i>
+                                        <i class="fa-regular fa-user-pen"></i>
                                         {{ $supplier->creator->name ?? '-' }}
                                     </small>
                                 </td>

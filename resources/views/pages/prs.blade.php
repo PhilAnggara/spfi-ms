@@ -30,7 +30,7 @@
                 </h5>
             </div> --}}
             <div class="card-body">
-                <table class="table table-striped text-center" id="table1">
+                <table class="table table-striped text-center text-nowrap" id="table1">
                     <thead>
                         <tr>
                             <th class="text-center">PRS Number</th>

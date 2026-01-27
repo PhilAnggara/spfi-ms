@@ -21,7 +21,7 @@
     <section class="section">
         <div class="card shadow-sm">
             <div class="card-body">
-                <table class="table table-striped text-center" id="table1">
+                <table class="table table-striped text-center text-nowrap" id="table1">
                     <thead>
                         <tr>
                             <th class="text-center">thead</th>
