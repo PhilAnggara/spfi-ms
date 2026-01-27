@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\UnitOfMeasureController;
@@ -30,6 +31,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('product-category', ItemCategoryController::class);
         Route::resource('unit-of-measurement', UnitOfMeasureController::class);
         Route::resource('supplier', SupplierController::class);
+        Route::resource('currency', CurrencyController::class);
     });
     Route::middleware('role:administrator|purchasing-manager')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');

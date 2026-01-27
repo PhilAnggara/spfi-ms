@@ -73,6 +73,9 @@
                                     <li class="submenu-item {{ Request::is('master/supplier') ? 'active' : '' }}">
                                         <a href="{{ route('supplier.index') }}" class="submenu-link">Supplier</a>
                                     </li>
+                                    <li class="submenu-item {{ Request::is('master/currency') ? 'active' : '' }}">
+                                        <a href="{{ route('currency.index') }}" class="submenu-link">Currency</a>
+                                    </li>
                                 </ul>
                             </li>
                         @endrole
