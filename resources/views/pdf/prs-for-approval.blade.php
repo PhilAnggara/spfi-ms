@@ -227,6 +227,12 @@
         </div>
     @endif
 
+    <!-- QR Code -->
+    <div style="text-align: center; margin: 20px 0;">
+        <img src="{{ $qrCodeBase64 }}" alt="QR Code" style="width: 100px; height: 100px; display: inline-block; border: 1px solid #d1d5db; padding: 5px; background: #ffffff;">
+        <p style="font-size: 8px; font-weight: 300; margin-top: 10px; color: #1f2937;">PRS QR Code</p>
+    </div>
+
     <!-- Bagian Tanda Tangan -->
     <div class="signature-section">
         <p style="font-size: 11px; font-weight: 600; margin-bottom: 30px;">

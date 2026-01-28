@@ -135,6 +135,16 @@
                     </table>
                 </div>
 
+                <!-- QR Code Section -->
+                <div class="text-center mb-4">
+                    <div class="d-inline-block border border-dark-subtle p-2 rounded">
+                        {!! QrCode::size(150)->generate($item->prs_number) !!}
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Scan to verify PRS Number</small>
+                    </div>
+                </div>
+
                 <div class="divider">
                     <div class="divider-text fw-bold">Items</div>
                 </div>

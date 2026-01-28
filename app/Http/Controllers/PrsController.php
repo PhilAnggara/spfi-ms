@@ -136,9 +136,14 @@ class PrsController extends Controller
         // Ambil data PRS beserta relasi yang diperlukan
         $prs = Prs::with(['user', 'department', 'items.item'])->findOrFail($id);
 
+        // Generate QR code sebagai SVG (tidak memerlukan Imagick)
+        $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(100)->generate($prs->prs_number);
+        $qrCodeBase64 = 'data:image/svg+xml;base64,' . base64_encode($qrCode);
+
         // Data yang dikirim ke view PDF
         $data = [
             'prs' => $prs,
+            'qrCodeBase64' => $qrCodeBase64,
         ];
 
         // Generate nama file dengan format: PRS-NOMOR-TANGGAL.pdf
