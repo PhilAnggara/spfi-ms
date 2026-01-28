@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             PrsItemSeeder::class,
             CurrencySeeder::class,
             BuyerSeeder::class,
+            FishSupplierSeeder::class,
         ]);
     }
 }

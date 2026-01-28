@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -88,5 +89,21 @@ if (! function_exists('is_active_menu')) {
             }
         }
         return '';
+    }
+}
+
+if (! function_exists('get_manager_name')) {
+    function get_manager_name($user)
+    {
+        $deptId = $user->department->id;
+        $manager = User::where('department_id', $deptId)
+            ->where('role', 'Manager')
+            ->first();
+
+        if (!$manager) {
+            return 'N/A';
+        }
+
+        return $manager->name;
     }
 }

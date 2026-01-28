@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\FishSupplierController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\MainController;
@@ -33,6 +34,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('supplier', SupplierController::class);
         Route::resource('buyer', BuyerController::class);
         Route::resource('currency', CurrencyController::class);
+        Route::resource('fish-supplier', FishSupplierController::class);
     });
     Route::middleware('role:administrator|purchasing-manager')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');

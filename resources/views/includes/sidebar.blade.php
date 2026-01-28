@@ -92,6 +92,21 @@
                                         </ul>
                                     </li>
 
+                                    <li class="submenu-item {{ is_active_menu(['master/product', 'master/product-category', 'master/unit-of-measurement', 'master/supplier', 'master/buyer', 'master/currency', 'master/fish-supplier']) }} has-sub">
+                                        <a href="#" class="submenu-link">Production</a>
+                                        <ul class="submenu submenu-level-2 ">
+                                            <li class="submenu-item {{ Request::is('master/product') ? 'active' : '' }}">
+                                                <a href="{{ route('product.index') }}" class="submenu-link">Batch Number</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/fish-supplier') ? 'active' : '' }}">
+                                                <a href="{{ route('fish-supplier.index') }}" class="submenu-link">Fish Supplier</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/unit-of-measurement') ? 'active' : '' }}">
+                                                <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">Vessel</a>
+                                            </li>
+                                        </ul>
+                                    </li>
+
                                 </ul>
                             </li>
                         @endrole
