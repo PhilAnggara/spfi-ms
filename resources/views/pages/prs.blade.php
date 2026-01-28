@@ -5,11 +5,11 @@
 <div class="page-heading">
     <div class="page-title">
         <div class="row mb-4">
-            <div class="col-12 col-md-6 order-md-1 order-last">
+            <div class="col-12 col-md-6 order-md-1">
                 <h3>Purchase Requisition Slip</h3>
             </div>
-            <div class="col-12 col-md-6 order-md-2 order-first">
-                <div class="float-end">
+            <div class="col-12 col-md-6 order-md-2">
+                <div class="float-md-end">
                     <button type="button" class="btn btn-sm icon icon-left btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#export-modal">
                         <i class="fa-duotone fa-solid fa-file-pdf"></i>
                         Export PDF

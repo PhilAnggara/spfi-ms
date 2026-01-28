@@ -5,7 +5,7 @@
 <div class="page-heading">
     <div class="page-title">
         <div class="row mb-4">
-            <div class="col-12 col-md-6 order-md-1 order-last">
+            <div class="col-12 col-md-6 order-md-1">
                 <h3>PRS Approval</h3>
             </div>
         </div>

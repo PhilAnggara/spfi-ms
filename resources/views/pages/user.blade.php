@@ -5,15 +5,23 @@
 <div class="page-heading">
     <div class="page-title">
         <div class="row mb-4">
-            <div class="col-12 col-md-6 order-md-1 order-last">
+            <div class="col-12 col-md-6 order-md-1">
                 <h3>Manage Users</h3>
+            </div>
+            <div class="col-12 col-md-6 order-md-2 d-lg-none">
+                <div class="float-md-end">
+                    <button type="button" class="btn btn-sm icon icon-left btn-outline-success" data-bs-toggle="modal" data-bs-target="#create-modal">
+                        <i class="fa-duotone fa-solid fa-plus"></i>
+                        Add User
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <section class="section">
-        <div class="row row-cols-2 row-cols-lg-4">
-            <div class="col mb-3">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3">
+            <div class="col mb-3 d-none d-lg-block">
                 <div data-aos="zoom-in" class="card h-100 shadow-sm text-center bg-light-primary hover-shadow card-add">
                     <div class="card-body d-flex justify-content-center align-items-center">
                         <i class="fa-duotone fa-regular fa-user-circle-plus fa-5x text-primary"></i>
