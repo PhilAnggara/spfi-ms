@@ -12,6 +12,7 @@ use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VesselController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/', function () {
@@ -35,6 +36,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('buyer', BuyerController::class);
         Route::resource('currency', CurrencyController::class);
         Route::resource('fish-supplier', FishSupplierController::class);
+        Route::resource('vessel', VesselController::class);
     });
     Route::middleware('role:administrator|purchasing-manager')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');

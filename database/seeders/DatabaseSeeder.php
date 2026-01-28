@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             CurrencySeeder::class,
             BuyerSeeder::class,
             FishSupplierSeeder::class,
+            VesselSeeder::class,
         ]);
     }
 }
