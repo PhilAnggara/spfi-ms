@@ -74,6 +74,10 @@ class RolePermissionSeeder extends Seeder
         $generalManagerRole = Role::create(['name' => 'general-manager']);
         $generalManagerRole->givePermissionTo($permissions_general);
 
+        $itManagerRole = Role::create(['name' => 'it-manager']);
+        $itManagerRole->givePermissionTo(Permission::all());
+
+        // Manager Roles
         $purchasingManagerRole = Role::create(['name' => 'purchasing-manager']);
         $purchasingManagerRole->givePermissionTo([
             'approve-prs',
@@ -89,6 +93,68 @@ class RolePermissionSeeder extends Seeder
             'print-document',
         ]);
 
+        $salesManagerRole = Role::create(['name' => 'sales-manager']);
+        $salesManagerRole->givePermissionTo([
+            'view-prs',
+            'view-po',
+            'view-dashboard',
+            'export-report',
+            'print-document',
+        ]);
+
+        $financeManagerRole = Role::create(['name' => 'finance-manager']);
+        $financeManagerRole->givePermissionTo([
+            'view-prs',
+            'view-po',
+            'view-rr',
+            'view-dashboard',
+            'export-report',
+            'print-document',
+        ]);
+
+        $itSupervisorRole = Role::create(['name' => 'it-supervisor']);
+        $itSupervisorRole->givePermissionTo(Permission::all());
+
+        // Supervisor Roles
+        $purchasingSupervisorRole = Role::create(['name' => 'purchasing-supervisor']);
+        $purchasingSupervisorRole->givePermissionTo([
+            'assign-canvaser',
+            'view-canvassing',
+            'create-po',
+            'view-po',
+            'submit-po',
+            'view-po-progress',
+            'view-prs',
+            'create-prs',
+            'view-dashboard',
+            'print-document',
+        ]);
+
+        $salesSupervisorRole = Role::create(['name' => 'sales-supervisor']);
+        $salesSupervisorRole->givePermissionTo([
+            'view-prs',
+            'view-po',
+            'view-dashboard',
+            'print-document',
+        ]);
+
+        $financeSupervisorRole = Role::create(['name' => 'finance-supervisor']);
+        $financeSupervisorRole->givePermissionTo([
+            'view-prs',
+            'view-po',
+            'view-rr',
+            'view-dashboard',
+            'export-report',
+            'print-document',
+        ]);
+
+        $itStaffRole = Role::create(['name' => 'it-staff']);
+        $itStaffRole->givePermissionTo([
+            'view-dashboard',
+            'print-document',
+        ]);
+
+        // Staff Roles
         $canvaserRole = Role::create(['name' => 'canvaser']);
         $canvaserRole->givePermissionTo([
             'view-canvassing',
@@ -106,6 +172,23 @@ class RolePermissionSeeder extends Seeder
             'print-document'
         ]);
 
+        $salesStaffRole = Role::create(['name' => 'sales-staff']);
+        $salesStaffRole->givePermissionTo([
+            'view-prs',
+            'view-po',
+            'view-dashboard',
+            'print-document',
+        ]);
+
+        $financeStaffRole = Role::create(['name' => 'finance-staff']);
+        $financeStaffRole->givePermissionTo([
+            'view-prs',
+            'view-po',
+            'view-rr',
+            'view-dashboard',
+            'print-document',
+        ]);
+
         $warehouseRole = Role::findOrCreate('warehouse-staff', 'web');
         $warehouseRole->givePermissionTo([
             'create-rr',
@@ -116,8 +199,7 @@ class RolePermissionSeeder extends Seeder
             'print-document',
         ]);
 
-
-        // 6. Finance Role - Untuk accounting nanti
+        // Finance Role - Untuk accounting nanti
         $financeRole = Role::findOrCreate('finance', 'web');
         $financeRole->givePermissionTo([
             'view-prs',

@@ -36,7 +36,7 @@
                                 <td>
                                     <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $supplier->code }}')">{{ $supplier->code }}</span>
                                 </td>
-                                <td>{{ $supplier->name }}</td>
+                                <td class="text-start">{{ $supplier->name }}</td>
                                 <td>{{ $supplier->creator->name ?? '-' }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">

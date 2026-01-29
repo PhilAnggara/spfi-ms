@@ -15,6 +15,10 @@ return new class extends Migration
             $table->id();
             $table->string('code')->unique();
             $table->string('name')->index();
+            $table->text('address')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('email')->nullable();
+            $table->string('npwp')->nullable();
             $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

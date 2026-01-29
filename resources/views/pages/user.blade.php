@@ -31,7 +31,7 @@
             </div>
             @foreach ($users as $user)
                 <div class="col mb-3">
-                    <div data-aos="zoom-in" data-aos-delay="{{ $loop->iteration * 150 }}" class="card h-100 shadow-sm text-center hover-shadow">
+                    <div data-aos="zoom-in" data-aos-delay="{{ $loop->iteration <= 5 ? $loop->iteration * 150 : 750 }}" class="card h-100 shadow-sm text-center hover-shadow">
                         <div class="card-header position-relative">
                             <div class="avatar avatar-xl">
                                 <img src="https://ui-avatars.com/api/?background=435EBE&color=fff&bold=true&name={{ $user->name }}" alt="Avatar">
@@ -41,6 +41,9 @@
                             @endif
                         </div>
                         <div class="card-body">
+                            {{-- @foreach ($user->roles as $role)
+                                <span class="badge bg-light-dark mb-2">{{ $role->name }}</span>
+                            @endforeach --}}
                             <h5 class="card-title mb-0">
                                 {{ $user->name }}
                                 @if ($user->hasRole('administrator'))
@@ -55,21 +58,21 @@
                                 <i class="fa-light fa-building-user"></i>
                                 {{ $user->department->name }} ({{ $user->department->code }})
                             </p>
-                            @if ($user->role === 'General Manager')
-                                <span class="badge bg-primary">{{ $user->role }}</span>
-                            @elseif ($user->role === 'Manager')
-                                <span class="badge bg-light-primary">{{ $user->role }}</span>
-                            @elseif ($user->role === 'Programmer')
-                                <span class="badge bg-light-info">{{ $user->role }}</span>
-                            @else
-                                <span class="badge bg-light-secondary">{{ $user->role }}</span>
-                            @endif
+                            <span class="badge
+                                @if ($user->role === 'General Manager') bg-primary
+                                @elseif ($user->role === 'Manager') bg-light-primary
+                                @elseif ($user->role === 'Programmer') bg-light-info
+                                @else bg-light-secondary
+                                @endif
+                            ">
+                                {{ $user->role }}
+                            </span>
                         </div>
                         <div class="card-footer text-body-secondary py-1">
                             <button class="btn icon icon-left" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $user->id }}">
                                 <i class="fal fa-user-pen"></i> Edit {{ auth()->user()->id == $user->id ? 'Profile' : 'User' }}
                             </button>
-                            @if (auth()->check() && auth()->user()->id !== $user->id)
+                            @if (auth()->user()->id !== $user->id && $user->role !== 'General Manager')
                                 <button class="btn icon icon-left" onclick="hapusData({{ $user->id }}, 'Delete User', 'Are you sure you want to delete {{ $user->name }}?')">
                                     <i class="fal fa-trash-alt"></i> Delete User
                                 </button>

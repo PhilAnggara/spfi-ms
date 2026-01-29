@@ -54,8 +54,8 @@
                                 <td>
                                     <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $supplier->code }}')">{{ $supplier->code }}</span>
                                 </td>
-                                <td>{{ $supplier->name }}</td>
-                                <td>{{ $supplier->address }}</td>
+                                <td class="text-start">{{ $supplier->name }}</td>
+                                <td class="text-start">{{ $supplier->address }}</td>
                                 <td>
                                     @if ($supplier->phone)
                                         <i class="fa-light fa-phone"></i> {{ $supplier->phone }}

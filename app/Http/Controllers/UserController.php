@@ -7,10 +7,37 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 
 class UserController extends Controller
 {
+    private const ROLE_MAP = [
+        'Manager' => [
+            'Purchasing' => 'purchasing-manager',
+            'Sales' => 'sales-manager',
+            'Finance' => 'finance-manager',
+            'Information Technology' => 'it-manager',
+        ],
+        'Supervisor' => [
+            'Purchasing' => 'purchasing-supervisor',
+            'Sales' => 'sales-supervisor',
+            'Finance' => 'finance-supervisor',
+            'Information Technology' => 'it-supervisor',
+        ],
+        'Staff' => [
+            'Purchasing' => 'canvaser',
+            'Sales' => 'sales-staff',
+            'Finance' => 'finance-staff',
+            'Information Technology' => 'it-staff',
+        ],
+    ];
+
+    private function resolveSpatieRole(?string $departmentName, ?string $role): ?string
+    {
+        return self::ROLE_MAP[$role][$departmentName] ?? null;
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -44,17 +71,23 @@ class UserController extends Controller
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'department_id' => ['required', 'exists:departments,id'],
-            'role' => ['required'],
+            'role' => ['required', 'in:Manager,Supervisor,Staff'],
         ]);
 
         $user = User::create([
-            'name' => $request->name,
+            'name' => Str::title($request->name),
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'department_id' => $request->department_id,
             'role' => $request->role,
         ]);
+
+        $departmentName = Department::find($request->department_id)?->name;
+        $spatieRole = $this->resolveSpatieRole($departmentName, $request->role);
+        if ($spatieRole) {
+            $user->syncRoles([$spatieRole]);
+        }
 
         return redirect()->back()->with('success', 'New user has been created successfully.');
     }
@@ -90,7 +123,7 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:255', 'unique:users,username,'.$id],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,'.$id],
             'department_id' => ['required', 'exists:departments,id'],
-            // 'role' => ['required'],
+            'role' => ['nullable', 'in:Manager,Supervisor,Staff'],
         ];
 
         // Add password validation only if password field is filled
@@ -101,7 +134,7 @@ class UserController extends Controller
         $request->validate($rules);
 
         // Update user data
-        $user->name = $request->name;
+        $user->name = Str::title($request->name);
         $user->username = $request->username;
         $user->email = $request->email;
         $user->department_id = $request->department_id;
@@ -117,6 +150,14 @@ class UserController extends Controller
         }
 
         $user->save();
+
+        if ($request->filled('role') || $request->filled('department_id')) {
+            $departmentName = Department::find($request->department_id)?->name;
+            $spatieRole = $this->resolveSpatieRole($departmentName, $request->input('role', $user->role));
+            if ($spatieRole) {
+                $user->syncRoles([$spatieRole]);
+            }
+        }
 
         return redirect()->back()->with('success', "User {$user->name} has been updated successfully.");
     }

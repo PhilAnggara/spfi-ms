@@ -32,7 +32,7 @@
                     <tbody>
                         @foreach ($buyers as $buyer)
                             <tr>
-                                <td>{{ $buyer->name }}</td>
+                                <td class="text-start">{{ $buyer->name }}</td>
                                 <td class="text-start">{{ $buyer->address }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
