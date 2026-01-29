@@ -14,9 +14,9 @@ class FishSeeder extends Seeder
     public function run(): void
     {
         $item = [
-            ['Skipjack Tuna', 'SJ'],
-            ['Yellowfin Tuna', 'YF'],
-            ['Bigeye Tuna', 'BE'],
+            ['Skipjack', 'SJ'],
+            ['Yellowfin', 'YF'],
+            ['Bigeye', 'BE'],
             ['Spoilage', 'SPO'],
         ];
 

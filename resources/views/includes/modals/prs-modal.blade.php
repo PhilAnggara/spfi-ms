@@ -150,7 +150,7 @@
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table table-bordered mb-0 text-center">
+                    <table class="table table-bordered mb-0 text-center text-nowrap">
                         <thead>
                             <tr>
                                 <th>Item Code</th>

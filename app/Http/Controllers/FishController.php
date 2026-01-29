@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Fish;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class FishController extends Controller
 {
@@ -13,7 +15,11 @@ class FishController extends Controller
      */
     public function index()
     {
-        //
+        $fishes = Fish::all()->sortDesc();
+
+        return view('pages.fish', [
+            'fishes' => $fishes,
+        ]);
     }
 
     /**
@@ -29,7 +35,18 @@ class FishController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'code' => ['required', 'string', Rule::unique('fish', 'code')],
+            'name' => ['required', 'string'],
+        ]);
+
+        Fish::create([
+            'code' => $request->code,
+            'name' => $request->name,
+            'created_by' => Auth::id(),
+        ]);
+
+        return redirect()->back()->with('success', 'Fish has been created successfully.');
     }
 
     /**
@@ -53,7 +70,21 @@ class FishController extends Controller
      */
     public function update(Request $request, Fish $fish)
     {
-        //
+        // Flag for error-handling to reopen the correct modal
+        $request->session()->flash('editing_fish_id', $fish->id);
+
+        $request->validate([
+            'code' => ['required', 'string', Rule::unique('fish', 'code')->ignore($fish->id)],
+            'name' => ['required', 'string'],
+        ]);
+
+        $fish->update([
+            'code' => $request->code,
+            'name' => $request->name,
+            'updated_by' => Auth::id(),
+        ]);
+
+        return redirect()->back()->with('success', 'Fish has been updated successfully.');
     }
 
     /**
@@ -61,6 +92,9 @@ class FishController extends Controller
      */
     public function destroy(Fish $fish)
     {
-        //
+        $name = $fish->name;
+        $fish->delete();
+
+        return redirect()->back()->with('success', 'Fish ' . $name . ' has been deleted successfully.');
     }
 }

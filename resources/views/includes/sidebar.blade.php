@@ -92,7 +92,7 @@
                                         </ul>
                                     </li>
 
-                                    <li class="submenu-item {{ is_active_menu(['master/product', 'master/product-category', 'master/unit-of-measurement', 'master/supplier', 'master/buyer', 'master/currency', 'master/fish-supplier', 'master/vessel', 'master/batch']) }} has-sub">
+                                    <li class="submenu-item {{ is_active_menu(['master/product', 'master/product-category', 'master/unit-of-measurement', 'master/supplier', 'master/buyer', 'master/currency', 'master/fish-supplier', 'master/vessel', 'master/batch', 'master/fish']) }} has-sub">
                                         <a href="#" class="submenu-link">Production</a>
                                         <ul class="submenu submenu-level-2 ">
                                             <li class="submenu-item {{ Request::is('master/batch') ? 'active' : '' }}">
@@ -103,6 +103,9 @@
                                             </li>
                                             <li class="submenu-item {{ Request::is('master/vessel') ? 'active' : '' }}">
                                                 <a href="{{ route('vessel.index') }}" class="submenu-link">Vessel</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/fish') ? 'active' : '' }}">
+                                                <a href="{{ route('fish.index') }}" class="submenu-link">Fish</a>
                                             </li>
                                         </ul>
                                     </li>
