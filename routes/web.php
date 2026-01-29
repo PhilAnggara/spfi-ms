@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BatchController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\FishSupplierController;
@@ -35,6 +36,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('supplier', SupplierController::class);
         Route::resource('buyer', BuyerController::class);
         Route::resource('currency', CurrencyController::class);
+        Route::resource('batch', BatchController::class);
         Route::resource('fish-supplier', FishSupplierController::class);
         Route::resource('vessel', VesselController::class);
     });
