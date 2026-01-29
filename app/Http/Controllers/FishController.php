@@ -15,7 +15,9 @@ class FishController extends Controller
      */
     public function index()
     {
-        $fishes = Fish::all()->sortDesc();
+        $fishes = Fish::with(['sizes' => function ($query) {
+            $query->orderByRaw('CAST(code AS UNSIGNED)');
+        }])->latest()->get();
 
         return view('pages.fish', [
             'fishes' => $fishes,

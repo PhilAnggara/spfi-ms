@@ -26,6 +26,7 @@
 						<tr>
 							<th class="text-center">Code</th>
 							<th class="text-center">Name</th>
+							<th class="text-center">Size</th>
 							<th class="text-center">Action</th>
 						</tr>
 					</thead>
@@ -36,6 +37,12 @@
 									<span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $fish->code }}')">{{ $fish->code }}</span>
 								</td>
 								<td>{{ $fish->name }}</td>
+								<td>
+									<button type="button" class="btn btn-sm icon icon-left btn-light-primary" data-bs-toggle="modal" data-bs-target="#size-modal-{{ $fish->id }}">
+										<i class="fa-thin fa-ruler"></i>
+										{{ $fish->sizes->count() }} size
+									</button>
+								</td>
 								<td>
 									<div class="btn-group btn-group-sm">
 										<button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $fish->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
@@ -59,6 +66,7 @@
 	</section>
 </div>
 @include('includes.modals.fish-modal')
+@include('includes.modals.fish-size-modal')
 @endsection
 
 @push('prepend-style')
@@ -82,6 +90,9 @@
 			@if (session('editing_fish_id'))
 				const editModal = new bootstrap.Modal(document.getElementById('edit-modal-{{ session("editing_fish_id") }}'));
 				editModal.show();
+			@elseif (session('size_modal_fish_id'))
+				const sizeModal = new bootstrap.Modal(document.getElementById('size-modal-{{ session("size_modal_fish_id") }}'));
+				sizeModal.show();
 			@else
 				const createModal = new bootstrap.Modal(document.getElementById('create-modal'));
 				createModal.show();

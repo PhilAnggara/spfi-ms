@@ -5,20 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\FishSize;
 
-class Fish extends Model
+class FishSize extends Model
 {
     use HasFactory;
     use SoftDeletes;
 
-    // protected $table = 'fish';
+    protected $table = 'fish_sizes';
     protected $guarded = [
-        'id'
+        'id',
     ];
 
-    public function sizes()
+    public function fish()
     {
-        return $this->hasMany(FishSize::class);
+        return $this->belongsTo(Fish::class);
     }
 }
