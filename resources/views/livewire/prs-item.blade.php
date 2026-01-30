@@ -28,7 +28,7 @@
                             <div class="form-group">
                                 <label for="item-code-{{ $loop->index }}">Item Code</label>
                                 <select class="choices form-select prs-item-select" id="item-code-{{ $loop->index }}" data-index="{{ $loop->index }}" required>
-                                    <option value="" @selected(!$prsItem['item_id'])>-- Search Item Code --</option>
+                                    <option value="" @selected(!$prsItem['item_id']) disabled>-- Search Item Code --</option>
                                     @foreach ($this->getAvailableItems($loop->index) as $item)
                                         <option value="{{ $item->id }}" @selected($prsItem['item_id'] == $item->id)>{{ $item->code }}</option>
                                     @endforeach
@@ -39,7 +39,7 @@
                             <div class="form-group">
                                 <label for="item-name-{{ $loop->index }}">Item Name</label>
                                 <select class="choices form-select prs-item-select" id="item-name-{{ $loop->index }}" data-index="{{ $loop->index }}" required>
-                                    <option value="" @selected(!$prsItem['item_id'])>-- Search Item Name --</option>
+                                    <option value="" @selected(!$prsItem['item_id']) disabled>-- Search Item Name --</option>
                                     @foreach ($this->getAvailableItems($loop->index) as $item)
                                         <option value="{{ $item->id }}" @selected($prsItem['item_id'] == $item->id)>{{ $item->name }}</option>
                                     @endforeach
@@ -71,7 +71,7 @@
         <input type="hidden" name="prsItems[{{ $loop->index }}][item_id]" value="{{ is_array($prsItem['item_id'] ?? '') ? '' : ($prsItem['item_id'] ?? '') }}">
     @endforeach
 
-    <div wire:loading.class.remove="d-none" wire:target="addPrsItem" class="card shadow mt-2 w-100 d-none">
+    <div wire:loading.class.remove="d-none" wire:target="addPrsItem" class="card shadow mt-2 w-100 d-none" style="min-height: 165.75px">
         <div class="card-content">
             <div class="card-body">
                 <div class="d-flex justify-content-center align-items-center">
@@ -85,7 +85,7 @@
     </div>
 
     <div class="d-flex justify-content-center">
-        <button wire:loading.remove wire:target="addPrsItem" type="button" class="btn icon icon-left btn-outline-secondary btn-sm" wire:click="addPrsItem">
+        <button wire:loading.attr="disabled" wire:target="addPrsItem" type="button" class="btn icon icon-left btn-outline-secondary btn-sm" wire:click="addPrsItem">
             <i class="fa-duotone fa-solid fa-layer-plus"></i>
             Add Item
         </button>

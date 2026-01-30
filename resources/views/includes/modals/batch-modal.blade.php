@@ -31,7 +31,7 @@
                             </div>
                             <div class="col-md-8 form-group">
                                 <select id="fish_supplier_id" name="fish_supplier_id" class="form-select choices {{ ($errors->any() && !session('editing_batch_id')) ? ($errors->has('fish_supplier_id') ? 'is-invalid' : '') : '' }}" required>
-                                    <option value="">Select Fish Supplier</option>
+                                    <option value="" selected disabled>-- Select Fish Supplier --</option>
                                     @foreach ($fishSuppliers as $supplier)
                                         <option value="{{ $supplier->id }}" {{ (($errors->any() && !session('editing_batch_id')) ? old('fish_supplier_id') : '') == $supplier->id ? 'selected' : '' }}>
                                             {{ $supplier->name }}
@@ -50,7 +50,7 @@
                             </div>
                             <div class="col-md-8 form-group">
                                 <select id="vessel_id" name="vessel_id" class="form-select choices {{ ($errors->any() && !session('editing_batch_id')) ? ($errors->has('vessel_id') ? 'is-invalid' : '') : '' }}" required>
-                                    <option value="">Select Vessel</option>
+                                    <option value="" selected disabled>-- Select Vessel --</option>
                                     @foreach ($vessels as $vessel)
                                         <option value="{{ $vessel->id }}" {{ (($errors->any() && !session('editing_batch_id')) ? old('vessel_id') : '') == $vessel->id ? 'selected' : '' }}>
                                             {{ $vessel->name }}
