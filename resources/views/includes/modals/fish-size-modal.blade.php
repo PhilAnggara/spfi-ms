@@ -14,11 +14,11 @@
                         @forelse ($fish->sizes as $size)
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
-                                    <span class="badge bg-light-secondary me-2">{{ $size->code }}</span>
+                                    <span class="badge bg-light-secondary me-2">{{ $fish->code }}-{{ $size->code }}</span>
                                     {{ $size->size_range }}
                                 </div>
                                 <div class="ms-auto">
-                                    <button type="button" class="btn btn-sm icon icon-left btn-light-danger" onclick="hapusData('size-{{ $size->id }}', 'Delete Size', 'Are you sure want to delete {{ $size->code }}?')">
+                                    <button type="button" class="btn btn-sm icon icon-left" onclick="hapusData('size-{{ $size->id }}', 'Delete Size', 'Are you sure want to delete {{ $size->code }}?')">
                                         <i class="fa-thin fa-trash"></i>
                                         Delete
                                     </button>
@@ -50,12 +50,15 @@
                             <label for="code-{{ $fish->id }}">Code</label>
                         </div>
                         <div class="col-md-8 form-group">
-                            <input type="text" id="code-{{ $fish->id }}" name="code" placeholder="e.g. FS001" class="form-control {{ ($errors->any() && session('size_modal_fish_id') == $fish->id) ? ($errors->has('code') ? 'is-invalid' : '') : '' }}" value="{{ ($errors->any() && session('size_modal_fish_id') == $fish->id) ? old('code') : '' }}" required>
-                            @if ($errors->any() && session('size_modal_fish_id') == $fish->id)
-                                @error('code')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            @endif
+                            <div class="input-group">
+                                <span class="input-group-text">{{ $fish->code }}</span>
+                                <input typ  e="text" id="code-{{ $fish->id }}" name="code" placeholder="e.g. 200" class="form-control {{ ($errors->any() && session('size_modal_fish_id') == $fish->id) ? ($errors->has('code') ? 'is-invalid' : '') : '' }}" value="{{ ($errors->any() && session('size_modal_fish_id') == $fish->id) ? old('code') : '' }}" required>
+                                @if ($errors->any() && session('size_modal_fish_id') == $fish->id)
+                                    @error('code')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                @endif
+                            </div>
                         </div>
 
                         <div class="col-md-4">

@@ -28,7 +28,7 @@ class PrsItem extends Component
                     'item_code'     => $itemModel->code ?? '',
                     'item_name'     => $itemModel->name ?? '',
                     'stock_on_hand' => $itemModel->stock_on_hand ?? 0,
-                    'unit'          => $itemModel->unit ?? 'PCS',
+                    'unit'          => $itemModel?->unit?->name ?? 'PCS',
                     'quantity'      => $existing->quantity ?? 1,
                 ];
             }
@@ -83,7 +83,7 @@ class PrsItem extends Component
                     $this->prsItems[$index]['item_code'] = $item->code;
                     $this->prsItems[$index]['item_name'] = $item->name;
                     $this->prsItems[$index]['stock_on_hand'] = $item->stock_on_hand;
-                    $this->prsItems[$index]['unit'] = $item->unit;
+                    $this->prsItems[$index]['unit'] = $item->unit?->name ?? 'PCS';
                 }
             }
 
@@ -103,7 +103,7 @@ class PrsItem extends Component
                 $this->prsItems[$index]['item_code'] = $item->code;
                 $this->prsItems[$index]['item_name'] = $item->name;
                 $this->prsItems[$index]['stock_on_hand'] = $item->stock_on_hand;
-                $this->prsItems[$index]['unit'] = $item->unit;
+                $this->prsItems[$index]['unit'] = $item->unit?->name ?? 'PCS';
             }
         }
 

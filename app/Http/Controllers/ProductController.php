@@ -16,11 +16,11 @@ class ProductController extends Controller
      */
     public function index()
     {
-        // get only item category names and item unit names
-        $itemCategories = ItemCategory::query()->pluck('name');
-        $itemUnits = UnitOfMeasure::query()->pluck('name');
+        $itemCategories = ItemCategory::query()->orderBy('name')->get();
+        $itemUnits = UnitOfMeasure::query()->orderBy('name')->get();
         $types = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
-        $items = Item::all()->sortDesc();
+        $items = Item::query()->with(['unit', 'category'])->orderByDesc('id')->get();
+
         return view('pages.product', [
             'items' => $items,
             'itemCategories' => $itemCategories,
@@ -42,24 +42,21 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        // Build allowed lists for validation
-        $allowedCategories = ItemCategory::query()->pluck('name')->toArray();
-        $allowedUnits = UnitOfMeasure::query()->pluck('name')->toArray();
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
         $request->validate([
             'code' => ['required', 'string', 'alpha_num', 'size:7', Rule::unique('items', 'code')],
             'name' => ['required', 'string'],
-            'unit' => ['required', 'string', Rule::in($allowedUnits)],
-            'category' => ['required', 'string', Rule::in($allowedCategories)],
+            'unit_of_measure_id' => ['required', 'integer', Rule::exists('unit_of_measures', 'id')],
+            'category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
             'type' => ['required', 'string', Rule::in($allowedTypes)],
         ]);
 
         Item::create([
             'code' => $request->code,
             'name' => $request->name,
-            'unit' => $request->unit,
-            'category' => $request->category,
+            'unit_of_measure_id' => $request->unit_of_measure_id,
+            'category_id' => $request->category_id,
             'type' => $request->type,
         ]);
 
@@ -92,24 +89,21 @@ class ProductController extends Controller
         // Flag for error-handling to reopen the correct modal
         $request->session()->flash('editing_product_id', $id);
 
-        // Build allowed lists for validation
-        $allowedCategories = ItemCategory::query()->pluck('name')->toArray();
-        $allowedUnits = UnitOfMeasure::query()->pluck('name')->toArray();
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
         $request->validate([
             'code' => ['required', 'string', 'alpha_num', 'size:7', Rule::unique('items', 'code')->ignore($id)],
             'name' => ['required', 'string'],
-            'unit' => ['required', 'string', Rule::in($allowedUnits)],
-            'category' => ['required', 'string', Rule::in($allowedCategories)],
+            'unit_of_measure_id' => ['required', 'integer', Rule::exists('unit_of_measures', 'id')],
+            'category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
             'type' => ['required', 'string', Rule::in($allowedTypes)],
         ]);
 
         $item->update([
             'code' => $request->code,
             'name' => $request->name,
-            'unit' => $request->unit,
-            'category' => $request->category,
+            'unit_of_measure_id' => $request->unit_of_measure_id,
+            'category_id' => $request->category_id,
             'type' => $request->type,
         ]);
 

@@ -18,4 +18,13 @@ class Item extends Model
     protected $hidden = [
 
     ];
+
+    public function unit()
+    {
+        return $this->belongsTo(UnitOfMeasure::class, 'unit_of_measure_id');
+    }
+    public function category()
+    {
+        return $this->belongsTo(ItemCategory::class, 'category_id');
+    }
 }

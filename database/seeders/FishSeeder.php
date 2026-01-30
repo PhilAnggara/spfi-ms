@@ -13,18 +13,19 @@ class FishSeeder extends Seeder
      */
     public function run(): void
     {
-        $item = [
+        $items = [
             ['Skipjack', 'SJ'],
-            ['Yellowfin', 'YF'],
             ['Bigeye', 'BE'],
+            ['Yellowfin', 'YF'],
+            ['Albacore', 'AL'],
             ['Spoilage', 'SPO'],
         ];
 
         $data = [];
-        foreach ($item as $fish) {
+        foreach ($items as $item) {
             $data[] = [
-                'code' => $fish[1],
-                'name' => $fish[0],
+                'code' => $item[1],
+                'name' => $item[0],
                 'created_by' => 1, // Assuming the admin user has ID 1
                 'created_at' => now(),
                 'updated_at' => now(),

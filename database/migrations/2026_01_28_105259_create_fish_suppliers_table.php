@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('fish_suppliers', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique();
             $table->string('name')->index();
+            $table->string('code')->unique();
             $table->text('address')->nullable();
             $table->string('phone')->nullable();
             $table->string('email')->nullable();

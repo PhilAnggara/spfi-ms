@@ -33,10 +33,10 @@ class FishSizeController extends Controller
 
         FishSize::create([
             'fish_id' => $request->fish_id,
-            'code' => $request->fish_code .$request->code,
+            'code' => $request->code,
             'size_range' => $request->size_range,
             'created_by' => Auth::id(),
-            'updated_by' => Auth::id(),
+            // 'updated_by' => Auth::id(),
         ]);
 
         return redirect()->back()->with('success', 'Size range added successfully.');

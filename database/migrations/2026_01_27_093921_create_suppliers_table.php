@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('suppliers', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique();
             $table->string('name')->index();
+            $table->string('code')->unique();
             $table->string('address');
             $table->string('phone')->nullable();
             $table->string('fax')->nullable();

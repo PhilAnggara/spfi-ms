@@ -48,9 +48,9 @@
                                 </td>
                                 <td>{{ $item->name }}</td>
                                 <td>
-                                    <span class="badge bg-light-secondary">{{ $item->unit }}</span>
+                                    <span class="badge bg-light-secondary">{{ $item->unit?->name ?? '-' }}</span>
                                 </td>
-                                <td>{{ $item->category }}</td>
+                                <td>{{ $item->category?->name ?? '-' }}</td>
                                 <td>{{ $item->type }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">

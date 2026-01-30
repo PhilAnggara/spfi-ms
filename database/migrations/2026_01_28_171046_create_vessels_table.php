@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('vessels', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique();
             $table->string('name')->index();
+            $table->string('code')->unique();
             $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

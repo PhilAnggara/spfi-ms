@@ -170,7 +170,7 @@
                                     </td>
                                     <td>{{ $itemInfo->item->name }}</td>
                                     <td>{{ $itemInfo->item->stock_on_hand }}</td>
-                                    <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit }}</td>
+                                    <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

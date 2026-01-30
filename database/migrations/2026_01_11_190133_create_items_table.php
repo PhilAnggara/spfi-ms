@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::create('items', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique();
             $table->string('name');
-            $table->string('unit');
-            $table->string('category');
+            $table->string('code')->unique();
+            $table->foreignId('unit_of_measure_id')->constrained('unit_of_measures')->restrictOnDelete();
+            $table->foreignId('category_id')->constrained('item_categories')->restrictOnDelete();
             $table->string('type');
             $table->integer('stock_on_hand')->default(0);
             $table->boolean('is_active')->default(true);

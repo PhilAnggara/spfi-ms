@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('unit_of_measures', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique();
             $table->string('name')->index();
+            $table->string('code')->unique();
             $table->text('remarks')->nullable();
             $table->timestamps();
             $table->softDeletes();

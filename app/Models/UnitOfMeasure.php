@@ -18,6 +18,6 @@ class UnitOfMeasure extends Model
 
     public function items()
     {
-        return $this->hasMany(Item::class, 'unit', 'name');
+        return $this->hasMany(Item::class, 'unit_of_measure_id');
     }
 }

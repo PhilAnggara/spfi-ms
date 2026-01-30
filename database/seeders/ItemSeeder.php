@@ -17,8 +17,8 @@ class ItemSeeder extends Seeder
             [
                 'code' => 'ELC0001',
                 'name' => 'Kompter PC ASUS',
-                'unit' => 'SET',
-                'category' => 'Office Supplies',
+                'unit_of_measure_id' => 6,
+                'category_id' => 1,
                 'type' => 'Capital Goods',
                 'stock_on_hand' => 2,
                 'created_at' => now(),
@@ -27,8 +27,8 @@ class ItemSeeder extends Seeder
             [
                 'code' => 'ELC0002',
                 'name' => 'Keyboard Logitech',
-                'unit' => 'PCS',
-                'category' => 'Office Supplies',
+                'unit_of_measure_id' => 2,
+                'category_id' => 1,
                 'type' => 'Capital Goods',
                 'stock_on_hand' => 5,
                 'created_at' => now(),
@@ -37,8 +37,8 @@ class ItemSeeder extends Seeder
             [
                 'code' => 'FUR0001',
                 'name' => 'Kursi Kantor Ergonomic',
-                'unit' => 'PCS',
-                'category' => 'Office Supplies',
+                'unit_of_measure_id' => 2,
+                'category_id' => 1,
                 'type' => 'Capital Goods',
                 'stock_on_hand' => 0,
                 'created_at' => now(),
@@ -47,8 +47,8 @@ class ItemSeeder extends Seeder
             [
                 'code' => 'FUR0002',
                 'name' => 'Meja Kantor Kayu',
-                'unit' => 'SET',
-                'category' => 'Office Supplies',
+                'unit_of_measure_id' => 6,
+                'category_id' => 1,
                 'type' => 'Capital Goods',
                 'stock_on_hand' => 1,
                 'created_at' => now(),

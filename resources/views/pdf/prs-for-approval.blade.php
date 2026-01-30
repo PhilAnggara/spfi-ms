@@ -206,7 +206,7 @@
                         <td><strong>{{ $item->item->code ?? '-' }}</strong></td>
                         <td>{{ $item->item->name ?? '-' }}</td>
                         <td class="text-right">{{ $item->quantity }}</td>
-                        <td class="text-center">{{ $item->item->unit ?? 'PCS' }}</td>
+                        <td class="text-center">{{ $item->item->unit?->name ?? 'PCS' }}</td>
                     </tr>
                 @empty
                     <tr>
