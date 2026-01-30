@@ -37,7 +37,7 @@
                             <th class="text-center">Charged to Department</th>
                             <th class="text-center">PRS Date</th>
                             <th class="text-center">Date Needed</th>
-                            <th class="text-center">No. of Items</th>
+                            <th class="text-center">Status</th>
                             <th class="text-center">Remarks</th>
                             <th class="text-center">Action</th>
                         </tr>
@@ -55,7 +55,7 @@
                                 <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
                                 <td><i class="fa-duotone fa-solid fa-calendar-star text-primary"></i> {{ tgl($item->date_needed) }}</td>
                                 <td>
-                                    <span class="badge bg-light-secondary">{{ $item->items->count() }}</span>
+                                    <span class="badge bg-light-warning">{{ $item->status }}</span>
                                 </td>
                                 <td>{{ Str::limit($item->remarks, 20, '...') ?? '-' }}</td>
                                 <td>

@@ -1,6 +1,6 @@
 <div>
     @foreach ($prsItems as $prsItem)
-        <div wire:loading.class="opacity-50" wire:target="removePrsItem({{ $loop->index }})" class="card shadow mt-2" wire:key="prs-item-{{ $prsItem['row_id'] ?? $loop->index }}">
+        <div wire:loading.class="opacity-25" wire:target="removePrsItem({{ $loop->index }})" class="card shadow mt-2" wire:key="prs-item-{{ $prsItem['row_id'] ?? $loop->index }}">
             <div class="card-content">
                 <div class="card-body position-relative">
                     @if ($loop->count > 1)
@@ -73,13 +73,11 @@
 
     <div wire:loading.class.remove="d-none" wire:target="addPrsItem" class="card shadow mt-2 w-100 d-none" style="min-height: 165.75px">
         <div class="card-content">
-            <div class="card-body">
-                <div class="d-flex justify-content-center align-items-center">
-                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <span class="ms-2">Loading...</span>
+            <div class="card-body d-flex justify-content-center align-items-center" style="min-height: 165.75px;">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Adding...</span>
                 </div>
+                <span class="ms-3 fs-5 fst-italic">Adding new item...</span>
             </div>
         </div>
     </div>

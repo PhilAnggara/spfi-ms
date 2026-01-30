@@ -21,10 +21,10 @@ class Item extends Model
 
     public function unit()
     {
-        return $this->belongsTo(UnitOfMeasure::class, 'unit_of_measure_id');
+        return $this->belongsTo(UnitOfMeasure::class, 'unit_of_measure_id')->withTrashed();
     }
     public function category()
     {
-        return $this->belongsTo(ItemCategory::class, 'category_id');
+        return $this->belongsTo(ItemCategory::class, 'category_id')->withTrashed();
     }
 }

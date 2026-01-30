@@ -101,7 +101,7 @@
                         <tbody>
                             <tr>
                                 <th>Progress</th>
-                                <td><span class="badge bg-light-info">{{ $item->status }}</span></td>
+                                <td><span class="badge bg-light-warning">{{ $item->status }}</span></td>
                             </tr>
                             <tr>
                                 <th>Submitted by</th>
