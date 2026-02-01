@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use App\Models\Prs;
 use App\Models\PrsItem;
+use App\Models\User;
+use App\Notifications\PrsSubmittedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -52,6 +54,20 @@ class PrsController extends Controller
                 'item_id'      => $prsItem['item_id'],
                 'quantity'     => $prsItem['quantity'],
             ]);
+        }
+
+        // ===== KIRIM NOTIFIKASI =====
+        // Ambil user yang memiliki role 'Purchasing Manager' atau permission 'approve prs'
+        $purchasingManagers = User::role('purchasing-manager')->get();
+
+        // Jika tidak ada role, coba cari berdasarkan permission
+        if ($purchasingManagers->isEmpty()) {
+            $purchasingManagers = User::permission('approve-prs')->get();
+        }
+
+        // Kirim notifikasi ke setiap Purchasing Manager
+        foreach ($purchasingManagers as $manager) {
+            $manager->notify(new PrsSubmittedNotification($newPrs));
         }
 
         return redirect()->back()->with('success', 'New PRS has been created successfully.');

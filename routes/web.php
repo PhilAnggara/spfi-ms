@@ -13,6 +13,7 @@ use App\Http\Controllers\UnitOfMeasureController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VesselController;
@@ -55,6 +56,16 @@ Route::middleware('auth')->group(function () {
     Route::resource('prs', PrsController::class);
     Route::post('prs/export', [PrsController::class, 'export'])->name('prs.export');
     Route::get('prs/{prs}/print', [PrsController::class, 'print'])->name('prs.print');
+
+    // ===== Notification Routes =====
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::get('/unread-count', [NotificationController::class, 'getUnreadCount'])->name('notifications.unread-count');
+        Route::post('/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+        Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+        Route::post('/clear-read', [NotificationController::class, 'clearRead'])->name('notifications.clear-read');
+    });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
