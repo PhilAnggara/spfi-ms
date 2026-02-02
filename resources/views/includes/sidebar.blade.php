@@ -110,6 +110,24 @@
                                         </ul>
                                     </li>
 
+                                    <li class="submenu-item {{ is_active_menu(['master/accounting/*']) }} has-sub">
+                                        <a href="#" class="submenu-link">Accounting</a>
+                                        <ul class="submenu submenu-level-2 ">
+                                            <li class="submenu-item {{ Request::is('master/accounting/groupings') ? 'active' : '' }}">
+                                                <a href="{{ route('accounting.groupings.index') }}" class="submenu-link">Groupings</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/accounting/group-codes') ? 'active' : '' }}">
+                                                <a href="{{ route('accounting.group-codes.index') }}" class="submenu-link">Group Codes</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/accounting/codes') ? 'active' : '' }}">
+                                                <a href="{{ route('accounting.codes.index') }}" class="submenu-link">Accounting Codes</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/accounting/balance-sheet') ? 'active' : '' }}">
+                                                <a href="{{ route('accounting.balance-sheet.index') }}" class="submenu-link">Balance Sheet Mapping</a>
+                                            </li>
+                                        </ul>
+                                    </li>
+
                                 </ul>
                             </li>
                         @endrole

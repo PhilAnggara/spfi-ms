@@ -3,6 +3,10 @@
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\Accounting\AccountingCodeController;
+use App\Http\Controllers\Accounting\AccountingGroupCodeController;
+use App\Http\Controllers\Accounting\BsGroupingController;
+use App\Http\Controllers\Accounting\GroupingController;
 use App\Http\Controllers\FishController;
 use App\Http\Controllers\FishSizeController;
 use App\Http\Controllers\FishSupplierController;
@@ -45,6 +49,13 @@ Route::middleware('auth')->group(function () {
         Route::resource('fish', FishController::class);
         Route::post('fish-size', [FishSizeController::class, 'store'])->name('fish-size.store');
         Route::delete('fish-size/{fishSize}', [FishSizeController::class, 'destroy'])->name('fish-size.destroy');
+
+        Route::prefix('accounting')->name('accounting.')->group(function () {
+            Route::resource('groupings', GroupingController::class)->except(['create', 'show', 'edit']);
+            Route::resource('group-codes', AccountingGroupCodeController::class)->except(['create', 'show', 'edit']);
+            Route::resource('codes', AccountingCodeController::class)->except(['create', 'show', 'edit']);
+            Route::resource('balance-sheet', BsGroupingController::class)->except(['create', 'show', 'edit']);
+        });
     });
     Route::middleware('role:administrator|purchasing-manager')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');
