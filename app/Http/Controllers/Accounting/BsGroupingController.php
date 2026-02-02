@@ -14,15 +14,34 @@ class BsGroupingController extends Controller
 {
     public function index()
     {
-        $balanceSheets = BsGrouping::with(['groupCode', 'accountingCode', 'grouping'])
+        // Eager load relationships untuk menghindari N+1 query
+        $balanceSheets = BsGrouping::with([
+                'groupCode:id,group_code,group_desc',
+                'accountingCode:id,code,desc',
+                'grouping:id,code,desc'
+            ])
+            ->select('id', 'group_code_id', 'accounting_code_id', 'grouping_id', 'major')
             ->orderBy('id', 'desc')
+            ->get();
+
+        // Cache reference data untuk select options
+        $groupCodes = AccountingGroupCode::select('id', 'group_code', 'group_desc')
+            ->orderBy('group_code')
+            ->get();
+
+        $accountingCodes = AccountingCode::select('id', 'code', 'desc')
+            ->orderBy('code')
+            ->get();
+
+        $groupings = Grouping::select('id', 'code', 'desc')
+            ->orderBy('code')
             ->get();
 
         return view('pages.accounting.balance-sheet', [
             'balanceSheets' => $balanceSheets,
-            'groupCodes' => AccountingGroupCode::orderBy('group_code')->get(),
-            'accountingCodes' => AccountingCode::orderBy('code')->get(),
-            'groupings' => Grouping::orderBy('code')->get(),
+            'groupCodes' => $groupCodes,
+            'accountingCodes' => $accountingCodes,
+            'groupings' => $groupings,
         ]);
     }
 
