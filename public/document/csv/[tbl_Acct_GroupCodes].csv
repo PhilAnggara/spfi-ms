@@ -1,0 +1,52 @@
+﻿Id;GroupCode;GroupCodeDesc
+64;0;''
+1;"1001 ";CASH
+2;"1002 ";"ACCOUNT RECEIVABLE - TRADE                        "
+3;"1003 ";"ACCOUNT RECEIVABLE - OTHER                        "
+72;1004;SHORT-TERM INVESTMENT
+4;"1005 ";"INVENTORIES                                       "
+5;"1006 ";"PREPAYMENTS                                       "
+6;"1007 ";"FIXED ASSETS                                      "
+7;"1008 ";"OTHER ASSETS                                      "
+8;"1009 ";"SHORT TERM LOANS                                  "
+73;1010;CURRENT PORTION -  LONG TERM DEBT
+9;"1011 ";"ACCOUNTS PAYABLE - TRADE                          "
+10;"1012 ";"ACCRUED EXPENSES                                  "
+11;"1013 ";OTHER CURRENT LIABILITIES
+12;"1014 ";"OTHER PAYABLE                                     "
+74;1015;LONG TERM DEBT
+13;"1016 ";"DUE TO STOCKHOLDERS                               "
+14;"1018 ";"STOCKHOLDERS EQUITY                               "
+49;"5655 ";"BANK DATA                                         "
+48;"5955 ";"BANK DATA                                         "
+15;"7000 ";"SALES                                             "
+16;"7010 ";"RAW MATERIAL USED                                 "
+17;"7029 ";"VARIABLE ICE PLANT                                "
+18;"7030 ";"FIXED ICE PLANT                                   "
+19;"7031 ";"VARIABLE FISH PROCUREMENT                         "
+20;"7032 ";"FIXED FISH PROCUREMENT                            "
+21;"7033 ";VARIABLE PRODUCTION
+22;"7034 ";"FIXED PRODUCTION                                  "
+23;"7035 ";"VARIABLE DISTRIBUTION                             "
+24;"7036 ";"EXPORTS DOCUMENTATION                             "
+25;"7037 ";"VARIABLE RENDERING                                "
+26;"7038 ";"FIXED RENDERING                                   "
+27;"7039 ";"VARIABLE LABELING                                 "
+28;"7040 ";"FIXED LABELING                                    "
+29;"7042 ";"INVENTORY MANAGEMENT                              "
+30;"7044 ";"QUALITY ASSURANCE                                 "
+31;"7046 ";"ENGINEERING                                       "
+32;"7048 ";"HUMAN RESOURCES DEVELOPMENT                       "
+33;"7050 ";"PURCHASING                                        "
+34;"7052 ";"FINANCE                                           "
+35;"7054 ";"OFFICE OF THE MANAGING DIRECTOR                   "
+65;7056;IT
+75;7058;ADMIN TUNA VIAND
+36;"7060 ";"JAKARTA OFFICE                                    "
+37;"7061 ";"VARIABLE COLD STORAGE                             "
+38;"7062 ";"FIXED COLD STORAGE                                "
+39;"7063 ";"VARIABLE VIAND TUNA                               "
+40;"7064 ";"FIXED VIAND TUNA                                  "
+76;7065;VARIABLE FROZEN PRECOOKED LOIN
+77;7066;FIXED FROZEN PRECOOKED LOIN
+41;"8000 ";"OTHERS                                            "

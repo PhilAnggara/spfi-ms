@@ -11,4 +11,10 @@ class MainController extends Controller
     {
         return view('pages.dashboard');
     }
+
+    public function cekCsv()
+    {
+        $data = [];
+        return response()->json($data);
+    }
 }
