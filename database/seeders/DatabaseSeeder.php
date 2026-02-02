@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
             BatchSeeder::class,
             FishSeeder::class,
             FishSizeSeeder::class,
+            AccountingDataSeeder::class,
         ]);
     }
 }
