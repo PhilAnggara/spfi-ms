@@ -48,7 +48,7 @@
 
                                     <a class="d-flex align-items-start text-decoration-none" href="#">
                                         <!-- Icon -->
-                                        <div class="notification-icon {{ $notification->data['icon_color'] ?? 'bg-primary' }} flex-shrink-0">
+                                        <div class="notification-icon {{ $notification->data['icon_color'] ?? 'bg-primary' }} flex-shrink-0 p-1">
                                             <i class="{{ $notification->data['icon'] ?? 'bi-bell' }}"></i>
                                         </div>
 
@@ -72,8 +72,8 @@
                             @empty
                                 <li class="dropdown-item text-center py-4">
                                     <div class="text-muted">
-                                        <i class="bi bi-inbox fa-2x mb-2 d-block"></i>
-                                        <p class="mb-0">No notifications</p>
+                                        <i class="bi bi-inbox fa-2x ms-1 d-block"></i>
+                                        <p class="ms-1">No notifications</p>
                                     </div>
                                 </li>
                             @endforelse

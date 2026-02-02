@@ -86,12 +86,12 @@
 
                                     <!-- Actions -->
                                     <div class="dropdown">
-                                        <button class="btn btn-sm btn-light" type="button"
+                                        <button class="btn btn-sm " type="button"
                                             data-bs-toggle="dropdown" aria-expanded="false"
                                             onclick="event.stopPropagation()">
                                             <i class="bi bi-three-dots-vertical"></i>
                                         </button>
-                                        <ul class="dropdown-menu dropdown-menu-end">
+                                        <ul class="dropdown-menu dropdown-menu-end shadow">
                                             @if(!$notification->read_at)
                                                 <li>
                                                     <a class="dropdown-item" href="#"
