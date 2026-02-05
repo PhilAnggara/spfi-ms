@@ -22,9 +22,10 @@
     <section class="section">
         <div class="card shadow-sm">
             <div class="card-body">
-                <table class="table table-striped text-center text-nowrap" id="table1">
+                <table class="table table-striped text-center text-nowrap" id="balance-sheet-table" data-source="{{ route('accounting.balance-sheet.datatables') }}">
                     <thead>
                         <tr>
+                            <th class="text-center d-none">ID</th>
                             <th class="text-center">Group Code</th>
                             <th class="text-center">Accounting Code</th>
                             <th class="text-center">Grouping</th>
@@ -32,30 +33,7 @@
                             <th class="text-center">Action</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @foreach ($balanceSheets as $balanceSheet)
-                            <tr>
-                                <td>{{ $balanceSheet->groupCode?->group_code ?? '-' }}</td>
-                                <td>{{ $balanceSheet->accountingCode?->code ?? '-' }}</td>
-                                <td>{{ $balanceSheet->grouping?->code ?? '-' }}</td>
-                                <td>{{ $balanceSheet->major ?? '-' }}</td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $balanceSheet->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
-                                            <i class="fa-light fa-edit text-primary"></i>
-                                        </button>
-                                        <button type="button" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete" onclick="hapusData({{ $balanceSheet->id }}, 'Delete Mapping', 'Are you sure want to delete this mapping?')">
-                                            <i class="fa-light fa-trash text-secondary"></i>
-                                        </button>
-                                        <form action="{{ route('accounting.balance-sheet.destroy', $balanceSheet->id) }}" id="hapus-{{ $balanceSheet->id }}" method="POST">
-                                            @method('delete')
-                                            @csrf
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
@@ -148,34 +126,33 @@
     </div>
 </div>
 
-<!-- Edit Modals -->
-@foreach ($balanceSheets as $balanceSheet)
-<div class="modal fade text-left modal-borderless" id="edit-modal-{{ $balanceSheet->id }}" tabindex="-1" role="dialog" aria-labelledby="edit-modal-label-{{ $balanceSheet->id }}" aria-hidden="true">
+<!-- Edit Modal (Reusable) -->
+<div class="modal fade text-left modal-borderless" id="edit-modal" tabindex="-1" role="dialog" aria-labelledby="edit-modal-label" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="edit-modal-label-{{ $balanceSheet->id }}">Edit Mapping</h5>
+                <h5 class="modal-title" id="edit-modal-label">Edit Mapping</h5>
                 <button type="button" class="close rounded-pill" data-bs-dismiss="modal" aria-label="Close">
                     <i data-feather="x"></i>
                 </button>
             </div>
 
-            <form action="{{ route('accounting.balance-sheet.update', $balanceSheet->id) }}" method="POST" class="form form-horizontal">
+            <form action="{{ $editingBalanceSheet ? route('accounting.balance-sheet.update', $editingBalanceSheet->id) : '#' }}" method="POST" class="form form-horizontal" id="edit-form">
                 @csrf
                 @method('PUT')
                 <div class="modal-body">
                     <div class="form-body">
                         <div class="row">
                             <div class="col-md-4">
-                                <label for="group_code_id-{{ $balanceSheet->id }}">Group Code</label>
+                                <label for="edit-group-code-id">Group Code</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <select id="group_code_id-{{ $balanceSheet->id }}" name="group_code_id" class="form-select choices {{ ($errors->any() && session('editing_balance_sheet_id') == $balanceSheet->id) ? ($errors->has('group_code_id') ? 'is-invalid' : '') : '' }}" required>
+                                <select id="edit-group-code-id" name="group_code_id" class="form-select choices {{ ($errors->any() && session('editing_balance_sheet_id')) ? ($errors->has('group_code_id') ? 'is-invalid' : '') : '' }}" required>
                                     @foreach ($groupCodes as $groupCode)
-                                        <option value="{{ $groupCode->id }}" {{ (session('editing_balance_sheet_id') == $balanceSheet->id ? old('group_code_id', $balanceSheet->group_code_id) : $balanceSheet->group_code_id) == $groupCode->id ? 'selected' : '' }}>{{ $groupCode->group_code }} - {{ $groupCode->group_desc }}</option>
+                                        <option value="{{ $groupCode->id }}" {{ (session('editing_balance_sheet_id') ? old('group_code_id', $editingBalanceSheet?->group_code_id) : $editingBalanceSheet?->group_code_id) == $groupCode->id ? 'selected' : '' }}>{{ $groupCode->group_code }} - {{ $groupCode->group_desc }}</option>
                                     @endforeach
                                 </select>
-                                @if ($errors->any() && session('editing_balance_sheet_id') == $balanceSheet->id)
+                                @if ($errors->any() && session('editing_balance_sheet_id'))
                                     @error('group_code_id')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -183,15 +160,15 @@
                             </div>
 
                             <div class="col-md-4">
-                                <label for="accounting_code_id-{{ $balanceSheet->id }}">Accounting Code</label>
+                                <label for="edit-accounting-code-id">Accounting Code</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <select id="accounting_code_id-{{ $balanceSheet->id }}" name="accounting_code_id" class="form-select choices {{ ($errors->any() && session('editing_balance_sheet_id') == $balanceSheet->id) ? ($errors->has('accounting_code_id') ? 'is-invalid' : '') : '' }}" required>
+                                <select id="edit-accounting-code-id" name="accounting_code_id" class="form-select choices {{ ($errors->any() && session('editing_balance_sheet_id')) ? ($errors->has('accounting_code_id') ? 'is-invalid' : '') : '' }}" required>
                                     @foreach ($accountingCodes as $accountingCode)
-                                        <option value="{{ $accountingCode->id }}" {{ (session('editing_balance_sheet_id') == $balanceSheet->id ? old('accounting_code_id', $balanceSheet->accounting_code_id) : $balanceSheet->accounting_code_id) == $accountingCode->id ? 'selected' : '' }}>{{ $accountingCode->code }} - {{ $accountingCode->desc }}</option>
+                                        <option value="{{ $accountingCode->id }}" {{ (session('editing_balance_sheet_id') ? old('accounting_code_id', $editingBalanceSheet?->accounting_code_id) : $editingBalanceSheet?->accounting_code_id) == $accountingCode->id ? 'selected' : '' }}>{{ $accountingCode->code }} - {{ $accountingCode->desc }}</option>
                                     @endforeach
                                 </select>
-                                @if ($errors->any() && session('editing_balance_sheet_id') == $balanceSheet->id)
+                                @if ($errors->any() && session('editing_balance_sheet_id'))
                                     @error('accounting_code_id')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -199,22 +176,22 @@
                             </div>
 
                             <div class="col-md-4">
-                                <label for="grouping_id-{{ $balanceSheet->id }}">Grouping</label>
+                                <label for="edit-grouping-id">Grouping</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <select id="grouping_id-{{ $balanceSheet->id }}" name="grouping_id" class="form-select choices">
+                                <select id="edit-grouping-id" name="grouping_id" class="form-select choices">
                                     <option value="">-</option>
                                     @foreach ($groupings as $grouping)
-                                        <option value="{{ $grouping->id }}" {{ (session('editing_balance_sheet_id') == $balanceSheet->id ? old('grouping_id', $balanceSheet->grouping_id) : $balanceSheet->grouping_id) == $grouping->id ? 'selected' : '' }}>{{ $grouping->code }} - {{ $grouping->desc }}</option>
+                                        <option value="{{ $grouping->id }}" {{ (session('editing_balance_sheet_id') ? old('grouping_id', $editingBalanceSheet?->grouping_id) : $editingBalanceSheet?->grouping_id) == $grouping->id ? 'selected' : '' }}>{{ $grouping->code }} - {{ $grouping->desc }}</option>
                                     @endforeach
                                 </select>
                             </div>
 
                             <div class="col-md-4">
-                                <label for="major-{{ $balanceSheet->id }}">Major</label>
+                                <label for="edit-major">Major</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <input type="text" id="major-{{ $balanceSheet->id }}" name="major" class="form-control" value="{{ (session('editing_balance_sheet_id') == $balanceSheet->id) ? old('major', $balanceSheet->major) : $balanceSheet->major }}">
+                                <input type="text" id="edit-major" name="major" class="form-control" value="{{ session('editing_balance_sheet_id') ? old('major', $editingBalanceSheet?->major) : ($editingBalanceSheet?->major ?? '') }}">
                             </div>
                         </div>
                     </div>
@@ -233,19 +210,18 @@
         </div>
     </div>
 </div>
-@endforeach
 @endsection
 
 @push('prepend-style')
     <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
 @endpush
 @push('addon-style')
-    <link rel="stylesheet" href="{{ url('assets/extensions/simple-datatables/style.css') }}">
-    <link rel="stylesheet" href="{{ url('assets/compiled/css/table-datatable.css') }}">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
 @endpush
 @push('addon-script')
-    <script src="{{ url('assets/extensions/simple-datatables/umd/simple-datatables.js') }}"></script>
-    <script src="{{ url('assets/static/js/pages/simple-datatables.js') }}"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
     <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
     <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
 @endpush
@@ -253,10 +229,148 @@
 @push('addon-script')
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const table = $('#balance-sheet-table');
+        const tableUrl = table.data('source');
+        const csrfToken = '{{ csrf_token() }}';
+        const updateRouteTemplate = '{{ route('accounting.balance-sheet.update', '__ID__') }}';
+        const editModalElement = document.getElementById('edit-modal');
+        const editModal = editModalElement ? new bootstrap.Modal(editModalElement) : null;
+
+        const escapeHtml = (value) => {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+
+        const dataTable = table.DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: tableUrl,
+                type: 'GET'
+            },
+            order: [[0, 'desc']],
+            columns: [
+                {
+                    data: 'id',
+                    visible: false,
+                    searchable: false
+                },
+                {
+                    data: 'group_code',
+                    render: function(data) {
+                        return escapeHtml(data ?? '-');
+                    }
+                },
+                {
+                    data: 'accounting_code',
+                    render: function(data) {
+                        return escapeHtml(data ?? '-');
+                    }
+                },
+                {
+                    data: 'grouping_code',
+                    render: function(data) {
+                        return escapeHtml(data ?? '-');
+                    }
+                },
+                {
+                    data: 'major',
+                    render: function(data) {
+                        return escapeHtml(data ?? '-');
+                    }
+                },
+                {
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    render: function(row) {
+                        const safeGroupCode = escapeHtml(row.group_code ?? '-');
+                        const safeAccountingCode = escapeHtml(row.accounting_code ?? '-');
+                        const editAttrs = `
+                            data-id="${row.id}"
+                            data-group-code-id="${row.group_code_id ?? ''}"
+                            data-accounting-code-id="${row.accounting_code_id ?? ''}"
+                            data-grouping-id="${row.grouping_id ?? ''}"
+                            data-major="${escapeHtml(row.major ?? '')}"
+                            data-group-code="${safeGroupCode}"
+                            data-accounting-code="${safeAccountingCode}"
+                        `;
+
+                        return `
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn icon edit-balance-sheet" ${editAttrs} data-bs-toggle="modal" data-bs-target="#edit-modal" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                                    <i class="fa-light fa-edit text-primary"></i>
+                                </button>
+                                <button type="button" class="btn icon delete-balance-sheet" data-id="${row.id}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
+                                    <i class="fa-light fa-trash text-secondary"></i>
+                                </button>
+                                <form action="{{ route('accounting.balance-sheet.destroy', '__ID__') }}" id="hapus-${row.id}" method="POST">
+                                    <input type="hidden" name="_token" value="${csrfToken}">
+                                    <input type="hidden" name="_method" value="delete">
+                                </form>
+                            </div>
+                        `.replace('__ID__', row.id);
+                    }
+                }
+            ]
+        });
+
+        $('#balance-sheet-table tbody').on('click', '.edit-balance-sheet', function() {
+            const button = $(this);
+            const itemId = button.data('id');
+            const updateUrl = updateRouteTemplate.replace('__ID__', itemId);
+            const setSelectValue = (elementId, value) => {
+                const selectElement = document.getElementById(elementId);
+                if (!selectElement) {
+                    return;
+                }
+
+                const normalizedValue = value === null || value === undefined ? '' : String(value);
+                if (selectElement.choicesInstance) {
+                    selectElement.choicesInstance.removeActiveItems();
+                    if (normalizedValue) {
+                        selectElement.choicesInstance.setChoiceByValue(normalizedValue);
+                    }
+                } else {
+                    selectElement.value = normalizedValue;
+                }
+
+                selectElement.dispatchEvent(new Event('change'));
+            };
+
+            setSelectValue('edit-group-code-id', button.data('group-code-id'));
+            setSelectValue('edit-accounting-code-id', button.data('accounting-code-id'));
+            setSelectValue('edit-grouping-id', button.data('grouping-id'));
+            document.getElementById('edit-major').value = button.data('major') || '';
+            document.getElementById('edit-form').setAttribute('action', updateUrl);
+
+            const editLabel = document.getElementById('edit-modal-label');
+            if (editLabel) {
+                editLabel.textContent = `Edit Mapping - ${button.data('group-code') || ''} / ${button.data('accounting-code') || ''}`;
+            }
+
+            if (editModal) {
+                editModal.show();
+            }
+        });
+
+        $('#balance-sheet-table tbody').on('click', '.delete-balance-sheet', function() {
+            const itemId = $(this).data('id');
+            hapusData(itemId, 'Delete Mapping', 'Are you sure want to delete this mapping?');
+        });
+
         @if ($errors->any())
             @if (session('editing_balance_sheet_id'))
-                const editModal = new bootstrap.Modal(document.getElementById('edit-modal-{{ session("editing_balance_sheet_id") }}'));
-                editModal.show();
+                if (editModal) {
+                    editModal.show();
+                }
             @else
                 const createModal = new bootstrap.Modal(document.getElementById('create-modal'));
                 createModal.show();

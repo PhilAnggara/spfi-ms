@@ -56,6 +56,7 @@ Route::middleware('auth')->group(function () {
             Route::resource('groupings', GroupingController::class)->except(['create', 'show', 'edit']);
             Route::resource('group-codes', AccountingGroupCodeController::class)->except(['create', 'show', 'edit']);
             Route::resource('codes', AccountingCodeController::class)->except(['create', 'show', 'edit']);
+            Route::get('balance-sheet/datatables', [BsGroupingController::class, 'datatable'])->name('balance-sheet.datatables');
             Route::resource('balance-sheet', BsGroupingController::class)->except(['create', 'show', 'edit']);
         });
     });
