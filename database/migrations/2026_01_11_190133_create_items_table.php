@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('items', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->text('name');
             $table->string('code')->unique();
             $table->foreignId('unit_of_measure_id')->constrained('unit_of_measures')->restrictOnDelete();
             $table->foreignId('category_id')->constrained('item_categories')->restrictOnDelete();

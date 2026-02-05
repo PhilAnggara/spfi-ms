@@ -5,6 +5,9 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class ItemSeeder extends Seeder
 {
@@ -13,47 +16,64 @@ class ItemSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('items')->insert([
-            [
-                'code' => 'ELC0001',
-                'name' => 'Kompter PC ASUS',
-                'unit_of_measure_id' => 6,
-                'category_id' => 1,
-                'type' => 'Capital Goods',
-                'stock_on_hand' => 2,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'code' => 'ELC0002',
-                'name' => 'Keyboard Logitech',
-                'unit_of_measure_id' => 2,
-                'category_id' => 1,
-                'type' => 'Capital Goods',
-                'stock_on_hand' => 5,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'code' => 'FUR0001',
-                'name' => 'Kursi Kantor Ergonomic',
-                'unit_of_measure_id' => 2,
-                'category_id' => 1,
-                'type' => 'Capital Goods',
+        // 1) Ambil file CSV export dari sistem lama.
+        $path = public_path('document/csv/product.csv');
+        if (!File::exists($path)) {
+            return;
+        }
+
+        // 2) Siapkan mapping master dari nama -> id untuk relasi.
+        $uomByName = DB::table('unit_of_measures')->pluck('id', 'name');
+        $categoryByName = DB::table('item_categories')->pluck('id', 'name');
+
+        // 3) Baca header agar mapping kolom lebih aman jika urutan berubah.
+        $handle = fopen($path, 'r');
+        $header = fgetcsv($handle, 0, ';');
+        if (!$header) {
+            fclose($handle);
+            return;
+        }
+
+        // 4) Import row by row ke table items sesuai mapping.
+        while (($row = fgetcsv($handle, 0, ';')) !== false) {
+            if (count($row) !== count($header)) {
+                continue;
+            }
+
+            $data = array_combine($header, $row);
+            $uomName = $data['uom_name'] ?? null;
+            $categoryName = $data['product_category'] ?? null;
+
+            $unitId = $uomName !== null ? ($uomByName[$uomName] ?? null) : null;
+            $categoryId = $categoryName !== null ? ($categoryByName[$categoryName] ?? null) : null;
+
+            if (!$unitId || !$categoryId) {
+                continue;
+            }
+
+            $createdDate = trim((string) ($data['created_date'] ?? ''));
+            $updatedDate = trim((string) ($data['updated_date'] ?? ''));
+
+            $createdAt = $createdDate === '' || Str::upper($createdDate) === 'NULL'
+                ? now()
+                : Carbon::parse($createdDate);
+            $updatedAt = $updatedDate === '' || Str::upper($updatedDate) === 'NULL'
+                ? now()
+                : Carbon::parse($updatedDate);
+
+            DB::table('items')->insert([
+                'name' => $data['product_name'] ?? null,
+                'code' => $data['product_code'] ?? null,
+                'unit_of_measure_id' => $unitId,
+                'category_id' => $categoryId,
+                'type' => $data['type'] ?? null,
                 'stock_on_hand' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'code' => 'FUR0002',
-                'name' => 'Meja Kantor Kayu',
-                'unit_of_measure_id' => 6,
-                'category_id' => 1,
-                'type' => 'Capital Goods',
-                'stock_on_hand' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
+                'is_active' => true,
+                'created_at' => $createdAt,
+                'updated_at' => $updatedAt,
+            ]);
+        }
+
+        fclose($handle);
     }
 }

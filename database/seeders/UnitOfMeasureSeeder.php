@@ -5,6 +5,9 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class UnitOfMeasureSeeder extends Seeder
 {
@@ -13,108 +16,49 @@ class UnitOfMeasureSeeder extends Seeder
      */
     public function run(): void
     {
-        $units = [
-            ['MT', 'MT',],
-            ['PCS', 'PCS',],
-            ['PAIR', 'PAIR',],
-            ['LOT', 'LOT',],
-            ['KGS', 'KGS',],
-            ['SET', 'SET',],
-            ['BOX', 'BOX',],
-            ['UNIT', 'UNIT',],
-            ['TIN', 'TIN',],
-            ['BTL', 'BTL',],
-            ['PC', 'PC',],
-            ['ROLL', 'ROLL',],
-            ['PACK', 'PACK',],
-            ['LE', 'LE',],
-            ['SHEET', 'SHEET',],
-            ['m3', 'm3',],
-            ['0', '0',],
-            ['MTR', 'MTR',],
-            ['GLN', 'GLN',],
-            ['TUBE', 'TUBE',],
-            ['SACK', 'SACK',],
-            ['LTR', 'LTR',],
-            ['LGTS', 'LGTS',],
-            ['DOS', 'DOS',],
-            ['PAILS', 'PAILS',],
-            ['GRAMS', 'GRAMS',],
-            ['LUSIN', 'LUSIN',],
-            ['TBG', 'TBG',],
-            ['ROLLS', 'ROLLS',],
-            ['SCHT', 'SCHT',],
-            ['MTRS', 'MTRS',],
-            ['TRUCK', 'TRUCK',],
-            ['DOSS', 'DOSS',],
-            ['SETS', 'SETS',],
-            ['TINS', 'TINS',],
-            ['BOXES', 'BOXES',],
-            ['PART', 'PART',],
-            ['PADS', 'PADS',],
-            ['REAMS', 'REAMS',],
-            ['KALENG', 'KALENG',],
-            ['SHTS', 'SHTS',],
-            ['SHEETS', 'SHEETS',],
-            ['BAGS', 'BAGS',],
-            ['UJUNG', 'UJUNG',],
-            ['LEMBAR', 'LEMBAR',],
-            ['UNITS', 'UNITS',],
-            ['PAIRS', 'PAIRS',],
-            ['CYL', 'CYL',],
-            ['QUART', 'QUART',],
-            ['M2', 'M2',],
-            ['TUBES', 'TUBES',],
-            ['truk', 'truk',],
-            ['TRIP', 'TRIP',],
-            ['METERS', 'METERS',],
-            ['TBNG', 'TBNG',],
-            ['DRUM', 'DRUM',],
-            ['TIMES', 'TIMES',],
-            ['BTG', 'BTG',],
-            ['BUNDLES', 'BUNDLES',],
-            ['HOUR', 'HOUR',],
-            ['Ea', 'Ea',],
-            ['RIM', 'RIM',],
-            ['MB', 'MB',],
-            ['CASE', 'CASE',],
-            ['SACKS', 'SACKS',],
-            ['CM', 'CM',],
-            ['POTS', 'POTS',],
-            ['LITER', 'LITER',],
-            ['POHON', 'POHON',],
-            ['PACKS', 'PACKS',],
-            ['METER', 'METER',],
-            ['SHETS', 'SHETS',],
-            ['STRIP', 'STRIP',],
-            ['PAIL', 'PAIL',],
-            ['OCS', 'OCS',],
-            ['GB', 'GB',],
-            ['MBPS', 'MBPS',],
-            ['LITERS', 'LITERS',],
-            ['KLG', 'KLG',],
-            ['BKS', 'BKS',],
-            ['DOZ', 'DOZ',],
-            ['PCA', 'PCA',],
-            ['KG', 'KG',],
-            ['TRAY', 'TRAY',],
-            ['ROLSS', 'ROLSS',],
-            ['WEEK', 'WEEK',],
-            ['FEET', 'FEET',],
-            ['PRINTED', 'PRINTED',],
-            ['CRTG', 'CRTG',],
-            ['LENGHT', 'LENGTH',],
-            ['11', 'USER',],
-        ];
+        // 1) Ambil file CSV export dari sistem lama.
+        $path = public_path('document/csv/uom.csv');
+        if (!File::exists($path)) {
+            return;
+        }
 
-        foreach ($units as $unit) {
+        // 2) Baca header agar mapping kolom lebih aman jika urutan berubah.
+        $handle = fopen($path, 'r');
+        $header = fgetcsv($handle, 0, ';');
+        if (!$header) {
+            fclose($handle);
+            return;
+        }
+
+        // 3) Import row by row ke table unit_of_measures sesuai mapping.
+        while (($row = fgetcsv($handle, 0, ';')) !== false) {
+            if (count($row) !== count($header)) {
+                continue;
+            }
+
+            $data = array_combine($header, $row);
+            $remarks = trim((string) ($data['remarks'] ?? ''));
+            $remarks = $remarks === '' || Str::upper($remarks) === 'NULL' ? null : $remarks;
+
+            $createdDate = trim((string) ($data['created_date'] ?? ''));
+            $updatedDate = trim((string) ($data['updated_date'] ?? ''));
+
+            $createdAt = $createdDate === '' || Str::upper($createdDate) === 'NULL'
+                ? now()
+                : Carbon::parse($createdDate);
+            $updatedAt = $updatedDate === '' || Str::upper($updatedDate) === 'NULL'
+                ? now()
+                : Carbon::parse($updatedDate);
+
             DB::table('unit_of_measures')->insert([
-                'code' => $unit[0],
-                'name' => $unit[1],
-                'remarks' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'name' => $data['uom_name'] ?? null,
+                'code' => $data['uom_code'] ?? null,
+                'remarks' => $remarks,
+                'created_at' => $createdAt,
+                'updated_at' => $updatedAt,
             ]);
         }
+
+        fclose($handle);
     }
 }
