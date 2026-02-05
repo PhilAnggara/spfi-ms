@@ -11,4 +11,6 @@ for (let i = 0; i < choices.length; i++) {
   } else {
     initChoice = new Choices(choices[i])
   }
+  // Simpan instance agar bisa diakses saat set value dari modal edit
+  choices[i].choicesInstance = initChoice
 }

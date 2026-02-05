@@ -111,31 +111,31 @@
     </div>
 </div>
 
-@foreach ($items as $item)
-<div class="modal fade text-left modal-borderless" id="edit-modal-{{ $item->id }}" tabindex="-1" role="dialog" aria-labelledby="editProductLabel-{{ $item->id }}" aria-hidden="true">
+<!-- Modal edit reusable: dipakai untuk semua item agar tidak render ribuan modal -->
+<div class="modal fade text-left modal-borderless" id="edit-modal" tabindex="-1" role="dialog" aria-labelledby="editProductLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="editProductLabel-{{ $item->id }}">Edit Product - {{ $item->name }}</h5>
+                <h5 class="modal-title" id="editProductLabel">Edit Product{{ $editingItem ? ' - ' . $editingItem->name : '' }}</h5>
                 <button type="button" class="close rounded-pill" data-bs-dismiss="modal" aria-label="Close">
                     <i data-feather="x"></i>
                 </button>
             </div>
 
-            <form action="{{ route('product.update', $item->id) }}" method="POST" class="form form-horizontal">
+            <form action="{{ $editingItem ? route('product.update', $editingItem->id) : '#' }}" method="POST" class="form form-horizontal" id="edit-form">
                 @csrf
                 @method('PUT')
                 <div class="modal-body">
                     <div class="form-body">
                         <div class="row">
                             <div class="col-md-4">
-                                <label for="code-{{ $item->id }}">Code</label>
+                                <label for="edit-code">Code</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <input type="text" id="code-{{ $item->id }}" name="code" placeholder="ABCDE" maxlength="8"
-                                    class="form-control {{ ($errors->any() && session('editing_product_id') == $item->id) ? ($errors->has('code') ? 'is-invalid' : '') : '' }}"
-                                    value="{{ ($errors->any() && session('editing_product_id') == $item->id) ? old('code') : $item->code }}" required>
-                                @if ($errors->any() && session('editing_product_id') == $item->id)
+                                <input type="text" id="edit-code" name="code" placeholder="ABCDE" maxlength="8"
+                                    class="form-control {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('code') ? 'is-invalid' : '') : '' }}"
+                                    value="{{ ($errors->any() && session('editing_product_id')) ? old('code') : ($editingItem?->code ?? '') }}" required>
+                                @if ($errors->any() && session('editing_product_id'))
                                     @error('code')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -143,13 +143,13 @@
                             </div>
 
                             <div class="col-md-4">
-                                <label for="name-{{ $item->id }}">Name</label>
+                                <label for="edit-name">Name</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <input type="text" id="name-{{ $item->id }}" name="name" placeholder="Product Name"
-                                    class="form-control {{ ($errors->any() && session('editing_product_id') == $item->id) ? ($errors->has('name') ? 'is-invalid' : '') : '' }}"
-                                    value="{{ ($errors->any() && session('editing_product_id') == $item->id) ? old('name') : $item->name }}" required>
-                                @if ($errors->any() && session('editing_product_id') == $item->id)
+                                <input type="text" id="edit-name" name="name" placeholder="Product Name"
+                                    class="form-control {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('name') ? 'is-invalid' : '') : '' }}"
+                                    value="{{ ($errors->any() && session('editing_product_id')) ? old('name') : ($editingItem?->name ?? '') }}" required>
+                                @if ($errors->any() && session('editing_product_id'))
                                     @error('name')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -157,16 +157,16 @@
                             </div>
 
                             <div class="col-md-4">
-                                <label for="unit-{{ $item->id }}">Unit</label>
+                                <label for="edit-unit">Unit</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <select id="unit-{{ $item->id }}" name="unit_of_measure_id" class="choices form-select {{ ($errors->any() && session('editing_product_id') == $item->id) ? ($errors->has('unit_of_measure_id') ? 'is-invalid' : '') : '' }}" required>
-                                    <option value="" {{ ($errors->any() && session('editing_product_id') == $item->id && old('unit_of_measure_id')) ? '' : 'selected' }} disabled>-- Select Unit --</option>
+                                <select id="edit-unit" name="unit_of_measure_id" class="choices form-select {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('unit_of_measure_id') ? 'is-invalid' : '') : '' }}" required>
+                                    <option value="" {{ ($errors->any() && session('editing_product_id') && old('unit_of_measure_id')) ? '' : 'selected' }} disabled>-- Select Unit --</option>
                                     @foreach ($itemUnits as $unit)
-                                        <option value="{{ $unit->id }}" {{ ($errors->any() && session('editing_product_id') == $item->id) ? ((string) old('unit_of_measure_id') === (string) $unit->id ? 'selected' : '') : ($item->unit_of_measure_id == $unit->id ? 'selected' : '') }}>{{ $unit->name }}</option>
+                                        <option value="{{ $unit->id }}" {{ ($errors->any() && session('editing_product_id')) ? ((string) old('unit_of_measure_id') === (string) $unit->id ? 'selected' : '') : (($editingItem && $editingItem->unit_of_measure_id == $unit->id) ? 'selected' : '') }}>{{ $unit->name }}</option>
                                     @endforeach
                                 </select>
-                                @if ($errors->any() && session('editing_product_id') == $item->id)
+                                @if ($errors->any() && session('editing_product_id'))
                                     @error('unit_of_measure_id')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -174,16 +174,16 @@
                             </div>
 
                             <div class="col-md-4">
-                                <label for="category-{{ $item->id }}">Category</label>
+                                <label for="edit-category">Category</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <select id="category-{{ $item->id }}" name="category_id" class="choices form-select {{ ($errors->any() && session('editing_product_id') == $item->id) ? ($errors->has('category_id') ? 'is-invalid' : '') : '' }}" required>
-                                    <option value="" {{ ($errors->any() && session('editing_product_id') == $item->id && old('category_id')) ? '' : 'selected' }} disabled>-- Select Category --</option>
+                                <select id="edit-category" name="category_id" class="choices form-select {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('category_id') ? 'is-invalid' : '') : '' }}" required>
+                                    <option value="" {{ ($errors->any() && session('editing_product_id') && old('category_id')) ? '' : 'selected' }} disabled>-- Select Category --</option>
                                     @foreach ($itemCategories as $category)
-                                        <option value="{{ $category->id }}" {{ ($errors->any() && session('editing_product_id') == $item->id) ? ((string) old('category_id') === (string) $category->id ? 'selected' : '') : ($item->category_id == $category->id ? 'selected' : '') }}>{{ $category->name }}</option>
+                                        <option value="{{ $category->id }}" {{ ($errors->any() && session('editing_product_id')) ? ((string) old('category_id') === (string) $category->id ? 'selected' : '') : (($editingItem && $editingItem->category_id == $category->id) ? 'selected' : '') }}>{{ $category->name }}</option>
                                     @endforeach
                                 </select>
-                                @if ($errors->any() && session('editing_product_id') == $item->id)
+                                @if ($errors->any() && session('editing_product_id'))
                                     @error('category_id')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -191,16 +191,16 @@
                             </div>
 
                             <div class="col-md-4">
-                                <label for="type-{{ $item->id }}">Type</label>
+                                <label for="edit-type">Type</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <select id="type-{{ $item->id }}" name="type" class="choices form-select {{ ($errors->any() && session('editing_product_id') == $item->id) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}">
-                                    <option value="" {{ ($errors->any() && session('editing_product_id') == $item->id && old('type')) ? '' : 'selected' }}>-- Select Type --</option>
+                                <select id="edit-type" name="type" class="choices form-select {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}">
+                                    <option value="" {{ ($errors->any() && session('editing_product_id') && old('type')) ? '' : 'selected' }}>-- Select Type --</option>
                                     @foreach ($types as $t)
-                                        <option value="{{ $t }}" {{ ($errors->any() && session('editing_product_id') == $item->id) ? (old('type') === $t ? 'selected' : '') : ($item->type === $t ? 'selected' : '') }}>{{ $t }}</option>
+                                        <option value="{{ $t }}" {{ ($errors->any() && session('editing_product_id')) ? (old('type') === $t ? 'selected' : '') : (($editingItem && $editingItem->type === $t) ? 'selected' : '') }}>{{ $t }}</option>
                                     @endforeach
                                 </select>
-                                @if ($errors->any() && session('editing_product_id') == $item->id)
+                                @if ($errors->any() && session('editing_product_id'))
                                     @error('type')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -224,5 +224,3 @@
         </div>
     </div>
 </div>
-
-@endforeach

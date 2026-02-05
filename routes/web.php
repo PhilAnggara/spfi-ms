@@ -37,6 +37,8 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role:administrator')->prefix('master')->group(function () {
         Route::resource('user', UserController::class);
+        // Endpoint khusus untuk DataTables (server-side)
+        Route::get('product/datatables', [ProductController::class, 'datatable'])->name('product.datatables');
         Route::resource('product', ProductController::class);
         Route::resource('product-category', ItemCategoryController::class);
         Route::resource('unit-of-measurement', UnitOfMeasureController::class);

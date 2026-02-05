@@ -19,13 +19,92 @@ class ProductController extends Controller
         $itemCategories = ItemCategory::query()->orderBy('name')->get();
         $itemUnits = UnitOfMeasure::query()->orderBy('name')->get();
         $types = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
-        $items = Item::query()->with(['unit', 'category'])->orderByDesc('id')->get();
+        $editingItem = null;
+        $editingProductId = session('editing_product_id');
+
+        if ($editingProductId) {
+            $editingItem = Item::query()->find($editingProductId);
+        }
 
         return view('pages.product', [
-            'items' => $items,
             'itemCategories' => $itemCategories,
             'itemUnits' => $itemUnits,
             'types' => $types,
+            'editingItem' => $editingItem,
+        ]);
+    }
+
+    /**
+     * Server-side datatable data.
+     */
+    public function datatable(Request $request)
+    {
+        // Mapping kolom agar sorting sesuai urutan kolom di DataTables
+        $columns = [
+            'items.id',
+            'items.code',
+            'items.name',
+            'unit_of_measures.name',
+            'item_categories.name',
+            'items.type',
+        ];
+
+        // Base query untuk kebutuhan paging + join relasi
+        $baseQuery = Item::query()
+            ->leftJoin('unit_of_measures', 'items.unit_of_measure_id', '=', 'unit_of_measures.id')
+            ->leftJoin('item_categories', 'items.category_id', '=', 'item_categories.id')
+            ->select([
+                'items.id',
+                'items.code',
+                'items.name',
+                'items.type',
+                'items.unit_of_measure_id',
+                'items.category_id',
+                'unit_of_measures.name as unit_name',
+                'item_categories.name as category_name',
+            ]);
+
+        // Total data tanpa filter
+        $recordsTotal = Item::query()->count();
+
+        $searchValue = $request->input('search.value');
+        if ($searchValue) {
+            // Filter pencarian global (search box DataTables)
+            $baseQuery->where(function ($query) use ($searchValue) {
+                $likeValue = '%' . $searchValue . '%';
+                $query->where('items.code', 'like', $likeValue)
+                    ->orWhere('items.name', 'like', $likeValue)
+                    ->orWhere('unit_of_measures.name', 'like', $likeValue)
+                    ->orWhere('item_categories.name', 'like', $likeValue)
+                    ->orWhere('items.type', 'like', $likeValue);
+            });
+        }
+
+        // Total data setelah filter
+        $recordsFiltered = (clone $baseQuery)->count();
+
+        // Sorting yang dikirim DataTables (default id desc di sisi client)
+        $orderColumnIndex = (int) $request->input('order.0.column', 0);
+        $orderDirection = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
+        $orderColumn = $columns[$orderColumnIndex] ?? 'items.id';
+
+        // Paging
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 10);
+        $length = $length > 0 ? $length : 10;
+
+        $data = $baseQuery
+            ->orderBy($orderColumn, $orderDirection)
+            ->skip($start)
+            ->take($length)
+            ->get();
+
+        // Format JSON sesuai kebutuhan DataTables
+        return response()->json([
+            'draw' => (int) $request->input('draw', 1),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
         ]);
     }
 
