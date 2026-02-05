@@ -46,12 +46,14 @@
                                         {{ $item->code }}
                                     </button>
                                 </td>
-                                <td>{{ $item->name }}</td>
+                                <td data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $item->name }}" onclick="copyToClipboard('{{ $item->name }}')" style="cursor: pointer">
+                                    {{ Str::limit($item->name, 30, '...') ?? '-' }}
+                                </td>
                                 <td>
                                     <span class="badge bg-light-secondary">{{ $item->unit?->name ?? '-' }}</span>
                                 </td>
                                 <td>{{ $item->category?->name ?? '-' }}</td>
-                                <td>{{ $item->type }}</td>
+                                <td>{{ $item->type ?? '-' }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
                                         <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">

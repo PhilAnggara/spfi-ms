@@ -19,7 +19,7 @@ class ProductController extends Controller
         $itemCategories = ItemCategory::query()->orderBy('name')->get();
         $itemUnits = UnitOfMeasure::query()->orderBy('name')->get();
         $types = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
-        $items = Item::query()->with(['unit', 'category'])->orderByDesc('id')->get();
+        $items = Item::query()->with(['unit', 'category'])->orderByDesc('id')->limit(10)->get();
 
         return view('pages.product', [
             'items' => $items,
@@ -45,11 +45,11 @@ class ProductController extends Controller
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
         $request->validate([
-            'code' => ['required', 'string', 'alpha_num', 'size:7', Rule::unique('items', 'code')],
+            'code' => ['required', 'string', 'max:8', Rule::unique('items', 'code')],
             'name' => ['required', 'string'],
             'unit_of_measure_id' => ['required', 'integer', Rule::exists('unit_of_measures', 'id')],
             'category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
-            'type' => ['required', 'string', Rule::in($allowedTypes)],
+            'type' => ['nullable', 'string', Rule::in($allowedTypes)],
         ]);
 
         Item::create([
@@ -92,11 +92,11 @@ class ProductController extends Controller
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
         $request->validate([
-            'code' => ['required', 'string', 'alpha_num', 'size:7', Rule::unique('items', 'code')->ignore($id)],
+            'code' => ['required', 'string', 'max:8', Rule::unique('items', 'code')->ignore($id)],
             'name' => ['required', 'string'],
             'unit_of_measure_id' => ['required', 'integer', Rule::exists('unit_of_measures', 'id')],
             'category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
-            'type' => ['required', 'string', Rule::in($allowedTypes)],
+            'type' => ['nullable', 'string', Rule::in($allowedTypes)],
         ]);
 
         $item->update([

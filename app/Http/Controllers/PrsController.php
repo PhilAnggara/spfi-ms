@@ -19,7 +19,7 @@ class PrsController extends Controller
      */
     public function index()
     {
-        $items = Prs::all()->sortDesc();
+        $items = Prs::with(['department', 'user', 'items.item'])->orderByDesc('id')->get();
         $departments = Department::all();
         return view('pages.prs', [
             'items' => $items,

@@ -61,12 +61,17 @@ class ItemSeeder extends Seeder
                 ? now()
                 : Carbon::parse($updatedDate);
 
+            $type = $data['type'] ?? null;
+            if ($type === 'NULL') {
+                $type = null;
+            }
+
             DB::table('items')->insert([
                 'name' => $data['product_name'] ?? null,
                 'code' => $data['product_code'] ?? null,
                 'unit_of_measure_id' => $unitId,
                 'category_id' => $categoryId,
-                'type' => $data['type'] ?? null,
+                'type' => $type,
                 'stock_on_hand' => 0,
                 'is_active' => true,
                 'created_at' => $createdAt,

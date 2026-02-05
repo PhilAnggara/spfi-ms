@@ -18,7 +18,7 @@
                                 <label for="code">Code</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <input type="text" id="code" name="code" placeholder="ABCDE" minlength="7" maxlength="7" pattern="[A-Za-z0-9]{7}"
+                                <input type="text" id="code" name="code" placeholder="ABCDE" maxlength="8"
                                     class="form-control {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('code') ? 'is-invalid' : '') : '' }}"
                                     value="{{ ($errors->any() && !session('editing_product_id')) ? old('code') : '' }}" required>
                                 @if ($errors->any() && !session('editing_product_id'))
@@ -80,8 +80,8 @@
                                 <label for="type">Type</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <select id="type" name="type" class="choices form-select {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}" required>
-                                    <option value="" {{ ($errors->any() && !session('editing_product_id') && old('type')) ? '' : 'selected' }} disabled>-- Select Type --</option>
+                                <select id="type" name="type" class="choices form-select {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}">
+                                    <option value="" {{ ($errors->any() && !session('editing_product_id') && old('type')) ? '' : 'selected' }}>-- Select Type --</option>
                                     @foreach ($types as $t)
                                         <option value="{{ $t }}" {{ ($errors->any() && !session('editing_product_id') && old('type') === $t) ? 'selected' : '' }}>{{ $t }}</option>
                                     @endforeach
@@ -132,7 +132,7 @@
                                 <label for="code-{{ $item->id }}">Code</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <input type="text" id="code-{{ $item->id }}" name="code" placeholder="ABCDE" minlength="7" maxlength="7" pattern="[A-Za-z0-9]{7}"
+                                <input type="text" id="code-{{ $item->id }}" name="code" placeholder="ABCDE" maxlength="8"
                                     class="form-control {{ ($errors->any() && session('editing_product_id') == $item->id) ? ($errors->has('code') ? 'is-invalid' : '') : '' }}"
                                     value="{{ ($errors->any() && session('editing_product_id') == $item->id) ? old('code') : $item->code }}" required>
                                 @if ($errors->any() && session('editing_product_id') == $item->id)
@@ -194,8 +194,8 @@
                                 <label for="type-{{ $item->id }}">Type</label>
                             </div>
                             <div class="col-md-8 form-group">
-                                <select id="type-{{ $item->id }}" name="type" class="choices form-select {{ ($errors->any() && session('editing_product_id') == $item->id) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}" required>
-                                    <option value="" {{ ($errors->any() && session('editing_product_id') == $item->id && old('type')) ? '' : 'selected' }} disabled>-- Select Type --</option>
+                                <select id="type-{{ $item->id }}" name="type" class="choices form-select {{ ($errors->any() && session('editing_product_id') == $item->id) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}">
+                                    <option value="" {{ ($errors->any() && session('editing_product_id') == $item->id && old('type')) ? '' : 'selected' }}>-- Select Type --</option>
                                     @foreach ($types as $t)
                                         <option value="{{ $t }}" {{ ($errors->any() && session('editing_product_id') == $item->id) ? (old('type') === $t ? 'selected' : '') : ($item->type === $t ? 'selected' : '') }}>{{ $t }}</option>
                                     @endforeach
