@@ -19,7 +19,7 @@ class ProductController extends Controller
         $itemCategories = ItemCategory::query()->orderBy('name')->get();
         $itemUnits = UnitOfMeasure::query()->orderBy('name')->get();
         $types = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
-        $items = Item::query()->with(['unit', 'category'])->orderByDesc('id')->limit(10)->get();
+        $items = Item::query()->with(['unit', 'category'])->orderByDesc('id')->get();
 
         return view('pages.product', [
             'items' => $items,
