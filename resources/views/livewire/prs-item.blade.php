@@ -3,6 +3,9 @@
         <div wire:loading.class="opacity-25" wire:target="removePrsItem({{ $loop->index }})" class="card shadow mt-2" wire:key="prs-item-{{ $prsItem['row_id'] ?? $loop->index }}">
             <div class="card-content">
                 <div class="card-body position-relative">
+                    <div class="position-absolute top-0 start-0 translate-middle badge-container">
+                        <span class="badge bg-secondary">{{ $loop->index + 1}}</span>
+                    </div>
                     @if ($loop->count > 1)
                         <div class="position-absolute top-0 end-0 p-2">
                             <button

@@ -23,6 +23,10 @@ class Prs extends Model
     {
         return $this->hasMany(PrsItem::class, 'prs_id', 'id');
     }
+    public function logs()
+    {
+        return $this->hasMany(PrsLog::class, 'prs_id', 'id');
+    }
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'id');

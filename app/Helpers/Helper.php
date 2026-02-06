@@ -72,7 +72,7 @@ if (! function_exists('get_job_title')) {
         $dept = $user->department->name;
         // jika nama department lebih dari 12 karakter maka singkat $dept menggunakan code
         if (strlen($dept) > 12) {
-            $dept = $user->department->code;
+            $dept = $user->department->alias;
         }
 
         return $dept . ' ' . $user->role;

@@ -123,7 +123,7 @@ class PrsItem extends Component
 
         // Exclude items already chosen in other rows to prevent duplicates
         return Item::query()
-            ->whereNotIn('id', $selectedItemIds)
+            ->whereNotIn('id', $selectedItemIds)->limit(100)
             ->get();
     }
 
