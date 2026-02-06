@@ -16,7 +16,7 @@ class PrsSeeder extends Seeder
     {
         DB::table('prs')->insert([
             [
-                'prs_number' => 'IT-010126-001',
+                'prs_number' => '7056-010126-001',
                 'user_id' => 1,
                 'department_id' => 1,
                 'prs_date' => Carbon::now(),
@@ -27,7 +27,7 @@ class PrsSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'prs_number' => 'IT-010126-002',
+                'prs_number' => '7056-010126-002',
                 'user_id' => 1,
                 'department_id' => 1,
                 'prs_date' => Carbon::now(),
@@ -38,7 +38,7 @@ class PrsSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'prs_number' => 'PUR-010126-001',
+                'prs_number' => '7050-010126-003',
                 'user_id' => 5,
                 'department_id' => 5,
                 'prs_date' => Carbon::now(),

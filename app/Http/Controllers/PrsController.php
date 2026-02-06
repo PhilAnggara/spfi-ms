@@ -19,7 +19,9 @@ class PrsController extends Controller
      */
     public function index()
     {
-        $items = Prs::with(['department', 'user', 'items.item'])->orderByDesc('id')->get();
+        $items = Prs::with(['department', 'user', 'items.item', 'logs' => function ($query) {
+            $query->latest();
+        }])->orderByDesc('id')->get();
         $departments = Department::all();
         return view('pages.prs', [
             'items' => $items,
@@ -115,6 +117,11 @@ class PrsController extends Controller
             $prs->prs_number = $this->generatePrsNumber($validated['department_id']);
         }
 
+        $previousStatus = $prs->status;
+        if ($prs->status === 'ON_HOLD') {
+            $prs->status = 'RESUBMITTED';
+        }
+
         $prs->save();
 
         // Reset items then re-create based on submitted rows
@@ -125,6 +132,17 @@ class PrsController extends Controller
                 'prs_id'   => $prs->id,
                 'item_id'  => $itemRow['item_id'],
                 'quantity' => $itemRow['quantity'],
+            ]);
+        }
+
+        if ($previousStatus === 'ON_HOLD') {
+            $prs->logs()->create([
+                'user_id' => $request->user()?->id,
+                'action' => 'RESUBMIT',
+                'message' => 'PRS updated after hold.',
+                'meta' => [
+                    'previous_status' => $previousStatus,
+                ],
             ]);
         }
 
@@ -151,6 +169,23 @@ class PrsController extends Controller
     {
         // Ambil data PRS beserta relasi yang diperlukan
         $prs = Prs::with(['user', 'department', 'items.item'])->findOrFail($id);
+
+        // ubah status jadi SUBMITTED
+        if ($prs->status === 'DRAFT' || $prs->status === 'ON_HOLD') {
+            $previousStatus = $prs->status;
+            $prs->status = 'SUBMITTED';
+            $prs->save();
+
+            // Log perubahan status jika sebelumnya DRAFT atau ON_HOLD
+            $prs->logs()->create([
+                'user_id' => Auth::id(),
+                'action' => 'SUBMIT',
+                'message' => 'PRS submitted for GM approval.',
+                'meta' => [
+                    'previous_status' => $previousStatus,
+                ],
+            ]);
+        }
 
         // Generate QR code sebagai SVG (tidak memerlukan Imagick)
         $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(100)->generate($prs->prs_number);

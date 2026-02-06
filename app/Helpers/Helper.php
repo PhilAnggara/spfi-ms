@@ -107,3 +107,32 @@ if (! function_exists('get_manager_name')) {
         return $manager->name;
     }
 }
+
+if (! function_exists('status_badge_color')) {
+    function status_badge_color($status)
+    {
+        return match ($status) {
+            'DRAFT' => 'bg-light-secondary',
+            'SUBMITTED' => 'bg-light-info',
+            'RESUBMITTED' => 'bg-light-info',
+            'ON_HOLD' => 'bg-light-warning',
+            'CANVASING' => 'bg-light-primary',
+            'REJECTED' => 'bg-light-danger',
+            default => 'bg-light-secondary',
+        };
+    }
+}
+if (! function_exists('status_badge_icon')) {
+    function status_badge_icon($status)
+    {
+        return match ($status) {
+            'DRAFT' => 'fa-duotone fa-solid fa-circle-dot text-secondary',
+            'SUBMITTED' => 'fa-duotone fa-solid fa-circle-up text-info',
+            'RESUBMITTED' => 'fa-duotone fa-solid fa-circle-up text-info',
+            'ON_HOLD' => 'fa-duotone fa-solid fa-circle-pause text-warning',
+            'CANVASING' => 'fa-duotone fa-solid fa-circle-check text-primary',
+            'REJECTED' => 'fa-duotone fa-solid fa-circle-xmark text-danger',
+            default => 'fa-duotone fa-solid fa-circle-dot text-secondary',
+        };
+    }
+}

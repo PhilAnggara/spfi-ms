@@ -55,7 +55,10 @@
                                 <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
                                 <td><i class="fa-duotone fa-solid fa-calendar-star text-primary"></i> {{ tgl($item->date_needed) }}</td>
                                 <td>
-                                    <span class="badge bg-light-warning">{{ $item->status }}</span>
+                                    <span class="badge {{ status_badge_color($item->status) }}">
+                                        <i class="{{ status_badge_icon($item->status) }}"></i>
+                                        {{ $item->status }}
+                                    </span>
                                 </td>
                                 <td>{{ Str::limit($item->remarks, 20, '...') ?? '-' }}</td>
                                 <td>
@@ -63,16 +66,18 @@
                                         <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
                                             <i class="fa-light fa-eye text-primary"></i>
                                         </button>
-                                        <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
-                                            <i class="fa-light fa-edit text-primary"></i>
-                                        </button>
-                                        <button type="button" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete" onclick="hapusData({{ $item->id }}, 'Delete PRS', 'Are you sure want to delete PRS {{ $item->prs_number }}?')">
-                                            <i class="fa-light fa-trash text-secondary"></i>
-                                        </button>
-                                        <form action="{{ route('prs.destroy', $item->id) }}" id="hapus-{{ $item->id }}" method="POST">
-                                            @method('delete')
-                                            @csrf
-                                        </form>
+                                        @if ($item->status === 'DRAFT' || $item->status === 'ON_HOLD' || $item->status === 'SUBMITTED' || $item->status === 'RESUBMITTED')
+                                            <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                                                <i class="fa-light fa-edit text-primary"></i>
+                                            </button>
+                                            <button type="button" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete" onclick="hapusData({{ $item->id }}, 'Delete PRS', 'Are you sure want to delete PRS {{ $item->prs_number }}?')">
+                                                <i class="fa-light fa-trash text-secondary"></i>
+                                            </button>
+                                            <form action="{{ route('prs.destroy', $item->id) }}" id="hapus-{{ $item->id }}" method="POST">
+                                                @method('delete')
+                                                @csrf
+                                            </form>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

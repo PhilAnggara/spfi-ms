@@ -64,6 +64,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');
         Route::get('/approval/{prs}', [PrsApprovalController::class, 'show'])->name('prs.approval.show');
         Route::post('/approval/{prs}/approve', [PrsApprovalController::class, 'approve'])->name('prs.approve');
+        Route::post('/approval/{prs}/hold', [PrsApprovalController::class, 'hold'])->name('prs.hold');
         Route::post('/approval/{prs}/reject', [PrsApprovalController::class, 'reject'])->name('prs.reject');
     });
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');

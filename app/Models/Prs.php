@@ -27,9 +27,18 @@ class Prs extends Model
     {
         return $this->hasMany(PrsLog::class, 'prs_id', 'id');
     }
+    public function canvasingDate()
+    {
+        $date = $this->hasOne(PrsLog::class, 'prs_id', 'id')->where('action', 'CANVASING')->orderBy('created_at', 'asc')->first('created_at');
+        return tgl($date?->created_at);
+    }
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
+    }
+    public function canvaser()
+    {
+        return $this->belongsTo(User::class, 'canvaser_id', 'id');
     }
     public function department()
     {

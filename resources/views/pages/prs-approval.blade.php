@@ -20,8 +20,8 @@
                             <th class="text-center">Charged to Department</th>
                             <th class="text-center">PRS Date</th>
                             <th class="text-center">Date Needed</th>
-                            <th class="text-center">No. of Items</th>
                             <th class="text-center">Remarks</th>
+                            <th class="text-center">Details</th>
                             <th class="text-center">Action</th>
                         </tr>
                     </thead>
@@ -37,23 +37,34 @@
                                 <td>{{ $item->department->name }}</td>
                                 <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
                                 <td><i class="fa-duotone fa-solid fa-calendar-star text-primary"></i> {{ tgl($item->date_needed) }}</td>
-                                <td>
-                                    <span class="badge bg-light-secondary">{{ $item->items->count() }}</span>
-                                </td>
                                 <td>{{ Str::limit($item->remarks, 20, '...') ?? '-' }}</td>
                                 <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn icon icon-left btn-outline-success" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete" onclick="hapusData({{ $item->id }}, 'Delete PRS', 'Are you sure want to delete PRS {{ $item->prs_number }}?')">
-                                            <i class="fa-duotone fa-solid fa-file-pdf"></i>
-                                            Approve
-                                        </button>
-                                        <form action="{{ route('prs.destroy', $item->id) }}" id="hapus-{{ $item->id }}" method="POST">
-                                            @method('delete')
-                                            @csrf
-                                        </form>
-                                    </div>
+                                    <button type="button" class="btn btn-sm icon icon-left" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}">
+                                        <i class="fa-light fa-eye text-primary"></i>
+                                        View Details
+                                    </button>
+                                </td>
+                                <td>
+                                    @if ($item->status === 'APPROVED' || $item->status === 'ON_HOLD')
+                                        <span class="badge {{ status_badge_color($item->status) }}">
+                                            <i class="{{ status_badge_icon($item->status) }}"></i>
+                                            {{ $item->status }}
+                                        </span>
+                                    @else
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn icon icon-left btn-outline-success" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process" @disabled($item->status === 'DRAFT')>
+                                                <i class="fa-duotone fa-solid fa-circle-check"></i>
+                                                Process
+                                            </button>
+                                            <button type="button" class="btn icon icon-left btn-outline-warning" data-bs-toggle="modal" data-bs-target="#hold-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Hold" @disabled($item->status === 'DRAFT' || $item->status === 'APPROVED')>
+                                                <i class="fa-duotone fa-solid fa-circle-pause"></i>
+                                                Hold
+                                            </button>
+                                        </div>
+                                    @endif
                                 </td>
                             </tr>
+
                         @endforeach
                     </tbody>
                 </table>
@@ -62,6 +73,207 @@
 
     </section>
 </div>
+
+@foreach ($items as $item)
+    <div class="modal fade text-left modal-borderless" id="approve-modal-{{ $item->id }}" tabindex="-1"
+        role="dialog" aria-labelledby="approveModalLabel-{{ $item->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="approveModalLabel-{{ $item->id }}">Approve & Assign Canvasser</h5>
+                    <button type="button" class="close rounded-pill" data-bs-dismiss="modal" aria-label="Close">
+                        <i data-feather="x"></i>
+                    </button>
+                </div>
+                <form action="{{ route('prs.approve', $item->id) }}" method="post" class="form">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="canvaser-{{ $item->id }}">Assign to Canvasser</label>
+                            <select id="canvaser-{{ $item->id }}" name="canvaser_id" class="form-select" required>
+                                <option value="" disabled selected>-- Select Canvasser --</option>
+                                @foreach ($canvasers as $canvaser)
+                                    <option value="{{ $canvaser->id }}">{{ $canvaser->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn icon icon-left btn-light-primary" data-bs-dismiss="modal">
+                            <i class="fa-thin fa-xmark"></i>
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn icon icon-left btn-success ms-1">
+                            <i class="fa-thin fa-check me-1"></i>
+                            Process
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade text-left modal-borderless" id="hold-modal-{{ $item->id }}" tabindex="-1"
+        role="dialog" aria-labelledby="holdModalLabel-{{ $item->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="holdModalLabel-{{ $item->id }}">Hold PRS</h5>
+                    <button type="button" class="close rounded-pill" data-bs-dismiss="modal" aria-label="Close">
+                        <i data-feather="x"></i>
+                    </button>
+                </div>
+                <form action="{{ route('prs.hold', $item->id) }}" method="post" class="form">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="form-floating">
+                            <textarea class="form-control" placeholder="Reason" id="hold-message-{{ $item->id }}" name="message" required></textarea>
+                            <label for="hold-message-{{ $item->id }}">Reason for hold</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn icon icon-left btn-light-primary" data-bs-dismiss="modal">
+                            <i class="fa-thin fa-xmark"></i>
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn icon icon-left btn-warning ms-1">
+                            <i class="fa-thin fa-pause me-1"></i>
+                            Hold
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade text-left modal-borderless" id="detail-modal-{{ $item->id }}" tabindex="-1"
+    role="dialog" aria-labelledby="myModalLabel1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Detail PRS - ({{ $item->prs_number }})</h5>
+                    <button type="button" class="close rounded-pill" data-bs-dismiss="modal"
+                        aria-label="Close">
+                        <i data-feather="x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+
+                    @php
+                        $holdLog = $item->logs?->firstWhere('action', 'HOLD');
+                    @endphp
+
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <tbody>
+                                <tr>
+                                    <th>Progress</th>
+                                    <td>
+                                        <span class="badge {{ status_badge_color($item->status) }}">
+                                            <i class="{{ status_badge_icon($item->status) }}"></i>
+                                            {{ $item->status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                @if ($item->status === 'ON_HOLD' && $holdLog)
+                                    <tr>
+                                        <th>Hold Reason</th>
+                                        <td>
+                                            {{ $holdLog->message }}
+                                        </td>
+                                    </tr>
+                                @else
+                                    -
+                                @endif
+                                <tr>
+                                    <th>Submitted by</th>
+                                    <td><i class="fa-duotone fa-solid fa-circle-user text-secondary"></i> {{ $item->user->name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Department</th>
+                                    <td><i class="fa-duotone fa-solid fa-building-user text-secondary"></i> {{ $item->department->name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>PRS Date</th>
+                                    <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Date Needed</th>
+                                    <td>
+                                        <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i>
+                                        {{ tgl($item->date_needed) }}
+                                        @if (!Carbon\Carbon::parse($item->date_needed)->isPast())
+                                            <small class="text-muted"> - ({{ human_time($item->date_needed) }})</small>
+                                        @else
+                                            <span class="badge bg-light-danger ms-2">Overdue</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Remarks</th>
+                                    <td><i class="fa-duotone fa-solid fa-circle-info text-secondary"></i> {{ $item->remarks ? $item->remarks : '-' }}</td>
+                                </tr>
+                                @if ($item->canvaser)
+                                    <tr>
+                                        <th>Canvaser</th>
+                                        <td><i class="fa-duotone fa-solid fa-user text-secondary"></i> {{ $item->canvaser->name }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Canvasing Date</th>
+                                        <td><i class="fa-duotone fa-solid fa-calendar-days text-primary"></i> {{ $item->canvasingDate() }}</td>
+                                    </tr>
+                                @endif
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="divider">
+                        <div class="divider-text fw-bold">Items</div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered mb-0 text-center text-nowrap">
+                            <thead>
+                                <tr>
+                                    <th>Item Code</th>
+                                    <th>Item Name</th>
+                                    <th>Stock on Hand</th>
+                                    <th>Quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($item->items as $itemInfo)
+                                    <tr>
+                                        <td>
+                                            <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $itemInfo->item->code }}')">
+                                                <i class="fa-solid fa-regular fa-clipboard"></i>
+                                                {{ $itemInfo->item->code }}
+                                            </button>
+                                        </td>
+                                        <td>{{ $itemInfo->item->name }}</td>
+                                        <td>{{ $itemInfo->item->stock_on_hand }}</td>
+                                        <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- QR Code Section -->
+                    <div class="text-center my-4">
+                        <div class="d-inline-block border border-dark-subtle p-2 rounded">
+                            {!! QrCode::size(150)->generate($item->prs_number) !!}
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">Scan to verify PRS Number</small>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+@endforeach
 @endsection
 
 @push('prepend-style')

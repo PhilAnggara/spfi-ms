@@ -92,6 +92,10 @@
             </div>
             <div class="modal-body">
 
+                @php
+                    $holdLog = $item->logs?->firstWhere('action', 'HOLD');
+                @endphp
+
                 <div class="progress progress-primary my-4">
                     <div class="progress-bar progress-label" role="progressbar" style="width: 35%" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
@@ -101,8 +105,23 @@
                         <tbody>
                             <tr>
                                 <th>Progress</th>
-                                <td><span class="badge bg-light-warning">{{ $item->status }}</span></td>
+                                <td>
+                                    <span class="badge {{ status_badge_color($item->status) }}">
+                                        <i class="{{ status_badge_icon($item->status) }}"></i>
+                                        {{ $item->status }}
+                                    </span>
+                                </td>
                             </tr>
+                            @if ($item->status === 'ON_HOLD' && $holdLog)
+                                <tr>
+                                    <th>Hold Reason</th>
+                                    <td>
+                                        {{ $holdLog->message }}
+                                    </td>
+                                </tr>
+                            @else
+                                -
+                            @endif
                             <tr>
                                 <th>Submitted by</th>
                                 <td><i class="fa-duotone fa-solid fa-circle-user text-secondary"></i> {{ $item->user->name }}</td>
@@ -131,18 +150,18 @@
                                 <th>Remarks</th>
                                 <td><i class="fa-duotone fa-solid fa-circle-info text-secondary"></i> {{ $item->remarks ? $item->remarks : '-' }}</td>
                             </tr>
+                            @if ($item->canvaser)
+                                <tr>
+                                    <th>Canvaser</th>
+                                    <td><i class="fa-duotone fa-solid fa-user text-secondary"></i> {{ $item->canvaser->name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Canvasing Date</th>
+                                    <td><i class="fa-duotone fa-solid fa-calendar-days text-primary"></i> {{ $item->canvasingDate() }}</td>
+                                </tr>
+                            @endif
                         </tbody>
                     </table>
-                </div>
-
-                <!-- QR Code Section -->
-                <div class="text-center mb-4">
-                    <div class="d-inline-block border border-dark-subtle p-2 rounded">
-                        {!! QrCode::size(150)->generate($item->prs_number) !!}
-                    </div>
-                    <div class="mt-2">
-                        <small class="text-muted">Scan to verify PRS Number</small>
-                    </div>
                 </div>
 
                 <div class="divider">
@@ -177,6 +196,16 @@
                     </table>
                 </div>
 
+                <!-- QR Code Section -->
+                <div class="text-center my-4">
+                    <div class="d-inline-block border border-dark-subtle p-2 rounded">
+                        {!! QrCode::size(150)->generate($item->prs_number) !!}
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Scan to verify PRS Number</small>
+                    </div>
+                </div>
+
             </div>
             <div class="modal-footer d-flex justify-content-center">
                 <a href="{{ route('prs.print', $item->id) }}" target="_blank" class="btn icon icon-left btn-outline-primary">
@@ -204,6 +233,12 @@
                 @csrf
                 @method('PUT')
                 <div class="modal-body">
+
+                    @if ($item->status === 'ON_HOLD' && $holdLog)
+                        <div class="alert alert-warning" role="alert">
+                            <strong>Hold Reason:</strong> {{ $holdLog->message }}
+                        </div>
+                    @endif
 
                     <div class="row">
                         <div class="col-md-6 col-12">

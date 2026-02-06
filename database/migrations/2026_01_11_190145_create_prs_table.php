@@ -20,6 +20,7 @@ return new class extends Migration
             $table->date('date_needed');
             $table->text('remarks')->nullable();
             $table->string('status')->default('DRAFT'); // DRAFT, SUBMITTED, APPROVED
+            $table->foreignId('canvaser_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
             $table->softDeletes();
         });
