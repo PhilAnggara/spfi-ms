@@ -45,12 +45,7 @@
                                     </button>
                                 </td>
                                 <td>
-                                    @if ($item->status === 'APPROVED' || $item->status === 'ON_HOLD')
-                                        <span class="badge {{ status_badge_color($item->status) }}">
-                                            <i class="{{ status_badge_icon($item->status) }}"></i>
-                                            {{ $item->status }}
-                                        </span>
-                                    @else
+                                    @if ($item->status === 'SUBMITTED' || $item->status === 'RESUBMITTED')
                                         <div class="btn-group btn-group-sm">
                                             <button type="button" class="btn icon icon-left btn-outline-success" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process" @disabled($item->status === 'DRAFT')>
                                                 <i class="fa-duotone fa-solid fa-circle-check"></i>
@@ -61,6 +56,11 @@
                                                 Hold
                                             </button>
                                         </div>
+                                    @else
+                                        <span class="badge {{ status_badge_color($item->status) }}">
+                                            <i class="{{ status_badge_icon($item->status) }}"></i>
+                                            {{ $item->status }}
+                                        </span>
                                     @endif
                                 </td>
                             </tr>

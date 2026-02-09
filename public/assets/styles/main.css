@@ -47,6 +47,29 @@ html[data-bs-theme="dark"] .card-add {
 }
 
 
+/* Floating label fixes for textarea */
+/* .form-floating textarea.form-control {
+    min-height: 140px;
+    padding: 1.25rem .75rem .75rem .75rem;
+    box-sizing: border-box;
+    resize: vertical;
+}
+.form-floating textarea.form-control::placeholder {
+    color: transparent;
+}
+.form-floating label {
+    left: .75rem;
+    padding: 0 .25rem;
+    transition: transform .15s ease, opacity .15s ease;
+} */
+.form-floating textarea.form-control:focus + label,
+.form-floating textarea.form-control:not(:placeholder-shown) + label {
+    /* transform: translateY(-1.25rem) scale(.85); */
+    transform: translateY(-.75rem) scale(.8);
+    /* opacity: 1; */
+}
+
+
 /* auth */
 #auth #auth-right {
     background: url(../images/auth-img.png), linear-gradient(90deg, #cfdbff, #edf2ff);
