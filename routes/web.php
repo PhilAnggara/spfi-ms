@@ -18,6 +18,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\CanvasingController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VesselController;
@@ -66,6 +67,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/approval/{prs}/approve', [PrsApprovalController::class, 'approve'])->name('prs.approve');
         Route::post('/approval/{prs}/hold', [PrsApprovalController::class, 'hold'])->name('prs.hold');
         Route::post('/approval/{prs}/reject', [PrsApprovalController::class, 'reject'])->name('prs.reject');
+    });
+
+    Route::middleware('role:administrator|canvaser')->group(function () {
+        Route::get('/canvasing', [CanvasingController::class, 'index'])->name('canvasing.index');
+        Route::get('/canvasing/{prs}', [CanvasingController::class, 'show'])->name('canvasing.show');
+        Route::post('/canvasing/{prs}', [CanvasingController::class, 'store'])->name('canvasing.store');
     });
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
     Route::resource('prs', PrsController::class);

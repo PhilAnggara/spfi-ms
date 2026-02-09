@@ -236,8 +236,8 @@
                         </li>
 
                         @role('administrator|canvaser')
-                            <li class="sidebar-item {{ Request::is('canvasing') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
+                            <li class="sidebar-item {{ Request::is('canvasing*') ? 'active' : '' }}">
+                                <a href="{{ route('canvasing.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-diagram-lean-canvas {{ Request::is('canvasing') ? 'fa-fade' : '' }}"></i>
                                     <span>Canvasing</span>
                                 </a>
