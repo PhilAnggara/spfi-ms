@@ -69,12 +69,10 @@
                                         <div class="row g-3">
                                             <div class="col-12 col-lg-6">
                                                 <label class="form-label" for="supplier-{{ $item->id }}">Supplier</label>
-                                                <select id="supplier-{{ $item->id }}" name="items[{{ $index }}][supplier_id]" class="choices form-select" required>
+                                                <select id="supplier-{{ $item->id }}" name="items[{{ $index }}][supplier_id]" class="choices choices-supplier form-select" required>
                                                     <option value="" disabled {{ $canvasing ? '' : 'selected' }}>-- Select Supplier --</option>
                                                     @foreach ($suppliers as $supplier)
-                                                        <option value="{{ $supplier->id }}" @selected($canvasing && $canvasing->supplier_id == $supplier->id)>
-                                                            {{ $supplier->name }}
-                                                        </option>
+                                                        <option value="{{ $supplier->id }}" data-custom-properties='@json(['searchText' => $supplier->name])' @selected($canvasing && $canvasing->supplier_id == $supplier->id)>{{ $supplier->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -115,5 +113,22 @@
 @endpush
 @push('addon-script')
     <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
-    <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const supplierSelects = document.querySelectorAll('.choices-supplier');
+            supplierSelects.forEach((selectEl) => {
+                const instance = new Choices(selectEl, {
+                    searchFields: ['label', 'value', 'customProperties.searchText'],
+                    fuseOptions: {
+                        includeScore: true,
+                        ignoreLocation: true,
+                        threshold: 0.3,
+                    },
+                });
+
+                // Simpan instance agar konsisten dengan halaman lain
+                selectEl.choicesInstance = instance;
+            });
+        });
+    </script>
 @endpush

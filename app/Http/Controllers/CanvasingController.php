@@ -15,6 +15,14 @@ class CanvasingController extends Controller
     public function index(Request $request)
     {
         $items = Prs::with(['department', 'items.item'])
+            ->withCount([
+                'items as items_count',
+                'items as canvased_items_count' => function ($query) {
+                    $query->whereHas('canvasingItem', function ($subQuery) {
+                        $subQuery->whereNotNull('unit_price');
+                    });
+                },
+            ])
             ->where('canvaser_id', $request->user()->id)
             ->orderByDesc('id')
             ->get();

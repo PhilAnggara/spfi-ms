@@ -16,6 +16,8 @@ return new class extends Migration
             $table->foreignId('prs_id')->constrained()->cascadeOnDelete();
             $table->foreignId('item_id')->constrained()->restrictOnDelete();
             $table->integer('quantity');
+            $table->text('notes')->nullable();
+            $table->foreignId('canvaser_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
             $table->softDeletes();
         });

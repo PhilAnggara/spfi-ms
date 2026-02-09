@@ -37,12 +37,15 @@
                                 <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
                                 <td><i class="fa-duotone fa-solid fa-calendar-star text-primary"></i> {{ tgl($item->date_needed) }}</td>
                                 <td>
-                                    <span class="badge bg-light-secondary">{{ $item->items->count() }}</span>
+                                    <span class="badge bg-light-secondary">{{ $item->items_count }}</span>
                                 </td>
                                 <td>
-                                    <a href="{{ route('canvasing.show', $item->id) }}" class="btn btn-sm icon icon-left btn-outline-primary">
+                                    @php
+                                        $isComplete = $item->items_count > 0 && $item->canvased_items_count >= $item->items_count;
+                                    @endphp
+                                    <a href="{{ route('canvasing.show', $item->id) }}" class="btn btn-sm icon icon-left {{ $isComplete ? 'btn-primary' : 'btn-outline-primary' }}">
                                         <i class="fa-duotone fa-solid fa-pen-to-square"></i>
-                                        Fill Canvasing
+                                        {{ $isComplete ? 'Edit Canvasing' : 'Fill Canvasing' }}
                                     </a>
                                 </td>
                             </tr>
