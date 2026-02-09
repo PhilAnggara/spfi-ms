@@ -13,33 +13,72 @@ class SupplierSeeder extends Seeder
      */
     public function run(): void
     {
-        $suppliers = [
-            ['477', 'AZKO', 'MANADO', '085340330616', '', '', '', ''],
-            ['427', 'UD CAHAYA', 'BITUNG', '', '', '', '', ''],
-            ['8', 'ANEKA ELEKTRO CV.', 'JL. SAM RATULANGI 21 No.32, -', '', '', '', '', ''],
-            ['9', 'ANEKA GAS INDUSTRI PT.', 'JL. RAYA MANADO - BITUNG, SAGERAT', '', '', '', '', ''],
-            ['604', 'SUARA ELECTRO BITUNG', 'BITUNG', '', '', '', '', ''],
-            ['573', 'CV ESA GENANG', 'B ITUNG', '085341615541', '', 'esagenang@yahoo.com', '', ''],
-            ['346', 'AREMA TEKNIK', 'KEL.PATETEN BITUNG', '', '', '', '', ''],
-            ['6', 'ARENA TEKNIK POMPA', 'SURABAYA', '', '', '', '', ''],
-            ['15', 'ANUGRAH JAYA BOX', 'DS NGABETAN NO 2 RT001 RW04 CERME GRESIK', '031 7994774', '7994771', '', '', ''],
-            ['509', 'PT HALIM SARANA CAHAYA SE', 'SURABAYA', '0317388322', '0317388329', '', '', ''],
-        ];
+        $csvPath = base_path('public/document/csv/supplier.csv');
 
-        foreach ($suppliers as $index => $supplier) {
-            DB::table('suppliers')->insert ([
-                'code' => $supplier[0] ,
-                'name' => $supplier[1],
-                'address' => $supplier[2],
-                'phone' => $supplier[3],
-                'fax' => $supplier[4],
-                'email' => $supplier[5],
-                'contact_person' => $supplier[6],
-                'remarks' => $supplier[7],
-                'created_by' => 1, // Assuming the admin user has ID 1
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        if (!file_exists($csvPath)) {
+            $this->command?->warn("supplier.csv not found at: {$csvPath}");
+            return;
         }
+
+        $normalize = static function (?string $value): ?string {
+            if ($value === null) {
+                return null;
+            }
+
+            $value = trim($value);
+            if ($value === '' || strtoupper($value) === 'NULL') {
+                return null;
+            }
+
+            return $value;
+        };
+
+        $handle = fopen($csvPath, 'r');
+        if ($handle === false) {
+            $this->command?->warn("Failed to open supplier.csv at: {$csvPath}");
+            return;
+        }
+
+        $header = fgetcsv($handle, 0, ';');
+        if ($header === false) {
+            fclose($handle);
+            $this->command?->warn("supplier.csv is empty: {$csvPath}");
+            return;
+        }
+
+        while (($row = fgetcsv($handle, 0, ';')) !== false) {
+            if (count($row) < 8) {
+                continue;
+            }
+
+            $isActive = strtoupper($normalize($row[8] ?? null) ?? '');
+            $isDeleted = strtoupper($normalize($row[9] ?? null) ?? '');
+            if ($isActive !== 'Y' || $isDeleted !== 'N') {
+                continue;
+            }
+
+            $code = $normalize($row[1] ?? null);
+            if ($code === null) {
+                continue;
+            }
+
+            DB::table('suppliers')->updateOrInsert(
+                ['code' => $code],
+                [
+                    'name' => $normalize($row[2] ?? null) ?? '',
+                    'address' => $normalize($row[3] ?? null),
+                    'phone' => $normalize($row[4] ?? null),
+                    'fax' => $normalize($row[5] ?? null),
+                    'email' => $normalize($row[6] ?? null),
+                    'contact_person' => $normalize($row[7] ?? null),
+                    'remarks' => null,
+                    'created_by' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+
+        fclose($handle);
     }
 }
