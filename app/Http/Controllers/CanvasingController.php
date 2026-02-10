@@ -14,16 +14,22 @@ class CanvasingController extends Controller
      */
     public function index(Request $request)
     {
-        $items = Prs::with(['department', 'items.item'])
+        $userId = $request->user()->id;
+
+        $items = Prs::with(['department'])
             ->withCount([
-                'items as items_count',
-                'items as canvased_items_count' => function ($query) {
-                    $query->whereHas('canvasingItem', function ($subQuery) {
+                'items as items_count' => function ($query) use ($userId) {
+                    $query->where('canvaser_id', $userId);
+                },
+                'items as canvased_items_count' => function ($query) use ($userId) {
+                    $query->where('canvaser_id', $userId)->whereHas('canvasingItem', function ($subQuery) {
                         $subQuery->whereNotNull('unit_price');
                     });
                 },
             ])
-            ->where('canvaser_id', $request->user()->id)
+            ->whereHas('items', function ($query) use ($userId) {
+                $query->where('canvaser_id', $userId);
+            })
             ->orderByDesc('id')
             ->get();
 
@@ -37,13 +43,17 @@ class CanvasingController extends Controller
      */
     public function show(Prs $prs, Request $request)
     {
-        if ($prs->canvaser_id !== $request->user()->id) {
+        $userId = $request->user()->id;
+        if (! $prs->items()->where('canvaser_id', $userId)->exists()) {
             abort(403);
         }
 
         $prs->load([
             'department',
             'user',
+            'items' => function ($query) use ($userId) {
+                $query->where('canvaser_id', $userId);
+            },
             'items.item',
             'items.canvasingItem.supplier',
         ]);
@@ -61,20 +71,25 @@ class CanvasingController extends Controller
      */
     public function store(Request $request, Prs $prs)
     {
-        if ($prs->canvaser_id !== $request->user()->id) {
+        $userId = $request->user()->id;
+        if (! $prs->items()->where('canvaser_id', $userId)->exists()) {
             abort(403);
         }
 
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
-            'items.*.prs_item_id' => ['required', 'exists:prs_items,id'],
+            'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
             'items.*.supplier_id' => ['required', 'exists:suppliers,id'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.lead_time_days' => ['nullable', 'integer', 'min:0'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
-        $prsItemIds = $prs->items()->pluck('id')->all();
+        $prsItemIds = $prs->items()->where('canvaser_id', $userId)->pluck('id')->all();
+        $invalidItems = collect($validated['items'])->pluck('prs_item_id')->diff($prsItemIds);
+        if ($invalidItems->isNotEmpty()) {
+            return redirect()->back()->withErrors(['items' => 'One or more items are not assigned to you.']);
+        }
 
         foreach ($validated['items'] as $row) {
             if (! in_array((int) $row['prs_item_id'], $prsItemIds, true)) {

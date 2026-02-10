@@ -150,16 +150,6 @@
                                 <th>Remarks</th>
                                 <td><i class="fa-duotone fa-solid fa-circle-info text-secondary"></i> {{ $item->remarks ? $item->remarks : '-' }}</td>
                             </tr>
-                            @if ($item->canvaser)
-                                <tr>
-                                    <th>Canvaser</th>
-                                    <td><i class="fa-duotone fa-solid fa-user text-secondary"></i> {{ $item->canvaser->name }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Canvasing Date</th>
-                                    <td><i class="fa-duotone fa-solid fa-calendar-days text-primary"></i> {{ $item->canvasingDate() }}</td>
-                                </tr>
-                            @endif
                         </tbody>
                     </table>
                 </div>
@@ -176,6 +166,8 @@
                                 <th>Item Name</th>
                                 <th>Stock on Hand</th>
                                 <th>Quantity</th>
+                                <th>Canvasser</th>
+                                <th>Canvasing Date</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -190,6 +182,8 @@
                                     <td>{{ $itemInfo->item->name }}</td>
                                     <td>{{ $itemInfo->item->stock_on_hand }}</td>
                                     <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
+                                    <td>{{ $itemInfo->canvaser?->name ?? '-' }}</td>
+                                    <td>{{ $itemInfo->canvasingItem?->created_at ? tgl($itemInfo->canvasingItem->created_at) : '-' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

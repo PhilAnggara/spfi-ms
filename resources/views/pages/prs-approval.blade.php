@@ -88,14 +88,33 @@
                 <form action="{{ route('prs.approve', $item->id) }}" method="post" class="form">
                     @csrf
                     <div class="modal-body">
-                        <div class="form-group">
-                            <label for="canvaser-{{ $item->id }}">Assign to Canvasser</label>
-                            <select id="canvaser-{{ $item->id }}" name="canvaser_id" class="form-select" required>
-                                <option value="" disabled selected>-- Select Canvasser --</option>
-                                @foreach ($canvasers as $canvaser)
-                                    <option value="{{ $canvaser->id }}">{{ $canvaser->name }}</option>
-                                @endforeach
-                            </select>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle text-nowrap">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Quantity</th>
+                                        <th>Assign Canvasser</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($item->items as $index => $itemInfo)
+                                        <tr>
+                                            <td>{{ $itemInfo->item->code }} - {{ $itemInfo->item->name }}</td>
+                                            <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
+                                            <td>
+                                                <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $itemInfo->id }}">
+                                                <select name="items[{{ $index }}][canvaser_id]" class="form-select" required>
+                                                    <option value="" disabled {{ $itemInfo->canvaser_id ? '' : 'selected' }}>-- Select Canvasser --</option>
+                                                    @foreach ($canvasers as $canvaser)
+                                                        <option value="{{ $canvaser->id }}" @selected($itemInfo->canvaser_id == $canvaser->id)>{{ $canvaser->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -213,16 +232,6 @@
                                     <th>Remarks</th>
                                     <td><i class="fa-duotone fa-solid fa-circle-info text-secondary"></i> {{ $item->remarks ? $item->remarks : '-' }}</td>
                                 </tr>
-                                @if ($item->canvaser)
-                                    <tr>
-                                        <th>Canvaser</th>
-                                        <td><i class="fa-duotone fa-solid fa-user text-secondary"></i> {{ $item->canvaser->name }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Canvasing Date</th>
-                                        <td><i class="fa-duotone fa-solid fa-calendar-days text-primary"></i> {{ $item->canvasingDate() }}</td>
-                                    </tr>
-                                @endif
                             </tbody>
                         </table>
                     </div>
@@ -239,6 +248,8 @@
                                     <th>Item Name</th>
                                     <th>Stock on Hand</th>
                                     <th>Quantity</th>
+                                    <th>Canvasser</th>
+                                    <th>Canvasing Date</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -253,6 +264,8 @@
                                         <td>{{ $itemInfo->item->name }}</td>
                                         <td>{{ $itemInfo->item->stock_on_hand }}</td>
                                         <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
+                                        <td>{{ $itemInfo->canvaser?->name ?? '-' }}</td>
+                                        <td>{{ $itemInfo->canvasingItem?->created_at ? tgl($itemInfo->canvasingItem->created_at) : '-' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
