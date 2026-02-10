@@ -175,7 +175,7 @@
 
     <div class="modal fade text-left modal-borderless" id="detail-modal-{{ $item->id }}" tabindex="-1"
     role="dialog" aria-labelledby="myModalLabel1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+        <div class="modal-dialog modal-dialog-scrollable modal-xl" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Detail PRS - ({{ $item->prs_number }})</h5>
@@ -188,6 +188,7 @@
 
                     @php
                         $holdLog = $item->logs?->firstWhere('action', 'HOLD');
+                        $assignLog = $item->logs?->firstWhere('action', 'CANVASING');
                     @endphp
 
                     <div class="table-responsive">
@@ -272,7 +273,7 @@
                                         <td>{{ $itemInfo->item->stock_on_hand }}</td>
                                         <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
                                         <td>{{ $itemInfo->canvaser?->name ?? '-' }}</td>
-                                        <td>{{ $itemInfo->canvasingItem?->created_at ? tgl($itemInfo->canvasingItem->created_at) : '-' }}</td>
+                                        <td>{{ $assignLog?->created_at ? tgl($assignLog->created_at) : '-' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
