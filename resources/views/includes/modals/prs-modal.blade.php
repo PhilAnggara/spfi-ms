@@ -159,7 +159,7 @@
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table table-bordered mb-0 text-center text-nowrap">
+                    <table class="table table-bordered mb-0 text-center">
                         <thead>
                             <tr>
                                 <th>Item Code</th>
@@ -175,7 +175,6 @@
                                 <tr>
                                     <td>
                                         <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $itemInfo->item->code }}')">
-                                            <i class="fa-solid fa-regular fa-clipboard"></i>
                                             {{ $itemInfo->item->code }}
                                         </button>
                                     </td>

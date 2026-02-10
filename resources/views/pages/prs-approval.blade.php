@@ -47,14 +47,22 @@
                                 <td>
                                     @if ($item->status === 'SUBMITTED' || $item->status === 'RESUBMITTED')
                                         <div class="btn-group btn-group-sm">
-                                            <button type="button" class="btn icon icon-left btn-outline-success" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process" @disabled($item->status === 'DRAFT')>
+
+                                            <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process" @disabled($item->status === 'DRAFT')>
+                                                <i class="fa-duotone fa-solid fa-circle-check text-success"></i>
+                                            </button>
+                                            <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#hold-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Hold" @disabled($item->status === 'DRAFT' || $item->status === 'APPROVED')>
+                                                <i class="fa-duotone fa-solid fa-circle-pause text-warning"></i>
+                                            </button>
+
+                                            {{-- <button type="button" class="btn icon icon-left btn-outline-success" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process" @disabled($item->status === 'DRAFT')>
                                                 <i class="fa-duotone fa-solid fa-circle-check"></i>
                                                 Process
                                             </button>
                                             <button type="button" class="btn icon icon-left btn-outline-warning" data-bs-toggle="modal" data-bs-target="#hold-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Hold" @disabled($item->status === 'DRAFT' || $item->status === 'APPROVED')>
                                                 <i class="fa-duotone fa-solid fa-circle-pause"></i>
                                                 Hold
-                                            </button>
+                                            </button> --}}
                                         </div>
                                     @else
                                         <span class="badge {{ status_badge_color($item->status) }}">
@@ -77,7 +85,7 @@
 @foreach ($items as $item)
     <div class="modal fade text-left modal-borderless" id="approve-modal-{{ $item->id }}" tabindex="-1"
         role="dialog" aria-labelledby="approveModalLabel-{{ $item->id }}" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-scrollable" role="document">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="approveModalLabel-{{ $item->id }}">Approve & Assign Canvasser</h5>
@@ -89,7 +97,7 @@
                     @csrf
                     <div class="modal-body">
                         <div class="table-responsive">
-                            <table class="table table-sm align-middle text-nowrap">
+                            <table class="table table-sm align-middle">
                                 <thead>
                                     <tr>
                                         <th>Item</th>
@@ -241,7 +249,7 @@
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-bordered mb-0 text-center text-nowrap">
+                        <table class="table table-bordered mb-0 text-center">
                             <thead>
                                 <tr>
                                     <th>Item Code</th>
@@ -257,7 +265,6 @@
                                     <tr>
                                         <td>
                                             <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $itemInfo->item->code }}')">
-                                                <i class="fa-solid fa-regular fa-clipboard"></i>
                                                 {{ $itemInfo->item->code }}
                                             </button>
                                         </td>

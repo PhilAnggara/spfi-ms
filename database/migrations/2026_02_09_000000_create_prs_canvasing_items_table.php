@@ -18,6 +18,9 @@ return new class extends Migration
             $table->foreignId('supplier_id')->constrained('suppliers')->restrictOnDelete();
             $table->decimal('unit_price', 15, 2);
             $table->unsignedInteger('lead_time_days')->nullable();
+            $table->string('term_of_payment_type')->nullable();
+            $table->string('term_of_payment')->nullable();
+            $table->string('term_of_delivery')->nullable();
             $table->text('notes')->nullable();
             $table->foreignId('canvased_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

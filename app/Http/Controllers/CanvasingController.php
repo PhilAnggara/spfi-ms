@@ -2,66 +2,54 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Prs;
 use App\Models\PrsCanvasingItem;
+use App\Models\PrsItem;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 
 class CanvasingController extends Controller
 {
     /**
-     * List PRS assigned to the current canvasser.
+     * List items assigned to the current canvasser.
      */
     public function index(Request $request)
     {
         $userId = $request->user()->id;
 
-        $items = Prs::with(['department'])
-            ->withCount([
-                'items as items_count' => function ($query) use ($userId) {
-                    $query->where('canvaser_id', $userId);
-                },
-                'items as canvased_items_count' => function ($query) use ($userId) {
-                    $query->where('canvaser_id', $userId)->whereHas('canvasingItem', function ($subQuery) {
-                        $subQuery->whereNotNull('unit_price');
-                    });
-                },
-            ])
-            ->whereHas('items', function ($query) use ($userId) {
-                $query->where('canvaser_id', $userId);
-            })
-            ->orderByDesc('id')
+        $prsItems = PrsItem::with([
+            'prs',
+            'item',
+            'canvasingItem',
+        ])
+            ->where('canvaser_id', $userId)
+            ->orderByDesc('created_at')
             ->get();
 
         return view('pages.canvasing', [
-            'items' => $items,
+            'prsItems' => $prsItems,
         ]);
     }
 
     /**
      * Show PRS detail for canvasing input.
      */
-    public function show(Prs $prs, Request $request)
+    public function show(PrsItem $prsItem, Request $request)
     {
-        $userId = $request->user()->id;
-        if (! $prs->items()->where('canvaser_id', $userId)->exists()) {
+        if ($prsItem->canvaser_id !== $request->user()->id) {
             abort(403);
         }
 
-        $prs->load([
-            'department',
-            'user',
-            'items' => function ($query) use ($userId) {
-                $query->where('canvaser_id', $userId);
-            },
-            'items.item',
-            'items.canvasingItem.supplier',
+        $prsItem->load([
+            'prs.department',
+            'prs.user',
+            'item',
+            'canvasingItem.supplier',
         ]);
 
         $suppliers = Supplier::orderBy('name')->get();
 
         return view('pages.canvasing-detail', [
-            'prs' => $prs,
+            'prsItem' => $prsItem,
             'suppliers' => $suppliers,
         ]);
     }
@@ -69,55 +57,46 @@ class CanvasingController extends Controller
     /**
      * Save canvasing results per item.
      */
-    public function store(Request $request, Prs $prs)
+    public function store(Request $request, PrsItem $prsItem)
     {
-        $userId = $request->user()->id;
-        if (! $prs->items()->where('canvaser_id', $userId)->exists()) {
+        if ($prsItem->canvaser_id !== $request->user()->id) {
             abort(403);
         }
 
         $validated = $request->validate([
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
-            'items.*.supplier_id' => ['required', 'exists:suppliers,id'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'items.*.lead_time_days' => ['nullable', 'integer', 'min:0'],
-            'items.*.notes' => ['nullable', 'string'],
+            'supplier_id' => ['required', 'exists:suppliers,id'],
+            'unit_price' => ['required', 'numeric', 'min:0'],
+            'lead_time_days' => ['nullable', 'integer', 'min:0'],
+            'term_of_payment_type' => ['nullable', 'in:cash,credit'],
+            'term_of_payment' => ['nullable', 'string', 'max:255'],
+            'term_of_delivery' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
         ]);
 
-        $prsItemIds = $prs->items()->where('canvaser_id', $userId)->pluck('id')->all();
-        $invalidItems = collect($validated['items'])->pluck('prs_item_id')->diff($prsItemIds);
-        if ($invalidItems->isNotEmpty()) {
-            return redirect()->back()->withErrors(['items' => 'One or more items are not assigned to you.']);
-        }
+        PrsCanvasingItem::updateOrCreate(
+            ['prs_item_id' => $prsItem->id],
+            [
+                'prs_id' => $prsItem->prs_id,
+                'supplier_id' => $validated['supplier_id'],
+                'unit_price' => $validated['unit_price'],
+                'lead_time_days' => $validated['lead_time_days'] ?? null,
+                'term_of_payment_type' => $validated['term_of_payment_type'] ?? null,
+                'term_of_payment' => $validated['term_of_payment'] ?? null,
+                'term_of_delivery' => $validated['term_of_delivery'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'canvased_by' => $request->user()->id,
+            ]
+        );
 
-        foreach ($validated['items'] as $row) {
-            if (! in_array((int) $row['prs_item_id'], $prsItemIds, true)) {
-                continue;
-            }
-
-            PrsCanvasingItem::updateOrCreate(
-                ['prs_item_id' => $row['prs_item_id']],
-                [
-                    'prs_id' => $prs->id,
-                    'supplier_id' => $row['supplier_id'],
-                    'unit_price' => $row['unit_price'],
-                    'lead_time_days' => $row['lead_time_days'] ?? null,
-                    'notes' => $row['notes'] ?? null,
-                    'canvased_by' => $request->user()->id,
-                ]
-            );
-        }
-
-        $prs->logs()->create([
+        $prsItem->prs?->logs()->create([
             'user_id' => $request->user()?->id,
             'action' => 'CANVASE',
-            'message' => 'Canvasing data saved.',
+            'message' => 'Canvasing data saved per item.',
             'meta' => [
-                'items_count' => count($validated['items']),
+                'prs_item_id' => $prsItem->id,
             ],
         ]);
 
-        return redirect()->route('canvasing.show', $prs)->with('success', 'Canvasing data saved.');
+        return redirect()->route('canvasing.show', $prsItem)->with('success', 'Canvasing data saved.');
     }
 }

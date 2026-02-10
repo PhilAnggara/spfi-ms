@@ -13,43 +13,67 @@
     <section class="section">
         <div class="card shadow-sm">
             <div class="card-body">
-                <table class="table table-striped text-center text-nowrap" id="table1">
+                <table class="table table-striped align-middle text-nowrap" id="table1">
                     <thead>
                         <tr>
-                            <th class="text-center">PRS Number</th>
-                            <th class="text-center">Department</th>
-                            <th class="text-center">PRS Date</th>
-                            <th class="text-center">Date Needed</th>
-                            <th class="text-center">No. of Items</th>
+                            <th>PRS Number</th>
+                            <th>Item Code</th>
+                            <th>Item Name</th>
+                            <th>Quantity</th>
+                            <th>Date Needed</th>
+                            <th>Status</th>
                             <th class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($items as $item)
+                        @forelse ($prsItems as $prsItem)
                             <tr>
                                 <td>
-                                    <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $item->prs_number }}')">
+                                    <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $prsItem->prs->prs_number }}')">
                                         <i class="fa-solid fa-regular fa-clipboard"></i>
-                                        {{ $item->prs_number }}
+                                        {{ $prsItem->prs->prs_number }}
                                     </button>
                                 </td>
-                                <td>{{ $item->department->name }}</td>
-                                <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
-                                <td><i class="fa-duotone fa-solid fa-calendar-star text-primary"></i> {{ tgl($item->date_needed) }}</td>
                                 <td>
-                                    <span class="badge bg-light-secondary">{{ $item->items_count }}</span>
+                                    <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $prsItem->item->code }}')">{{ $prsItem->item->code }}</span>
+                                </td>
+                                <td>{{ $prsItem->item->name }}</td>
+                                <td>
+                                    <span class="fw-semibold">{{ $prsItem->quantity }}</span>
+                                    <small class="text-muted">{{ $prsItem->item->unit?->name ?? 'PCS' }}</small>
                                 </td>
                                 <td>
-                                    @php
-                                        $isComplete = $item->items_count > 0 && $item->canvased_items_count >= $item->items_count;
-                                    @endphp
-                                    <a href="{{ route('canvasing.show', $item->id) }}" class="btn btn-sm icon icon-left {{ $isComplete ? 'btn-primary' : 'btn-outline-primary' }}">
+                                    <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i>
+                                    {{ tgl($prsItem->prs->date_needed) }}
+                                </td>
+                                <td>
+                                    @if ($prsItem->canvasingItem?->unit_price)
+                                        <span class="badge bg-light-success">
+                                            <i class="fa-duotone fa-solid fa-circle-check"></i>
+                                            Completed
+                                        </span>
+                                    @else
+                                        <span class="badge bg-light-warning">
+                                            <i class="fa-duotone fa-solid fa-hourglass"></i>
+                                            Pending
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="text-center">
+                                    <a href="{{ route('canvasing.show', $prsItem->id) }}" class="btn btn-sm {{ $prsItem->canvasingItem?->unit_price ? 'btn-primary' : 'btn-outline-primary' }}">
                                         <i class="fa-duotone fa-solid fa-pen-to-square"></i>
-                                        {{ $isComplete ? 'Edit Canvasing' : 'Fill Canvasing' }}
+                                        {{ $prsItem->canvasingItem?->unit_price ? 'Edit Canvasing' : 'Add Canvasing' }}
                                     </a>
                                 </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    <i class="fa-duotone fa-solid fa-inbox"></i>
+                                    <p class="mb-0 mt-2">No canvasing items assigned yet.</p>
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>

@@ -71,8 +71,8 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role:administrator|canvaser')->group(function () {
         Route::get('/canvasing', [CanvasingController::class, 'index'])->name('canvasing.index');
-        Route::get('/canvasing/{prs}', [CanvasingController::class, 'show'])->name('canvasing.show');
-        Route::post('/canvasing/{prs}', [CanvasingController::class, 'store'])->name('canvasing.store');
+        Route::get('/canvasing/{prsItem}', [CanvasingController::class, 'show'])->name('canvasing.show');
+        Route::post('/canvasing/{prsItem}', [CanvasingController::class, 'store'])->name('canvasing.store');
     });
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
     Route::resource('prs', PrsController::class);

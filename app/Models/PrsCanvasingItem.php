@@ -17,6 +17,9 @@ class PrsCanvasingItem extends Model
         'supplier_id',
         'unit_price',
         'lead_time_days',
+        'term_of_payment_type',
+        'term_of_payment',
+        'term_of_delivery',
         'notes',
         'canvased_by',
     ];
