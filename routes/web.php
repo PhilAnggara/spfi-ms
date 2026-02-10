@@ -19,6 +19,8 @@ use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CanvasingController;
+use App\Http\Controllers\PurchaseOrderApprovalController;
+use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VesselController;
@@ -73,6 +75,36 @@ Route::middleware('auth')->group(function () {
         Route::get('/canvasing', [CanvasingController::class, 'index'])->name('canvasing.index');
         Route::get('/canvasing/{prsItem}', [CanvasingController::class, 'show'])->name('canvasing.show');
         Route::post('/canvasing/{prsItem}', [CanvasingController::class, 'store'])->name('canvasing.store');
+
+        Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
+            Route::get('/draft', [PurchaseOrderController::class, 'draft'])->name('draft');
+            Route::post('/preview', [PurchaseOrderController::class, 'preview'])->name('preview');
+            Route::post('/', [PurchaseOrderController::class, 'store'])->name('store');
+            Route::post('/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit'])->name('submit');
+        });
+    });
+
+    Route::middleware('role:administrator|purchasing-manager')->group(function () {
+        Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
+            Route::get('/approval', [PurchaseOrderApprovalController::class, 'index'])->name('approval');
+            Route::post('/{purchaseOrder}/approve', [PurchaseOrderApprovalController::class, 'approve'])->name('approve');
+            Route::post('/{purchaseOrder}/request-changes', [PurchaseOrderApprovalController::class, 'requestChanges'])->name('request-changes');
+        });
+    });
+
+    Route::middleware('role:administrator|canvaser|purchasing-manager|general-manager')->group(function () {
+        Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
+            Route::get('/', [PurchaseOrderController::class, 'index'])->name('index');
+            Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
+                ->whereNumber('purchaseOrder')
+                ->name('show');
+            Route::post('/{purchaseOrder}/number', [PurchaseOrderController::class, 'updateNumber'])
+                ->whereNumber('purchaseOrder')
+                ->name('number');
+            Route::get('/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])
+                ->whereNumber('purchaseOrder')
+                ->name('print');
+        });
     });
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
     Route::resource('prs', PrsController::class);

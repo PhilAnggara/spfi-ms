@@ -242,13 +242,34 @@
                                     <span>Canvasing</span>
                                 </a>
                             </li>
+
+                            <li class="sidebar-item {{ Request::is('purchase-orders') ? 'active' : '' }}">
+                                <a href="{{ route('purchase-orders.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-clipboard-list-check {{ Request::is('purchase-orders') ? 'fa-fade' : '' }}"></i>
+                                    <span>PO List</span>
+                                </a>
+                            </li>
+
+                            <li class="sidebar-item {{ Request::is('purchase-orders/draft') ? 'active' : '' }}">
+                                <a href="{{ route('purchase-orders.draft') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-bag-shopping-plus {{ Request::is('purchase-orders/draft') ? 'fa-fade' : '' }}"></i>
+                                    <span>Draft PO</span>
+                                </a>
+                            </li>
                         @endrole
 
                         @role('administrator|purchasing-manager|general-manager')
-                            <li class="sidebar-item {{ Request::is('purchase-order') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-bag-shopping-plus {{ Request::is('purchase-order') ? 'fa-fade' : '' }}"></i>
-                                    <span>Purchase Order</span>
+                            <li class="sidebar-item {{ Request::is('purchase-orders/approval') ? 'active' : '' }}">
+                                <a href="{{ route('purchase-orders.approval') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-bag-shopping-plus {{ Request::is('purchase-orders/approval') ? 'fa-fade' : '' }}"></i>
+                                    <span>PO Approval</span>
+                                </a>
+                            </li>
+
+                            <li class="sidebar-item {{ Request::is('purchase-orders') ? 'active' : '' }}">
+                                <a href="{{ route('purchase-orders.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-clipboard-list-check {{ Request::is('purchase-orders') ? 'fa-fade' : '' }}"></i>
+                                    <span>PO List</span>
                                 </a>
                             </li>
                         @endrole

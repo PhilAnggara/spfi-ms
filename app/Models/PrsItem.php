@@ -38,4 +38,14 @@ class PrsItem extends Model
     {
         return $this->belongsTo(User::class, 'canvaser_id', 'id');
     }
+
+    public function purchaseOrder()
+    {
+        return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id');
+    }
+
+    public function purchaseOrderItem()
+    {
+        return $this->hasOne(PurchaseOrderItem::class, 'prs_item_id', 'id');
+    }
 }
