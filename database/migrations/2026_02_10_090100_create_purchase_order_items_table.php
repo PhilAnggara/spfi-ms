@@ -20,6 +20,7 @@ return new class extends Migration
             $table->decimal('unit_price', 15, 2);
             $table->decimal('total', 15, 2);
             $table->text('notes')->nullable();
+            // Snapshot PR/canvasing details for audit.
             $table->json('meta')->nullable();
             $table->timestamps();
         });

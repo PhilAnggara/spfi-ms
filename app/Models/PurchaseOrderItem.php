@@ -23,6 +23,7 @@ class PurchaseOrderItem extends Model
     ];
 
     protected $casts = [
+        // Holds PR/canvasing snapshot (terms, lead time).
         'meta' => 'array',
     ];
 

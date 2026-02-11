@@ -35,6 +35,7 @@ class PurchaseOrderApprovalController extends Controller
         $manager = $request->user();
         $gm = User::where('role', 'General Manager')->first();
 
+        // Approval routing follows total threshold rule.
         $approvedBy = $purchaseOrder->total > 4000000 && $gm ? $gm : $manager;
         $certifiedBy = $manager;
 

@@ -22,6 +22,7 @@ class PurchaseOrderController extends Controller
         $query = PurchaseOrder::with(['supplier', 'items', 'createdBy'])
             ->orderByDesc('id');
 
+        // Limit non-manager users to only their own PO.
         if (! $request->user()->hasRole('administrator') && ! $request->user()->hasRole('purchasing-manager') && ! $request->user()->hasRole('general-manager')) {
             $query->where('created_by', $request->user()->id);
         }
@@ -174,6 +175,7 @@ class PurchaseOrderController extends Controller
 
         $itemsById = $prsItems->keyBy('id');
 
+        // Atomic create: PO header, items, and PR item marking.
         $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $taxRate, $fees, $prsItems, $request) {
             $purchaseOrder = PurchaseOrder::create([
                 'supplier_id' => $validated['supplier_id'],
@@ -221,6 +223,7 @@ class PurchaseOrderController extends Controller
                 'total' => $total,
             ]);
 
+            // Mark PR items so they won't reappear in draft list.
             PrsItem::whereIn('id', $itemsById->keys()->all())
                 ->update(['purchase_order_id' => $purchaseOrder->id]);
 

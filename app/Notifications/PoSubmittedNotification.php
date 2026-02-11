@@ -21,6 +21,7 @@ class PoSubmittedNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
+        // Keep payload small for in-app notification list.
         return [
             'type' => 'po_submitted',
             'po_id' => $this->purchaseOrder->id,

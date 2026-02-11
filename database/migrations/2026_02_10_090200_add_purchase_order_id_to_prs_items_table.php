@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('prs_items', function (Blueprint $table) {
+            // Prevent reusing PR items once a PO is created.
             $table->foreignId('purchase_order_id')
                 ->nullable()
                 ->after('canvaser_id')

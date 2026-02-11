@@ -34,6 +34,7 @@ class PurchaseOrder extends Model
     protected $casts = [
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
+        // Snapshot of signature names/titles for print.
         'signature_meta' => 'array',
     ];
 

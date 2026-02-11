@@ -243,12 +243,14 @@
                                 </a>
                             </li>
 
-                            <li class="sidebar-item {{ Request::is('purchase-orders') ? 'active' : '' }}">
-                                <a href="{{ route('purchase-orders.index') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-clipboard-list-check {{ Request::is('purchase-orders') ? 'fa-fade' : '' }}"></i>
-                                    <span>PO List</span>
-                                </a>
-                            </li>
+                            @unlessrole('administrator')
+                                <li class="sidebar-item {{ Request::is('purchase-orders') ? 'active' : '' }}">
+                                    <a href="{{ route('purchase-orders.index') }}" class='sidebar-link'>
+                                        <i class="fa-duotone fa-solid fa-clipboard-list-check {{ Request::is('purchase-orders') ? 'fa-fade' : '' }}"></i>
+                                        <span>PO List</span>
+                                    </a>
+                                </li>
+                            @endunlessrole
 
                             <li class="sidebar-item {{ Request::is('purchase-orders/draft') ? 'active' : '' }}">
                                 <a href="{{ route('purchase-orders.draft') }}" class='sidebar-link'>
