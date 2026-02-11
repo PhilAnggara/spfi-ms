@@ -57,10 +57,6 @@
                                                     <i class="fa-duotone fa-solid fa-eye"></i>
                                                     Preview PO
                                                 </button>
-                                                {{-- <button type="submit" class="btn btn-sm btn-success" name="action" value="submit" formaction="{{ route('purchase-orders.store') }}">
-                                                    <i class="fa-duotone fa-solid fa-paper-plane"></i>
-                                                    Submit for Approval
-                                                </button> --}}
                                             </div>
 
                                             <div class="table-responsive">

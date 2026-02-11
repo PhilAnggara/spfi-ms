@@ -69,5 +69,14 @@ class UserSeeder extends Seeder
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
         ])->assignRole('canvaser');
+
+        User::create([
+            'name' => 'Rommy Tendean',
+            'username' => 'rommytendean',
+            'email' => 'rommy.tendean@ptsinarpurefoods.com',
+            'role' => 'Manager',
+            'password' => bcrypt('Admin123'),
+            'department_id' => 8,
+        ])->assignRole('inventory-manager');
     }
 }

@@ -6,47 +6,92 @@
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
-            font-size: 12px;
-            color: #1f2933;
+            font-size: 11px;
+            color: #111827;
         }
         .header {
-            margin-bottom: 16px;
+            display: block;
+            margin-bottom: 8px;
         }
         .title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .line {
+            border-top: 1px solid #111827;
+            margin: 6px 0 8px;
         }
         .muted {
             color: #6b7280;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 12px;
-        }
-        th, td {
-            border: 1px solid #d1d5db;
-            padding: 6px;
-            text-align: left;
-        }
-        th {
-            background: #f3f4f6;
-        }
         .text-right {
             text-align: right;
         }
-        .signatures {
-            margin-top: 32px;
+        .text-center {
+            text-align: center;
         }
-        .signature-block {
-            width: 48%;
-            display: inline-block;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #111827;
+            padding: 4px 6px;
+            text-align: left;
             vertical-align: top;
         }
-        .signature-name {
-            margin-top: 48px;
+        th {
+            background: #f3f4f6;
             font-weight: bold;
-            text-decoration: underline;
+            font-size: 10px;
+        }
+        .table-clean th,
+        .table-clean td {
+            border: none;
+            padding: 2px 0;
+        }
+        .table-summary td {
+            border: none;
+            padding: 2px 0;
+        }
+        .label {
+            width: 120px;
+            white-space: nowrap;
+            font-weight: bold;
+        }
+        .summary-box {
+            border: 1px solid #111827;
+            padding: 6px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .summary-row span {
+            display: inline-block;
+        }
+        .summary-total {
+            border-top: 1px solid #111827;
+            margin-top: 4px;
+            padding-top: 4px;
+            font-weight: bold;
+        }
+        .signatures {
+            margin-top: 24px;
+        }
+        .signature-table td {
+            border: none;
+            padding: 4px 0;
+        }
+        .signature-line {
+            margin-top: 24px;
+            font-weight: bold;
+        }
+        .note {
+            font-size: 9px;
+            line-height: 1.4;
         }
     </style>
 </head>
@@ -55,82 +100,138 @@
         $signatureMeta = $purchaseOrder->signature_meta ?? [];
         $certified = $signatureMeta['certified_by'] ?? null;
         $approved = $signatureMeta['approved_by'] ?? null;
+        $currency = $purchaseOrder->currency;
+        $currencyCode = $currency?->code ?? 'IDR';
+        $supplier = $purchaseOrder->supplier;
+        $firstItem = $purchaseOrder->items->first();
+        $firstMeta = $firstItem?->meta ?? [];
+        $termType = $firstMeta['term_of_payment_type'] ?? null;
+        $termValue = $firstMeta['term_of_payment'] ?? null;
+        $termPayment = trim(($termValue ? $termValue . ' ' : '') . ($termType ?? ''));
+        $termPayment = $termPayment !== '' ? $termPayment : '-';
     @endphp
 
     <div class="header">
         <div class="title">PURCHASE ORDER</div>
-        <div class="muted">PO Number: {{ $purchaseOrder->po_number }}</div>
-        <div class="muted">Date: {{ format_date($purchaseOrder->created_at) }}</div>
     </div>
 
-    <table>
+    <table class="table-clean">
         <tr>
-            <td><strong>Supplier</strong></td>
-            <td>{{ $purchaseOrder->supplier?->name }}</td>
-            <td><strong>Total</strong></td>
-            <td class="text-right">{{ number_format($purchaseOrder->total, 2) }}</td>
+            <td class="label">Supplier Name</td>
+            <td>: {{ $supplier?->name ?? '-' }}{{ $supplier?->code ? ' | ' . $supplier->code : '' }}</td>
+            <td class="label text-right">PO Date</td>
+            <td class="text-right">: {{ format_date($purchaseOrder->created_at) }}</td>
         </tr>
         <tr>
-            <td><strong>Created By</strong></td>
-            <td>{{ $purchaseOrder->createdBy?->name }}</td>
-            <td><strong>Status</strong></td>
-            <td>{{ $purchaseOrder->status }}</td>
+            <td class="label">Address</td>
+            <td colspan="3">: {{ $supplier?->address ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Term Payment</td>
+            <td colspan="3">: {{ $termPayment }}</td>
         </tr>
     </table>
+
+    <div class="line"></div>
 
     <table>
         <thead>
             <tr>
-                <th>Item</th>
-                <th>Qty</th>
-                <th>Unit</th>
-                <th class="text-right">Unit Price</th>
-                <th class="text-right">Line Total</th>
+                <th style="width: 72px;">PRS ID</th>
+                <th>Item Name</th>
+                <th style="width: 70px;">Item Code</th>
+                <th style="width: 70px;">Dept</th>
+                <th style="width: 48px;" class="text-center">Qty</th>
+                <th style="width: 52px;" class="text-center">Unit</th>
+                <th style="width: 90px;" class="text-right">Unit/price</th>
+                <th style="width: 90px;" class="text-right">Amount</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($purchaseOrder->items as $item)
+                @php
+                    $meta = $item->meta ?? [];
+                    $prsNumber = $meta['prs_number'] ?? $item->prsItem?->prs?->prs_number ?? '-';
+                    $dept = $item->prsItem?->prs?->department?->name ?? '-';
+                    $itemCode = $item->item?->code ?? '-';
+                    $unitName = $item->item?->unit?->name ?? 'PCS';
+                @endphp
                 <tr>
-                    <td>{{ $item->item?->name }}</td>
-                    <td>{{ $item->quantity }}</td>
-                    <td>{{ $item->item?->unit?->name ?? 'PCS' }}</td>
-                    <td class="text-right">{{ number_format($item->unit_price, 2) }}</td>
-                    <td class="text-right">{{ number_format($item->total, 2) }}</td>
+                    <td>{{ $prsNumber }}</td>
+                    <td>{{ $item->item?->name ?? '-' }}</td>
+                    <td>{{ $itemCode }}</td>
+                    <td>{{ $dept }}</td>
+                    <td class="text-center">{{ number_format($item->quantity, 0, ',', '.') }}</td>
+                    <td class="text-center">{{ $unitName }}</td>
+                    <td class="text-right">{{ $currencyCode }} {{ number_format($item->unit_price, 2, ',', '.') }}</td>
+                    <td class="text-right">{{ number_format($item->total, 2, ',', '.') }}</td>
                 </tr>
             @endforeach
         </tbody>
     </table>
 
-    <table>
+    <table class="table-clean" style="margin-top: 10px;">
         <tr>
-            <td class="text-right"><strong>Subtotal</strong></td>
-            <td class="text-right" style="width: 140px;">{{ number_format($purchaseOrder->subtotal, 2) }}</td>
-        </tr>
-        <tr>
-            <td class="text-right"><strong>Tax</strong></td>
-            <td class="text-right">{{ number_format($purchaseOrder->tax_amount, 2) }}</td>
-        </tr>
-        <tr>
-            <td class="text-right"><strong>Fees</strong></td>
-            <td class="text-right">{{ number_format($purchaseOrder->fees, 2) }}</td>
-        </tr>
-        <tr>
-            <td class="text-right"><strong>Total</strong></td>
-            <td class="text-right"><strong>{{ number_format($purchaseOrder->total, 2) }}</strong></td>
+            <td style="width: 60%;">
+                <div class="note">
+                    Untuk menciptakan kode etik bisnis yang adil, jujur dan produktif, PT. Sinar Pure Foods International menerapkan kebijakan antikorupsi dan anti-siap dalam setiap transaksi bisnis.
+                </div>
+                <div class="note" style="margin-top: 4px;">
+                    Delivery to PT Sinar Pure Foods International
+                </div>
+                <div style="margin-top: 6px;">
+                    <strong>PO Number</strong> : {{ $purchaseOrder->po_number }}
+                </div>
+            </td>
+            <td style="width: 40%;">
+                <div class="summary-box">
+                    <div class="summary-row">
+                        <span>Amount</span>
+                        <span>{{ $currencyCode }} {{ number_format($purchaseOrder->subtotal, 2, ',', '.') }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Disc {{ number_format($purchaseOrder->discount_rate ?? 0, 2) }}%</span>
+                        <span>{{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>PPH {{ number_format($purchaseOrder->pph_rate ?? 0, 2) }}%</span>
+                        <span>{{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>PPN/VAT {{ number_format($purchaseOrder->ppn_rate ?? 0, 2) }}%</span>
+                        <span>{{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Fees</span>
+                        <span>{{ number_format($purchaseOrder->fees ?? 0, 2, ',', '.') }}</span>
+                    </div>
+                    <div class="summary-row summary-total">
+                        <span>TOTAL</span>
+                        <span>{{ $currencyCode }} {{ number_format($purchaseOrder->total, 2, ',', '.') }}</span>
+                    </div>
+                </div>
+            </td>
         </tr>
     </table>
 
     <div class="signatures">
-        <div class="signature-block">
-            <div class="muted">Certified by</div>
-            <div class="signature-name">{{ $certified['name'] ?? $purchaseOrder->certifiedBy?->name ?? '-' }}</div>
-            {{-- <div class="muted">{{ $certified['title'] ?? ($purchaseOrder->certifiedBy ? get_job_title($purchaseOrder->certifiedBy) : '-') }}</div> --}}
-        </div>
-        <div class="signature-block" style="float: right;">
-            <div class="muted">Approved by</div>
-            <div class="signature-name">{{ $approved['name'] ?? $purchaseOrder->approvedBy?->name ?? '-' }}</div>
-            {{-- <div class="muted">{{ $approved['title'] ?? ($purchaseOrder->approvedBy ? get_job_title($purchaseOrder->approvedBy) : '-') }}</div> --}}
-        </div>
+        <table class="signature-table" style="width: 100%;">
+            <tr>
+                <td style="width: 22%;">Certified by</td>
+                <td style="width: 28%;">Date Certified</td>
+                <td style="width: 22%;">Approved by</td>
+                <td style="width: 28%;">Date Approved</td>
+            </tr>
+            <tr>
+                <td class="signature-line">{{ $certified['name'] ?? $purchaseOrder->certifiedBy?->name ?? '-' }}</td>
+                <td>{{ $purchaseOrder->submitted_at ? format_date($purchaseOrder->submitted_at) : '-' }}</td>
+                <td class="signature-line">{{ $approved['name'] ?? $purchaseOrder->approvedBy?->name ?? '-' }}</td>
+                <td>{{ $purchaseOrder->approved_at ? format_date($purchaseOrder->approved_at) : '-' }}</td>
+            </tr>
+            <tr>
+                <td colspan="4" style="padding-top: 18px;">Supplier's Signature : ____________________________</td>
+            </tr>
+        </table>
     </div>
 </body>
 </html>

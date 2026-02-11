@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Currency;
 use App\Models\PrsItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -136,12 +137,20 @@ class PurchaseOrderController extends Controller
         });
 
         $subtotal = $lineItems->sum('line_total');
+        $currencies = Currency::query()->orderBy('id')->get();
+        $currencyId = $currencies->first()?->id;
 
         return view('pages.purchase-orders.preview', [
             'supplier' => Supplier::findOrFail($validated['supplier_id']),
             'lineItems' => $lineItems,
             'subtotal' => $subtotal,
-            'taxRate' => 0,
+            'currencies' => $currencies,
+            'currencyId' => $currencyId,
+            'remarkType' => 'Normal',
+            'remarkText' => '',
+            'discountRate' => 0,
+            'ppnRate' => 0,
+            'pphRate' => 0,
             'fees' => 0,
         ]);
     }
@@ -153,9 +162,14 @@ class PurchaseOrderController extends Controller
     {
         $validated = $request->validate([
             'supplier_id' => ['required', 'exists:suppliers,id'],
+            'currency_id' => ['required', 'exists:currencies,id'],
             'action' => ['required', 'in:draft,submit'],
-            'tax_rate' => ['nullable', 'numeric', 'min:0'],
+            'discount_rate' => ['nullable', 'numeric', 'min:0'],
+            'ppn_rate' => ['nullable', 'numeric', 'min:0'],
+            'pph_rate' => ['nullable', 'numeric', 'min:0'],
             'fees' => ['nullable', 'numeric', 'min:0'],
+            'remark_type' => ['required', 'in:Normal,Confirmatory'],
+            'remark_text' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -163,7 +177,9 @@ class PurchaseOrderController extends Controller
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
-        $taxRate = (float) ($validated['tax_rate'] ?? 0);
+        $discountRate = (float) ($validated['discount_rate'] ?? 0);
+        $ppnRate = (float) ($validated['ppn_rate'] ?? 0);
+        $pphRate = (float) ($validated['pph_rate'] ?? 0);
         $fees = (float) ($validated['fees'] ?? 0);
 
         $prsItemIds = collect($validated['items'])->pluck('prs_item_id');
@@ -189,13 +205,19 @@ class PurchaseOrderController extends Controller
         $itemsById = $prsItems->keyBy('id');
 
         // Atomic create: PO header, items, and PR item marking.
-        $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $taxRate, $fees, $prsItems, $request) {
+        $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $discountRate, $ppnRate, $pphRate, $fees, $request) {
             $purchaseOrder = PurchaseOrder::create([
                 'supplier_id' => $validated['supplier_id'],
+                'currency_id' => $validated['currency_id'],
                 'created_by' => $request->user()->id,
                 'status' => $validated['action'] === 'submit' ? 'PENDING_APPROVAL' : 'DRAFT',
-                'tax_rate' => $taxRate,
+                'tax_rate' => 0,
                 'fees' => $fees,
+                'discount_rate' => $discountRate,
+                'ppn_rate' => $ppnRate,
+                'pph_rate' => $pphRate,
+                'remark_type' => $validated['remark_type'],
+                'remark_text' => $validated['remark_text'],
                 'submitted_at' => $validated['action'] === 'submit' ? now() : null,
             ]);
 
@@ -227,12 +249,18 @@ class PurchaseOrderController extends Controller
                 ]);
             }
 
-            $taxAmount = $subtotal * ($taxRate / 100);
-            $total = $subtotal + $taxAmount + $fees;
+            $discountAmount = $subtotal * ($discountRate / 100);
+            $baseAmount = $subtotal - $discountAmount;
+            $ppnAmount = $baseAmount * ($ppnRate / 100);
+            $pphAmount = $baseAmount * ($pphRate / 100);
+            $total = $baseAmount + $ppnAmount - $pphAmount + $fees;
 
             $purchaseOrder->update([
                 'subtotal' => $subtotal,
-                'tax_amount' => $taxAmount,
+                'tax_amount' => 0,
+                'discount_amount' => $discountAmount,
+                'ppn_amount' => $ppnAmount,
+                'pph_amount' => $pphAmount,
                 'total' => $total,
             ]);
 
@@ -297,7 +325,9 @@ class PurchaseOrderController extends Controller
     {
         $purchaseOrder->load([
             'supplier',
+            'currency',
             'items.item.unit',
+            'items.prsItem.prs.department',
             'createdBy',
         ]);
 
@@ -329,7 +359,9 @@ class PurchaseOrderController extends Controller
     {
         $purchaseOrder->load([
             'supplier',
+            'currency',
             'items.item.unit',
+            'items.prsItem.prs.department',
             'createdBy',
             'certifiedBy',
             'approvedBy',

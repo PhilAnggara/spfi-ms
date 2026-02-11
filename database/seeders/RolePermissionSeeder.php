@@ -93,6 +93,16 @@ class RolePermissionSeeder extends Seeder
             'print-document',
         ]);
 
+        $inventoryManagerRole = Role::create(['name' => 'inventory-manager']);
+        $inventoryManagerRole->givePermissionTo([
+            'create-rr',
+            'view-rr',
+            'update-rr',
+            'view-po',
+            'view-dashboard',
+            'print-document',
+        ]);
+
         $salesManagerRole = Role::create(['name' => 'sales-manager']);
         $salesManagerRole->givePermissionTo([
             'view-prs',
@@ -189,8 +199,8 @@ class RolePermissionSeeder extends Seeder
             'print-document',
         ]);
 
-        $warehouseRole = Role::findOrCreate('warehouse-staff', 'web');
-        $warehouseRole->givePermissionTo([
+        $inventoryStaffRole = Role::findOrCreate('inventory-staff', 'web');
+        $inventoryStaffRole->givePermissionTo([
             'create-rr',
             'view-rr',
             'update-rr',
