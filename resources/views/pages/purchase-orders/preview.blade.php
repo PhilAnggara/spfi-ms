@@ -35,33 +35,40 @@
                             <tr>
                                 <th>PRS</th>
                                 <th>Item</th>
-                                <th style="width: 120px;">Qty</th>
-                                <th style="width: 140px;">Unit Price</th>
+                                <th style="width: 150px;">Quantity</th>
+                                <th style="width: 150px;">Unit Price</th>
                                 <th>Notes</th>
-                                <th style="width: 140px;">Line Total</th>
+                                <th style="width: 150px;" class="text-end">Line Total</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($lineItems as $index => $item)
                                 <tr data-row="{{ $index }}">
-                                    <td>{{ $item['prs_number'] ?? '-' }}</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark">{{ $item['prs_number'] ?? '-' }}</span>
+                                    </td>
                                     <td>
                                         <div class="fw-semibold">{{ $item['item_name'] }}</div>
                                         <small class="text-muted">{{ $item['item_code'] }}</small>
                                     </td>
                                     <td>
                                         <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $item['prs_item_id'] }}">
-                                        <input type="number" name="items[{{ $index }}][quantity]" class="form-control form-control-sm qty-input" min="1" value="{{ $item['quantity'] }}" data-row="{{ $index }}">
-                                        <small class="text-muted">{{ $item['unit_name'] }}</small>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" name="items[{{ $index }}][quantity]" class="form-control qty-input" min="1" value="{{ $item['quantity'] }}" data-row="{{ $index }}">
+                                            <span class="input-group-text" style="min-width: 60px;">{{ $item['unit_name'] }}</span>
+                                        </div>
                                     </td>
                                     <td>
-                                        <input type="number" name="items[{{ $index }}][unit_price]" class="form-control form-control-sm price-input" min="0" step="0.01" value="{{ $item['unit_price'] }}" data-row="{{ $index }}">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">Rp</span>
+                                            <input type="number" name="items[{{ $index }}][unit_price]" class="form-control price-input text-end" min="0" step="0.01" value="{{ $item['unit_price'] }}" data-row="{{ $index }}">
+                                        </div>
                                     </td>
                                     <td>
-                                        <input type="text" name="items[{{ $index }}][notes]" class="form-control form-control-sm" value="{{ $item['notes'] }}">
+                                        <input type="text" name="items[{{ $index }}][notes]" class="form-control form-control-sm" placeholder="-" value="{{ $item['notes'] }}">
                                     </td>
-                                    <td>
-                                        <div class="fw-semibold line-total" data-row="{{ $index }}">{{ number_format($item['line_total'], 2) }}</div>
+                                    <td class="text-end">
+                                        <div class="fw-bold text-secondary line-total" data-row="{{ $index }}" style="font-size: 1.05em;">Rp {{ number_format($item['line_total'], 0, ',', '.') }}</div>
                                     </td>
                                 </tr>
                             @endforeach
@@ -83,22 +90,23 @@
                 <div class="row mt-4">
                     <div class="col-12 col-md-6"></div>
                     <div class="col-12 col-md-6">
-                        <div class="border rounded p-3">
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Subtotal</span>
-                                <span class="fw-semibold" id="subtotal">{{ number_format($subtotal, 2) }}</span>
+                        <div class="border-start border-4 border-primary rounded bg-light-primary p-3">
+                            <div class="d-flex justify-content-between mb-3">
+                                <span class="text-muted">Subtotal</span>
+                                <span class="fw-semibold" id="subtotal">Rp 0</span>
                             </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Tax</span>
-                                <span class="fw-semibold" id="tax-amount">0.00</span>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span class="text-muted">Tax</span>
+                                <span class="fw-semibold" id="tax-amount">Rp 0</span>
                             </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Fees</span>
-                                <span class="fw-semibold" id="fees-amount">{{ number_format($fees, 2) }}</span>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span class="text-muted">Additional Fees</span>
+                                <span class="fw-semibold" id="fees-amount">Rp 0</span>
                             </div>
+                            <hr class="my-2">
                             <div class="d-flex justify-content-between">
-                                <span class="fw-bold">Total</span>
-                                <span class="fw-bold" id="total">{{ number_format($subtotal, 2) }}</span>
+                                <span class="fw-bold">Total Amount</span>
+                                <span class="fw-bold" id="total" style="font-size: 1.2em;">Rp 0</span>
                             </div>
                         </div>
                     </div>
@@ -106,10 +114,12 @@
             </div>
 
             <div class="card-footer d-flex flex-wrap justify-content-end gap-2">
-                <button type="submit" class="btn btn-outline-primary" name="action" value="draft">
-                    Save as Draft
-                </button>
-                <button type="submit" class="btn btn-primary" name="action" value="submit">
+                <a href="{{ route('purchase-orders.draft') }}" class="btn btn-outline-secondary">
+                    <i class="fa-duotone fa-solid fa-arrow-left"></i>
+                    Back
+                </a>
+                <button type="submit" class="btn btn-success" name="action" value="submit">
+                    <i class="fa-duotone fa-solid fa-check-circle"></i>
                     Submit for Approval
                 </button>
             </div>
@@ -121,10 +131,14 @@
 @push('addon-script')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const formatNumber = (value) => Number(value || 0).toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-            });
+            // Format as Indonesian Rupiah (Rp)
+            const formatCurrency = (value) => {
+                const number = Number(value || 0);
+                return 'Rp ' + number.toLocaleString('id-ID', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                });
+            };
 
             const updateTotals = () => {
                 let subtotal = 0;
@@ -140,7 +154,7 @@
                     const lineTotal = qty * price;
 
                     subtotal += lineTotal;
-                    lineTotalEl.textContent = formatNumber(lineTotal);
+                    lineTotalEl.textContent = formatCurrency(lineTotal);
                 });
 
                 const taxRate = parseFloat(document.getElementById('tax-rate').value || 0);
@@ -148,10 +162,10 @@
                 const taxAmount = subtotal * (taxRate / 100);
                 const total = subtotal + taxAmount + fees;
 
-                document.getElementById('subtotal').textContent = formatNumber(subtotal);
-                document.getElementById('tax-amount').textContent = formatNumber(taxAmount);
-                document.getElementById('fees-amount').textContent = formatNumber(fees);
-                document.getElementById('total').textContent = formatNumber(total);
+                document.getElementById('subtotal').textContent = formatCurrency(subtotal);
+                document.getElementById('tax-amount').textContent = formatCurrency(taxAmount);
+                document.getElementById('fees-amount').textContent = formatCurrency(fees);
+                document.getElementById('total').textContent = formatCurrency(total);
             };
 
             document.querySelectorAll('.qty-input, .price-input, #tax-rate, #fees').forEach((input) => {

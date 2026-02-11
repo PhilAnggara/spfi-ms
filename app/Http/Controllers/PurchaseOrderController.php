@@ -75,24 +75,37 @@ class PurchaseOrderController extends Controller
 
     /**
      * Preview selected items before creating PO.
+     * Filter items based on checked status (items[*][checked] = "1").
      */
     public function preview(Request $request)
     {
         $validated = $request->validate([
             'supplier_id' => ['required', 'exists:suppliers,id'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*' => ['required', 'distinct', 'exists:prs_items,id'],
+            'items' => ['required', 'array'],
+            'items.*' => ['required', 'array'],
+            'items.*.prs_item_id' => ['required', 'exists:prs_items,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.notes' => ['nullable', 'string'],
+            'items.*.checked' => ['required', 'in:0,1'],
         ]);
 
+        // Filter only checked items
+        $checkedItems = array_filter($validated['items'], fn ($item) => $item['checked'] === '1');
+        if (empty($checkedItems)) {
+            return redirect()->back()->withErrors(['items' => 'Please select at least one item.']);
+        }
+
         $userId = $request->user()->id;
+        $checkedItemIds = array_column($checkedItems, 'prs_item_id');
 
         $prsItems = PrsItem::with(['prs', 'item.unit', 'canvasingItem'])
-            ->whereIn('id', $validated['items'])
+            ->whereIn('id', $checkedItemIds)
             ->where('canvaser_id', $userId)
             ->whereNull('purchase_order_id')
             ->get();
 
-        if ($prsItems->count() !== count($validated['items'])) {
+        if ($prsItems->count() !== count($checkedItemIds)) {
             return redirect()->back()->withErrors(['items' => 'One or more PR items are invalid or already assigned.']);
         }
 

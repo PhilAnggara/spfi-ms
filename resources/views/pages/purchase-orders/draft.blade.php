@@ -26,13 +26,20 @@
                             @php
                                 $supplier = $items->first()?->canvasingItem?->supplier;
                                 $accordionId = 'supplier-' . $supplierId;
+                                // Calculate supplier total
+                                $supplierTotal = $items->sum(function ($item) {
+                                    return $item->quantity * ($item->canvasingItem?->unit_price ?? 0);
+                                });
                             @endphp
                             <div class="accordion-item">
                                 <h2 class="accordion-header" id="heading-{{ $accordionId }}">
                                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ $accordionId }}">
-                                        <div class="d-flex flex-column">
-                                            <span class="fw-semibold">{{ $supplier?->name ?? 'Unknown Supplier' }}</span>
-                                            <small class="text-muted">{{ itemOrItems($items->count()) }}</small>
+                                        <div class="d-flex justify-content-between align-items-center flex-grow-1">
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-semibold">{{ $supplier?->name ?? 'Unknown Supplier' }}</span>
+                                                <small class="text-muted">{{ itemOrItems($items->count()) }}</small>
+                                            </div>
+                                            <span class="badge bg-light-secondary me-4">Rp {{ number_format($supplierTotal, 2) }}</span>
                                         </div>
                                     </button>
                                 </h2>
@@ -50,10 +57,10 @@
                                                     <i class="fa-duotone fa-solid fa-eye"></i>
                                                     Preview PO
                                                 </button>
-                                                <button type="submit" class="btn btn-sm btn-success" name="action" value="submit" formaction="{{ route('purchase-orders.store') }}">
+                                                {{-- <button type="submit" class="btn btn-sm btn-success" name="action" value="submit" formaction="{{ route('purchase-orders.store') }}">
                                                     <i class="fa-duotone fa-solid fa-paper-plane"></i>
                                                     Submit for Approval
-                                                </button>
+                                                </button> --}}
                                             </div>
 
                                             <div class="table-responsive">
@@ -76,11 +83,12 @@
                                                             @endphp
                                                             <tr>
                                                                 <td>
-                                                                    <input type="checkbox" class="form-check-input item-checkbox" data-item="{{ $prsItem->id }}" checked>
-                                                                    <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $prsItem->id }}" data-item-input="{{ $prsItem->id }}">
-                                                                    <input type="hidden" name="items[{{ $index }}][quantity]" value="{{ $prsItem->quantity }}" data-item-input="{{ $prsItem->id }}">
-                                                                    <input type="hidden" name="items[{{ $index }}][unit_price]" value="{{ $canvasing?->unit_price ?? 0 }}" data-item-input="{{ $prsItem->id }}">
-                                                                    <input type="hidden" name="items[{{ $index }}][notes]" value="{{ $canvasing?->notes }}" data-item-input="{{ $prsItem->id }}">
+                                                                    <input type="checkbox" class="form-check-input item-checkbox" data-item-index="{{ $index }}" checked>
+                                                                    <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $prsItem->id }}">
+                                                                    <input type="hidden" name="items[{{ $index }}][quantity]" value="{{ $prsItem->quantity }}">
+                                                                    <input type="hidden" name="items[{{ $index }}][unit_price]" value="{{ $canvasing?->unit_price ?? 0 }}">
+                                                                    <input type="hidden" name="items[{{ $index }}][notes]" value="{{ $canvasing?->notes }}">
+                                                                    <input type="hidden" name="items[{{ $index }}][checked]" class="item-checked" value="1">
                                                                 </td>
                                                                 <td>{{ $prsItem->prs?->prs_number ?? '-' }}</td>
                                                                 <td>
@@ -112,18 +120,22 @@
 @push('addon-script')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const toggleItemInputs = (itemId, enabled) => {
-                const inputs = document.querySelectorAll(`[data-item-input="${itemId}"]`);
-                inputs.forEach((input) => {
-                    input.disabled = !enabled;
-                });
+            const toggleItemChecked = (itemIndex, checked) => {
+                const checkedInput = document.querySelector(`input[name="items[${itemIndex}][checked]"]`);
+                if (checked) {
+                    checkedInput.value = '1';
+                } else {
+                    checkedInput.value = '0';
+                }
             };
 
             document.querySelectorAll('.item-checkbox').forEach((checkbox) => {
-                toggleItemInputs(checkbox.dataset.item, checkbox.checked);
+                const itemIndex = checkbox.dataset.itemIndex;
+                toggleItemChecked(itemIndex, checkbox.checked);
 
                 checkbox.addEventListener('change', (event) => {
-                    toggleItemInputs(event.target.dataset.item, event.target.checked);
+                    const itemIndex = event.target.dataset.itemIndex;
+                    toggleItemChecked(itemIndex, event.target.checked);
                 });
             });
 
@@ -132,7 +144,8 @@
                     const form = button.closest('form');
                     form.querySelectorAll('.item-checkbox').forEach((checkbox) => {
                         checkbox.checked = true;
-                        toggleItemInputs(checkbox.dataset.item, true);
+                        const itemIndex = checkbox.dataset.itemIndex;
+                        toggleItemChecked(itemIndex, true);
                     });
                 });
             });

@@ -124,12 +124,12 @@
         <div class="signature-block">
             <div class="muted">Certified by</div>
             <div class="signature-name">{{ $certified['name'] ?? $purchaseOrder->certifiedBy?->name ?? '-' }}</div>
-            <div class="muted">{{ $certified['title'] ?? ($purchaseOrder->certifiedBy ? get_job_title($purchaseOrder->certifiedBy) : '-') }}</div>
+            {{-- <div class="muted">{{ $certified['title'] ?? ($purchaseOrder->certifiedBy ? get_job_title($purchaseOrder->certifiedBy) : '-') }}</div> --}}
         </div>
         <div class="signature-block" style="float: right;">
             <div class="muted">Approved by</div>
             <div class="signature-name">{{ $approved['name'] ?? $purchaseOrder->approvedBy?->name ?? '-' }}</div>
-            <div class="muted">{{ $approved['title'] ?? ($purchaseOrder->approvedBy ? get_job_title($purchaseOrder->approvedBy) : '-') }}</div>
+            {{-- <div class="muted">{{ $approved['title'] ?? ($purchaseOrder->approvedBy ? get_job_title($purchaseOrder->approvedBy) : '-') }}</div> --}}
         </div>
     </div>
 </body>

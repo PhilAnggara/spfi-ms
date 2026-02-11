@@ -53,18 +53,18 @@ class UserSeeder extends Seeder
         ])->assignRole('purchasing-manager');
 
         User::create([
-            'name' => 'Purchasing Staff 1',
-            'username' => 'purchasingstaff1',
-            'email' => 'purchasing.staff1@ptsinarpurefoods.com',
+            'name' => 'Jeffry Lantang',
+            'username' => 'jeffrylantang',
+            'email' => 'jeffry.lantang@ptsinarpurefoods.com',
             'role' => 'Staff',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
         ])->assignRole('canvaser');
 
         User::create([
-            'name' => 'Purchasing Staff 2',
-            'username' => 'purchasingstaff2',
-            'email' => 'purchasing.staff2@ptsinarpurefoods.com',
+            'name' => 'Erni Ending',
+            'username' => 'erniending',
+            'email' => 'erni.ending@ptsinarpurefoods.com',
             'role' => 'Staff',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
