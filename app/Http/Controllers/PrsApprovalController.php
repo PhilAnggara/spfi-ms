@@ -14,7 +14,7 @@ class PrsApprovalController extends Controller
      */
     public function index()
     {
-        $items = Prs::with(['department', 'user', 'items.item', 'items.canvaser', 'items.canvasingItem', 'logs' => function ($query) {
+        $items = Prs::with(['department', 'user', 'items.item', 'items.canvaser', 'items.canvasingItems', 'items.selectedCanvasingItem', 'logs' => function ($query) {
             $query->latest();
         }])->orderByDesc('id')->get();
         $canvasers = User::role('canvaser')->orderBy('name')->get();

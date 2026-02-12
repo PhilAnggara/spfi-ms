@@ -144,6 +144,9 @@
                 <th style="width: 48px;" class="text-center">Qty</th>
                 <th style="width: 52px;" class="text-center">Unit</th>
                 <th style="width: 90px;" class="text-right">Unit/price</th>
+                <th style="width: 55px;" class="text-right">Disc %</th>
+                <th style="width: 55px;" class="text-right">PPN %</th>
+                <th style="width: 55px;" class="text-right">PPh %</th>
                 <th style="width: 90px;" class="text-right">Amount</th>
             </tr>
         </thead>
@@ -164,7 +167,10 @@
                     <td class="text-center">{{ number_format($item->quantity, 0, ',', '.') }}</td>
                     <td class="text-center">{{ $unitName }}</td>
                     <td class="text-right">{{ $currencyCode }} {{ number_format($item->unit_price, 2, ',', '.') }}</td>
-                    <td class="text-right">{{ number_format($item->total, 2, ',', '.') }}</td>
+                    <td class="text-right">{{ number_format($item->discount_rate ?? 0, 2, ',', '.') }}</td>
+                    <td class="text-right">{{ number_format($item->ppn_rate ?? 0, 2, ',', '.') }}</td>
+                    <td class="text-right">{{ number_format($item->pph_rate ?? 0, 2, ',', '.') }}</td>
+                    <td class="text-right">{{ $currencyCode }} {{ number_format($item->total, 2, ',', '.') }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -190,20 +196,20 @@
                         <span>{{ $currencyCode }} {{ number_format($purchaseOrder->subtotal, 2, ',', '.') }}</span>
                     </div>
                     <div class="summary-row">
-                        <span>Disc {{ number_format($purchaseOrder->discount_rate ?? 0, 2) }}%</span>
-                        <span>{{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</span>
+                        <span>Disc</span>
+                        <span>{{ $currencyCode }} {{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</span>
                     </div>
                     <div class="summary-row">
-                        <span>PPH {{ number_format($purchaseOrder->pph_rate ?? 0, 2) }}%</span>
-                        <span>{{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</span>
+                        <span>PPH</span>
+                        <span>{{ $currencyCode }} {{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</span>
                     </div>
                     <div class="summary-row">
-                        <span>PPN/VAT {{ number_format($purchaseOrder->ppn_rate ?? 0, 2) }}%</span>
-                        <span>{{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</span>
+                        <span>PPN/VAT</span>
+                        <span>{{ $currencyCode }} {{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</span>
                     </div>
                     <div class="summary-row">
                         <span>Fees</span>
-                        <span>{{ number_format($purchaseOrder->fees ?? 0, 2, ',', '.') }}</span>
+                        <span>{{ $currencyCode }} {{ number_format($purchaseOrder->fees ?? 0, 2, ',', '.') }}</span>
                     </div>
                     <div class="summary-row summary-total">
                         <span>TOTAL</span>

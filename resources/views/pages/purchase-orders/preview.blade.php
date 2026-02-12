@@ -67,6 +67,9 @@
                                 <th>Item</th>
                                 <th style="width: 150px;">Quantity</th>
                                 <th style="width: 150px;">Unit Price</th>
+                                <th style="width: 120px;">Discount (%)</th>
+                                <th style="width: 120px;">PPN (%)</th>
+                                <th style="width: 120px;">PPh (%)</th>
                                 <th>Notes</th>
                                 <th style="width: 150px;" class="text-end">Line Total</th>
                             </tr>
@@ -95,6 +98,24 @@
                                         </div>
                                     </td>
                                     <td>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" name="items[{{ $index }}][discount_rate]" class="form-control discount-input text-end" min="0" step="0.01" value="{{ $item['discount_rate'] ?? 0 }}" data-row="{{ $index }}">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" name="items[{{ $index }}][ppn_rate]" class="form-control ppn-input text-end" min="0" step="0.01" value="{{ $item['ppn_rate'] ?? 0 }}" data-row="{{ $index }}">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" name="items[{{ $index }}][pph_rate]" class="form-control pph-input text-end" min="0" step="0.01" value="{{ $item['pph_rate'] ?? 0 }}" data-row="{{ $index }}">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </td>
+                                    <td>
                                         <input type="text" name="items[{{ $index }}][notes]" class="form-control form-control-sm" placeholder="-" value="{{ $item['notes'] }}">
                                     </td>
                                     <td class="text-end">
@@ -109,27 +130,6 @@
                 </div>
 
                 <div class="row g-3 mt-4">
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="discount-rate">Discount (%)</label>
-                        <div class="input-group">
-                            <input type="number" name="discount_rate" id="discount-rate" class="form-control" min="0" step="0.01" value="{{ $discountRate }}">
-                            <span class="input-group-text">%</span>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="ppn-rate">PPN (%)</label>
-                        <div class="input-group">
-                            <input type="number" name="ppn_rate" id="ppn-rate" class="form-control" min="0" step="0.01" value="{{ $ppnRate }}">
-                            <span class="input-group-text">%</span>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="pph-rate">PPh (%)</label>
-                        <div class="input-group">
-                            <input type="number" name="pph_rate" id="pph-rate" class="form-control" min="0" step="0.01" value="{{ $pphRate }}">
-                            <span class="input-group-text">%</span>
-                        </div>
-                    </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label" for="fees">Additional Fees</label>
                         <input type="number" name="fees" id="fees" class="form-control" min="0" step="0.01" value="{{ $fees }}">
@@ -234,6 +234,10 @@
 
             const updateTotals = () => {
                 let subtotal = 0;
+                let discountTotal = 0;
+                let ppnTotal = 0;
+                let pphTotal = 0;
+                let itemsTotal = 0;
 
                 updateCurrencySymbols();
 
@@ -241,36 +245,43 @@
                     const rowId = row.getAttribute('data-row');
                     const qtyInput = row.querySelector(`.qty-input[data-row="${rowId}"]`);
                     const priceInput = row.querySelector(`.price-input[data-row="${rowId}"]`);
+                    const discountInput = row.querySelector(`.discount-input[data-row="${rowId}"]`);
+                    const ppnInput = row.querySelector(`.ppn-input[data-row="${rowId}"]`);
+                    const pphInput = row.querySelector(`.pph-input[data-row="${rowId}"]`);
                     const lineTotalEl = row.querySelector(`.line-total[data-row="${rowId}"]`);
 
                     const qty = parseFloat(qtyInput.value || 0);
                     const price = parseFloat(priceInput.value || 0);
-                    const lineTotal = qty * price;
+                    const discountRate = parseFloat(discountInput?.value || 0);
+                    const ppnRate = parseFloat(ppnInput?.value || 0);
+                    const pphRate = parseFloat(pphInput?.value || 0);
+                    const lineSubtotal = qty * price;
+                    const discountAmount = lineSubtotal * (discountRate / 100);
+                    const baseAmount = lineSubtotal - discountAmount;
+                    const ppnAmount = baseAmount * (ppnRate / 100);
+                    const pphAmount = baseAmount * (pphRate / 100);
+                    const lineTotal = baseAmount + ppnAmount - pphAmount;
 
-                    subtotal += lineTotal;
+                    subtotal += lineSubtotal;
+                    discountTotal += discountAmount;
+                    ppnTotal += ppnAmount;
+                    pphTotal += pphAmount;
+                    itemsTotal += lineTotal;
                     lineTotalEl.textContent = formatCurrency(lineTotal);
                 });
-
-                const discountRate = parseFloat(document.getElementById('discount-rate').value || 0);
-                const ppnRate = parseFloat(document.getElementById('ppn-rate').value || 0);
-                const pphRate = parseFloat(document.getElementById('pph-rate').value || 0);
                 const fees = parseFloat(document.getElementById('fees').value || 0);
 
-                const discountAmount = subtotal * (discountRate / 100);
-                const baseAmount = subtotal - discountAmount;
-                const ppnAmount = baseAmount * (ppnRate / 100);
-                const pphAmount = baseAmount * (pphRate / 100);
-                const total = baseAmount + ppnAmount - pphAmount + fees;
+                const total = itemsTotal + fees;
 
                 document.getElementById('subtotal').textContent = formatCurrency(subtotal);
-                document.getElementById('discount-amount').textContent = formatSignedCurrency(-discountAmount);
-                document.getElementById('ppn-amount').textContent = formatCurrency(ppnAmount);
-                document.getElementById('pph-amount').textContent = formatSignedCurrency(-pphAmount);
+                document.getElementById('discount-amount').textContent = formatSignedCurrency(-discountTotal);
+                document.getElementById('ppn-amount').textContent = formatCurrency(ppnTotal);
+                document.getElementById('pph-amount').textContent = formatSignedCurrency(-pphTotal);
                 document.getElementById('fees-amount').textContent = formatCurrency(fees);
                 document.getElementById('total').textContent = formatCurrency(total);
             };
 
-            document.querySelectorAll('.qty-input, .price-input, #discount-rate, #ppn-rate, #pph-rate, #fees').forEach((input) => {
+            document.querySelectorAll('.qty-input, .price-input, .discount-input, .ppn-input, .pph-input, #fees').forEach((input) => {
                 input.addEventListener('input', updateTotals);
             });
 

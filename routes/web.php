@@ -22,6 +22,7 @@ use App\Http\Controllers\CanvasingController;
 use App\Http\Controllers\PurchasingReportController;
 use App\Http\Controllers\PurchaseOrderApprovalController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\SupplierComparisonController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VesselController;
@@ -70,6 +71,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/approval/{prs}/approve', [PrsApprovalController::class, 'approve'])->name('prs.approve');
         Route::post('/approval/{prs}/hold', [PrsApprovalController::class, 'hold'])->name('prs.hold');
         Route::post('/approval/{prs}/reject', [PrsApprovalController::class, 'reject'])->name('prs.reject');
+
+        Route::get('/supplier-comparison', [SupplierComparisonController::class, 'index'])->name('procurement.supplier-comparison.index');
+        Route::post('/supplier-comparison/{prsItem}', [SupplierComparisonController::class, 'select'])->name('procurement.supplier-comparison.select');
 
         Route::get('/reports', [PurchasingReportController::class, 'index'])->name('procurement.reports.index');
         Route::post('/reports/prs-not-yet-po', [PurchasingReportController::class, 'prsNotYetPo'])->name('procurement.reports.prs-not-yet-po');

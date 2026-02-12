@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\PrsCanvasingItem;
 use App\Models\PrsItem;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class CanvasingController extends Controller
 {
@@ -19,7 +20,8 @@ class CanvasingController extends Controller
         $prsItems = PrsItem::with([
             'prs',
             'item',
-            'canvasingItem',
+            'canvasingItems.supplier',
+            'selectedCanvasingItem.supplier',
         ])
             ->where('canvaser_id', $userId)
             ->orderByDesc('created_at')
@@ -43,7 +45,8 @@ class CanvasingController extends Controller
             'prs.department',
             'prs.user',
             'item',
-            'canvasingItem.supplier',
+            'canvasingItems.supplier',
+            'selectedCanvasingItem.supplier',
         ]);
 
         $suppliers = Supplier::orderBy('name')->get();
@@ -64,29 +67,62 @@ class CanvasingController extends Controller
         }
 
         $validated = $request->validate([
-            'supplier_id' => ['required', 'exists:suppliers,id'],
-            'unit_price' => ['required', 'numeric', 'min:0'],
-            'lead_time_days' => ['nullable', 'integer', 'min:0'],
-            'term_of_payment_type' => ['nullable', 'in:cash,credit'],
-            'term_of_payment' => ['nullable', 'string', 'max:255'],
-            'term_of_delivery' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string'],
+            'suppliers' => ['required', 'array', 'min:1'],
+            'suppliers.*.id' => ['nullable', 'integer', 'exists:prs_canvasing_items,id'],
+            'suppliers.*.supplier_id' => ['required', 'distinct', 'exists:suppliers,id'],
+            'suppliers.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'suppliers.*.lead_time_days' => ['nullable', 'integer', 'min:0'],
+            'suppliers.*.term_of_payment_type' => ['nullable', 'in:cash,credit'],
+            'suppliers.*.term_of_payment' => ['nullable', 'string', 'max:255'],
+            'suppliers.*.term_of_delivery' => ['nullable', 'string', 'max:255'],
+            'suppliers.*.notes' => ['nullable', 'string'],
         ]);
 
-        PrsCanvasingItem::updateOrCreate(
-            ['prs_item_id' => $prsItem->id],
-            [
-                'prs_id' => $prsItem->prs_id,
-                'supplier_id' => $validated['supplier_id'],
-                'unit_price' => $validated['unit_price'],
-                'lead_time_days' => $validated['lead_time_days'] ?? null,
-                'term_of_payment_type' => $validated['term_of_payment_type'] ?? null,
-                'term_of_payment' => $validated['term_of_payment'] ?? null,
-                'term_of_delivery' => $validated['term_of_delivery'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'canvased_by' => $request->user()->id,
-            ]
-        );
+        $rows = collect($validated['suppliers']);
+        $keepIds = $rows->pluck('id')->filter()->values();
+
+        DB::transaction(function () use ($prsItem, $rows, $keepIds, $request) {
+            if ($keepIds->isEmpty()) {
+                $prsItem->canvasingItems()->delete();
+                if ($prsItem->selected_canvasing_item_id) {
+                    $prsItem->update(['selected_canvasing_item_id' => null]);
+                }
+            } else {
+                $prsItem->canvasingItems()->whereNotIn('id', $keepIds)->delete();
+            }
+
+            foreach ($rows as $row) {
+                $payload = [
+                    'prs_id' => $prsItem->prs_id,
+                    'supplier_id' => $row['supplier_id'],
+                    'unit_price' => $row['unit_price'],
+                    'lead_time_days' => $row['lead_time_days'] ?? null,
+                    'term_of_payment_type' => $row['term_of_payment_type'] ?? null,
+                    'term_of_payment' => $row['term_of_payment'] ?? null,
+                    'term_of_delivery' => $row['term_of_delivery'] ?? null,
+                    'notes' => $row['notes'] ?? null,
+                    'canvased_by' => $request->user()->id,
+                ];
+
+                if (! empty($row['id'])) {
+                    $existing = $prsItem->canvasingItems()->whereKey($row['id'])->first();
+                    if (! $existing) {
+                        throw ValidationException::withMessages([
+                            'suppliers' => 'Invalid canvasing row for this PRS item.',
+                        ]);
+                    }
+                    $existing->update($payload);
+                } else {
+                    $prsItem->canvasingItems()->create($payload);
+                }
+            }
+
+            if ($prsItem->selected_canvasing_item_id && $keepIds->isNotEmpty()) {
+                if (! $keepIds->contains($prsItem->selected_canvasing_item_id)) {
+                    $prsItem->update(['selected_canvasing_item_id' => null]);
+                }
+            }
+        });
 
         $prsItem->prs?->logs()->create([
             'user_id' => $request->user()?->id,
@@ -94,6 +130,7 @@ class CanvasingController extends Controller
             'message' => 'Canvasing data saved per item.',
             'meta' => [
                 'prs_item_id' => $prsItem->id,
+                'supplier_ids' => $rows->pluck('supplier_id')->values()->all(),
             ],
         ]);
 

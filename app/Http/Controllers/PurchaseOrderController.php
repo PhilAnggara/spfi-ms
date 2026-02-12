@@ -50,22 +50,20 @@ class PurchaseOrderController extends Controller
         $prsItems = PrsItem::with([
             'prs',
             'item.unit',
-            'canvasingItem.supplier',
+            'selectedCanvasingItem.supplier',
         ])
             ->where('canvaser_id', $userId)
             ->whereNull('purchase_order_id')
-            ->whereHas('canvasingItem', function ($query) {
-                $query->whereNotNull('supplier_id');
-            })
+            ->whereNotNull('selected_canvasing_item_id')
             ->orderByDesc('created_at')
             ->get();
 
         $itemsBySupplier = $prsItems
-            ->filter(fn ($item) => $item->canvasingItem?->supplier_id)
-            ->groupBy(fn ($item) => $item->canvasingItem->supplier_id);
+            ->filter(fn ($item) => $item->selectedCanvasingItem?->supplier_id)
+            ->groupBy(fn ($item) => $item->selectedCanvasingItem->supplier_id);
 
         $suppliers = $itemsBySupplier
-            ->map(fn ($items) => $items->first()?->canvasingItem?->supplier)
+            ->map(fn ($items) => $items->first()?->selectedCanvasingItem?->supplier)
             ->filter();
 
         return view('pages.purchase-orders.draft', [
@@ -100,10 +98,11 @@ class PurchaseOrderController extends Controller
         $userId = $request->user()->id;
         $checkedItemIds = array_column($checkedItems, 'prs_item_id');
 
-        $prsItems = PrsItem::with(['prs', 'item.unit', 'canvasingItem'])
+        $prsItems = PrsItem::with(['prs', 'item.unit', 'selectedCanvasingItem'])
             ->whereIn('id', $checkedItemIds)
             ->where('canvaser_id', $userId)
             ->whereNull('purchase_order_id')
+            ->whereNotNull('selected_canvasing_item_id')
             ->get();
 
         if ($prsItems->count() !== count($checkedItemIds)) {
@@ -111,7 +110,7 @@ class PurchaseOrderController extends Controller
         }
 
         $invalidSupplierItems = $prsItems->filter(function ($item) use ($validated) {
-            return $item->canvasingItem?->supplier_id !== (int) $validated['supplier_id'];
+            return $item->selectedCanvasingItem?->supplier_id !== (int) $validated['supplier_id'];
         });
 
         if ($invalidSupplierItems->isNotEmpty()) {
@@ -119,7 +118,7 @@ class PurchaseOrderController extends Controller
         }
 
         $lineItems = $prsItems->map(function ($item) {
-            $unitPrice = $item->canvasingItem?->unit_price ?? 0;
+            $unitPrice = $item->selectedCanvasingItem?->unit_price ?? 0;
             $quantity = $item->quantity;
             $lineTotal = $quantity * $unitPrice;
 
@@ -130,9 +129,12 @@ class PurchaseOrderController extends Controller
                 'unit_name' => $item->item->unit?->name ?? 'PCS',
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
-                'notes' => $item->canvasingItem?->notes,
+                'notes' => $item->selectedCanvasingItem?->notes,
                 'line_total' => $lineTotal,
                 'prs_number' => $item->prs?->prs_number,
+                'discount_rate' => 0,
+                'ppn_rate' => 0,
+                'pph_rate' => 0,
             ];
         });
 
@@ -148,9 +150,6 @@ class PurchaseOrderController extends Controller
             'currencyId' => $currencyId,
             'remarkType' => 'Normal',
             'remarkText' => '',
-            'discountRate' => 0,
-            'ppnRate' => 0,
-            'pphRate' => 0,
             'fees' => 0,
         ]);
     }
@@ -164,9 +163,6 @@ class PurchaseOrderController extends Controller
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'currency_id' => ['required', 'exists:currencies,id'],
             'action' => ['required', 'in:draft,submit'],
-            'discount_rate' => ['nullable', 'numeric', 'min:0'],
-            'ppn_rate' => ['nullable', 'numeric', 'min:0'],
-            'pph_rate' => ['nullable', 'numeric', 'min:0'],
             'fees' => ['nullable', 'numeric', 'min:0'],
             'remark_type' => ['required', 'in:Normal,Confirmatory'],
             'remark_text' => ['nullable', 'string', 'max:255'],
@@ -174,20 +170,21 @@ class PurchaseOrderController extends Controller
             'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.discount_rate' => ['nullable', 'numeric', 'min:0'],
+            'items.*.ppn_rate' => ['nullable', 'numeric', 'min:0'],
+            'items.*.pph_rate' => ['nullable', 'numeric', 'min:0'],
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
-        $discountRate = (float) ($validated['discount_rate'] ?? 0);
-        $ppnRate = (float) ($validated['ppn_rate'] ?? 0);
-        $pphRate = (float) ($validated['pph_rate'] ?? 0);
         $fees = (float) ($validated['fees'] ?? 0);
 
         $prsItemIds = collect($validated['items'])->pluck('prs_item_id');
 
-        $prsItems = PrsItem::with(['prs', 'item', 'canvasingItem'])
+        $prsItems = PrsItem::with(['prs', 'item', 'selectedCanvasingItem'])
             ->whereIn('id', $prsItemIds)
             ->where('canvaser_id', $request->user()->id)
             ->whereNull('purchase_order_id')
+            ->whereNotNull('selected_canvasing_item_id')
             ->get();
 
         if ($prsItems->count() !== count($prsItemIds)) {
@@ -195,7 +192,7 @@ class PurchaseOrderController extends Controller
         }
 
         $invalidSupplierItems = $prsItems->filter(function ($item) use ($validated) {
-            return $item->canvasingItem?->supplier_id !== (int) $validated['supplier_id'];
+            return $item->selectedCanvasingItem?->supplier_id !== (int) $validated['supplier_id'];
         });
 
         if ($invalidSupplierItems->isNotEmpty()) {
@@ -205,7 +202,7 @@ class PurchaseOrderController extends Controller
         $itemsById = $prsItems->keyBy('id');
 
         // Atomic create: PO header, items, and PR item marking.
-        $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $discountRate, $ppnRate, $pphRate, $fees, $request) {
+        $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $fees, $request) {
             $purchaseOrder = PurchaseOrder::create([
                 'supplier_id' => $validated['supplier_id'],
                 'currency_id' => $validated['currency_id'],
@@ -213,22 +210,39 @@ class PurchaseOrderController extends Controller
                 'status' => $validated['action'] === 'submit' ? 'PENDING_APPROVAL' : 'DRAFT',
                 'tax_rate' => 0,
                 'fees' => $fees,
-                'discount_rate' => $discountRate,
-                'ppn_rate' => $ppnRate,
-                'pph_rate' => $pphRate,
+                'discount_rate' => 0,
+                'ppn_rate' => 0,
+                'pph_rate' => 0,
                 'remark_type' => $validated['remark_type'],
                 'remark_text' => $validated['remark_text'],
                 'submitted_at' => $validated['action'] === 'submit' ? now() : null,
             ]);
 
             $subtotal = 0;
+            $discountTotal = 0;
+            $ppnTotal = 0;
+            $pphTotal = 0;
+            $itemsTotal = 0;
 
             foreach ($validated['items'] as $row) {
                 $prsItem = $itemsById->get($row['prs_item_id']);
-                $lineTotal = $row['quantity'] * $row['unit_price'];
-                $subtotal += $lineTotal;
+                $lineSubtotal = $row['quantity'] * $row['unit_price'];
+                $discountRate = (float) ($row['discount_rate'] ?? 0);
+                $ppnRate = (float) ($row['ppn_rate'] ?? 0);
+                $pphRate = (float) ($row['pph_rate'] ?? 0);
+                $discountAmount = $lineSubtotal * ($discountRate / 100);
+                $baseAmount = $lineSubtotal - $discountAmount;
+                $ppnAmount = $baseAmount * ($ppnRate / 100);
+                $pphAmount = $baseAmount * ($pphRate / 100);
+                $lineTotal = $baseAmount + $ppnAmount - $pphAmount;
 
-                $canvasing = $prsItem->canvasingItem;
+                $subtotal += $lineSubtotal;
+                $discountTotal += $discountAmount;
+                $ppnTotal += $ppnAmount;
+                $pphTotal += $pphAmount;
+                $itemsTotal += $lineTotal;
+
+                $canvasing = $prsItem->selectedCanvasingItem;
 
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $purchaseOrder->id,
@@ -236,6 +250,13 @@ class PurchaseOrderController extends Controller
                     'item_id' => $prsItem->item_id,
                     'quantity' => $row['quantity'],
                     'unit_price' => $row['unit_price'],
+                    'line_subtotal' => $lineSubtotal,
+                    'discount_rate' => $discountRate,
+                    'discount_amount' => $discountAmount,
+                    'ppn_rate' => $ppnRate,
+                    'ppn_amount' => $ppnAmount,
+                    'pph_rate' => $pphRate,
+                    'pph_amount' => $pphAmount,
                     'total' => $lineTotal,
                     'notes' => $row['notes'] ?? null,
                     'meta' => [
@@ -249,18 +270,14 @@ class PurchaseOrderController extends Controller
                 ]);
             }
 
-            $discountAmount = $subtotal * ($discountRate / 100);
-            $baseAmount = $subtotal - $discountAmount;
-            $ppnAmount = $baseAmount * ($ppnRate / 100);
-            $pphAmount = $baseAmount * ($pphRate / 100);
-            $total = $baseAmount + $ppnAmount - $pphAmount + $fees;
+            $total = $itemsTotal + $fees;
 
             $purchaseOrder->update([
                 'subtotal' => $subtotal,
                 'tax_amount' => 0,
-                'discount_amount' => $discountAmount,
-                'ppn_amount' => $ppnAmount,
-                'pph_amount' => $pphAmount,
+                'discount_amount' => $discountTotal,
+                'ppn_amount' => $ppnTotal,
+                'pph_amount' => $pphTotal,
                 'total' => $total,
             ]);
 

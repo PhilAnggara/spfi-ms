@@ -21,6 +21,7 @@
                             <th>Item Name</th>
                             <th>Quantity</th>
                             <th>Date Needed</th>
+                            <th>Suppliers</th>
                             {{-- <th>Status</th> --}}
                             <th class="text-center">Action</th>
                         </tr>
@@ -46,6 +47,12 @@
                                     <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i>
                                     {{ tgl($prsItem->prs->date_needed) }}
                                 </td>
+                                <td>
+                                    <div class="small text-muted">Quotes: {{ $prsItem->canvasingItems->count() }}</div>
+                                    <div class="fw-semibold">
+                                        {{ $prsItem->selectedCanvasingItem?->supplier?->name ?? 'Not selected' }}
+                                    </div>
+                                </td>
                                 {{-- <td>
                                     @if ($prsItem->canvasingItem?->unit_price)
                                         <span class="badge bg-light-success">
@@ -60,9 +67,9 @@
                                     @endif
                                 </td> --}}
                                 <td class="text-center">
-                                    <a href="{{ route('canvasing.show', $prsItem->id) }}" class="btn btn-sm {{ $prsItem->canvasingItem?->unit_price ? 'btn-primary' : 'btn-outline-primary' }}">
+                                    <a href="{{ route('canvasing.show', $prsItem->id) }}" class="btn btn-sm {{ $prsItem->canvasingItems->isNotEmpty() ? 'btn-primary' : 'btn-outline-primary' }}">
                                         <i class="fa-duotone fa-solid fa-pen-to-square"></i>
-                                        {{ $prsItem->canvasingItem?->unit_price ? 'Edit Supplier' : 'Add Supplier' }}
+                                        {{ $prsItem->canvasingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}
                                     </a>
                                 </td>
                             </tr>

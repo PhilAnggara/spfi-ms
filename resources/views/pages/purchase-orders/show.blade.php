@@ -86,6 +86,9 @@
                                 <th>Qty</th>
                                 <th>Unit</th>
                                 <th class="text-end">Unit/Price</th>
+                                <th class="text-end">Disc %</th>
+                                <th class="text-end">PPN %</th>
+                                <th class="text-end">PPh %</th>
                                 <th class="text-end">Amount</th>
                                 <th>Notes</th>
                             </tr>
@@ -102,7 +105,10 @@
                                     <td>{{ number_format($item->quantity, 0, ',', '.') }}</td>
                                     <td>{{ $item->item?->unit?->name ?? 'PCS' }}</td>
                                     <td class="text-end">{{ $currencyCode }} {{ number_format($item->unit_price, 2, ',', '.') }}</td>
-                                    <td class="text-end">{{ number_format($item->total, 2, ',', '.') }}</td>
+                                    <td class="text-end">{{ number_format($item->discount_rate ?? 0, 2, ',', '.') }}</td>
+                                    <td class="text-end">{{ number_format($item->ppn_rate ?? 0, 2, ',', '.') }}</td>
+                                    <td class="text-end">{{ number_format($item->pph_rate ?? 0, 2, ',', '.') }}</td>
+                                    <td class="text-end">{{ $currencyCode }} {{ number_format($item->total, 2, ',', '.') }}</td>
                                     <td>{{ $item->notes ?? '-' }}</td>
                                 </tr>
                             @endforeach
@@ -119,20 +125,20 @@
                                 <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->subtotal, 2, ',', '.') }}</span>
                             </div>
                             <div class="d-flex justify-content-between mb-2">
-                                <span>Discount ({{ number_format($purchaseOrder->discount_rate ?? 0, 2) }}%)</span>
-                                <span class="fw-semibold">- {{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</span>
+                                <span>Discount</span>
+                                <span class="fw-semibold">- {{ $currencyCode }} {{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</span>
                             </div>
                             <div class="d-flex justify-content-between mb-2">
-                                <span>PPN ({{ number_format($purchaseOrder->ppn_rate ?? 0, 2) }}%)</span>
-                                <span class="fw-semibold">{{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</span>
+                                <span>PPN</span>
+                                <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</span>
                             </div>
                             <div class="d-flex justify-content-between mb-2">
-                                <span>PPh ({{ number_format($purchaseOrder->pph_rate ?? 0, 2) }}%)</span>
-                                <span class="fw-semibold">- {{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</span>
+                                <span>PPh</span>
+                                <span class="fw-semibold">- {{ $currencyCode }} {{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</span>
                             </div>
                             <div class="d-flex justify-content-between mb-2">
                                 <span>Fees</span>
-                                <span class="fw-semibold">{{ number_format($purchaseOrder->fees, 2, ',', '.') }}</span>
+                                <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->fees, 2, ',', '.') }}</span>
                             </div>
                             <div class="d-flex justify-content-between">
                                 <span class="fw-bold">Total</span>

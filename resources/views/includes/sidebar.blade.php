@@ -223,9 +223,17 @@
                             <li class="sidebar-item {{ Request::is('procurement/approval') ? 'active' : '' }}">
                                 <a href="{{ route('prs.approval.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-cart-circle-check {{ Request::is('procurement/approval') ? 'fa-fade' : '' }}"></i>
-                                    <span>PRS Approval</span>
+                                    <span>Canvasser Assignment</span>
                                 </a>
                             </li>
+                            @role('administrator|purchasing-manager')
+                                <li class="sidebar-item {{ Request::is('procurement/supplier-comparison') ? 'active' : '' }}">
+                                    <a href="{{ route('procurement.supplier-comparison.index') }}" class='sidebar-link'>
+                                        <i class="fa-duotone fa-solid fa-scale-balanced {{ Request::is('procurement/supplier-comparison') ? 'fa-fade' : '' }}"></i>
+                                        <span>Supplier Comparison</span>
+                                    </a>
+                                </li>
+                            @endrole
                             <li class="sidebar-item {{ Request::is('procurement/reports') ? 'active' : '' }}">
                                 <a href="{{ route('procurement.reports.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-file-chart-column {{ Request::is('procurement/reports') ? 'fa-fade' : '' }}"></i>

@@ -1,12 +1,12 @@
 @extends('layouts.app')
-@section('title', ' | PRS')
+@section('title', ' | Canvasser Assignment')
 
 @section('content')
 <div class="page-heading">
     <div class="page-title">
         <div class="row mb-4">
             <div class="col-12 col-md-6 order-md-1">
-                <h3>PRS Approval</h3>
+                <h3>Canvasser Assignment</h3>
             </div>
         </div>
     </div>
@@ -88,7 +88,7 @@
         <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="approveModalLabel-{{ $item->id }}">Approve & Assign Canvasser</h5>
+                    <h5 class="modal-title" id="approveModalLabel-{{ $item->id }}">Assign Canvasser</h5>
                     <button type="button" class="close rounded-pill" data-bs-dismiss="modal" aria-label="Close">
                         <i data-feather="x"></i>
                     </button>

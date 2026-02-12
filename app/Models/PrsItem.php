@@ -29,9 +29,14 @@ class PrsItem extends Model
         return $this->belongsTo(Prs::class, 'prs_id', 'id');
     }
 
-    public function canvasingItem()
+    public function canvasingItems()
     {
-        return $this->hasOne(PrsCanvasingItem::class, 'prs_item_id', 'id');
+        return $this->hasMany(PrsCanvasingItem::class, 'prs_item_id', 'id');
+    }
+
+    public function selectedCanvasingItem()
+    {
+        return $this->belongsTo(PrsCanvasingItem::class, 'selected_canvasing_item_id');
     }
 
     public function canvaser()

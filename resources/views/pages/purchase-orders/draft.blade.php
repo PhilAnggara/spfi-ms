@@ -24,11 +24,11 @@
                     <div class="accordion" id="poDraftAccordion">
                         @foreach ($itemsBySupplier as $supplierId => $items)
                             @php
-                                $supplier = $items->first()?->canvasingItem?->supplier;
+                                $supplier = $items->first()?->selectedCanvasingItem?->supplier;
                                 $accordionId = 'supplier-' . $supplierId;
                                 // Calculate supplier total
                                 $supplierTotal = $items->sum(function ($item) {
-                                    return $item->quantity * ($item->canvasingItem?->unit_price ?? 0);
+                                    return $item->quantity * ($item->selectedCanvasingItem?->unit_price ?? 0);
                                 });
                             @endphp
                             <div class="accordion-item">
@@ -75,7 +75,7 @@
                                                     <tbody>
                                                         @foreach ($items as $index => $prsItem)
                                                             @php
-                                                                $canvasing = $prsItem->canvasingItem;
+                                                                $canvasing = $prsItem->selectedCanvasingItem;
                                                             @endphp
                                                             <tr>
                                                                 <td>

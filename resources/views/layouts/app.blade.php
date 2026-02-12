@@ -14,7 +14,7 @@
         @include('includes.sidebar')
         <div id="main" class='layout-navbar navbar-fixed'>
             @include('includes.navbar')
-            <div id="main-content">
+            <div id="main-content" style="min-height: 80vh;">
 
                 @yield('content')
 
