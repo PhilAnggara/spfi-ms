@@ -19,6 +19,7 @@ use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CanvasingController;
+use App\Http\Controllers\PurchasingReportController;
 use App\Http\Controllers\PurchaseOrderApprovalController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\SupplierController;
@@ -69,6 +70,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/approval/{prs}/approve', [PrsApprovalController::class, 'approve'])->name('prs.approve');
         Route::post('/approval/{prs}/hold', [PrsApprovalController::class, 'hold'])->name('prs.hold');
         Route::post('/approval/{prs}/reject', [PrsApprovalController::class, 'reject'])->name('prs.reject');
+
+        Route::get('/reports', [PurchasingReportController::class, 'index'])->name('procurement.reports.index');
+        Route::post('/reports/prs-not-yet-po', [PurchasingReportController::class, 'prsNotYetPo'])->name('procurement.reports.prs-not-yet-po');
+        Route::post('/reports/po-not-yet-delivered', [PurchasingReportController::class, 'poNotYetDelivered'])->name('procurement.reports.po-not-yet-delivered');
+        Route::post('/reports/po-registered-period', [PurchasingReportController::class, 'poRegisteredPerPeriod'])->name('procurement.reports.po-registered-period');
+        Route::post('/reports/po-registered-department', [PurchasingReportController::class, 'poRegisteredPerDepartment'])->name('procurement.reports.po-registered-department');
+        Route::post('/reports/po-registered-item', [PurchasingReportController::class, 'poRegisteredPerItem'])->name('procurement.reports.po-registered-item');
+        Route::post('/reports/po-registered-supplier', [PurchasingReportController::class, 'poRegisteredPerSupplier'])->name('procurement.reports.po-registered-supplier');
     });
 
     Route::middleware('role:administrator|canvaser')->group(function () {

@@ -124,7 +124,7 @@ class ProductController extends Controller
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
         $request->validate([
-            'code' => ['required', 'string', 'max:8', Rule::unique('items', 'code')],
+            'code' => ['required', 'string', 'max:8', 'alpha_num', Rule::unique('items', 'code')],
             'name' => ['required', 'string'],
             'unit_of_measure_id' => ['required', 'integer', Rule::exists('unit_of_measures', 'id')],
             'category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
@@ -171,7 +171,7 @@ class ProductController extends Controller
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
         $request->validate([
-            'code' => ['required', 'string', 'max:8', Rule::unique('items', 'code')->ignore($id)],
+            'code' => ['required', 'string', 'max:8', 'alpha_num', Rule::unique('items', 'code')->ignore($id)],
             'name' => ['required', 'string'],
             'unit_of_measure_id' => ['required', 'integer', Rule::exists('unit_of_measures', 'id')],
             'category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],

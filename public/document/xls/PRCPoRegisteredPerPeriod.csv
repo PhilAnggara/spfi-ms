@@ -1,0 +1,10 @@
+﻿PT. SINAR PURE FOODS INTERNATIONAL;;;;;;;;;;;;;;;;;;;;;;;;;
+Purchase Order (PO) Register Per Period;;;;;;;;;;;;;;;;;;;;;;;;;
+Period February 11, 2026 - February 11, 2026;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+Purchase Requisition Slip;;;Department;;Purchase Order;;;;Item;;;;Unit Price;Disc;PPH;PPN;Amount;;;;;;Canvasser Name;Remarks;
+ID;Number;Date;Code;Name;Number;Date;Curr;Supplier;Code;Description;Quantity;Unit;;;;;IDR;PHP;EUR;GBP;USD;YEN;;;
+20793;70420020659;09-02-2026;7042;Inventory Management;66711;11-02-2026;IDR;PT SPLENDOR INOVASI INDONESIA;61590;BAND SAW BLADE SPECS : L 116 x W 5/8, THICNESS = 0,022, 3 THREAD PER INCH;10,00;PCS;188.800,00;0,00;0,00;207.680,00;2.095.680,00;0,00;0,00;0,00;0,00;0,00;Jeffry Lantang;HARGA FRANKO BITUNG , REPEAT ORDER PO: 65558;
+20790;70440020656;09-02-2026;7044;Quality Assurance;66712;11-02-2026;IDR;APOTIK GRACIA;93678;ALCOHOL 70 % @ 5LTR/GALLON ;4,00;GLN;200.000,00;0,00;0,00;0,00;800.000,00;0,00;0,00;0,00;0,00;0,00;Erni Ending;;
+20786;70460020652;09-02-2026;7048;Human Resources Development;66713;11-02-2026;IDR;TK.KARYA BANGUNAN;51330;PASIR PLESTER [SAND];1,00;TRUCK;550.000,00;0,00;0,00;0,00;550.000,00;0,00;0,00;0,00;0,00;0,00;Erni Ending;;
+G R A N D   T O T A L;;;;;;;;;;;;;;;;;0,00;0,00;0,00;0,00;0,00;0,00;;;
