@@ -93,6 +93,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/draft', [PurchaseOrderController::class, 'draft'])->name('draft');
             Route::post('/preview', [PurchaseOrderController::class, 'preview'])->name('preview');
             Route::post('/', [PurchaseOrderController::class, 'store'])->name('store');
+            Route::put('/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('update');
             Route::post('/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit'])->name('submit');
         });
     });
@@ -114,7 +115,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/{purchaseOrder}/number', [PurchaseOrderController::class, 'updateNumber'])
                 ->whereNumber('purchaseOrder')
                 ->name('number');
-            Route::get('/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])
+            Route::match(['get', 'post'], '/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])
                 ->whereNumber('purchaseOrder')
                 ->name('print');
         });

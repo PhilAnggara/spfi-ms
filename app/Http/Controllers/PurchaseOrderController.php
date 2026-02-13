@@ -354,6 +354,101 @@ class PurchaseOrderController extends Controller
     }
 
     /**
+     * Update PO details when changes are requested.
+     */
+    public function update(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        if (! in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED'], true)) {
+            return redirect()->back()->withErrors(['message' => 'Only draft PO can be updated.']);
+        }
+
+        if ($purchaseOrder->created_by !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'currency_id' => ['required', 'exists:currencies,id'],
+            'fees' => ['nullable', 'numeric', 'min:0'],
+            'remark_type' => ['required', 'in:Normal,Confirmatory'],
+            'remark_text' => ['nullable', 'string', 'max:255'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'distinct', 'exists:purchase_order_items,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.discount_rate' => ['nullable', 'numeric', 'min:0'],
+            'items.*.ppn_rate' => ['nullable', 'numeric', 'min:0'],
+            'items.*.pph_rate' => ['nullable', 'numeric', 'min:0'],
+            'items.*.notes' => ['nullable', 'string'],
+        ]);
+
+        $itemIds = collect($validated['items'])->pluck('id')->values();
+        $poItems = $purchaseOrder->items()->whereIn('id', $itemIds)->get();
+
+        if ($poItems->count() !== $itemIds->count()) {
+            return redirect()->back()->withErrors(['items' => 'Invalid PO items submitted.']);
+        }
+
+        $itemsById = $poItems->keyBy('id');
+        $fees = (float) ($validated['fees'] ?? 0);
+
+        DB::transaction(function () use ($validated, $purchaseOrder, $itemsById, $fees) {
+            $subtotal = 0;
+            $discountTotal = 0;
+            $ppnTotal = 0;
+            $pphTotal = 0;
+            $itemsTotal = 0;
+
+            foreach ($validated['items'] as $row) {
+                $poItem = $itemsById->get($row['id']);
+                $lineSubtotal = $row['quantity'] * $row['unit_price'];
+                $discountRate = (float) ($row['discount_rate'] ?? 0);
+                $ppnRate = (float) ($row['ppn_rate'] ?? 0);
+                $pphRate = (float) ($row['pph_rate'] ?? 0);
+                $discountAmount = $lineSubtotal * ($discountRate / 100);
+                $baseAmount = $lineSubtotal - $discountAmount;
+                $ppnAmount = $baseAmount * ($ppnRate / 100);
+                $pphAmount = $baseAmount * ($pphRate / 100);
+                $lineTotal = $baseAmount + $ppnAmount - $pphAmount;
+
+                $subtotal += $lineSubtotal;
+                $discountTotal += $discountAmount;
+                $ppnTotal += $ppnAmount;
+                $pphTotal += $pphAmount;
+                $itemsTotal += $lineTotal;
+
+                $poItem->update([
+                    'quantity' => $row['quantity'],
+                    'unit_price' => $row['unit_price'],
+                    'line_subtotal' => $lineSubtotal,
+                    'discount_rate' => $discountRate,
+                    'discount_amount' => $discountAmount,
+                    'ppn_rate' => $ppnRate,
+                    'ppn_amount' => $ppnAmount,
+                    'pph_rate' => $pphRate,
+                    'pph_amount' => $pphAmount,
+                    'total' => $lineTotal,
+                    'notes' => $row['notes'] ?? null,
+                ]);
+            }
+
+            $purchaseOrder->update([
+                'currency_id' => $validated['currency_id'],
+                'fees' => $fees,
+                'remark_type' => $validated['remark_type'],
+                'remark_text' => $validated['remark_text'],
+                'subtotal' => $subtotal,
+                'tax_amount' => 0,
+                'discount_amount' => $discountTotal,
+                'ppn_amount' => $ppnTotal,
+                'pph_amount' => $pphTotal,
+                'total' => $itemsTotal + $fees,
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Purchase order updated.');
+    }
+
+    /**
      * Update PO number before print.
      */
     public function updateNumber(Request $request, PurchaseOrder $purchaseOrder)
@@ -372,7 +467,7 @@ class PurchaseOrderController extends Controller
     /**
      * Print approved PO.
      */
-    public function print(PurchaseOrder $purchaseOrder)
+    public function print(Request $request, PurchaseOrder $purchaseOrder)
     {
         $purchaseOrder->load([
             'supplier',
@@ -386,6 +481,16 @@ class PurchaseOrderController extends Controller
 
         if ($purchaseOrder->status !== 'APPROVED') {
             return redirect()->back()->withErrors(['message' => 'PO must be approved before printing.']);
+        }
+
+        if ($request->filled('po_number')) {
+            $validated = $request->validate([
+                'po_number' => ['required', 'string', 'max:50'],
+            ]);
+
+            $purchaseOrder->update([
+                'po_number' => $validated['po_number'],
+            ]);
         }
 
         if (! $purchaseOrder->po_number) {

@@ -118,6 +118,7 @@ if (! function_exists('status_badge_color')) {
             'RESUBMITTED' => 'bg-light-info',
             'ON_HOLD' => 'bg-light-warning',
             'CANVASING' => 'bg-light-primary',
+            'PO_APPROVED' => 'bg-light-success',
             'REJECTED' => 'bg-light-danger',
             default => 'bg-light-secondary',
         };
@@ -132,6 +133,7 @@ if (! function_exists('status_badge_icon')) {
             'RESUBMITTED' => 'fa-duotone fa-solid fa-circle-up text-info',
             'ON_HOLD' => 'fa-duotone fa-solid fa-circle-pause text-warning',
             'CANVASING' => 'fa-duotone fa-solid fa-circle-check text-primary',
+            'PO_APPROVED' => 'fa-duotone fa-solid fa-circle-check text-success',
             'REJECTED' => 'fa-duotone fa-solid fa-circle-xmark text-danger',
             default => 'fa-duotone fa-solid fa-circle-dot text-secondary',
         };

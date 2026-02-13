@@ -63,6 +63,26 @@ class PurchaseOrderApprovalController extends Controller
             ],
         ]);
 
+        $purchaseOrder->load(['items.prsItem.prs']);
+        $prsById = $purchaseOrder->items
+            ->map(fn ($item) => $item->prsItem?->prs)
+            ->filter()
+            ->unique('id');
+
+        foreach ($prsById as $prs) {
+            $previousStatus = $prs->status;
+            $prs->update(['status' => 'PO_APPROVED']);
+            $prs->logs()->create([
+                'user_id' => $request->user()?->id,
+                'action' => 'PO_APPROVED',
+                'message' => 'PO approved for this PRS.',
+                'meta' => [
+                    'previous_status' => $previousStatus,
+                    'purchase_order_id' => $purchaseOrder->id,
+                ],
+            ]);
+        }
+
         return redirect()->back()->with('success', 'Purchase order approved.');
     }
 
