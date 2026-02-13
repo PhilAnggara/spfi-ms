@@ -16,6 +16,14 @@ class Batch extends Model
         'id'
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+        'fish_supplier_id' => 'integer',
+        'vessel_id' => 'integer',
+        'created_by' => 'integer',
+        'updated_by' => 'integer',
+    ];
+
     public function fishSupplier()
     {
         return $this->belongsTo(FishSupplier::class, 'fish_supplier_id', 'id');

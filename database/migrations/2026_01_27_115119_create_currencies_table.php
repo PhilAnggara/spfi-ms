@@ -16,8 +16,8 @@ return new class extends Migration
             $table->string('name')->index();
             $table->string('code')->unique();
             $table->string('symbol')->nullable();
-            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
+            $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->timestamps();
             $table->softDeletes();
         });

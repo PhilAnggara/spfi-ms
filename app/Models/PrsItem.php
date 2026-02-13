@@ -15,6 +15,15 @@ class PrsItem extends Model
     protected $guarded = [
         'id'
     ];
+
+    protected $casts = [
+        'id' => 'integer',
+        'item_id' => 'integer',
+        'prs_id' => 'integer',
+        'selected_canvasing_item_id' => 'integer',
+        'canvaser_id' => 'integer',
+        'purchase_order_id' => 'integer',
+    ];
     protected $hidden = [
 
     ];

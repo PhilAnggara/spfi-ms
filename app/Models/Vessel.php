@@ -16,6 +16,12 @@ class Vessel extends Model
         'id'
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+        'created_by' => 'integer',
+        'updated_by' => 'integer',
+    ];
+
     /**
      * Get the user who created this fish supplier.
      */

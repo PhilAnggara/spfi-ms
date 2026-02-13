@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('purchase_orders', function (Blueprint $table) {
-            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies')->onDelete(fk_on_delete('set null'));
             $table->decimal('discount_rate', 5, 2)->default(0);
             $table->decimal('discount_amount', 15, 2)->default(0);
             $table->decimal('ppn_rate', 5, 2)->default(0);

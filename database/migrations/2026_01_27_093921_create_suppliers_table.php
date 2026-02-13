@@ -21,8 +21,8 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->string('contact_person')->nullable();
             $table->text('remarks')->nullable();
-            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
+            $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->timestamps();
             $table->softDeletes();
         });

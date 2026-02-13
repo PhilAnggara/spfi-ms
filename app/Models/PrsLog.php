@@ -21,6 +21,9 @@ class PrsLog extends Model
     ];
 
     protected $casts = [
+        'id' => 'integer',
+        'prs_id' => 'integer',
+        'user_id' => 'integer',
         'meta' => 'array',
     ];
 

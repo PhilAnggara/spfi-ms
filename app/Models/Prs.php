@@ -15,6 +15,12 @@ class Prs extends Model
     protected $guarded = [
         'id'
     ];
+
+    protected $casts = [
+        'id' => 'integer',
+        'user_id' => 'integer',
+        'department_id' => 'integer',
+    ];
     protected $hidden = [
 
     ];

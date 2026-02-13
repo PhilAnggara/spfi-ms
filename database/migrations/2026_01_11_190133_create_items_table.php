@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->text('name');
             $table->string('code')->unique();
-            $table->foreignId('unit_of_measure_id')->constrained('unit_of_measures')->restrictOnDelete();
-            $table->foreignId('category_id')->constrained('item_categories')->restrictOnDelete();
+            $table->foreignId('unit_of_measure_id')->constrained('unit_of_measures')->onDelete(fk_on_delete('restrict'));
+            $table->foreignId('category_id')->constrained('item_categories')->onDelete(fk_on_delete('restrict'));
             $table->string('type')->nullable();
             $table->integer('stock_on_hand')->default(0);
             $table->boolean('is_active')->default(true);

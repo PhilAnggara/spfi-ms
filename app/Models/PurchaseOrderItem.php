@@ -30,6 +30,10 @@ class PurchaseOrderItem extends Model
     ];
 
     protected $casts = [
+        'id' => 'integer',
+        'purchase_order_id' => 'integer',
+        'prs_item_id' => 'integer',
+        'item_id' => 'integer',
         // Holds PR/canvasing snapshot (terms, lead time).
         'meta' => 'array',
     ];

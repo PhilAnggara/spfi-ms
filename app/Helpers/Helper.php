@@ -4,6 +4,7 @@ use App\Models\Department;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 if (! function_exists('toast')) {
@@ -134,5 +135,18 @@ if (! function_exists('status_badge_icon')) {
             'REJECTED' => 'fa-duotone fa-solid fa-circle-xmark text-danger',
             default => 'fa-duotone fa-solid fa-circle-dot text-secondary',
         };
+    }
+}
+
+if (! function_exists('fk_on_delete')) {
+    function fk_on_delete(string $action): string
+    {
+        $driver = DB::getDriverName();
+
+        if ($driver === 'sqlsrv' && in_array($action, ['cascade', 'restrict', 'set null'], true)) {
+            return 'no action';
+        }
+
+        return $action;
     }
 }

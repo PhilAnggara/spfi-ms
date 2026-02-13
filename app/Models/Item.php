@@ -15,6 +15,12 @@ class Item extends Model
     protected $guarded = [
         'id'
     ];
+
+    protected $casts = [
+        'id' => 'integer',
+        'unit_of_measure_id' => 'integer',
+        'category_id' => 'integer',
+    ];
     protected $hidden = [
 
     ];

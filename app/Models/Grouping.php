@@ -20,6 +20,7 @@ class Grouping extends Model
     ];
 
     protected $casts = [
+        'id' => 'integer',
         'other' => 'boolean',
         'selection' => 'boolean',
     ];

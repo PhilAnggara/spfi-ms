@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('fish_sizes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('fish_id')->constrained('fish')->cascadeOnDelete();
+            $table->foreignId('fish_id')->constrained('fish')->onDelete(fk_on_delete('cascade'));
             $table->string('code');
             $table->string('size_range');
-            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
+            $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->timestamps();
             $table->softDeletes();
 

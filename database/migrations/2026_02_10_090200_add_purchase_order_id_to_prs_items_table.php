@@ -17,7 +17,7 @@ return new class extends Migration
                 ->nullable()
                 ->after('canvaser_id')
                 ->constrained('purchase_orders')
-                ->nullOnDelete();
+                ->onDelete(fk_on_delete('set null'));
         });
     }
 

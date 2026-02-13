@@ -16,6 +16,10 @@ class UnitOfMeasure extends Model
         'id'
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+    ];
+
     public function items()
     {
         return $this->hasMany(Item::class, 'unit_of_measure_id');

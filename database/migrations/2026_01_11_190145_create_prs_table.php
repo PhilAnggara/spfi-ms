@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('prs', function (Blueprint $table) {
             $table->id();
             $table->string('prs_number')->unique();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('department_id')->constrained()->restrictOnDelete();
+            $table->foreignId('user_id')->constrained()->onDelete(fk_on_delete('cascade'));
+            $table->foreignId('department_id')->constrained()->onDelete(fk_on_delete('restrict'));
             $table->date('prs_date');
             $table->date('date_needed');
             $table->text('remarks')->nullable();

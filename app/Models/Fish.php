@@ -17,6 +17,10 @@ class Fish extends Model
         'id'
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+    ];
+
     public function sizes()
     {
         return $this->hasMany(FishSize::class);

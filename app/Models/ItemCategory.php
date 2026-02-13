@@ -15,6 +15,10 @@ class ItemCategory extends Model
     protected $guarded = [
         'id'
     ];
+
+    protected $casts = [
+        'id' => 'integer',
+    ];
     protected $hidden = [
 
     ];

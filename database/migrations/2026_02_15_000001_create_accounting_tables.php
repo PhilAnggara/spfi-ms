@@ -40,9 +40,9 @@ return new class extends Migration
         // Tabel Pivot: BS Grouping (many-to-many relationship)
         Schema::create('bs_groupings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('group_code_id')->constrained('accounting_group_codes')->cascadeOnDelete();
-            $table->foreignId('accounting_code_id')->constrained('accounting_codes')->cascadeOnDelete();
-            $table->foreignId('grouping_id')->nullable()->constrained('groupings')->nullOnDelete();
+            $table->foreignId('group_code_id')->constrained('accounting_group_codes')->onDelete(fk_on_delete('cascade'));
+            $table->foreignId('accounting_code_id')->constrained('accounting_codes')->onDelete(fk_on_delete('cascade'));
+            $table->foreignId('grouping_id')->nullable()->constrained('groupings')->onDelete(fk_on_delete('set null'));
             $table->string('major', 2)->nullable();
             $table->timestamps();
 

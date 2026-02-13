@@ -14,12 +14,12 @@ return new class extends Migration
         Schema::create('batches', function (Blueprint $table) {
             $table->id();
             $table->string('code')->unique();
-            $table->foreignId('fish_supplier_id')->constrained()->restrictOnDelete();
-            $table->foreignId('vessel_id')->constrained()->restrictOnDelete();
+            $table->foreignId('fish_supplier_id')->constrained()->onDelete(fk_on_delete('restrict'));
+            $table->foreignId('vessel_id')->constrained()->onDelete(fk_on_delete('restrict'));
             $table->string('fishing_method');
             $table->string('fish_type');
-            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
+            $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->timestamps();
             $table->softDeletes();
         });

@@ -15,6 +15,12 @@ class Supplier extends Model
     protected $guarded = [
         'id'
     ];
+
+    protected $casts = [
+        'id' => 'integer',
+        'created_by' => 'integer',
+        'updated_by' => 'integer',
+    ];
     protected $hidden = [
 
     ];

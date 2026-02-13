@@ -42,6 +42,12 @@ class PurchaseOrder extends Model
     ];
 
     protected $casts = [
+        'id' => 'integer',
+        'supplier_id' => 'integer',
+        'currency_id' => 'integer',
+        'created_by' => 'integer',
+        'certified_by_user_id' => 'integer',
+        'approved_by_user_id' => 'integer',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
         // Snapshot of signature names/titles for print.

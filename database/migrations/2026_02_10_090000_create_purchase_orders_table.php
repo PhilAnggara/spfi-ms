@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('purchase_orders', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('supplier_id')->constrained('suppliers')->restrictOnDelete();
-            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
+            $table->foreignId('supplier_id')->constrained('suppliers')->onDelete(fk_on_delete('restrict'));
+            $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
             $table->string('status')->default('DRAFT');
             $table->string('po_number')->nullable();
             $table->decimal('subtotal', 15, 2)->default(0);
@@ -22,8 +22,8 @@ return new class extends Migration
             $table->decimal('tax_amount', 15, 2)->default(0);
             $table->decimal('fees', 15, 2)->default(0);
             $table->decimal('total', 15, 2)->default(0);
-            $table->foreignId('certified_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('approved_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('certified_by_user_id')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
+            $table->foreignId('approved_by_user_id')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->timestamp('submitted_at')->nullable();
             $table->timestamp('approved_at')->nullable();
             $table->text('approval_notes')->nullable();

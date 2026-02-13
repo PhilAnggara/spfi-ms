@@ -14,6 +14,10 @@ class AccountingCode extends Model
         'desc',
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+    ];
+
     public function bsGroupings()
     {
         return $this->hasMany(BsGrouping::class, 'accounting_code_id');

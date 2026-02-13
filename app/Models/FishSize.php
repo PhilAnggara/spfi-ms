@@ -16,6 +16,11 @@ class FishSize extends Model
         'id',
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+        'fish_id' => 'integer',
+    ];
+
     public function fish()
     {
         return $this->belongsTo(Fish::class);

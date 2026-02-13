@@ -24,6 +24,15 @@ class PrsCanvasingItem extends Model
         'canvased_by',
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+        'prs_id' => 'integer',
+        'prs_item_id' => 'integer',
+        'supplier_id' => 'integer',
+        'lead_time_days' => 'integer',
+        'canvased_by' => 'integer',
+    ];
+
     public function prs()
     {
         return $this->belongsTo(Prs::class, 'prs_id');

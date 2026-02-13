@@ -16,6 +16,13 @@ class BsGrouping extends Model
         'major',
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+        'group_code_id' => 'integer',
+        'accounting_code_id' => 'integer',
+        'grouping_id' => 'integer',
+    ];
+
     public function groupCode()
     {
         return $this->belongsTo(AccountingGroupCode::class, 'group_code_id');
