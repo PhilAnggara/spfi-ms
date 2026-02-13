@@ -47,9 +47,13 @@
                                     <div class="text-muted small">Selected</div>
                                     <div class="fw-semibold">{{ $prsItem->selectedCanvasingItem?->supplier?->name ?? 'Not selected' }}</div>
                                 </div>
+                                <div>
+                                    <div class="text-muted small">Status</div>
+                                    <div class="fw-semibold">{{ $prsItem->purchase_order_id ? 'PO Created' : 'Open' }}</div>
+                                </div>
                             </div>
 
-                            <form method="post" action="{{ route('procurement.supplier-comparison.select', $prsItem) }}">
+                            <form method="post" action="{{ route('procurement.supplier-comparison.select', $prsItem) }}" @if ($prsItem->purchase_order_id) class="opacity-50" @endif>
                                 @csrf
                                 <div class="table-responsive">
                                     <table class="table table-striped align-middle">
@@ -68,7 +72,7 @@
                                             @foreach ($prsItem->canvasingItems as $canvasing)
                                                 <tr>
                                                     <td class="text-center">
-                                                        <input type="radio" name="canvasing_item_id" value="{{ $canvasing->id }}" @checked($prsItem->selected_canvasing_item_id === $canvasing->id) @if ($loop->first) required @endif>
+                                                        <input type="radio" name="canvasing_item_id" value="{{ $canvasing->id }}" @checked($prsItem->selected_canvasing_item_id === $canvasing->id) @if ($loop->first) required @endif @disabled($prsItem->purchase_order_id)>
                                                     </td>
                                                     <td>{{ $canvasing->supplier?->name ?? '-' }}</td>
                                                     <td class="text-end">{{ number_format($canvasing->unit_price, 2) }}</td>
@@ -88,7 +92,7 @@
                                 </div>
 
                                 <div class="d-flex justify-content-end">
-                                    <button type="submit" class="btn btn-primary">Save Selection</button>
+                                    <button type="submit" class="btn btn-primary" @disabled($prsItem->purchase_order_id)>Save Selection</button>
                                 </div>
                             </form>
                         </div>

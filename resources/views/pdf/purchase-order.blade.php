@@ -6,7 +6,7 @@
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             color: #111827;
         }
         .header {
@@ -37,14 +37,17 @@
         }
         th, td {
             border: 1px solid #111827;
-            padding: 4px 6px;
+            padding: 3px 4px;
             text-align: left;
             vertical-align: top;
         }
         th {
             background: #f3f4f6;
             font-weight: bold;
-            font-size: 10px;
+            font-size: 9px;
+        }
+        .po-items {
+            font-size: 9px;
         }
         .table-clean th,
         .table-clean td {
@@ -134,20 +137,20 @@
 
     <div class="line"></div>
 
-    <table>
+    <table class="po-items">
         <thead>
             <tr>
-                <th style="width: 72px;">PRS ID</th>
+                <th style="width: 60px;">PRS ID</th>
                 <th>Item Name</th>
-                <th style="width: 70px;">Item Code</th>
-                <th style="width: 70px;">Dept</th>
-                <th style="width: 48px;" class="text-center">Qty</th>
-                <th style="width: 52px;" class="text-center">Unit</th>
-                <th style="width: 90px;" class="text-right">Unit/price</th>
-                <th style="width: 55px;" class="text-right">Disc %</th>
-                <th style="width: 55px;" class="text-right">PPN %</th>
-                <th style="width: 55px;" class="text-right">PPh %</th>
-                <th style="width: 90px;" class="text-right">Amount</th>
+                <th style="width: 55px;">Item Code</th>
+                <th style="width: 55px;">Dept</th>
+                <th style="width: 40px;" class="text-center">Qty</th>
+                <th style="width: 40px;" class="text-center">Unit</th>
+                <th style="width: 70px;" class="text-right">Unit/price</th>
+                <th style="width: 40px;" class="text-right">Disc %</th>
+                <th style="width: 40px;" class="text-right">PPN %</th>
+                <th style="width: 40px;" class="text-right">PPh %</th>
+                <th style="width: 70px;" class="text-right">Amount</th>
             </tr>
         </thead>
         <tbody>

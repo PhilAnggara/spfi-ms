@@ -1,12 +1,12 @@
 @extends('layouts.app')
-@section('title', ' | Canvasing Detail')
+@section('title', ' | Supplier Canvasing')
 
 @section('content')
 <div class="page-heading">
     <div class="page-title">
         <div class="row mb-4">
             <div class="col-12 col-md-6 order-md-1">
-                <h3>Canvasing Detail</h3>
+                <h3>Supplier Canvasing</h3>
             </div>
             <div class="col-12 col-md-6 order-md-2">
                 <div class="float-md-end">

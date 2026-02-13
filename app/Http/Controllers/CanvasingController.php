@@ -134,6 +134,6 @@ class CanvasingController extends Controller
             ],
         ]);
 
-        return redirect()->route('canvasing.show', $prsItem)->with('success', 'Canvasing data saved.');
+        return redirect()->route('canvasing.index')->with('success', 'Canvasing data saved.');
     }
 }

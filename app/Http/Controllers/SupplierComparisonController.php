@@ -34,6 +34,10 @@ class SupplierComparisonController extends Controller
      */
     public function select(Request $request, PrsItem $prsItem)
     {
+        if ($prsItem->purchase_order_id) {
+            return redirect()->back()->withErrors(['canvasing_item_id' => 'Supplier selection is locked because a PO has been created.']);
+        }
+
         $validated = $request->validate([
             'canvasing_item_id' => ['required', 'exists:prs_canvasing_items,id'],
         ]);
