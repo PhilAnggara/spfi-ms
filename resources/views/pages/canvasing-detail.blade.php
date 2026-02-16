@@ -10,6 +10,10 @@
             </div>
             <div class="col-12 col-md-6 order-md-2">
                 <div class="float-md-end">
+                    <a href="{{ route('canvasing.print', $prsItem->id) }}" class="btn btn-sm icon icon-left btn-info" target="_blank">
+                        <i class="fa-duotone fa-solid fa-print"></i>
+                        Print Comparison
+                    </a>
                     <a href="{{ route('canvasing.index') }}" class="btn btn-sm icon icon-left btn-outline-secondary">
                         <i class="fa-duotone fa-solid fa-arrow-left"></i>
                         Back to list
@@ -210,6 +214,49 @@
                     });
 
                     selectEl.choicesInstance = instance;
+
+                    // Auto-populate supplier terms on selection
+                    selectEl.addEventListener('change', function(e) {
+                        const supplierId = e.target.value;
+                        if (!supplierId) return;
+
+                        const row = e.target.closest('.supplier-row');
+                        if (!row) return;
+
+                        const index = row.dataset.index;
+                        
+                        // Only auto-populate if fields are empty
+                        const paymentTypeField = row.querySelector(`[name="suppliers[${index}][term_of_payment_type]"]`);
+                        const paymentField = row.querySelector(`[name="suppliers[${index}][term_of_payment]"]`);
+                        const deliveryField = row.querySelector(`[name="suppliers[${index}][term_of_delivery]"]`);
+                        
+                        // Check if any field is already filled
+                        const hasExistingData = paymentTypeField?.value || paymentField?.value || deliveryField?.value;
+                        if (hasExistingData) {
+                            // Ask user if they want to overwrite
+                            if (!confirm('This supplier has previously used terms. Do you want to load them?')) {
+                                return;
+                            }
+                        }
+
+                        // Fetch supplier terms
+                        fetch(`/api/suppliers/${supplierId}/terms`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.term_of_payment_type && paymentTypeField) {
+                                    paymentTypeField.value = data.term_of_payment_type;
+                                }
+                                if (data.term_of_payment && paymentField) {
+                                    paymentField.value = data.term_of_payment;
+                                }
+                                if (data.term_of_delivery && deliveryField) {
+                                    deliveryField.value = data.term_of_delivery;
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error fetching supplier terms:', error);
+                            });
+                    });
                 });
             };
 

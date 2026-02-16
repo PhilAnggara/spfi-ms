@@ -30,6 +30,51 @@ class SupplierComparisonController extends Controller
     }
 
     /**
+     * Print supplier comparison.
+     */
+    public function print(Request $request)
+    {
+        $prsItems = PrsItem::with([
+            'prs.department',
+            'prs.user',
+            'item.unit',
+            'canvaser',
+            'canvasingItems.supplier',
+            'selectedCanvasingItem.supplier',
+        ])
+            ->whereNull('purchase_order_id')
+            ->whereHas('canvasingItems')
+            ->orderByDesc('id')
+            ->get();
+
+        return view('pages.procurement.supplier-comparison-print', [
+            'prsItems' => $prsItems,
+        ]);
+    }
+
+    /**
+     * Add feedback/notes for a PRS item.
+     */
+    public function addFeedback(Request $request, PrsItem $prsItem)
+    {
+        $validated = $request->validate([
+            'feedback' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $prsItem->prs?->logs()->create([
+            'user_id' => $request->user()?->id,
+            'action' => 'MANAGER_FEEDBACK',
+            'message' => 'Manager added feedback for supplier selection.',
+            'meta' => [
+                'prs_item_id' => $prsItem->id,
+                'feedback' => $validated['feedback'],
+            ],
+        ]);
+
+        return redirect()->back()->with('success', 'Feedback added successfully.');
+    }
+
+    /**
      * Select the supplier quote for a PRS item.
      */
     public function select(Request $request, PrsItem $prsItem)

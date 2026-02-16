@@ -9,6 +9,14 @@
                 <h3>Supplier Comparison</h3>
                 <p class="text-muted mb-0">Select the winning supplier quote per item.</p>
             </div>
+            <div class="col-12 col-md-6 order-md-2">
+                <div class="float-md-end">
+                    <a href="{{ route('procurement.supplier-comparison.print') }}" class="btn btn-sm icon icon-left btn-info" target="_blank">
+                        <i class="fa-duotone fa-solid fa-print"></i>
+                        Print All Comparisons
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -91,10 +99,52 @@
                                     </table>
                                 </div>
 
-                                <div class="d-flex justify-content-end">
+                                <div class="d-flex justify-content-between align-items-center gap-2 mt-3">
                                     <button type="submit" class="btn btn-primary" @disabled($prsItem->purchase_order_id)>Save Selection</button>
                                 </div>
                             </form>
+
+                            <!-- Manager Feedback Section -->
+                            <div class="mt-4 pt-3 border-top">
+                                <h6 class="mb-3">Manager Feedback</h6>
+                                <form method="post" action="{{ route('procurement.supplier-comparison.feedback', $prsItem) }}">
+                                    @csrf
+                                    <div class="mb-2">
+                                        <textarea name="feedback" class="form-control" rows="2" placeholder="Add feedback or notes for this supplier selection..." maxlength="1000" @disabled($prsItem->purchase_order_id)></textarea>
+                                    </div>
+                                    <div class="d-flex justify-content-end">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary" @disabled($prsItem->purchase_order_id)>
+                                            <i class="fa-duotone fa-solid fa-comment-dots"></i>
+                                            Add Feedback
+                                        </button>
+                                    </div>
+                                </form>
+                                
+                                @php
+                                    $feedbackLogs = $prsItem->prs?->logs()
+                                        ->where('action', 'MANAGER_FEEDBACK')
+                                        ->where('meta->prs_item_id', $prsItem->id)
+                                        ->with('user')
+                                        ->orderByDesc('created_at')
+                                        ->get();
+                                @endphp
+                                
+                                @if($feedbackLogs && $feedbackLogs->count() > 0)
+                                    <div class="mt-3">
+                                        <div class="small text-muted mb-2">Previous Feedback:</div>
+                                        @foreach($feedbackLogs as $log)
+                                            <div class="alert alert-light py-2 px-3 mb-2">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <div class="small"><strong>{{ $log->user?->name ?? 'Unknown' }}</strong> - {{ $log->created_at->format('d M Y H:i') }}</div>
+                                                        <div class="mt-1">{{ $log->meta['feedback'] ?? '-' }}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @endforeach

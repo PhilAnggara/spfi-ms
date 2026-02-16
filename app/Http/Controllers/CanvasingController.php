@@ -58,6 +58,53 @@ class CanvasingController extends Controller
     }
 
     /**
+     * Get supplier's last used terms.
+     */
+    public function getSupplierTerms(Request $request, $supplierId)
+    {
+        $lastCanvasing = \App\Models\PrsCanvasingItem::where('supplier_id', $supplierId)
+            ->where(function ($query) {
+                $query->whereNotNull('term_of_payment')
+                    ->orWhereNotNull('term_of_delivery')
+                    ->orWhereNotNull('term_of_payment_type');
+            })
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (!$lastCanvasing) {
+            return response()->json([]);
+        }
+
+        return response()->json([
+            'term_of_payment_type' => $lastCanvasing->term_of_payment_type,
+            'term_of_payment' => $lastCanvasing->term_of_payment,
+            'term_of_delivery' => $lastCanvasing->term_of_delivery,
+        ]);
+    }
+
+    /**
+     * Print canvasing comparison.
+     */
+    public function print(PrsItem $prsItem, Request $request)
+    {
+        if ($prsItem->canvaser_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $prsItem->load([
+            'prs.department',
+            'prs.user',
+            'item.unit',
+            'canvasingItems.supplier',
+            'selectedCanvasingItem.supplier',
+        ]);
+
+        return view('pages.canvasing-print', [
+            'prsItem' => $prsItem,
+        ]);
+    }
+
+    /**
      * Save canvasing results per item.
      */
     public function store(Request $request, PrsItem $prsItem)
