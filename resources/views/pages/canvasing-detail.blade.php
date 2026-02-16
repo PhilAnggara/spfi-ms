@@ -234,7 +234,7 @@
                         const hasExistingData = paymentTypeField?.value || paymentField?.value || deliveryField?.value;
                         if (hasExistingData) {
                             // Ask user if they want to overwrite
-                            if (!confirm('This supplier has previously used terms. Do you want to load them?')) {
+                            if (!confirm('This supplier has previously used payment and delivery terms. Do you want to load them?')) {
                                 return;
                             }
                         }
