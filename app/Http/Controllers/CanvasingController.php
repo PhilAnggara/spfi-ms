@@ -91,6 +91,9 @@ class CanvasingController extends Controller
                 $prsItem->canvasingItems()->whereNotIn('id', $keepIds)->delete();
             }
 
+            // Collect supplier updates to batch them
+            $supplierUpdates = [];
+
             foreach ($rows as $row) {
                 $payload = [
                     'prs_id' => $prsItem->prs_id,
@@ -104,14 +107,13 @@ class CanvasingController extends Controller
                     'canvased_by' => $request->user()->id,
                 ];
 
-                // Update supplier with the latest terms
-                $supplier = Supplier::find($row['supplier_id']);
-                if ($supplier) {
-                    $supplier->update([
+                // Collect supplier updates if terms are provided
+                if (isset($row['term_of_payment_type']) || isset($row['term_of_payment']) || isset($row['term_of_delivery'])) {
+                    $supplierUpdates[$row['supplier_id']] = [
                         'term_of_payment_type' => $row['term_of_payment_type'] ?? null,
                         'term_of_payment' => $row['term_of_payment'] ?? null,
                         'term_of_delivery' => $row['term_of_delivery'] ?? null,
-                    ]);
+                    ];
                 }
 
                 if (! empty($row['id'])) {
@@ -125,6 +127,11 @@ class CanvasingController extends Controller
                 } else {
                     $prsItem->canvasingItems()->create($payload);
                 }
+            }
+
+            // Batch update suppliers
+            foreach ($supplierUpdates as $supplierId => $updates) {
+                Supplier::where('id', $supplierId)->update($updates);
             }
 
             if ($prsItem->selected_canvasing_item_id && $keepIds->isNotEmpty()) {
@@ -150,10 +157,8 @@ class CanvasingController extends Controller
     /**
      * Get supplier payment and delivery terms.
      */
-    public function getSupplierTerms(Request $request, $supplierId)
+    public function getSupplierTerms(Supplier $supplier)
     {
-        $supplier = Supplier::findOrFail($supplierId);
-        
         return response()->json([
             'term_of_payment_type' => $supplier->term_of_payment_type,
             'term_of_payment' => $supplier->term_of_payment,
