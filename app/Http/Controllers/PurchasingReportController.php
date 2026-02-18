@@ -36,14 +36,17 @@ class PurchasingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
+        $dateFrom = Carbon::parse($validated['date_to'])->subMonths(3)->toDateString();
+
         $itemsQuery = PrsItem::with([
             'prs.department',
             'item.unit',
             'canvaser',
         ])
             ->whereNull('purchase_order_id')
-            ->whereHas('prs', function ($query) use ($validated) {
-                $query->whereDate('prs_date', '<=', $validated['date_to']);
+            ->whereHas('prs', function ($query) use ($validated, $dateFrom) {
+                $query->whereDate('prs_date', '>=', $dateFrom)
+                    ->whereDate('prs_date', '<=', $validated['date_to']);
             });
 
         if (! empty($validated['canvaser_id'])) {
@@ -98,14 +101,17 @@ class PurchasingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
+        $dateFrom = Carbon::parse($validated['date_to'])->subYear()->toDateString();
+
         $itemsQuery = PurchaseOrderItem::with([
             'purchaseOrder.supplier',
             'purchaseOrder.currency',
             'purchaseOrder.createdBy',
             'item.unit',
         ])
-            ->whereHas('purchaseOrder', function ($query) use ($validated) {
-                $query->whereDate('created_at', '<=', $validated['date_to']);
+            ->whereHas('purchaseOrder', function ($query) use ($validated, $dateFrom) {
+                $query->whereDate('created_at', '>=', $dateFrom)
+                    ->whereDate('created_at', '<=', $validated['date_to']);
             })
             ->where('meta->term_of_payment_type', $validated['po_type']);
 
