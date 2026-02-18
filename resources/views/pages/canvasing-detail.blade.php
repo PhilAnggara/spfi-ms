@@ -61,6 +61,16 @@
                     if ($canvasingRows->isEmpty()) {
                         $canvasingRows = collect([null]);
                     }
+
+                    $supplierTermMap = $suppliers
+                        ->mapWithKeys(fn ($supplier) => [
+                            $supplier->id => [
+                                'term_of_payment_type' => $supplier->term_of_payment_type,
+                                'term_of_payment' => $supplier->term_of_payment,
+                                'term_of_delivery' => $supplier->term_of_delivery,
+                            ],
+                        ])
+                        ->all();
                 @endphp
 
                 <form action="{{ route('canvasing.store', $prsItem->id) }}" method="post" class="form" id="canvasing-form">
@@ -193,6 +203,42 @@
     <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const supplierTermMap = @json($supplierTermMap);
+
+            const applySupplierTerms = (row, force = false) => {
+                if (!row) {
+                    return;
+                }
+
+                const supplierSelect = row.querySelector('select[name$="[supplier_id]"]');
+                const paymentTypeInput = row.querySelector('select[name$="[term_of_payment_type]"]');
+                const paymentInput = row.querySelector('input[name$="[term_of_payment]"]');
+                const deliveryInput = row.querySelector('input[name$="[term_of_delivery]"]');
+
+                if (!supplierSelect || !paymentTypeInput || !paymentInput || !deliveryInput) {
+                    return;
+                }
+
+                const supplierId = supplierSelect.value;
+                if (!supplierId || !Object.prototype.hasOwnProperty.call(supplierTermMap, supplierId)) {
+                    return;
+                }
+
+                const terms = supplierTermMap[supplierId] || {};
+
+                if (force || !paymentTypeInput.value) {
+                    paymentTypeInput.value = terms.term_of_payment_type ?? '';
+                }
+
+                if (force || !paymentInput.value.trim()) {
+                    paymentInput.value = terms.term_of_payment ?? '';
+                }
+
+                if (force || !deliveryInput.value.trim()) {
+                    deliveryInput.value = terms.term_of_delivery ?? '';
+                }
+            };
+
             const initChoices = (container) => {
                 const supplierSelects = (container || document).querySelectorAll('.choices-supplier');
                 supplierSelects.forEach((selectEl) => {
@@ -239,7 +285,18 @@
                     const row = wrapper.firstElementChild;
                     rowsContainer.appendChild(row);
                     initChoices(row);
+                    applySupplierTerms(row, false);
                     updateRemoveButtons();
+                });
+
+                rowsContainer.addEventListener('change', (event) => {
+                    const supplierSelect = event.target.closest('select[name$="[supplier_id]"]');
+                    if (!supplierSelect) {
+                        return;
+                    }
+
+                    const row = supplierSelect.closest('.supplier-row');
+                    applySupplierTerms(row, true);
                 });
 
                 rowsContainer.addEventListener('click', (event) => {
@@ -259,6 +316,7 @@
             }
 
             initChoices(document);
+            document.querySelectorAll('.supplier-row').forEach((row) => applySupplierTerms(row, true));
             updateRemoveButtons();
         });
     </script>

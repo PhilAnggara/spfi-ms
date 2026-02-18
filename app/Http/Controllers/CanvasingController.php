@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PrsItem;
+use App\Models\PrsCanvasingItem;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -80,8 +81,25 @@ class CanvasingController extends Controller
 
         $rows = collect($validated['suppliers']);
         $keepIds = $rows->pluck('id')->filter()->values();
+        $supplierTermsById = $rows
+            ->mapWithKeys(function (array $row) {
+                return [
+                    (int) $row['supplier_id'] => [
+                        'term_of_payment_type' => $this->sanitizeTermValue($row['term_of_payment_type'] ?? null),
+                        'term_of_payment' => $this->sanitizeTermValue($row['term_of_payment'] ?? null),
+                        'term_of_delivery' => $this->sanitizeTermValue($row['term_of_delivery'] ?? null),
+                    ],
+                ];
+            })
+            ->all();
 
-        DB::transaction(function () use ($prsItem, $rows, $keepIds, $request) {
+        DB::transaction(function () use ($prsItem, $rows, $keepIds, $request, $supplierTermsById) {
+            foreach ($supplierTermsById as $supplierId => $terms) {
+                Supplier::whereKey($supplierId)->update($terms);
+
+                PrsCanvasingItem::where('supplier_id', $supplierId)->update($terms);
+            }
+
             if ($keepIds->isEmpty()) {
                 $prsItem->canvasingItems()->delete();
                 if ($prsItem->selected_canvasing_item_id) {
@@ -92,14 +110,20 @@ class CanvasingController extends Controller
             }
 
             foreach ($rows as $row) {
+                $terms = $supplierTermsById[(int) $row['supplier_id']] ?? [
+                    'term_of_payment_type' => null,
+                    'term_of_payment' => null,
+                    'term_of_delivery' => null,
+                ];
+
                 $payload = [
                     'prs_id' => $prsItem->prs_id,
                     'supplier_id' => $row['supplier_id'],
                     'unit_price' => $row['unit_price'],
                     'lead_time_days' => $row['lead_time_days'] ?? null,
-                    'term_of_payment_type' => $row['term_of_payment_type'] ?? null,
-                    'term_of_payment' => $row['term_of_payment'] ?? null,
-                    'term_of_delivery' => $row['term_of_delivery'] ?? null,
+                    'term_of_payment_type' => $terms['term_of_payment_type'],
+                    'term_of_payment' => $terms['term_of_payment'],
+                    'term_of_delivery' => $terms['term_of_delivery'],
                     'notes' => $row['notes'] ?? null,
                     'canvased_by' => $request->user()->id,
                 ];
@@ -135,5 +159,12 @@ class CanvasingController extends Controller
         ]);
 
         return redirect()->route('canvasing.index')->with('success', 'Canvasing data saved.');
+    }
+
+    private function sanitizeTermValue(?string $value): ?string
+    {
+        $value = $value !== null ? trim($value) : null;
+
+        return $value === '' ? null : $value;
     }
 }
