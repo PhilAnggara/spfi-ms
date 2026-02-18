@@ -210,7 +210,50 @@
                     });
 
                     selectEl.choicesInstance = instance;
+
+                    // Add event listener for supplier selection
+                    selectEl.addEventListener('change', function(e) {
+                        const supplierId = e.target.value;
+                        if (supplierId) {
+                            fetchSupplierTerms(supplierId, selectEl);
+                        }
+                    });
                 });
+            };
+
+            const fetchSupplierTerms = async (supplierId, selectEl) => {
+                try {
+                    const response = await fetch(`/api/suppliers/${supplierId}/terms`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Find the row containing this select element
+                        const row = selectEl.closest('.supplier-row');
+                        if (row) {
+                            const index = row.getAttribute('data-index');
+                            
+                            // Update term of payment type
+                            const termPaymentTypeSelect = row.querySelector(`select[name="suppliers[${index}][term_of_payment_type]"]`);
+                            if (termPaymentTypeSelect && data.term_of_payment_type) {
+                                termPaymentTypeSelect.value = data.term_of_payment_type;
+                            }
+                            
+                            // Update term of payment
+                            const termPaymentInput = row.querySelector(`input[name="suppliers[${index}][term_of_payment]"]`);
+                            if (termPaymentInput && data.term_of_payment) {
+                                termPaymentInput.value = data.term_of_payment;
+                            }
+                            
+                            // Update term of delivery
+                            const termDeliveryInput = row.querySelector(`input[name="suppliers[${index}][term_of_delivery]"]`);
+                            if (termDeliveryInput && data.term_of_delivery) {
+                                termDeliveryInput.value = data.term_of_delivery;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching supplier terms:', error);
+                }
             };
 
             const updateRemoveButtons = () => {

@@ -88,6 +88,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/canvasing', [CanvasingController::class, 'index'])->name('canvasing.index');
         Route::get('/canvasing/{prsItem}', [CanvasingController::class, 'show'])->name('canvasing.show');
         Route::post('/canvasing/{prsItem}', [CanvasingController::class, 'store'])->name('canvasing.store');
+        Route::get('/api/suppliers/{supplier}/terms', [CanvasingController::class, 'getSupplierTerms'])->name('api.suppliers.terms');
 
         Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
             Route::get('/draft', [PurchaseOrderController::class, 'draft'])->name('draft');

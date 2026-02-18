@@ -104,6 +104,16 @@ class CanvasingController extends Controller
                     'canvased_by' => $request->user()->id,
                 ];
 
+                // Update supplier with the latest terms
+                $supplier = Supplier::find($row['supplier_id']);
+                if ($supplier) {
+                    $supplier->update([
+                        'term_of_payment_type' => $row['term_of_payment_type'] ?? null,
+                        'term_of_payment' => $row['term_of_payment'] ?? null,
+                        'term_of_delivery' => $row['term_of_delivery'] ?? null,
+                    ]);
+                }
+
                 if (! empty($row['id'])) {
                     $existing = $prsItem->canvasingItems()->whereKey($row['id'])->first();
                     if (! $existing) {
@@ -135,5 +145,19 @@ class CanvasingController extends Controller
         ]);
 
         return redirect()->route('canvasing.index')->with('success', 'Canvasing data saved.');
+    }
+
+    /**
+     * Get supplier payment and delivery terms.
+     */
+    public function getSupplierTerms(Request $request, $supplierId)
+    {
+        $supplier = Supplier::findOrFail($supplierId);
+        
+        return response()->json([
+            'term_of_payment_type' => $supplier->term_of_payment_type,
+            'term_of_payment' => $supplier->term_of_payment,
+            'term_of_delivery' => $supplier->term_of_delivery,
+        ]);
     }
 }

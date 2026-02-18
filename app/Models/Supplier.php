@@ -15,6 +15,22 @@ class Supplier extends Model
     protected $guarded = [
         'id'
     ];
+    
+    protected $fillable = [
+        'name',
+        'code',
+        'address',
+        'phone',
+        'fax',
+        'email',
+        'contact_person',
+        'remarks',
+        'term_of_payment_type',
+        'term_of_payment',
+        'term_of_delivery',
+        'created_by',
+        'updated_by',
+    ];
 
     protected $casts = [
         'id' => 'integer',
