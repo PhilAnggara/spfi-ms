@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PrsItem;
 use App\Models\PrsCanvasingItem;
 use App\Models\Supplier;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -158,7 +159,51 @@ class CanvasingController extends Controller
             ],
         ]);
 
-        return redirect()->route('canvasing.index')->with('success', 'Canvasing data saved.');
+        // return redirect()->route('canvasing.index')->with('success', 'Canvasing data saved.');
+        return redirect()->back()->with('success', 'Canvasing data saved.');
+    }
+
+    /**
+     * Download canvasing report per PRS item.
+     */
+    public function report(PrsItem $prsItem, Request $request)
+    {
+        if ($prsItem->canvaser_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $prsItem->load([
+            'prs.department',
+            'prs.user',
+            'item.unit',
+            'canvasingItems.supplier',
+            'selectedCanvasingItem.supplier',
+        ]);
+
+        $canvasingItems = $prsItem->canvasingItems
+            ->sortBy('unit_price')
+            ->values();
+
+        if ($canvasingItems->isEmpty()) {
+            return redirect()
+                ->route('canvasing.show', $prsItem)
+                ->withErrors(['message' => 'Canvasing report cannot be generated because no supplier data is available yet.']);
+        }
+
+        $filename = sprintf(
+            'canvasing-report-%s-%s.pdf',
+            $prsItem->item?->code ?? ('item-' . $prsItem->item_id),
+            now()->format('YmdHis')
+        );
+
+        return Pdf::loadView('pdf.canvasing-report', [
+            'prsItem' => $prsItem,
+            'canvasingItems' => $canvasingItems,
+            'maxUnitPrice' => (float) max($canvasingItems->max('unit_price') ?? 0, 1),
+            'generatedBy' => $request->user(),
+        ])
+            ->setPaper('a4', 'portrait')
+            ->stream($filename);
     }
 
     private function sanitizeTermValue(?string $value): ?string

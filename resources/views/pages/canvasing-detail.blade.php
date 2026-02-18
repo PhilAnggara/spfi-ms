@@ -10,6 +10,10 @@
             </div>
             <div class="col-12 col-md-6 order-md-2">
                 <div class="float-md-end">
+                    <a href="{{ route('canvasing.report', $prsItem->id) }}" target="_blank" rel="noopener" class="btn btn-sm icon icon-left btn-outline-danger me-2">
+                        <i class="fa-duotone fa-solid fa-file-pdf"></i>
+                        Export PDF
+                    </a>
                     <a href="{{ route('canvasing.index') }}" class="btn btn-sm icon icon-left btn-outline-secondary">
                         <i class="fa-duotone fa-solid fa-arrow-left"></i>
                         Back to list
