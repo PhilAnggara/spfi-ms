@@ -53,8 +53,9 @@
                                 </div>
                             </div>
 
-                            <form method="post" action="{{ route('procurement.supplier-comparison.select', $prsItem) }}" @if ($prsItem->purchase_order_id) class="opacity-50" @endif>
+                            <form method="post" action="{{ route('procurement.supplier-comparison.select', $prsItem) }}" id="form-{{ $prsItem->id }}" @if ($prsItem->purchase_order_id) class="opacity-50" @endif>
                                 @csrf
+                                <input type="hidden" name="selection_reason" id="reason-{{ $prsItem->id }}">
                                 <div class="table-responsive">
                                     <table class="table table-striped align-middle">
                                         <thead>
@@ -91,10 +92,35 @@
                                     </table>
                                 </div>
 
-                                <div class="d-flex justify-content-end">
-                                    <button type="submit" class="btn btn-primary" @disabled($prsItem->purchase_order_id)>Save Selection</button>
+                                <div class="d-flex justify-content-end gap-2">
+                                    @if ($prsItem->selected_canvasing_item_id)
+                                        <a href="{{ route('procurement.supplier-comparison.report', $prsItem->id) }}" target="_blank" rel="noopener" class="btn btn-outline-danger">
+                                            <i class="fa-duotone fa-solid fa-file-pdf"></i>
+                                            Export PDF
+                                        </a>
+                                    @endif
+                                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#reasonModal-{{ $prsItem->id }}" @disabled($prsItem->purchase_order_id)>Save Selection</button>
                                 </div>
                             </form>
+
+                            <!-- Modal for Selection Reason -->
+                            <div class="modal fade" id="reasonModal-{{ $prsItem->id }}" tabindex="-1" aria-labelledby="reasonModalLabel-{{ $prsItem->id }}" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="reasonModalLabel-{{ $prsItem->id }}">Selection Reason (Optional)</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <textarea class="form-control" id="reasonText-{{ $prsItem->id }}" rows="4" placeholder="Enter reason for selecting this supplier (optional)">{{ $prsItem->selection_reason }}</textarea>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="button" class="btn btn-primary" onclick="submitWithReason({{ $prsItem->id }})">Save Selection</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 @endforeach
@@ -102,4 +128,14 @@
         @endif
     </section>
 </div>
+
+@push('addon-script')
+<script>
+function submitWithReason(prsItemId) {
+    const reasonText = document.getElementById('reasonText-' + prsItemId).value;
+    document.getElementById('reason-' + prsItemId).value = reasonText;
+    document.getElementById('form-' + prsItemId).submit();
+}
+</script>
+@endpush
 @endsection

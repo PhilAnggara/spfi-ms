@@ -74,6 +74,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/supplier-comparison', [SupplierComparisonController::class, 'index'])->name('procurement.supplier-comparison.index');
         Route::post('/supplier-comparison/{prsItem}', [SupplierComparisonController::class, 'select'])->name('procurement.supplier-comparison.select');
+        Route::get('/supplier-comparison/{prsItem}/report', [SupplierComparisonController::class, 'report'])->name('procurement.supplier-comparison.report');
 
         Route::get('/reports', [PurchasingReportController::class, 'index'])->name('procurement.reports.index');
         Route::post('/reports/prs-not-yet-po', [PurchasingReportController::class, 'prsNotYetPo'])->name('procurement.reports.prs-not-yet-po');

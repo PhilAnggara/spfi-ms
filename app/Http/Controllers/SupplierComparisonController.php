@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PrsItem;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class SupplierComparisonController extends Controller
@@ -40,6 +41,7 @@ class SupplierComparisonController extends Controller
 
         $validated = $request->validate([
             'canvasing_item_id' => ['required', 'exists:prs_canvasing_items,id'],
+            'selection_reason' => ['nullable', 'string'],
         ]);
 
         $canvasing = $prsItem->canvasingItems()->whereKey($validated['canvasing_item_id'])->first();
@@ -49,6 +51,7 @@ class SupplierComparisonController extends Controller
 
         $prsItem->update([
             'selected_canvasing_item_id' => $canvasing->id,
+            'selection_reason' => $validated['selection_reason'] ?? null,
         ]);
 
         $prsItem->prs?->logs()->create([
@@ -63,5 +66,49 @@ class SupplierComparisonController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Supplier selected for this item.');
+    }
+
+    /**
+     * Generate supplier selection report PDF.
+     */
+    public function report(PrsItem $prsItem, Request $request)
+    {
+        $prsItem->load([
+            'prs.department',
+            'prs.user',
+            'item.unit',
+            'canvasingItems.supplier',
+            'selectedCanvasingItem.supplier',
+        ]);
+
+        $canvasingItems = $prsItem->canvasingItems
+            ->sortBy('unit_price')
+            ->values();
+
+        if ($canvasingItems->isEmpty()) {
+            return redirect()
+                ->back()
+                ->withErrors(['message' => 'Selection report cannot be generated because no supplier data is available.']);
+        }
+
+        if (!$prsItem->selected_canvasing_item_id) {
+            return redirect()
+                ->back()
+                ->withErrors(['message' => 'Selection report cannot be generated because no supplier has been selected yet.']);
+        }
+
+        $filename = sprintf(
+            'supplier-selection-report-%s-%s.pdf',
+            $prsItem->item?->code ?? ('item-' . $prsItem->item_id),
+            now()->format('YmdHis')
+        );
+
+        return Pdf::loadView('pdf.selection-report', [
+            'prsItem' => $prsItem,
+            'canvasingItems' => $canvasingItems,
+            'generatedBy' => $request->user(),
+        ])
+            ->setPaper('a4', 'portrait')
+            ->stream($filename);
     }
 }
