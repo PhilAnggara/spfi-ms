@@ -10,9 +10,12 @@ use Livewire\Attributes\On;
 class PrsItem extends Component
 {
     public $prsItems = [];
+    public $mode = 'form';
 
-    public function mount($existingItems = [])
+    public function mount($existingItems = [], $mode = 'form')
     {
+        $this->mode = $mode;
+
         // When editing, seed with existing PRS items; otherwise start with one empty row
         if ($existingItems instanceof \Illuminate\Support\Collection) {
             $existingItems = $existingItems->load('item');
@@ -32,8 +35,13 @@ class PrsItem extends Component
                     'quantity'      => $existing->quantity ?? 1,
                 ];
             }
+            $this->updateCartCount();
         } else {
-            $this->addPrsItem();
+            if ($this->mode === 'form') {
+                $this->addPrsItem();
+            } else {
+                $this->updateCartCount();
+            }
         }
     }
 
@@ -52,6 +60,7 @@ class PrsItem extends Component
 
         // Re-init Choices.js after Livewire DOM changes
         $this->dispatch('choices:refresh');
+        $this->updateCartCount();
     }
 
     public function removePrsItem($index)
@@ -61,10 +70,74 @@ class PrsItem extends Component
 
         // Keep dropdowns in sync after a row is removed
         $this->dispatch('choices:refresh');
+        $this->updateCartCount();
+    }
+
+    public function incrementQuantity($index)
+    {
+        if (!isset($this->prsItems[$index])) {
+            return;
+        }
+
+        $currentQty = (int) ($this->prsItems[$index]['quantity'] ?? 1);
+        $this->prsItems[$index]['quantity'] = $currentQty + 1;
+        $this->updateCartCount();
+    }
+
+    public function decrementQuantity($index)
+    {
+        if (!isset($this->prsItems[$index])) {
+            return;
+        }
+
+        $currentQty = (int) ($this->prsItems[$index]['quantity'] ?? 1);
+        $this->prsItems[$index]['quantity'] = max(1, $currentQty - 1);
+        $this->updateCartCount();
+    }
+
+    public function addFromCatalog($itemId, $quantity = 1)
+    {
+        if (!$itemId || !is_numeric($itemId)) {
+            return;
+        }
+
+        $quantity = (int) $quantity;
+        if ($quantity < 1) {
+            $quantity = 1;
+        }
+
+        $item = Item::query()->where('is_active', true)->find($itemId);
+        if (!$item) {
+            return;
+        }
+
+        foreach ($this->prsItems as $index => $row) {
+            if (($row['item_id'] ?? null) == $item->id) {
+                $this->prsItems[$index]['quantity'] = $quantity;
+                $this->updateCartCount();
+                return;
+            }
+        }
+
+        $this->prsItems[] = [
+            'row_id'        => (string) Str::uuid(),
+            'item_id'       => $item->id,
+            'item_code'     => $item->code,
+            'item_name'     => $item->name,
+            'stock_on_hand' => $item->stock_on_hand ?? 0,
+            'unit'          => $item->unit?->name ?? 'PCS',
+            'quantity'      => $quantity,
+        ];
+
+        $this->updateCartCount();
     }
 
     public function updated($property)
     {
+        if (preg_match('/prsItems\.(\d+)\.quantity/', $property)) {
+            $this->updateCartCount();
+        }
+
         // React only when item_id changes on any row
         if (preg_match('/prsItems\.(\d+)\.item_id/', $property, $matches)) {
             $index = (int) $matches[1];
@@ -130,5 +203,16 @@ class PrsItem extends Component
     public function render()
     {
         return view('livewire.prs-item');
+    }
+
+    private function updateCartCount()
+    {
+        $itemIds = collect($this->prsItems)
+            ->pluck('item_id')
+            ->filter(fn ($id) => $id)
+            ->values()
+            ->all();
+
+        $this->dispatch('prs-cart-count', count: count($this->prsItems), itemIds: $itemIds);
     }
 }

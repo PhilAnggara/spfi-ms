@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Prs;
 use App\Models\PrsItem;
 use App\Models\User;
@@ -32,9 +34,74 @@ class PrsController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Request $request)
     {
-        //
+        $departments = Department::all();
+        $categories = ItemCategory::query()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+
+        $search = trim((string) $request->query('search'));
+        $categoryId = trim((string) $request->query('category'));
+        $searchTerms = collect(preg_split('/\s+/', mb_strtolower($search), -1, PREG_SPLIT_NO_EMPTY))
+            ->filter()
+            ->values();
+
+        $itemsQuery = Item::with(['unit', 'category'])
+            ->select(['id', 'name', 'code', 'stock_on_hand', 'unit_of_measure_id', 'category_id'])
+            ->where('is_active', true)
+            ->when($searchTerms->isNotEmpty(), function ($query) use ($searchTerms) {
+                foreach ($searchTerms as $term) {
+                    $query->where(function ($subQuery) use ($term) {
+                        $subQuery
+                            ->whereRaw('LOWER(name) LIKE ?', ['%' . $term . '%'])
+                            ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $term . '%']);
+                    });
+                }
+            })
+            ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
+                $query->where('category_id', (int) $categoryId);
+            })
+            ->orderBy('name');
+
+        $items = $itemsQuery
+            ->paginate(36)
+            ->withQueryString();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            $transformedItems = $items->getCollection()->map(function ($item) {
+                $categoryName = $item->category?->name ?? 'Uncategorized';
+                return [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'code' => $item->code,
+                    'stock_on_hand' => $item->stock_on_hand,
+                    'unit' => $item->unit?->name ?? 'PCS',
+                    'category' => $categoryName,
+                    'category_icon' => category_icon($categoryName),
+                    'category_data' => category_data_attr($categoryName),
+                ];
+            })->values();
+
+            return response()->json([
+                'data' => $transformedItems,
+                'meta' => [
+                    'current_page' => $items->currentPage(),
+                    'last_page' => $items->lastPage(),
+                    'total' => $items->total(),
+                    'per_page' => $items->perPage(),
+                ],
+            ]);
+        }
+
+        return view('pages.prs-create', [
+            'departments' => $departments,
+            'categories' => $categories,
+            'items' => $items,
+            'search' => $search,
+            'selectedCategory' => $categoryId,
+        ]);
     }
 
     /**
@@ -72,7 +139,7 @@ class PrsController extends Controller
             $manager->notify(new PrsSubmittedNotification($newPrs));
         }
 
-        return redirect()->back()->with('success', 'New PRS has been created successfully.');
+        return redirect()->route('prs.index')->with('success', 'New PRS has been created successfully.');
     }
 
     /**

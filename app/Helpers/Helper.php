@@ -163,3 +163,61 @@ if (! function_exists('fk_on_delete')) {
         return $action;
     }
 }
+
+if (! function_exists('category_icon')) {
+    function category_icon($categoryName)
+    {
+        $name = strtolower($categoryName ?? '');
+
+        return match (true) {
+            str_contains($name, 'office') => 'fa-pen',
+            str_contains($name, 'parts') => 'fa-gear',
+            str_contains($name, 'factory') => 'fa-tools',
+            str_contains($name, 'chem') => 'fa-flask',
+            str_contains($name, 'fuel') => 'fa-gas-pump',
+            str_contains($name, 'label') => 'fa-tags',
+            str_contains($name, 'carton') => 'fa-box',
+            str_contains($name, 'can') => 'fa-jar',
+            str_contains($name, 'fish') && !str_contains($name, 'meal') => 'fa-fish',
+            str_contains($name, 'fishmeal') => 'fa-fish-bones',
+            str_contains($name, 'bc') => 'fa-box-open',
+            str_contains($name, 'coal') => 'fa-mountain',
+            str_contains($name, 'sludge') || str_contains($name, 'oil') => 'fa-oil-can',
+            str_contains($name, 'capital') => 'fa-building',
+            str_contains($name, 'scrap') => 'fa-recycle',
+            str_contains($name, 'spice') || str_contains($name, 'ingredient') => 'fa-mortar-pestle',
+            str_contains($name, 'raw') => 'fa-cubes',
+            str_contains($name, 'finished') => 'fa-box-check',
+            default => 'fa-box',
+        };
+    }
+}
+
+if (! function_exists('category_data_attr')) {
+    function category_data_attr($categoryName)
+    {
+        $name = strtolower($categoryName ?? 'other');
+
+        // Extract key part for CSS selector matching
+        if (str_contains($name, 'office')) return 'office';
+        if (str_contains($name, 'parts')) return 'parts';
+        if (str_contains($name, 'factory')) return 'factory';
+        if (str_contains($name, 'chem')) return 'chem';
+        if (str_contains($name, 'fuel')) return 'fuel';
+        if (str_contains($name, 'label')) return 'label';
+        if (str_contains($name, 'carton')) return 'carton';
+        if (str_contains($name, 'can')) return 'can';
+        if (str_contains($name, 'fishmeal')) return 'fishmeal';
+        if (str_contains($name, 'fish')) return 'fish';
+        if (str_contains($name, 'bc')) return 'bc';
+        if (str_contains($name, 'coal')) return 'coal';
+        if (str_contains($name, 'sludge') || str_contains($name, 'oil')) return 'sludge';
+        if (str_contains($name, 'capital')) return 'capital';
+        if (str_contains($name, 'scrap')) return 'scrap';
+        if (str_contains($name, 'spice') || str_contains($name, 'ingredient')) return 'spice';
+        if (str_contains($name, 'raw')) return 'raw';
+        if (str_contains($name, 'finished')) return 'finished';
+
+        return 'other';
+    }
+}
