@@ -151,7 +151,7 @@
             <tr>
                 <th style="width: 24px;" class="text-center">No</th>
                 <th style="width: 130px;">Supplier</th>
-                <th style="width: 80px;" class="text-right">Harga / Unit</th>
+                <th style="width: 80px;" class="text-right">Price / Unit</th>
                 <th style="width: 60px;" class="text-center">Payment Type</th>
                 <th style="width: 120px;">Payment Detail</th>
                 <th style="width: 55px;" class="text-center">Lead Time</th>
@@ -168,7 +168,7 @@
                     <td>
                         {{ $canvasing->supplier->name ?? '-' }}
                         @if ($selectedId === $canvasing->id)
-                            <div style="font-size:9px; color:#111827;">(Selected)</div>
+                            {{-- <div style="font-size:9px; color:#111827;">(Selected)</div> --}}
                         @endif
                         @if ($isLowest)
                             <div class="lowest-label">LOWEST PRICE</div>
@@ -177,7 +177,7 @@
                     <td class="text-right">{{ number_format((float) $canvasing->unit_price, 2, ',', '.') }}</td>
                     <td class="text-center">{{ $canvasing->term_of_payment_type ? ucfirst($canvasing->term_of_payment_type) : '-' }}</td>
                     <td class="text-wrap">{{ $canvasing->term_of_payment ?? '-' }}</td>
-                    <td class="text-center">{{ $canvasing->lead_time_days ?? '-' }} {{ $canvasing->lead_time_days ? 'hari' : '' }}</td>
+                    <td class="text-center">{{ $canvasing->lead_time_days ?? '-' }} {{ $canvasing->lead_time_days ? 'days' : '' }}</td>
                     <td class="text-wrap">{{ $canvasing->term_of_delivery ?? '-' }}</td>
                 </tr>
                 <tr class="notes-row">
@@ -190,15 +190,22 @@
     </table>
 
     <div class="visual-section">
-        <div class="visual-title">Visual Harga Supplier</div>
+        <div class="visual-title">Supplier Price Visualization</div>
         @foreach ($canvasingItems as $canvasing)
             @php
                 $isLowest = (float) $canvasing->unit_price === $lowestUnitPrice;
                 $ratio = $highestUnitPrice > 0 ? ((float) $canvasing->unit_price / $highestUnitPrice) * 100 : 0;
+                $differenceAmount = max($highestUnitPrice - (float) $canvasing->unit_price, 0);
+                $cheaperPercent = $highestUnitPrice > 0 ? ($differenceAmount / $highestUnitPrice) * 100 : 0;
             @endphp
             <div class="visual-row">
                 <div class="visual-label">
                     {{ $canvasing->supplier->name ?? '-' }} - {{ number_format((float) $canvasing->unit_price, 2, ',', '.') }}
+                    @if ($differenceAmount > 0)
+                        ({{ number_format($cheaperPercent, 2, ',', '.') }}% cheaper; difference {{ number_format($differenceAmount, 2, ',', '.') }} from highest)
+                    @else
+                        (HIGHEST PRICE)
+                    @endif
                     @if ($isLowest)
                         (LOWEST)
                     @endif
@@ -208,7 +215,7 @@
                 </div>
             </div>
         @endforeach
-        <div class="footnote">Panjang bar dibandingkan terhadap harga tertinggi pada item yang sama; warna hijau menandai harga terendah.</div>
+        <div class="footnote">Bar lengths are relative to the highest price for the same item; green indicates the lowest price.</div>
     </div>
 </body>
 </html>

@@ -63,14 +63,14 @@
             border-top: none;
         }
         .selected-row td {
-            background: #eef9ee;
+            background: #e6f0ff;
         }
         .selected-label {
             display: inline-block;
             margin-top: 2px;
             padding: 1px 4px;
-            border: 1px solid #2f855a;
-            color: #2f855a;
+            border: 1px solid #2563eb;
+            color: #2563eb;
             font-size: 8px;
             font-weight: bold;
         }
@@ -102,7 +102,7 @@
             background: #6b7280;
         }
         .bar-selected {
-            background: #2f855a;
+            background: #2563eb;
         }
         .footnote {
             margin-top: 4px;
@@ -166,7 +166,7 @@
             <tr>
                 <th style="width: 24px;" class="text-center">No</th>
                 <th style="width: 130px;">Supplier</th>
-                <th style="width: 80px;" class="text-right">Harga / Unit</th>
+                <th style="width: 80px;" class="text-right">Price / Unit</th>
                 <th style="width: 60px;" class="text-center">Payment Type</th>
                 <th style="width: 120px;">Payment Detail</th>
                 <th style="width: 55px;" class="text-center">Lead Time</th>
@@ -189,7 +189,7 @@
                     <td class="text-right">{{ number_format((float) $canvasing->unit_price, 2, ',', '.') }}</td>
                     <td class="text-center">{{ $canvasing->term_of_payment_type ? ucfirst($canvasing->term_of_payment_type) : '-' }}</td>
                     <td class="text-wrap">{{ $canvasing->term_of_payment ?? '-' }}</td>
-                    <td class="text-center">{{ $canvasing->lead_time_days ?? '-' }} {{ $canvasing->lead_time_days ? 'hari' : '' }}</td>
+                    <td class="text-center">{{ $canvasing->lead_time_days ?? '-' }} {{ $canvasing->lead_time_days ? 'days' : '' }}</td>
                     <td class="text-wrap">{{ $canvasing->term_of_delivery ?? '-' }}</td>
                 </tr>
                 <tr class="notes-row">
@@ -209,15 +209,22 @@
     @endif
 
     <div class="visual-section">
-        <div class="visual-title">Visual Harga Supplier</div>
+        <div class="visual-title">Supplier Price Visualization</div>
         @foreach ($canvasingItems as $canvasing)
             @php
                 $isSelected = $selectedId === $canvasing->id;
                 $ratio = $highestUnitPrice > 0 ? ((float) $canvasing->unit_price / $highestUnitPrice) * 100 : 0;
+                $differenceAmount = max($highestUnitPrice - (float) $canvasing->unit_price, 0);
+                $cheaperPercent = $highestUnitPrice > 0 ? ($differenceAmount / $highestUnitPrice) * 100 : 0;
             @endphp
             <div class="visual-row">
                 <div class="visual-label">
                     {{ $canvasing->supplier->name ?? '-' }} - {{ number_format((float) $canvasing->unit_price, 2, ',', '.') }}
+                    @if ($differenceAmount > 0)
+                        ({{ number_format($cheaperPercent, 2, ',', '.') }}% cheaper; difference {{ number_format($differenceAmount, 2, ',', '.') }} from highest)
+                    @else
+                        (HIGHEST PRICE)
+                    @endif
                     @if ($isSelected)
                         (SELECTED)
                     @endif
@@ -227,7 +234,7 @@
                 </div>
             </div>
         @endforeach
-        <div class="footnote">Panjang bar dibandingkan terhadap harga tertinggi pada item yang sama; warna hijau menandai supplier yang dipilih.</div>
+        <div class="footnote">Bar lengths are relative to the highest price for the same item; blue indicates the selected supplier.</div>
     </div>
 </body>
 </html>

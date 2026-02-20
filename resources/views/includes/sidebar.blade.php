@@ -234,6 +234,9 @@
                                     </a>
                                 </li>
                             @endrole
+                        @endrole
+
+                        @role('administrator|purchasing-manager|general-manager|finance-manager|canvaser')
                             <li class="sidebar-item {{ Request::is('procurement/reports') ? 'active' : '' }}">
                                 <a href="{{ route('procurement.reports.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-file-chart-column {{ Request::is('procurement/reports') ? 'fa-fade' : '' }}"></i>
