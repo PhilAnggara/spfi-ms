@@ -109,6 +109,17 @@ if (! function_exists('get_manager_name')) {
     }
 }
 
+if (! function_exists('get_manager')) {
+    function get_manager($user)
+    {
+        $deptId = $user->department->id;
+
+        return User::where('department_id', $deptId)
+            ->where('role', 'Manager')
+            ->first();
+    }
+}
+
 if (! function_exists('status_badge_color')) {
     function status_badge_color($status)
     {

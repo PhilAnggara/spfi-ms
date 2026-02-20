@@ -97,7 +97,7 @@
 
         .sig-column {
             display: table-cell;
-            width: 45%;
+            width: 33.33%;
             text-align: center;
             padding: 10px;
         }
@@ -162,10 +162,10 @@
                 <div class="info-label">PRS Number :</div>
                 <div class="info-value"><strong>{{ $prs->prs_number }}</strong></div>
             </div>
-            <div class="info-row">
+            {{-- <div class="info-row">
                 <div class="info-label">Status :</div>
                 <div class="info-value"><span class="badge">{{ $prs->status }}</span></div>
-            </div>
+            </div> --}}
             <div class="info-row">
                 <div class="info-label">Requested By :</div>
                 <div class="info-value">{{ $prs->user->name }}</div>
@@ -235,6 +235,10 @@
 
     <!-- Bagian Tanda Tangan -->
     <div class="signature-section">
+        @php
+            $manager = get_manager($prs->user);
+        @endphp
+
         <p style="font-size: 11px; font-weight: 600; margin-bottom: 30px;">
             This document requires General Manager approval before processing by the Purchasing Department.
         </p>
@@ -247,6 +251,15 @@
                     <div class="sig-name" style="font-size:11px; font-weight:600; color:#1f2937; margin-top:5px;">{{ $prs->user->name }}</div>
                     <div class="sig-title">Requester</div>
                     <div class="sig-date">{{ \Carbon\Carbon::parse($prs->prs_date)->format('d F Y') }}</div>
+                </div>
+            </div>
+            <div class="sig-column">
+                <div style="text-align: left;">
+                    <p style="font-size: 10px; margin-bottom: 5px;"><strong>Reviewed By:</strong></p>
+                    <div class="sig-line"></div>
+                    <div class="sig-name" style="font-size:11px; font-weight:600; color:#1f2937; margin-top:5px;">{{ $manager?->name ?? 'N/A' }}</div>
+                    <div class="sig-title">{{ $manager ? get_job_title($manager) : 'Manager' }}</div>
+                    <div class="sig-date">Date: _____________</div>
                 </div>
             </div>
             <div class="sig-column">
