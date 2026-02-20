@@ -201,11 +201,6 @@ function initPrsCatalog() {
 
             return `
                 <div class="prs-item-card" data-name="${itemName.toLowerCase()}" data-code="${itemCode.toLowerCase()}" data-category="${itemCategory.toLowerCase()}" data-item-id="${item.id}">
-                    <div class="prs-item-thumb" data-category="${categoryData}">
-                        <div class="prs-item-thumb-icon">
-                            <i class="fa-duotone fa-solid ${categoryIcon}"></i>
-                        </div>
-                    </div>
                     <div class="prs-item-body">
                         <div class="prs-item-title">${itemName}</div>
                         <div class="prs-item-meta">

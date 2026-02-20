@@ -50,13 +50,13 @@
                             <div class="prs-item-grid" id="prs-item-grid">
                                 @foreach ($items as $item)
                                     <div class="prs-item-card" data-name="{{ strtolower($item->name) }}" data-code="{{ strtolower($item->code) }}" data-category="{{ strtolower($item->category?->name ?? '') }}" data-item-id="{{ $item->id }}">
-                                        <div class="prs-item-thumb" data-category="{{ category_data_attr($item->category?->name) }}">
+                                        {{-- <div class="prs-item-thumb" data-category="{{ category_data_attr($item->category?->name) }}">
                                             <div class="prs-item-thumb-icon">
                                                 <i class="fa-duotone fa-solid {{ category_icon($item->category?->name) }}"></i>
                                             </div>
-                                        </div>
+                                        </div> --}}
                                         <div class="prs-item-body">
-                                            <div class="prs-item-title">{{ $item->name }}</div>
+                                            <div class="prs-item-title fon">{{ $item->name }}</div>
                                             <div class="prs-item-meta">
                                                 <span class="badge bg-light-primary">{{ $item->code }}</span>
                                                 <span class="text-muted">Stock {{ $item->stock_on_hand }} {{ $item->unit?->name ?? 'PCS' }}</span>
@@ -80,8 +80,8 @@
                                     </div>
                                 @endforeach
                             </div>
-                            <div class="mt-4 prs-pagination" id="prs-pagination" data-current-page="{{ $items->currentPage() }}" data-last-page="{{ $items->lastPage() }}">
-                            </div>
+                            {{-- <div class="mt-4 prs-pagination" id="prs-pagination" data-current-page="{{ $items->currentPage() }}" data-last-page="{{ $items->lastPage() }}">
+                            </div> --}}
                         </div>
                     </div>
                 </div>
