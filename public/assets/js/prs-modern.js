@@ -199,8 +199,18 @@ function initPrsCatalog() {
             const categoryIcon = escapeHtml(item.category_icon || 'fa-box');
             const categoryData = escapeHtml(item.category_data || 'other');
 
+            let optionalThumbnail = `
+                    <div class="prs-item-thumb" data-category="${categoryData}">
+                        <div class="prs-item-thumb-icon">
+                            <i class="fa-duotone fa-solid ${categoryIcon}"></i>
+                        </div>
+                    </div>`;
+
+            optionalThumbnail = ''; // Disable thumbnail for now, as per design change
+
             return `
                 <div class="prs-item-card" data-name="${itemName.toLowerCase()}" data-code="${itemCode.toLowerCase()}" data-category="${itemCategory.toLowerCase()}" data-item-id="${item.id}">
+                    ${optionalThumbnail}
                     <div class="prs-item-body">
                         <div class="prs-item-title">${itemName}</div>
                         <div class="prs-item-meta">
@@ -288,6 +298,7 @@ function initPrsCatalog() {
         query.set('page', String(page));
 
         const targetUrl = `${baseUrl}?${query.toString()}`;
+        const scrollPos = window.scrollY || window.pageYOffset;
 
         try {
             const response = await fetch(targetUrl, {
@@ -314,9 +325,16 @@ function initPrsCatalog() {
             renderPagination();
             updateInCartState();
 
-            // Scroll to top of grid smoothly
-            if (grid) {
-                grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Preserve scroll position or scroll smoothly to grid on pagination
+            if (page > 1) {
+                if (grid) {
+                    setTimeout(() => {
+                        grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 50);
+                }
+            } else {
+                // Restore scroll position for search/filter
+                window.scrollTo(0, scrollPos);
             }
 
             const cleanUrl = new URL(window.location.href);
@@ -324,6 +342,7 @@ function initPrsCatalog() {
             window.history.replaceState({}, '', cleanUrl.toString());
         } catch (error) {
             console.error('Catalog fetch error:', error);
+            window.scrollTo(0, scrollPos);
             renderPagination();
         }
     };
@@ -347,13 +366,11 @@ function initPrsCatalog() {
         getCards().forEach((card) => {
             const itemId = parseInt(card.dataset.itemId || '0', 10);
             const addButton = card.querySelector('.prs-item-add');
-            const inCartLabel = card.querySelector('.prs-in-cart-label');
-            if (!itemId || !addButton || !inCartLabel) {
+            if (!itemId || !addButton) {
                 return;
             }
 
             const isInCart = cartItems.has(itemId);
-            inCartLabel.classList.toggle('d-none', !isInCart);
             addButton.classList.toggle('btn-primary', !isInCart);
             addButton.classList.toggle('btn-outline-success', isInCart);
             addButton.innerHTML = isInCart
@@ -466,12 +483,44 @@ function initPrsCatalog() {
 
 function initPrsCartCount() {
     const countEl = document.getElementById('prs-cart-count');
-    if (!countEl) {
+    const floatingCartBtn = document.getElementById('toggle-prs-cart-mobile');
+    const topCartBtn = document.getElementById('toggle-prs-cart');
+
+    if (!countEl || !floatingCartBtn) {
         return;
     }
 
+    // Create badge for floating cart button if it doesn't exist
+    let floatingBadge = floatingCartBtn.querySelector('.prs-cart-badge');
+    if (!floatingBadge) {
+        floatingBadge = document.createElement('span');
+        floatingBadge.className = 'prs-cart-badge';
+        floatingBadge.textContent = '0';
+        floatingCartBtn.appendChild(floatingBadge);
+    }
+
+    // Initialize Intersection Observer to show/hide floating button based on top button visibility
+    if (topCartBtn && IntersectionObserver) {
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                // Top button is visible, hide floating button
+                floatingCartBtn.classList.remove('show');
+            } else {
+                // Top button is not visible, show floating button
+                floatingCartBtn.classList.add('show');
+            }
+        }, {
+            threshold: 0.5
+        });
+
+        observer.observe(topCartBtn);
+    }
+
+    // Update both badges when cart count changes
     window.addEventListener('prs-cart-count', (event) => {
         const count = event.detail?.count ?? 0;
         countEl.textContent = count;
+        floatingBadge.textContent = count;
     });
 }
+

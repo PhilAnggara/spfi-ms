@@ -56,7 +56,7 @@
                                             </div>
                                         </div> --}}
                                         <div class="prs-item-body">
-                                            <div class="prs-item-title fon">{{ $item->name }}</div>
+                                            <div class="prs-item-title fon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $item->name }}">{{ $item->name }}</div>
                                             <div class="prs-item-meta">
                                                 <span class="badge bg-light-primary">{{ $item->code }}</span>
                                                 <span class="text-muted">Stock {{ $item->stock_on_hand }} {{ $item->unit?->name ?? 'PCS' }}</span>
@@ -74,7 +74,6 @@
                                                     <i class="fa-light fa-plus"></i>
                                                     Add
                                                 </button>
-                                                <span class="prs-in-cart-label d-none">Sudah di cart</span>
                                             </div>
                                         </div>
                                     </div>
