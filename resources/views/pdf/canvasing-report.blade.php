@@ -143,6 +143,12 @@
                 <td class="label">Date Needed</td>
                 <td>: {{ $prs?->date_needed ? \Illuminate\Support\Carbon::parse($prs->date_needed)->format('d M Y') : '-' }}</td>
             </tr>
+            @if ($prsItem->is_direct_purchase)
+            <tr>
+                <td class="label">Purchase Type</td>
+                <td colspan="3" style="color: #2563eb; font-weight: bold;">Direct Purchase</td>
+            </tr>
+            @endif
         </table>
     </div>
 

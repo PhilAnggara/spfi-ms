@@ -79,10 +79,28 @@
                     </div>
 
                     <div class="border rounded-3 p-3 mt-3">
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <span class="badge bg-light-info text-uppercase">{{ $prsItem->item->code }}</span>
-                            <span class="fw-semibold">{{ $prsItem->item->name }}</span>
-                            <span class="badge bg-light-secondary">Qty {{ $prsItem->quantity }} {{ $prsItem->item->unit?->name ?? 'PCS' }}</span>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="badge bg-light-info text-uppercase">{{ $prsItem->item->code }}</span>
+                                <span class="fw-semibold">{{ $prsItem->item->name }}</span>
+                                <span class="badge bg-light-secondary">Qty {{ $prsItem->quantity }} {{ $prsItem->item->unit?->name ?? 'PCS' }}</span>
+                                @if ($prsItem->is_direct_purchase)
+                                    <span class="badge bg-light-info">
+                                        <i class="fa-duotone fa-solid fa-basket-shopping"></i>
+                                        Direct Purchase
+                                    </span>
+                                @endif
+                            </div>
+                            @if (!$prsItem->purchase_order_id)
+                                <form action="{{ route('canvasing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
+                                    @csrf
+                                    <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">
+                                    <button type="submit" class="btn btn-sm {{ $prsItem->is_direct_purchase ? 'btn-info' : 'btn-outline-info' }}">
+                                        <i class="fa-duotone fa-solid fa-basket-shopping"></i>
+                                        {{ $prsItem->is_direct_purchase ? 'Revert to Needs PO' : 'Mark as Direct Purchase' }}
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
                 </div>

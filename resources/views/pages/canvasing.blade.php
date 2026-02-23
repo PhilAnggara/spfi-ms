@@ -22,7 +22,7 @@
                             <th>Quantity</th>
                             <th>Date Needed</th>
                             <th>Suppliers</th>
-                            {{-- <th>Status</th> --}}
+                            <th>Status</th>
                             <th class="text-center">Action</th>
                         </tr>
                     </thead>
@@ -53,29 +53,41 @@
                                         {{ $prsItem->selectedCanvasingItem?->supplier?->name ?? 'Not selected' }}
                                     </div>
                                 </td>
-                                {{-- <td>
-                                    @if ($prsItem->canvasingItem?->unit_price)
-                                        <span class="badge bg-light-success">
-                                            <i class="fa-duotone fa-solid fa-circle-check"></i>
-                                            Completed
+                                <td>
+                                    @if ($prsItem->is_direct_purchase)
+                                        <span class="badge bg-light-info">
+                                            <i class="fa-duotone fa-solid fa-basket-shopping"></i>
+                                            Direct Purchase
                                         </span>
                                     @else
-                                        <span class="badge bg-light-warning">
-                                            <i class="fa-duotone fa-solid fa-hourglass"></i>
-                                            Pending
+                                        <span class="badge bg-light-secondary">
+                                            <i class="fa-duotone fa-solid fa-file-invoice"></i>
+                                            Needs PO
                                         </span>
                                     @endif
-                                </td> --}}
+                                </td>
                                 <td class="text-center">
-                                    <a href="{{ route('canvasing.show', $prsItem->id) }}" class="btn btn-sm {{ $prsItem->canvasingItems->isNotEmpty() ? 'btn-primary' : 'btn-outline-primary' }}">
-                                        <i class="fa-duotone fa-solid fa-pen-to-square"></i>
-                                        {{ $prsItem->canvasingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}
-                                    </a>
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <a href="{{ route('canvasing.show', $prsItem->id) }}" class="btn btn-sm {{ $prsItem->canvasingItems->isNotEmpty() ? 'btn-primary' : 'btn-outline-primary' }}">
+                                            <i class="fa-duotone fa-solid fa-pen-to-square"></i>
+                                            {{ $prsItem->canvasingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}
+                                        </a>
+                                        @if (!$prsItem->purchase_order_id)
+                                            <form action="{{ route('canvasing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">
+                                                <button type="submit" class="btn btn-sm {{ $prsItem->is_direct_purchase ? 'btn-info' : 'btn-outline-info' }}" title="{{ $prsItem->is_direct_purchase ? 'Revert to Needs PO' : 'Mark as Direct Purchase' }}">
+                                                    <i class="fa-duotone fa-solid fa-basket-shopping"></i>
+                                                    {{ $prsItem->is_direct_purchase ? 'Unmark DP' : 'Direct Purchase' }}
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
+                                <td colspan="8" class="text-center text-muted py-4">
                                     <i class="fa-duotone fa-solid fa-inbox"></i>
                                     <p class="mb-0 mt-2">No canvasing items assigned yet.</p>
                                 </td>

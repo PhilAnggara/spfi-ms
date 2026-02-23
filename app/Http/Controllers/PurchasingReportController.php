@@ -44,6 +44,7 @@ class PurchasingReportController extends Controller
             'canvaser',
         ])
             ->whereNull('purchase_order_id')
+            ->where('is_direct_purchase', false)
             ->whereHas('prs', function ($query) use ($validated, $dateFrom) {
                 $query->whereDate('prs_date', '>=', $dateFrom)
                     ->whereDate('prs_date', '<=', $validated['date_to']);

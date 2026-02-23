@@ -206,6 +206,46 @@ class CanvasingController extends Controller
             ->stream($filename);
     }
 
+    /**
+     * Toggle direct purchase status for a PRS item.
+     */
+    public function toggleDirectPurchase(Request $request, PrsItem $prsItem)
+    {
+        if ($prsItem->canvaser_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        if ($prsItem->purchase_order_id) {
+            return redirect()->back()->withErrors(['message' => 'Cannot change status because a PO has already been created for this item.']);
+        }
+
+        $validated = $request->validate([
+            'is_direct_purchase' => ['required', 'boolean'],
+        ]);
+
+        $oldStatus = $prsItem->is_direct_purchase ? 'Direct Purchase' : 'Needs PO';
+        $newStatus = $validated['is_direct_purchase'] ? 'Direct Purchase' : 'Needs PO';
+
+        $prsItem->update([
+            'is_direct_purchase' => $validated['is_direct_purchase'],
+        ]);
+
+        $prsItem->prs?->logs()->create([
+            'user_id' => $request->user()?->id,
+            'action' => 'TOGGLE_DIRECT_PURCHASE',
+            'message' => "Status changed from {$oldStatus} to {$newStatus}.",
+            'meta' => [
+                'prs_item_id' => $prsItem->id,
+                'item_code' => $prsItem->item?->code,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+                'is_direct_purchase' => $validated['is_direct_purchase'],
+            ],
+        ]);
+
+        return redirect()->back()->with('success', "Item marked as {$newStatus}.");
+    }
+
     private function sanitizeTermValue(?string $value): ?string
     {
         $value = $value !== null ? trim($value) : null;

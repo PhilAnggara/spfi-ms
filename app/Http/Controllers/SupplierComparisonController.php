@@ -21,6 +21,7 @@ class SupplierComparisonController extends Controller
             'selectedCanvasingItem.supplier',
         ])
             ->whereNull('purchase_order_id')
+            ->where('is_direct_purchase', false)
             ->whereHas('canvasingItems')
             ->orderByDesc('id')
             ->get();

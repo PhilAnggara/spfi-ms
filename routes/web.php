@@ -90,6 +90,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/canvasing/{prsItem}', [CanvasingController::class, 'show'])->name('canvasing.show');
         Route::get('/canvasing/{prsItem}/report', [CanvasingController::class, 'report'])->name('canvasing.report');
         Route::post('/canvasing/{prsItem}', [CanvasingController::class, 'store'])->name('canvasing.store');
+        Route::post('/canvasing/{prsItem}/toggle-direct-purchase', [CanvasingController::class, 'toggleDirectPurchase'])->name('canvasing.toggle-direct-purchase');
 
         Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
             Route::get('/draft', [PurchaseOrderController::class, 'draft'])->name('draft');

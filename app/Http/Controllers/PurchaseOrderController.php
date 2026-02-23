@@ -54,6 +54,7 @@ class PurchaseOrderController extends Controller
         ])
             ->where('canvaser_id', $userId)
             ->whereNull('purchase_order_id')
+            ->where('is_direct_purchase', false)
             ->whereNotNull('selected_canvasing_item_id')
             ->orderByDesc('created_at')
             ->get();

@@ -23,6 +23,7 @@ class PrsItem extends Model
         'selected_canvasing_item_id' => 'integer',
         'canvaser_id' => 'integer',
         'purchase_order_id' => 'integer',
+        'is_direct_purchase' => 'boolean',
     ];
     protected $hidden = [
 
