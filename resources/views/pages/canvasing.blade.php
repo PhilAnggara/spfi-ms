@@ -22,7 +22,6 @@
                             <th>Quantity</th>
                             <th>Date Needed</th>
                             <th>Suppliers</th>
-                            <th>Status</th>
                             <th class="text-center">Action</th>
                         </tr>
                     </thead>
@@ -38,7 +37,7 @@
                                 <td>
                                     <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $prsItem->item->code }}')">{{ $prsItem->item->code }}</span>
                                 </td>
-                                <td>{{ $prsItem->item->name }}</td>
+                                <td data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->item->name }}">{{ Str::limit($prsItem->item->name, 30) }}</td>
                                 <td>
                                     <span class="fw-semibold">{{ $prsItem->quantity }}</span>
                                     <small class="text-muted">{{ $prsItem->item->unit?->name ?? 'PCS' }}</small>
@@ -49,25 +48,12 @@
                                 </td>
                                 <td>
                                     <div class="small text-muted">Quotes: {{ $prsItem->canvasingItems->count() }}</div>
-                                    <div class="fw-semibold">
-                                        {{ $prsItem->selectedCanvasingItem?->supplier?->name ?? 'Not selected' }}
+                                    <div class="fw-semibold" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->selectedCanvasingItem?->supplier?->name ?? 'Not selected' }}">
+                                        <span class="{{ $prsItem->selectedCanvasingItem?->supplier?->name ? 'text-primary' : 'text-muted' }}">{{ Str::limit($prsItem->selectedCanvasingItem?->supplier?->name ?? 'Not selected', 15) }}</span>
                                     </div>
                                 </td>
-                                <td>
-                                    @if ($prsItem->is_direct_purchase)
-                                        <span class="badge bg-light-info">
-                                            <i class="fa-duotone fa-solid fa-basket-shopping"></i>
-                                            Direct Purchase
-                                        </span>
-                                    @else
-                                        <span class="badge bg-light-secondary">
-                                            <i class="fa-duotone fa-solid fa-file-invoice"></i>
-                                            Needs PO
-                                        </span>
-                                    @endif
-                                </td>
                                 <td class="text-center">
-                                    <div class="d-flex justify-content-center gap-1">
+                                    {{-- <div class="d-flex justify-content-center gap-1">
                                         <a href="{{ route('canvasing.show', $prsItem->id) }}" class="btn btn-sm {{ $prsItem->canvasingItems->isNotEmpty() ? 'btn-primary' : 'btn-outline-primary' }}">
                                             <i class="fa-duotone fa-solid fa-pen-to-square"></i>
                                             {{ $prsItem->canvasingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}
@@ -82,12 +68,28 @@
                                                 </button>
                                             </form>
                                         @endif
+                                    </div> --}}
+
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ route('canvasing.show', $prsItem->id) }}" class="btn icon {{ $prsItem->canvasingItems->isNotEmpty() ? 'btn-outline-primary' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->canvasingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}">
+                                            <i class="fa-light fa-pen-to-square"></i>
+                                        </a>
+                                        @if (!$prsItem->purchase_order_id)
+                                            <form action="{{ route('canvasing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">
+                                                <button type="submit" class="btn icon {{ $prsItem->is_direct_purchase ? 'btn-outline-info' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->is_direct_purchase ? 'Revert to Needs PO' : 'Mark as Direct Purchase' }}">
+                                                    <i class="fa-light fa-basket-shopping"></i>
+                                                </button>
+                                            </form>
+                                        @endif
                                     </div>
+
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">
+                                <td colspan="7" class="text-center text-muted py-4">
                                     <i class="fa-duotone fa-solid fa-inbox"></i>
                                     <p class="mb-0 mt-2">No canvasing items assigned yet.</p>
                                 </td>
