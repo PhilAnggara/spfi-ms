@@ -297,6 +297,13 @@
                             <div>Total Bad: <span class="fw-semibold text-danger">{{ number_format($rrBad, 2) }}</span></div>
                         </div>
                     </div>
+                    <div class="modal-footer">
+                        <a href="{{ route('receiving-reports.print', $rr) }}" target="_blank" rel="noopener" class="btn btn-outline-danger">
+                            <i class="fa-duotone fa-solid fa-file-pdf"></i>
+                            Print PDF
+                        </a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
                 </div>
             </div>
         </div>

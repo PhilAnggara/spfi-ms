@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -283,6 +284,28 @@ class ReceivingReportController extends Controller
         return redirect()
             ->route('receiving-reports.index')
             ->with('success', 'Receiving report has been deleted.');
+    }
+
+    public function print(ReceivingReport $receivingReport)
+    {
+        $receivingReport->load([
+            'purchaseOrder.supplier',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'createdBy',
+        ]);
+
+        $filename = sprintf(
+            'RR-%s-%s.pdf',
+            $receivingReport->rr_number ?? $receivingReport->id,
+            now()->format('YmdHis')
+        );
+
+        return Pdf::loadView('pdf.receiving-report', [
+            'receivingReport' => $receivingReport,
+        ])
+            ->setPaper('a4', 'portrait')
+            ->stream($filename);
     }
 
     /**

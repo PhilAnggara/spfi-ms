@@ -127,6 +127,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view-rr')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
         Route::get('/', [ReceivingReportController::class, 'index'])->name('index');
+        Route::get('/{receivingReport}/print', [ReceivingReportController::class, 'print'])->name('print');
     });
 
     Route::middleware('role:administrator|inventory-manager|inventory-staff')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
