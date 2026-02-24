@@ -151,5 +151,5 @@
 @endpush
 
 @push('addon-script')
-    <script src="{{ url('assets/js/prs-modern.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/prs-modern.js') }}"></script>
 @endpush

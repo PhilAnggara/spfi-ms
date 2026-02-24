@@ -69,6 +69,11 @@ class PurchaseOrder extends Model
         return $this->hasMany(PurchaseOrderItem::class, 'purchase_order_id');
     }
 
+    public function receivingReports()
+    {
+        return $this->hasMany(ReceivingReport::class, 'purchase_order_id');
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');

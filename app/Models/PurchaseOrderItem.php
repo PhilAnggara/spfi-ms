@@ -52,4 +52,9 @@ class PurchaseOrderItem extends Model
     {
         return $this->belongsTo(Item::class, 'item_id');
     }
+
+    public function receivingReportItems()
+    {
+        return $this->hasMany(ReceivingReportItem::class, 'purchase_order_item_id');
+    }
 }

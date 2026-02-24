@@ -168,7 +168,7 @@
 @push('addon-script')
     <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
     <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
-    <script src="{{ url('assets/js/prs-modern.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/prs-modern.js') }}"></script>
 @endpush
 
 {{-- New Version DataTables --}}

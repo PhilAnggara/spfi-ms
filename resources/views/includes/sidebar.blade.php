@@ -293,14 +293,14 @@
                             </li>
                         @endrole
 
-                        @role('administrator')
-                            <li class="sidebar-item {{ Request::is('receiving') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-hands-holding-diamond {{ Request::is('receiving') ? 'fa-fade' : '' }}"></i>
-                                    <span>Receiving</span>
+                        @can('view-rr')
+                            <li class="sidebar-item {{ Request::is('receiving-reports*') ? 'active' : '' }}">
+                                <a href="{{ route('receiving-reports.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-hands-holding-diamond {{ Request::is('receiving-reports*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Receiving Reports</span>
                                 </a>
                             </li>
-                        @endrole
+                        @endcan
 
                     </ul>
                 </div>

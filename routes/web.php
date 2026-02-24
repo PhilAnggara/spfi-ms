@@ -22,6 +22,7 @@ use App\Http\Controllers\CanvasingController;
 use App\Http\Controllers\PurchasingReportController;
 use App\Http\Controllers\PurchaseOrderApprovalController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\ReceivingReportController;
 use App\Http\Controllers\SupplierComparisonController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UserController;
@@ -123,6 +124,18 @@ Route::middleware('auth')->group(function () {
                 ->name('print');
         });
     });
+
+    Route::middleware('permission:view-rr')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
+        Route::get('/', [ReceivingReportController::class, 'index'])->name('index');
+    });
+
+    Route::middleware('role:administrator|inventory-manager|inventory-staff')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
+        Route::get('/po-by-number', [ReceivingReportController::class, 'poByNumber'])->name('po-by-number');
+        Route::post('/', [ReceivingReportController::class, 'store'])->name('store');
+        Route::put('/{receivingReport}', [ReceivingReportController::class, 'update'])->name('update');
+        Route::delete('/{receivingReport}', [ReceivingReportController::class, 'destroy'])->name('destroy');
+    });
+
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
     Route::resource('prs', PrsController::class);
     Route::post('prs/export', [PrsController::class, 'export'])->name('prs.export');
