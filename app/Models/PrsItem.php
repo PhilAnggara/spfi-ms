@@ -63,4 +63,50 @@ class PrsItem extends Model
     {
         return $this->hasOne(PurchaseOrderItem::class, 'prs_item_id', 'id');
     }
+
+    /**
+     * Get total delivered quantity from all associated receiving reports
+     */
+    public function getDeliveredQuantityAttribute()
+    {
+        $poItem = $this->purchaseOrderItem;
+        if (!$poItem) {
+            return 0;
+        }
+
+        return $poItem->receivingReportItems()
+            ->sum('qty_good');
+    }
+
+    /**
+     * Get delivery status: PENDING, PARTIAL, or RECEIVED
+     */
+    public function getDeliveryStatusAttribute()
+    {
+        $ordered = $this->quantity;
+        $delivered = $this->getDeliveredQuantityAttribute();
+
+        if ($delivered == 0) {
+            return 'PENDING';
+        } elseif ($delivered < $ordered) {
+            return 'PARTIAL';
+        } else {
+            return 'RECEIVED';
+        }
+    }
+
+    /**
+     * Get delivery progress percentage
+     */
+    public function getDeliveryProgressAttribute()
+    {
+        $ordered = $this->quantity;
+        $delivered = $this->getDeliveredQuantityAttribute();
+
+        if ($ordered == 0) {
+            return 0;
+        }
+
+        return min(100, (int)(($delivered / $ordered) * 100));
+    }
 }

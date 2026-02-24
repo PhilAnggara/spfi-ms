@@ -84,6 +84,7 @@ class ReceivingReportController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'rr_number' => ['required', 'string', 'max:50', 'unique:receiving_reports,rr_number'],
             'purchase_order_id' => ['required', 'exists:purchase_orders,id'],
             'received_date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
@@ -153,6 +154,7 @@ class ReceivingReportController extends Controller
 
         DB::transaction(function () use ($validated, $selectedRows, $request) {
             $receivingReport = ReceivingReport::create([
+                'rr_number' => $validated['rr_number'],
                 'purchase_order_id' => $validated['purchase_order_id'],
                 'received_date' => $validated['received_date'],
                 'notes' => $validated['notes'] ?? null,
@@ -168,9 +170,8 @@ class ReceivingReportController extends Controller
                 ]);
             }
 
-            $receivingReport->update([
-                'rr_number' => 'RR-' . now()->format('Ymd') . '-' . str_pad((string) $receivingReport->id, 4, '0', STR_PAD_LEFT),
-            ]);
+            // Trigger PRS status check for all affected items
+            $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
         });
 
         return redirect()
@@ -265,6 +266,9 @@ class ReceivingReportController extends Controller
                     'qty_bad' => (float) ($row['qty_bad'] ?? 0),
                 ]);
             }
+
+            // Trigger PRS status check for all affected items
+            $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
         });
 
         return redirect()
@@ -279,5 +283,29 @@ class ReceivingReportController extends Controller
         return redirect()
             ->route('receiving-reports.index')
             ->with('success', 'Receiving report has been deleted.');
+    }
+
+    /**
+     * Check and update PRS delivery status for all items related to a PO
+     */
+    private function checkPrsDeliveryStatus($purchaseOrderId)
+    {
+        $purchaseOrder = PurchaseOrder::with(['items.prsItem.prs'])
+            ->find($purchaseOrderId);
+
+        if (! $purchaseOrder) {
+            return;
+        }
+
+        // Collect all unique PRS records from the PO items
+        $prsRecords = $purchaseOrder->items
+            ->pluck('prsItem.prs')
+            ->whereNotNull()
+            ->unique('id');
+
+        // Check and update status for each PRS
+        foreach ($prsRecords as $prs) {
+            $prs->checkAndUpdateDeliveryStatus();
+        }
     }
 }

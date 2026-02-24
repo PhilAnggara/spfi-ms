@@ -42,7 +42,10 @@
                             <option value="SUBMITTED">SUBMITTED</option>
                             <option value="ON_HOLD">ON_HOLD</option>
                             <option value="RESUBMITTED">RESUBMITTED</option>
-                            <option value="APPROVED">APPROVED</option>
+                            <option value="CANVASING">CANVASING</option>
+                            <option value="DELIVERY_PENDING">DELIVERY_PENDING</option>
+                            <option value="PARTIAL_DELIVERY">PARTIAL_DELIVERY</option>
+                            <option value="DELIVERY_COMPLETE">DELIVERY_COMPLETE</option>
                             <option value="REJECTED">REJECTED</option>
                         </select>
                     </div>
@@ -96,7 +99,6 @@
                                 <th class="text-center">PRS Number</th>
                                 <th class="text-center">Charged to Department</th>
                                 <th class="text-center">PRS Date</th>
-                                <th class="text-center">Date Needed</th>
                                 <th class="text-center">Status</th>
                                 <th class="text-center">Remarks</th>
                                 <th class="text-center">Action</th>
@@ -104,10 +106,35 @@
                         </thead>
                         <tbody id="prs-table-body">
                             @foreach ($items as $item)
+                                @php
+                                    $isDeliveryPhase = in_array($item->status, ['APPROVED', 'DELIVERY_COMPLETE'], true);
+                                    if ($isDeliveryPhase) {
+                                        $deliveryStatus = $item->overall_delivery_status;
+                                        $primaryStatusText = match($deliveryStatus) {
+                                            'RECEIVED' => 'DELIVERY_COMPLETE',
+                                            'PARTIAL' => 'PARTIAL_DELIVERY',
+                                            default => 'DELIVERY_PENDING',
+                                        };
+                                        $primaryStatusColor = match($deliveryStatus) {
+                                            'RECEIVED' => 'bg-light-success text-success',
+                                            'PARTIAL' => 'bg-light-warning text-warning',
+                                            default => 'bg-light-danger text-danger',
+                                        };
+                                        $primaryStatusIcon = match($deliveryStatus) {
+                                            'RECEIVED' => 'fa-solid fa-boxes-packing',
+                                            'PARTIAL' => 'fa-solid fa-truck-ramp-box',
+                                            default => 'fa-solid fa-inbox',
+                                        };
+                                    } else {
+                                        $primaryStatusText = $item->status;
+                                        $primaryStatusColor = status_badge_color($item->status);
+                                        $primaryStatusIcon = status_badge_icon($item->status);
+                                    }
+                                @endphp
                                 <tr
                                     data-prs-number="{{ strtolower($item->prs_number) }}"
                                     data-department="{{ strtolower($item->department->name) }}"
-                                    data-status="{{ strtoupper($item->status) }}"
+                                    data-status="{{ strtoupper($primaryStatusText) }}"
                                     data-prs-date="{{ $item->prs_date }}"
                                     data-needed-date="{{ $item->date_needed }}"
                                     data-remarks="{{ strtolower($item->remarks ?? '') }}">
@@ -119,11 +146,10 @@
                                     </td>
                                     <td>{{ $item->department->name }}</td>
                                     <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
-                                    <td><i class="fa-duotone fa-solid fa-calendar-star text-primary"></i> {{ tgl($item->date_needed) }}</td>
                                     <td>
-                                        <span class="badge {{ status_badge_color($item->status) }}">
-                                            <i class="{{ status_badge_icon($item->status) }}"></i>
-                                            {{ $item->status }}
+                                        <span class="badge {{ $primaryStatusColor }}">
+                                            <i class="{{ $primaryStatusIcon }}"></i>
+                                            {{ $primaryStatusText }}
                                         </span>
                                     </td>
                                     <td>{{ $item->remarks ? Str::limit($item->remarks, 40, '...') : '-' }}</td>

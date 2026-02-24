@@ -71,10 +71,10 @@ class PurchaseOrderApprovalController extends Controller
 
         foreach ($prsById as $prs) {
             $previousStatus = $prs->status;
-            $prs->update(['status' => 'PO_APPROVED']);
+            $prs->update(['status' => 'APPROVED']);
             $prs->logs()->create([
                 'user_id' => $request->user()?->id,
-                'action' => 'PO_APPROVED',
+                'action' => 'APPROVED',
                 'message' => 'PO approved for this PRS.',
                 'meta' => [
                     'previous_status' => $previousStatus,

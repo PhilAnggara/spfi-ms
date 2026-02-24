@@ -21,9 +21,18 @@ class PrsController extends Controller
      */
     public function index()
     {
-        $items = Prs::with(['department', 'user', 'items.item', 'items.canvaser', 'items.canvasingItems', 'items.selectedCanvasingItem', 'logs' => function ($query) {
-            $query->latest();
-        }])->orderByDesc('id')->get();
+        $items = Prs::with([
+            'department',
+            'user',
+            'items.item',
+            'items.canvaser',
+            'items.canvasingItems',
+            'items.selectedCanvasingItem',
+            'items.purchaseOrderItem.receivingReportItems',
+            'logs' => function ($query) {
+                $query->latest();
+            }
+        ])->orderByDesc('id')->get();
         $departments = Department::all();
         return view('pages.prs', [
             'items' => $items,

@@ -19,7 +19,6 @@
                             <th class="text-center">PRS Number</th>
                             <th class="text-center">Charged to Department</th>
                             <th class="text-center">PRS Date</th>
-                            <th class="text-center">Date Needed</th>
                             <th class="text-center">Remarks</th>
                             <th class="text-center">Details</th>
                             <th class="text-center">Action</th>
@@ -36,7 +35,6 @@
                                 </td>
                                 <td>{{ $item->department->name }}</td>
                                 <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
-                                <td><i class="fa-duotone fa-solid fa-calendar-star text-primary"></i> {{ tgl($item->date_needed) }}</td>
                                 <td>{{ Str::limit($item->remarks, 20, '...') ?? '-' }}</td>
                                 <td>
                                     <button type="button" class="btn btn-sm icon icon-left" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}">
@@ -188,77 +186,121 @@
 
                     @php
                         $holdLog = $item->logs?->firstWhere('action', 'HOLD');
-                        $assignLog = $item->logs?->firstWhere('action', 'CANVASING');
+                        $isDeliveryPhase = in_array($item->status, ['APPROVED', 'DELIVERY_COMPLETE'], true);
+                        $headerProgress = $isDeliveryPhase
+                            ? (int) $item->overall_delivery_progress
+                            : match ($item->status) {
+                                'DRAFT' => 0,
+                                'SUBMITTED' => 35,
+                                'ON_HOLD' => 35,
+                                'RESUBMITTED' => 50,
+                                'CANVASING' => 65,
+                                'APPROVED' => 80,
+                                'DELIVERY_COMPLETE' => 100,
+                                'REJECTED' => 100,
+                                default => 0,
+                            };
+
+                        if ($isDeliveryPhase) {
+                            $headerStatusText = match ($item->overall_delivery_status) {
+                                'RECEIVED' => 'DELIVERY_COMPLETE',
+                                'PARTIAL' => 'PARTIAL_DELIVERY',
+                                default => 'DELIVERY_PENDING',
+                            };
+                            $headerStatusClass = match ($item->overall_delivery_status) {
+                                'RECEIVED' => 'bg-light-success text-success',
+                                'PARTIAL' => 'bg-light-warning text-warning',
+                                default => 'bg-light-danger text-danger',
+                            };
+                            $headerStatusIcon = match ($item->overall_delivery_status) {
+                                'RECEIVED' => 'fa-solid fa-boxes-packing',
+                                'PARTIAL' => 'fa-solid fa-truck-ramp-box',
+                                default => 'fa-solid fa-inbox',
+                            };
+                        } else {
+                            $headerStatusText = $item->status;
+                            $headerStatusClass = status_badge_color($item->status);
+                            $headerStatusIcon = status_badge_icon($item->status);
+                        }
+
+                        $headerProgressClass = $headerProgress >= 100
+                            ? 'bg-success'
+                            : ($headerProgress > 0 ? 'bg-warning' : 'bg-secondary');
                     @endphp
 
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <tbody>
-                                <tr>
-                                    <th>Progress</th>
-                                    <td>
-                                        <span class="badge {{ status_badge_color($item->status) }}">
-                                            <i class="{{ status_badge_icon($item->status) }}"></i>
-                                            {{ $item->status }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                @if ($item->status === 'ON_HOLD' && $holdLog)
-                                    <tr>
-                                        <th>Hold Reason</th>
-                                        <td>
-                                            {{ $holdLog->message }}
-                                        </td>
-                                    </tr>
-                                @else
-                                    -
-                                @endif
-                                <tr>
-                                    <th>Submitted by</th>
-                                    <td><i class="fa-duotone fa-solid fa-circle-user text-secondary"></i> {{ $item->user->name }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Department</th>
-                                    <td><i class="fa-duotone fa-solid fa-building-user text-secondary"></i> {{ $item->department->name }}</td>
-                                </tr>
-                                <tr>
-                                    <th>PRS Date</th>
-                                    <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Date Needed</th>
-                                    <td>
-                                        <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i>
-                                        {{ tgl($item->date_needed) }}
-                                        @if (!Carbon\Carbon::parse($item->date_needed)->isPast())
-                                            <small class="text-muted"> - ({{ human_time($item->date_needed) }})</small>
-                                        @else
-                                            <span class="badge bg-light-danger ms-2">Overdue</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Remarks</th>
-                                    <td><i class="fa-duotone fa-solid fa-circle-info text-secondary"></i> {{ $item->remarks ? $item->remarks : '-' }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <span class="badge {{ $headerStatusClass }} px-3 py-2">
+                            <i class="{{ $headerStatusIcon }}"></i>
+                            {{ $headerStatusText }}
+                        </span>
+                        <span class="fw-semibold text-muted">Progress {{ $headerProgress }}%</span>
                     </div>
+
+                    <div class="progress mb-4" style="height: 10px;">
+                        <div class="progress-bar {{ $headerProgressClass }}" role="progressbar" style="width: {{ $headerProgress }}%" aria-valuenow="{{ $headerProgress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-light-subtle">
+                                <small class="text-muted d-block mb-1">Submitted by</small>
+                                <div class="fw-semibold"><i class="fa-duotone fa-solid fa-circle-user text-secondary"></i> {{ $item->user->name }}</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-light-subtle">
+                                <small class="text-muted d-block mb-1">Department</small>
+                                <div class="fw-semibold"><i class="fa-duotone fa-solid fa-building-user text-secondary"></i> {{ $item->department->name }}</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-light-subtle">
+                                <small class="text-muted d-block mb-1">PRS Date</small>
+                                <div class="fw-semibold"><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-light-subtle">
+                                <small class="text-muted d-block mb-1">Date Needed</small>
+                                <div class="fw-semibold">
+                                    <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i> {{ tgl($item->date_needed) }}
+                                    @if (!Carbon\Carbon::parse($item->date_needed)->isPast())
+                                        <small class="text-muted"> ({{ human_time($item->date_needed) }})</small>
+                                    @else
+                                        <span class="badge bg-light-danger ms-1">Overdue</span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-8">
+                            <div class="border rounded-3 p-3 h-100 bg-light-subtle">
+                                <small class="text-muted d-block mb-1">Remarks</small>
+                                <div class="fw-semibold"><i class="fa-duotone fa-solid fa-circle-info text-secondary"></i> {{ $item->remarks ? $item->remarks : '-' }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if ($item->status === 'ON_HOLD' && $holdLog)
+                        <div class="alert alert-warning" role="alert">
+                            <strong>Hold Reason:</strong> {{ $holdLog->message }}
+                        </div>
+                    @endif
 
                     <div class="divider">
                         <div class="divider-text fw-bold">Items</div>
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-bordered mb-0 text-center">
+                        <table class="table table-striped table-hover align-middle mb-0 text-center">
                             <thead>
                                 <tr>
-                                    <th>Item Code</th>
-                                    <th>Item Name</th>
-                                    <th>Stock on Hand</th>
-                                    <th>Quantity</th>
-                                    <th>Canvasser</th>
-                                    <th>Canvasing Date</th>
+                                    <th class="text-uppercase small">Item Code</th>
+                                    <th class="text-uppercase small">Item Name</th>
+                                    <th class="text-uppercase small">Stock on Hand</th>
+                                    <th class="text-uppercase small">Qty Ordered</th>
+                                    <th class="text-uppercase small">Qty Delivered</th>
+                                    <th class="text-uppercase small">Delivery Status</th>
+                                    <th class="text-uppercase small">Canvasser</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -272,8 +314,28 @@
                                         <td>{{ $itemInfo->item->name }}</td>
                                         <td>{{ $itemInfo->item->stock_on_hand }}</td>
                                         <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
+                                        <td>{{ $itemInfo->delivered_quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
+                                        <td>
+                                            @php
+                                                $status = $itemInfo->delivery_status;
+                                                $statusColor = match($status) {
+                                                    'RECEIVED' => 'bg-light-success text-success',
+                                                    'PARTIAL' => 'bg-light-warning text-warning',
+                                                    'PENDING' => 'bg-light-danger text-danger',
+                                                    default => 'bg-light-secondary text-secondary'
+                                                };
+                                                $statusIcon = match($status) {
+                                                    'RECEIVED' => 'fa-solid fa-circle-check',
+                                                    'PARTIAL' => 'fa-solid fa-hourglass-end',
+                                                    'PENDING' => 'fa-solid fa-circle-xmark',
+                                                    default => 'fa-solid fa-circle-question'
+                                                };
+                                            @endphp
+                                            <span class="badge {{ $statusColor }}">
+                                                <i class="{{ $statusIcon }}"></i> {{ $status }}
+                                            </span>
+                                        </td>
                                         <td>{{ $itemInfo->canvaser?->name ?? '-' }}</td>
-                                        <td>{{ $assignLog?->created_at ? tgl($assignLog->created_at) : '-' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

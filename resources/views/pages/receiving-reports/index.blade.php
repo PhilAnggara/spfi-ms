@@ -172,20 +172,24 @@
                             <input type="hidden" name="purchase_order_id" id="create_purchase_order_id">
 
                             <div class="row g-3 align-items-end">
-                                <div class="col-12 col-md-4">
-                                    <label class="form-label">PO Number</label>
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label">RR Number <span class="text-danger">*</span></label>
+                                    <input type="text" name="rr_number" class="form-control" placeholder="e.g. RR-001" required>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label">PO Number <span class="text-danger">*</span></label>
                                     <input type="text" id="create_po_number" class="form-control" placeholder="e.g. PO-2026-001">
                                 </div>
                                 <div class="col-12 col-md-2 d-grid">
                                     <button type="button" id="create-load-po" class="btn btn-outline-primary">Load PO</button>
                                 </div>
-                                <div class="col-12 col-md-3">
-                                    <label class="form-label">Received Date</label>
+                                <div class="col-12 col-md-2">
+                                    <label class="form-label">Received Date <span class="text-danger">*</span></label>
                                     <input type="date" name="received_date" class="form-control" value="{{ now()->toDateString() }}" required>
                                 </div>
-                                <div class="col-12 col-md-3">
+                                <div class="col-12 col-md-2">
                                     <label class="form-label">Notes</label>
-                                    <input type="text" name="notes" class="form-control" placeholder="Optional note">
+                                    <input type="text" name="notes" class="form-control" placeholder="Optional">
                                 </div>
                             </div>
 
@@ -310,9 +314,10 @@
                             </div>
                             <div class="modal-body">
                                 <div class="row g-3 mb-3">
-                                    <div class="col-md-4"><label class="form-label">PO Number</label><input type="text" class="form-control" value="{{ $po?->po_number ?? '-' }}" disabled></div>
-                                    <div class="col-md-4"><label class="form-label">Supplier</label><input type="text" class="form-control" value="{{ $po?->supplier?->name ?? '-' }}" disabled></div>
-                                    <div class="col-md-4"><label class="form-label">Received Date</label><input type="date" name="received_date" class="form-control" value="{{ optional($rr->received_date)->format('Y-m-d') }}" required></div>
+                                    <div class="col-md-3"><label class="form-label">RR Number</label><input type="text" class="form-control" value="{{ $rr->rr_number ?? '-' }}" disabled></div>
+                                    <div class="col-md-3"><label class="form-label">PO Number</label><input type="text" class="form-control" value="{{ $po?->po_number ?? '-' }}" disabled></div>
+                                    <div class="col-md-3"><label class="form-label">Supplier</label><input type="text" class="form-control" value="{{ $po?->supplier?->name ?? '-' }}" disabled></div>
+                                    <div class="col-md-3"><label class="form-label">Received Date</label><input type="date" name="received_date" class="form-control" value="{{ optional($rr->received_date)->format('Y-m-d') }}" required></div>
                                 </div>
 
                                 <div class="mb-3">
