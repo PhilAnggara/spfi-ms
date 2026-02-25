@@ -19,7 +19,7 @@ return new class extends Migration
             $table->decimal('qty_bad', 15, 2)->default(0);
             $table->timestamps();
 
-            $table->unique(['receiving_report_id', 'purchase_order_item_id']);
+            $table->unique(['receiving_report_id', 'purchase_order_item_id'], 'rr_items_rrid_poid_unique');
         });
     }
 
