@@ -30,9 +30,9 @@
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
                 <div class="row g-3 align-items-end prs-filter-grid" id="prs-filter-form">
-                    <div class="col-12 col-md-6 col-xl-3">
+                    <div class="col-12 col-md-6 col-xl-{{ $canFilterDepartment ? 3 : 2 }}">
                         <label for="filter-keyword" class="form-label mb-1">Cari PRS</label>
-                        <input type="text" id="filter-keyword" class="form-control" placeholder="PRS number / remarks / department">
+                        <input type="text" id="filter-keyword" class="form-control" placeholder="PRS number / remarks{{ $canFilterDepartment ? ' / department' : '' }}">
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-status" class="form-label mb-1">Status</label>
@@ -49,15 +49,17 @@
                             <option value="REJECTED">REJECTED</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-3 col-xl-2">
-                        <label for="filter-department" class="form-label mb-1">Department</label>
-                        <select id="filter-department" class="form-select">
-                            <option value="">Semua</option>
-                            @foreach ($departments as $department)
-                                <option value="{{ $department->name }}">{{ $department->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @if ($canFilterDepartment)
+                        <div class="col-6 col-md-3 col-xl-3">
+                            <label for="filter-department" class="form-label mb-1">Department</label>
+                            <select id="filter-department" class="form-select">
+                                <option value="">Semua</option>
+                                @foreach ($filterDepartments as $department)
+                                    <option value="{{ $department->name }}">{{ $department->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-prs-start" class="form-label mb-1">PRS Date (from)</label>
                         <input type="date" id="filter-prs-start" class="form-control">

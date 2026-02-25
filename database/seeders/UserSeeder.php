@@ -22,6 +22,7 @@ class UserSeeder extends Seeder
             'password' => Hash::make('Admin123'),
             'department_id' => 1,
         ])->assignRole(
+            'it-staff',
             'administrator',
         );
 
@@ -32,7 +33,19 @@ class UserSeeder extends Seeder
             'role' => 'Manager',
             'password' => bcrypt('Admin123'),
             'department_id' => 1,
-        ])->assignRole('administrator');
+        ])->assignRole(
+            'it-manager',
+            'administrator'
+        );
+
+        User::create([
+            'name' => 'Garry Wowor',
+            'username' => 'garrywowor',
+            'email' => 'garry.wowor@ptsinarpurefoods.com',
+            'role' => 'Staff',
+            'password' => bcrypt('Admin123'),
+            'department_id' => 1,
+        ])->assignRole('it-staff');
 
         User::create([
             'name' => 'Samuel Calamba',
@@ -59,7 +72,7 @@ class UserSeeder extends Seeder
             'role' => 'Staff',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
-        ])->assignRole('canvaser');
+        ])->assignRole('purchasing-staff');
 
         User::create([
             'name' => 'Erni Ending',
@@ -68,7 +81,7 @@ class UserSeeder extends Seeder
             'role' => 'Staff',
             'password' => bcrypt('Admin123'),
             'department_id' => 5,
-        ])->assignRole('canvaser');
+        ])->assignRole('purchasing-staff');
 
         User::create([
             'name' => 'Rommy Tendean',
@@ -77,6 +90,15 @@ class UserSeeder extends Seeder
             'role' => 'Manager',
             'password' => bcrypt('Admin123'),
             'department_id' => 8,
-        ])->assignRole('inventory-manager');
+        ])->assignRole('im-manager');
+
+        User::create([
+            'name' => 'Ferdi Tobangen',
+            'username' => 'ferditobangen',
+            'email' => 'ferdi.tobangen@ptsinarpurefoods.com',
+            'role' => 'Staff',
+            'password' => bcrypt('Admin123'),
+            'department_id' => 8,
+        ])->assignRole('im-staff');
     }
 }

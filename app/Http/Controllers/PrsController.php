@@ -21,7 +21,15 @@ class PrsController extends Controller
      */
     public function index()
     {
-        $items = Prs::with([
+        $user = Auth::user();
+        $canViewAll = $user && $user->hasAnyRole([
+            'administrator',
+            'general-manager',
+            'purchasing-manager',
+            'purchasing-staff',
+        ]);
+
+        $itemsQuery = Prs::with([
             'department',
             'user',
             'items.item',
@@ -32,11 +40,20 @@ class PrsController extends Controller
             'logs' => function ($query) {
                 $query->latest();
             }
-        ])->orderByDesc('id')->get();
+        ])->orderByDesc('id');
+
+        if (! $canViewAll) {
+            $itemsQuery->where('user_id', $user?->id);
+        }
+
+        $items = $itemsQuery->get();
         $departments = Department::all();
+        $filterDepartments = $canViewAll ? $departments : collect();
         return view('pages.prs', [
             'items' => $items,
             'departments' => $departments,
+            'filterDepartments' => $filterDepartments,
+            'canFilterDepartment' => $canViewAll,
         ]);
     }
 

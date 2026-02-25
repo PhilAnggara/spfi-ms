@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -14,12 +14,15 @@ class RolePermissionSeeder extends Seeder
      */
     public function run(): void
     {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         $permissions_users = [
             'create-users',
             'view-users',
             'edit-users',
-            'delete-users'
+            'delete-users',
         ];
+
         $permissions_prs = [
             'create-prs',
             'view-prs',
@@ -35,189 +38,191 @@ class RolePermissionSeeder extends Seeder
         ];
 
         $permissions_po = [
-            'create-po',            // Buat Purchase Order
-            'view-po',              // Lihat PO
-            'submit-po',            // Submit PO
-            'approve-po',           // Approve PO
-            'cancel-po',            // Cancel PO
-            'view-po-progress',     // Lihat progress PO
+            'create-po',
+            'view-po',
+            'submit-po',
+            'approve-po',
+            'cancel-po',
+            'view-po-progress',
         ];
 
         $permissions_rr = [
-            'create-rr',            // Buat Receiving Report
-            'view-rr',              // Lihat RR
-            'update-rr',            // Update RR
+            'create-rr',
+            'view-rr',
+            'update-rr',
         ];
 
         $permissions_general = [
-            'view-dashboard',       // Akses dashboard
-            'export-report',        // Export laporan
-            'print-document',       // Cetak dokumen
+            'view-dashboard',
+            'export-report',
+            'print-document',
         ];
 
-        $all_permissions = array_merge(
+        $all_permissions = array_unique(array_merge(
             $permissions_users,
             $permissions_prs,
             $permissions_canvassing,
             $permissions_po,
             $permissions_rr,
             $permissions_general
-        );
+        ));
 
         foreach ($all_permissions as $permission) {
-            Permission::create(['name' => $permission]);
+            Permission::firstOrCreate(['name' => $permission]);
         }
 
-        $administratorRole = Role::create(['name' => 'administrator']);
-        $administratorRole->givePermissionTo(Permission::all());
+        $roles = [
+            'administrator',
+            'general-manager',
+            'it-manager',
+            'it-staff',
+            'purchasing-manager',
+            'purchasing-staff',
+            'im-manager',
+            'im-supervisor',
+            'im-staff',
+            'finance-manager',
+            'finance-supervisor',
+            'finance-staff',
+            'accounting-manager',
+            'accounting-supervisor',
+            'accounting-staff',
+            'production-manager',
+        ];
 
-        $generalManagerRole = Role::create(['name' => 'general-manager']);
-        $generalManagerRole->givePermissionTo($permissions_general);
+        foreach ($roles as $role) {
+            Role::firstOrCreate(['name' => $role]);
+        }
 
-        $itManagerRole = Role::create(['name' => 'it-manager']);
-        $itManagerRole->givePermissionTo(Permission::all());
+        $rolePermissions = [
+            'administrator' => $all_permissions,
+            'general-manager' => [
+                'view-prs',
+                'view-po',
+                'view-po-progress',
+                'view-rr',
+                'view-dashboard',
+                'export-report',
+                'print-document',
+            ],
+            'it-manager' => $all_permissions,
+            'it-staff' => [
+                'view-dashboard',
+                'print-document',
+            ],
+            'purchasing-manager' => [
+                'approve-prs',
+                'view-prs',
+                'assign-canvaser',
+                'view-canvassing',
+                'approve-po',
+                'view-po',
+                'view-po-progress',
+                'view-rr',
+                'view-dashboard',
+                'export-report',
+                'print-document',
+            ],
+            'purchasing-staff' => [
+                'view-canvassing',
+                'update-canvassing',
+                'create-po',
+                'view-po',
+                'submit-po',
+                'cancel-po',
+                'view-po-progress',
+                'create-prs',
+                'view-prs',
+                'edit-prs',
+                'delete-prs',
+                'view-dashboard',
+                'print-document',
+            ],
+            'im-manager' => [
+                'create-rr',
+                'view-rr',
+                'update-rr',
+                'view-po',
+                'view-dashboard',
+                'print-document',
+            ],
+            'im-supervisor' => [
+                'create-rr',
+                'view-rr',
+                'update-rr',
+                'view-po',
+                'view-dashboard',
+                'print-document',
+            ],
+            'im-staff' => [
+                'create-rr',
+                'view-rr',
+                'update-rr',
+                'view-po',
+                'view-dashboard',
+                'print-document',
+            ],
+            'finance-manager' => [
+                'view-prs',
+                'view-po',
+                'view-rr',
+                'view-dashboard',
+                'export-report',
+                'print-document',
+            ],
+            'finance-supervisor' => [
+                'view-prs',
+                'view-po',
+                'view-rr',
+                'view-dashboard',
+                'export-report',
+                'print-document',
+            ],
+            'finance-staff' => [
+                'view-prs',
+                'view-po',
+                'view-rr',
+                'view-dashboard',
+                'print-document',
+            ],
+            'accounting-manager' => [
+                'view-prs',
+                'view-po',
+                'view-rr',
+                'view-dashboard',
+                'export-report',
+                'print-document',
+            ],
+            'accounting-supervisor' => [
+                'view-prs',
+                'view-po',
+                'view-rr',
+                'view-dashboard',
+                'export-report',
+                'print-document',
+            ],
+            'accounting-staff' => [
+                'view-prs',
+                'view-po',
+                'view-rr',
+                'view-dashboard',
+                'print-document',
+            ],
+            'production-manager' => [
+                'create-prs',
+                'view-prs',
+                'edit-prs',
+                'approve-prs',
+                'view-po-progress',
+                'view-dashboard',
+                'print-document',
+            ],
+        ];
 
-        // Manager Roles
-        $purchasingManagerRole = Role::create(['name' => 'purchasing-manager']);
-        $purchasingManagerRole->givePermissionTo([
-            'approve-prs',
-            'view-prs',
-            'assign-canvaser',
-            'view-canvassing',
-            'approve-po',
-            'view-po',
-            'view-po-progress',
-            'view-rr',
-            'view-dashboard',
-            'export-report',
-            'print-document',
-        ]);
+        foreach ($rolePermissions as $role => $permissions) {
+            Role::findByName($role)->syncPermissions($permissions);
+        }
 
-        $inventoryManagerRole = Role::create(['name' => 'inventory-manager']);
-        $inventoryManagerRole->givePermissionTo([
-            'create-rr',
-            'view-rr',
-            'update-rr',
-            'view-po',
-            'view-dashboard',
-            'print-document',
-        ]);
-
-        $salesManagerRole = Role::create(['name' => 'sales-manager']);
-        $salesManagerRole->givePermissionTo([
-            'view-prs',
-            'view-po',
-            'view-dashboard',
-            'export-report',
-            'print-document',
-        ]);
-
-        $financeManagerRole = Role::create(['name' => 'finance-manager']);
-        $financeManagerRole->givePermissionTo([
-            'view-prs',
-            'view-po',
-            'view-rr',
-            'view-dashboard',
-            'export-report',
-            'print-document',
-        ]);
-
-        $itSupervisorRole = Role::create(['name' => 'it-supervisor']);
-        $itSupervisorRole->givePermissionTo(Permission::all());
-
-        // Supervisor Roles
-        $purchasingSupervisorRole = Role::create(['name' => 'purchasing-supervisor']);
-        $purchasingSupervisorRole->givePermissionTo([
-            'assign-canvaser',
-            'view-canvassing',
-            'create-po',
-            'view-po',
-            'submit-po',
-            'view-po-progress',
-            'view-prs',
-            'create-prs',
-            'view-dashboard',
-            'print-document',
-        ]);
-
-        $salesSupervisorRole = Role::create(['name' => 'sales-supervisor']);
-        $salesSupervisorRole->givePermissionTo([
-            'view-prs',
-            'view-po',
-            'view-dashboard',
-            'print-document',
-        ]);
-
-        $financeSupervisorRole = Role::create(['name' => 'finance-supervisor']);
-        $financeSupervisorRole->givePermissionTo([
-            'view-prs',
-            'view-po',
-            'view-rr',
-            'view-dashboard',
-            'export-report',
-            'print-document',
-        ]);
-
-        $itStaffRole = Role::create(['name' => 'it-staff']);
-        $itStaffRole->givePermissionTo([
-            'view-dashboard',
-            'print-document',
-        ]);
-
-        // Staff Roles
-        $canvaserRole = Role::create(['name' => 'canvaser']);
-        $canvaserRole->givePermissionTo([
-            'view-canvassing',
-            'update-canvassing',
-            'create-po',
-            'view-po',
-            'submit-po',
-            'cancel-po',
-            'view-po-progress',
-            'create-prs',
-            'view-prs',
-            'edit-prs',
-            'delete-prs',
-            'view-dashboard',
-            'print-document'
-        ]);
-
-        $salesStaffRole = Role::create(['name' => 'sales-staff']);
-        $salesStaffRole->givePermissionTo([
-            'view-prs',
-            'view-po',
-            'view-dashboard',
-            'print-document',
-        ]);
-
-        $financeStaffRole = Role::create(['name' => 'finance-staff']);
-        $financeStaffRole->givePermissionTo([
-            'view-prs',
-            'view-po',
-            'view-rr',
-            'view-dashboard',
-            'print-document',
-        ]);
-
-        $inventoryStaffRole = Role::findOrCreate('inventory-staff', 'web');
-        $inventoryStaffRole->givePermissionTo([
-            'create-rr',
-            'view-rr',
-            'update-rr',
-            'view-po',
-            'view-dashboard',
-            'print-document',
-        ]);
-
-        // Finance Role - Untuk accounting nanti
-        $financeRole = Role::findOrCreate('finance', 'web');
-        $financeRole->givePermissionTo([
-            'view-prs',
-            'view-po',
-            'view-rr',
-            'view-dashboard',
-            'export-report',
-            'print-document',
-        ]);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

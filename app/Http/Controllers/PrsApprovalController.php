@@ -17,7 +17,7 @@ class PrsApprovalController extends Controller
         $items = Prs::with(['department', 'user', 'items.item', 'items.canvaser', 'items.canvasingItems', 'items.selectedCanvasingItem', 'items.purchaseOrderItem.receivingReportItems', 'logs' => function ($query) {
             $query->latest();
         }])->orderByDesc('id')->get();
-        $canvasers = User::role('canvaser')->orderBy('name')->get();
+        $canvasers = User::role('purchasing-staff')->orderBy('name')->get();
         return view('pages.prs-approval', [
             'items' => $items,
             'canvasers' => $canvasers,
@@ -75,7 +75,7 @@ class PrsApprovalController extends Controller
         }
 
         $canvaserIds = $assignments->pluck('canvaser_id')->unique()->values();
-        $validCanvaserIds = User::role('canvaser')->whereIn('id', $canvaserIds)->pluck('id');
+        $validCanvaserIds = User::role('purchasing-staff')->whereIn('id', $canvaserIds)->pluck('id');
         $invalidCanvasers = $canvaserIds->diff($validCanvaserIds);
         if ($invalidCanvasers->isNotEmpty()) {
             return redirect()->back()->withErrors(['items' => 'One or more selected users are not canvassers.']);

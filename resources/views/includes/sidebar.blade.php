@@ -236,7 +236,7 @@
                             @endrole
                         @endrole
 
-                        @role('administrator|purchasing-manager|general-manager|finance-manager|canvaser')
+                        @role('administrator|purchasing-manager|general-manager|finance-manager|purchasing-staff')
                             <li class="sidebar-item {{ Request::is('procurement/reports') ? 'active' : '' }}">
                                 <a href="{{ route('procurement.reports.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-file-chart-column {{ Request::is('procurement/reports') ? 'fa-fade' : '' }}"></i>
@@ -252,7 +252,7 @@
                             </a>
                         </li>
 
-                        @role('administrator|canvaser')
+                        @role('administrator|purchasing-staff')
                             <li class="sidebar-item {{ Request::is('canvasing*') ? 'active' : '' }}">
                                 <a href="{{ route('canvasing.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-diagram-lean-canvas {{ Request::is('canvasing') ? 'fa-fade' : '' }}"></i>

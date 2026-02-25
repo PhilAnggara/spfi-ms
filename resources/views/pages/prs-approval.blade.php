@@ -321,7 +321,7 @@
                                                 $statusColor = match($status) {
                                                     'RECEIVED' => 'bg-light-success text-success',
                                                     'PARTIAL' => 'bg-light-warning text-warning',
-                                                    'PENDING' => 'bg-light-danger text-danger',
+                                                    'PENDING' => 'bg-light-secondary text-secondary',
                                                     default => 'bg-light-secondary text-secondary'
                                                 };
                                                 $statusIcon = match($status) {

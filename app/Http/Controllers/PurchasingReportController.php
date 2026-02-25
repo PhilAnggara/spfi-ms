@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Prs;
 use App\Models\PrsItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -16,7 +15,7 @@ class PurchasingReportController extends Controller
 {
     public function index()
     {
-        $canvasers = User::role('canvaser')
+        $canvasers = User::role('purchasing-staff')
             ->whereHas('department', function ($query) {
                 $query->whereRaw('LOWER(name) = ?', ['purchasing']);
             })

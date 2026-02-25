@@ -18,7 +18,7 @@
                     <p class="text-muted mb-0">Pantau semua penerimaan barang, lihat detail PO, dan kelola RR tanpa pindah halaman.</p>
                 </div>
             </div>
-            @role('administrator|inventory-manager|inventory-staff')
+            @role('administrator|im-manager|im-supervisor|im-staff')
                 <div class="col-12 col-lg-5 text-lg-end">
                     <button type="button" class="btn btn-success icon icon-left" data-bs-toggle="modal" data-bs-target="#create-rr-modal">
                         <i class="fa-duotone fa-solid fa-plus"></i>
@@ -130,7 +130,7 @@
                                                     <i class="fa-light fa-eye text-primary"></i>
                                                 </button>
 
-                                                @role('administrator|inventory-manager|inventory-staff')
+                                                @role('administrator|im-manager|im-supervisor|im-staff')
                                                     <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-edit-modal-{{ $rr->id }}" title="Edit">
                                                         <i class="fa-light fa-edit text-primary"></i>
                                                     </button>
@@ -158,7 +158,7 @@
         </div>
     </section>
 
-    @role('administrator|inventory-manager|inventory-staff')
+    @role('administrator|im-manager|im-supervisor|im-staff')
         <div class="modal fade" id="create-rr-modal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <div class="modal-content">
@@ -308,7 +308,7 @@
             </div>
         </div>
 
-        @role('administrator|inventory-manager|inventory-staff')
+        @role('administrator|im-manager|im-supervisor|im-staff')
             <div class="modal fade" id="rr-edit-modal-{{ $rr->id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-xl modal-dialog-scrollable">
                     <div class="modal-content">

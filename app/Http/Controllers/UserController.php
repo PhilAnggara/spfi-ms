@@ -5,31 +5,46 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules;
+use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
     private const ROLE_MAP = [
         'Manager' => [
+            'Management' => 'general-manager',
             'Purchasing' => 'purchasing-manager',
-            'Sales' => 'sales-manager',
             'Finance' => 'finance-manager',
             'Information Technology' => 'it-manager',
+            'Inventory Management' => 'im-manager',
+            'Accounting' => 'accounting-manager',
+            'Marketing / Export' => 'production-manager',
+            'Fixed Labeling' => 'production-manager',
+            'Quality Assurance' => 'production-manager',
+            'Engineering' => 'production-manager',
         ],
         'Supervisor' => [
-            'Purchasing' => 'purchasing-supervisor',
-            'Sales' => 'sales-supervisor',
+            'Purchasing' => 'purchasing-staff',
             'Finance' => 'finance-supervisor',
-            'Information Technology' => 'it-supervisor',
+            'Information Technology' => 'it-staff',
+            'Inventory Management' => 'im-supervisor',
+            'Accounting' => 'accounting-supervisor',
+            'Marketing / Export' => 'production-manager',
+            'Fixed Labeling' => 'production-manager',
+            'Quality Assurance' => 'production-manager',
+            'Engineering' => 'production-manager',
         ],
         'Staff' => [
-            'Purchasing' => 'canvaser',
-            'Sales' => 'sales-staff',
+            'Purchasing' => 'purchasing-staff',
             'Finance' => 'finance-staff',
             'Information Technology' => 'it-staff',
+            'Inventory Management' => 'im-staff',
+            'Accounting' => 'accounting-staff',
+            'Marketing / Export' => 'production-manager',
+            'Fixed Labeling' => 'production-manager',
+            'Quality Assurance' => 'production-manager',
+            'Engineering' => 'production-manager',
         ],
     ];
 
@@ -69,7 +84,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255', 'unique:users'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'password' => ['required', 'confirmed', Password::defaults()],
             'department_id' => ['required', 'exists:departments,id'],
             'role' => ['required', 'in:Manager,Supervisor,Staff'],
         ]);
@@ -128,7 +143,7 @@ class UserController extends Controller
 
         // Add password validation only if password field is filled
         if ($request->filled('password')) {
-            $rules['password'] = ['required', 'confirmed', Rules\Password::defaults()];
+            $rules['password'] = ['required', 'confirmed', Password::defaults()];
         }
 
         $request->validate($rules);
@@ -172,7 +187,7 @@ class UserController extends Controller
 
         $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
         $user = $request->user();

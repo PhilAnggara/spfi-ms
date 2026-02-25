@@ -86,7 +86,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/po-registered-supplier', [PurchasingReportController::class, 'poRegisteredPerSupplier'])->name('procurement.reports.po-registered-supplier');
     });
 
-    Route::middleware('role:administrator|canvaser')->group(function () {
+    Route::middleware('role:administrator|purchasing-staff')->group(function () {
         Route::get('/canvasing', [CanvasingController::class, 'index'])->name('canvasing.index');
         Route::get('/canvasing/{prsItem}', [CanvasingController::class, 'show'])->name('canvasing.show');
         Route::get('/canvasing/{prsItem}/report', [CanvasingController::class, 'report'])->name('canvasing.report');
@@ -110,7 +110,7 @@ Route::middleware('auth')->group(function () {
         });
     });
 
-    Route::middleware('role:administrator|canvaser|purchasing-manager|general-manager')->group(function () {
+    Route::middleware('role:administrator|purchasing-staff|purchasing-manager|general-manager')->group(function () {
         Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
             Route::get('/', [PurchaseOrderController::class, 'index'])->name('index');
             Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
@@ -130,7 +130,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{receivingReport}/print', [ReceivingReportController::class, 'print'])->name('print');
     });
 
-    Route::middleware('role:administrator|inventory-manager|inventory-staff')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
+    Route::middleware('role:administrator|im-manager|im-supervisor|im-staff')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
         Route::get('/po-by-number', [ReceivingReportController::class, 'poByNumber'])->name('po-by-number');
         Route::post('/', [ReceivingReportController::class, 'store'])->name('store');
         Route::put('/{receivingReport}', [ReceivingReportController::class, 'update'])->name('update');

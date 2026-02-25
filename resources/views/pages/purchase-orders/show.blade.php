@@ -16,7 +16,7 @@
                         Back to PO Approval
                     </a>
                 @endrole
-                @role('canvaser')
+                @role('purchasing-staff')
                     <a href="{{ route('purchase-orders.index') }}" class="btn btn-sm btn-outline-secondary">
                         <i class="fa-duotone fa-solid fa-arrow-left"></i>
                         Back to PO List
@@ -290,7 +290,7 @@
                         </form>
                     </div>
                     <div class="col-12 col-md-6 text-md-end">
-                        @role('administrator|canvaser')
+                        @role('administrator|purchasing-staff')
                             @if (in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED']))
                                 <form method="post" action="{{ route('purchase-orders.submit', $purchaseOrder) }}" class="d-inline">
                                     @csrf
