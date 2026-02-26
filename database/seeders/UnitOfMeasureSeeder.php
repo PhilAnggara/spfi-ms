@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Database\Seeders\Concerns\ResolvesLegacyImport;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -11,13 +11,49 @@ use Carbon\Carbon;
 
 class UnitOfMeasureSeeder extends Seeder
 {
+    use ResolvesLegacyImport;
+
     /**
      * Run the database seeds.
      */
     public function run(): void
     {
+        // Coba ambil data legacy jika mode seeding = legacy.
+        $legacyRows = $this->resolveRows('uom', fn (string $message) => $this->command?->warn($message));
+
+        if ($this->isLegacySource() && !empty($legacyRows)) {
+            $this->logImportSource('uom', 'legacy');
+
+            foreach ($legacyRows as $data) {
+                $remarks = trim((string) ($data['remarks'] ?? ''));
+                $remarks = $remarks === '' || Str::upper($remarks) === 'NULL' ? null : $remarks;
+
+                $createdDate = trim((string) ($data['created_date'] ?? ''));
+                $updatedDate = trim((string) ($data['updated_date'] ?? ''));
+
+                $createdAt = $createdDate === '' || Str::upper($createdDate) === 'NULL'
+                    ? now()
+                    : Carbon::parse($createdDate);
+                $updatedAt = $updatedDate === '' || Str::upper($updatedDate) === 'NULL'
+                    ? now()
+                    : Carbon::parse($updatedDate);
+
+                DB::table('unit_of_measures')->insert([
+                    'name' => $data['uom_name'] ?? null,
+                    'code' => $data['uom_code'] ?? null,
+                    'remarks' => $remarks,
+                    'created_at' => $createdAt,
+                    'updated_at' => $updatedAt,
+                ]);
+            }
+
+            return;
+        }
+
+        $this->logImportSource('uom', 'csv');
+
         // 1) Ambil file CSV export dari sistem lama.
-        $path = public_path('document/csv/uom.csv');
+        $path = $this->csvPathFor('uom');
         if (!File::exists($path)) {
             return;
         }

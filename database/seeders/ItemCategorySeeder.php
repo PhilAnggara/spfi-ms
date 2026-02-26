@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Database\Seeders\Concerns\ResolvesLegacyImport;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -11,13 +11,45 @@ use Carbon\Carbon;
 
 class ItemCategorySeeder extends Seeder
 {
+    use ResolvesLegacyImport;
+
     /**
      * Run the database seeds.
      */
     public function run(): void
     {
+        // Coba ambil data legacy jika mode seeding = legacy.
+        $legacyRows = $this->resolveRows('product_category', fn (string $message) => $this->command?->warn($message));
+
+        if ($this->isLegacySource() && !empty($legacyRows)) {
+            $this->logImportSource('product_category', 'legacy');
+
+            foreach ($legacyRows as $data) {
+                $createdDate = trim((string) ($data['created_date'] ?? ''));
+                $updatedDate = trim((string) ($data['updated_date'] ?? ''));
+
+                $createdAt = $createdDate === '' || Str::upper($createdDate) === 'NULL'
+                    ? now()
+                    : Carbon::parse($createdDate);
+                $updatedAt = $updatedDate === '' || Str::upper($updatedDate) === 'NULL'
+                    ? now()
+                    : Carbon::parse($updatedDate);
+
+                DB::table('item_categories')->insert([
+                    'name' => $data['category_name'] ?? null,
+                    'code' => $data['category_code'] ?? null,
+                    'created_at' => $createdAt,
+                    'updated_at' => $updatedAt,
+                ]);
+            }
+
+            return;
+        }
+
+        $this->logImportSource('product_category', 'csv');
+
         // 1) Ambil file CSV export dari sistem lama.
-        $path = public_path('document/csv/product_category.csv');
+        $path = $this->csvPathFor('product_category');
         if (!File::exists($path)) {
             return;
         }

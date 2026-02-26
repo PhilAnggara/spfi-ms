@@ -113,6 +113,51 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        // Legacy DB koneksi 1 (mis. sistem lama utama).
+        'legacy_sqlsrv_1' => [
+            'driver' => 'sqlsrv',
+            'host' => env('LEGACY_DB1_HOST', '127.0.0.1'),
+            'port' => env('LEGACY_DB1_PORT', '1433'),
+            'database' => env('LEGACY_DB1_DATABASE', ''),
+            'username' => env('LEGACY_DB1_USERNAME', ''),
+            'password' => env('LEGACY_DB1_PASSWORD', ''),
+            'charset' => env('LEGACY_DB1_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('LEGACY_DB1_ENCRYPT', 'no'),
+            'trust_server_certificate' => env('LEGACY_DB1_TRUST_SERVER_CERTIFICATE', true),
+        ],
+
+        // Legacy DB koneksi 2 (mis. sistem lama lain).
+        'legacy_sqlsrv_2' => [
+            'driver' => 'sqlsrv',
+            'host' => env('LEGACY_DB2_HOST', '127.0.0.1'),
+            'port' => env('LEGACY_DB2_PORT', '1433'),
+            'database' => env('LEGACY_DB2_DATABASE', ''),
+            'username' => env('LEGACY_DB2_USERNAME', ''),
+            'password' => env('LEGACY_DB2_PASSWORD', ''),
+            'charset' => env('LEGACY_DB2_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('LEGACY_DB2_ENCRYPT', 'no'),
+            'trust_server_certificate' => env('LEGACY_DB2_TRUST_SERVER_CERTIFICATE', true),
+        ],
+
+        // Legacy DB koneksi 3 (mis. sistem lama lain).
+        'legacy_sqlsrv_3' => [
+            'driver' => 'sqlsrv',
+            'host' => env('LEGACY_DB3_HOST', '127.0.0.1'),
+            'port' => env('LEGACY_DB3_PORT', '1433'),
+            'database' => env('LEGACY_DB3_DATABASE', ''),
+            'username' => env('LEGACY_DB3_USERNAME', ''),
+            'password' => env('LEGACY_DB3_PASSWORD', ''),
+            'charset' => env('LEGACY_DB3_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('LEGACY_DB3_ENCRYPT', 'no'),
+            'trust_server_certificate' => env('LEGACY_DB3_TRUST_SERVER_CERTIFICATE', true),
+        ],
+
     ],
 
     /*
