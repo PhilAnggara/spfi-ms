@@ -1,0 +1,13 @@
+<svg width="640" height="420" viewBox="0 0 640 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="640" height="420" rx="24" fill="#F8FAFC"/>
+    <circle cx="320" cy="178" r="96" fill="#EEF2FF"/>
+    <rect x="228" y="110" width="184" height="138" rx="20" fill="white" stroke="#D9E2F2" stroke-width="2"/>
+    <rect x="258" y="152" width="124" height="54" rx="12" fill="#EEF2FF" stroke="#435EBE" stroke-width="6"/>
+    <path d="M272 132H368" stroke="#7C8DB5" stroke-width="8" stroke-linecap="round"/>
+    <path d="M286 179H354" stroke="#435EBE" stroke-width="10" stroke-linecap="round"/>
+    <path d="M286 196H336" stroke="#7C8DB5" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="364" cy="196" r="6" fill="#F44336"/>
+    <rect x="222" y="274" width="196" height="66" rx="14" fill="#25396F"/>
+    <text x="320" y="317" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="36" font-weight="700">503</text>
+    <text x="320" y="376" text-anchor="middle" fill="#7C8DB5" font-family="Arial, sans-serif" font-size="22" font-weight="600">Service Unavailable</text>
+</svg>

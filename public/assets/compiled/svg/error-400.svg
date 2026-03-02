@@ -1,0 +1,11 @@
+<svg width="640" height="420" viewBox="0 0 640 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="640" height="420" rx="24" fill="#F8FAFC"/>
+    <circle cx="320" cy="178" r="96" fill="#EEF2FF"/>
+    <rect x="224" y="106" width="192" height="146" rx="20" fill="white" stroke="#D9E2F2" stroke-width="2"/>
+    <path d="M264 150H376" stroke="#435EBE" stroke-width="10" stroke-linecap="round"/>
+    <path d="M264 184H340" stroke="#7C8DB5" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="362" cy="184" r="8" fill="#F44336"/>
+    <rect x="222" y="274" width="196" height="66" rx="14" fill="#25396F"/>
+    <text x="320" y="317" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="36" font-weight="700">400</text>
+    <text x="320" y="376" text-anchor="middle" fill="#7C8DB5" font-family="Arial, sans-serif" font-size="22" font-weight="600">Bad Request</text>
+</svg>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>500 - SPFI-MS</title>
+    <title>401 - SPFI-MS</title>
     <link rel="shortcut icon" href="{{ url('assets/images/favicon.png') }}" type="image/x-icon">
     <link rel="stylesheet" href="{{ url('assets/compiled/css/app.css') }}">
     <link rel="stylesheet" href="{{ url('assets/compiled/css/error.css') }}">
@@ -15,9 +15,9 @@
         <div class="error-page container">
             <div class="col-md-8 col-12 offset-md-2">
                 <div class="text-center">
-                    <img class="img-error" src="{{ url('assets/compiled/svg/error-500.svg') }}" alt="System Error">
-                    <h1 class="error-title">System Error</h1>
-                    <p class="fs-5 text-gray-600">The website is currently unavailable. Please try again later, or contact the SPFI IT Department if the problem persists.</p>
+                    <img class="img-error" src="{{ url('assets/compiled/svg/error-401.svg') }}" alt="Unauthorized">
+                    <h1 class="error-title">Unauthorized</h1>
+                    <p class="fs-5 text-gray-600">You need to sign in to access this page. Please log in and try again. If the issue continues, please contact the SPFI IT Department.</p>
                     <a href="{{ url('/') }}" class="btn btn-lg btn-outline-primary mt-3">Go Home</a>
                 </div>
             </div>

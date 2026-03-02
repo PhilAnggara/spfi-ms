@@ -1,0 +1,10 @@
+<svg width="640" height="420" viewBox="0 0 640 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="640" height="420" rx="24" fill="#F8FAFC"/>
+    <circle cx="320" cy="178" r="96" fill="#EEF2FF"/>
+    <circle cx="320" cy="178" r="68" fill="white" stroke="#435EBE" stroke-width="10"/>
+    <path d="M320 138V180L348 198" stroke="#435EBE" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="320" cy="178" r="6" fill="#435EBE"/>
+    <rect x="222" y="274" width="196" height="66" rx="14" fill="#25396F"/>
+    <text x="320" y="317" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="36" font-weight="700">408</text>
+    <text x="320" y="376" text-anchor="middle" fill="#7C8DB5" font-family="Arial, sans-serif" font-size="22" font-weight="600">Request Timeout</text>
+</svg>
