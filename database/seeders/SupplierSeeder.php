@@ -20,17 +20,20 @@ class SupplierSeeder extends Seeder
 
         if ($this->isLegacySource() && !empty($legacyRows)) {
             $this->logImportSource('supplier', 'legacy');
+            $this->command?->info('ℹ [supplier] rows loaded: ' . count($legacyRows));
+
+            $imported = 0;
+            $skippedByCode = 0;
+            $finalSoftDeleteByCode = [];
 
             foreach ($legacyRows as $row) {
                 $isActive = strtoupper($this->normalizeValue($this->readSupplierField($row, ['is_active', 'active', 'status_active'])) ?? '');
-                $isDeleted = strtoupper($this->normalizeValue($this->readSupplierField($row, ['is_deleted', 'deleted', 'status_deleted'])) ?? '');
-
-                if ($isActive !== 'Y' || $isDeleted !== 'N') {
-                    continue;
-                }
+                $isDeleted = strtoupper($this->normalizeValue($this->readSupplierField($row, ['is_deleted', 'is_delete', 'deleted', 'status_deleted'])) ?? '');
+                $shouldSoftDelete = $isActive !== 'Y' || $isDeleted !== 'N';
 
                 $code = $this->normalizeValue($this->readSupplierField($row, ['supplier_code', 'code', 'supp_code', 'vendor_code']));
                 if ($code === null) {
+                    $skippedByCode++;
                     continue;
                 }
 
@@ -47,8 +50,24 @@ class SupplierSeeder extends Seeder
                         'created_by' => 1,
                         'created_at' => now(),
                         'updated_at' => now(),
+                        'deleted_at' => $shouldSoftDelete ? now() : null,
                     ]
                 );
+
+                $imported++;
+                $finalSoftDeleteByCode[$code] = $shouldSoftDelete;
+            }
+
+            $importedUnique = count($finalSoftDeleteByCode);
+            $softDeleted = count(array_filter($finalSoftDeleteByCode));
+
+            $this->command?->info("✓ Imported {$importedUnique} suppliers (legacy, unique codes)");
+            if ($imported !== $importedUnique) {
+                $this->command?->warn("⚠ Duplicate supplier codes in source (legacy): " . ($imported - $importedUnique));
+            }
+            $this->command?->info("ℹ Soft-deleted suppliers (legacy): {$softDeleted}");
+            if ($skippedByCode > 0) {
+                $this->command?->warn("⚠ Skipped suppliers (legacy) - missing code: {$skippedByCode}");
             }
 
             return;
@@ -89,19 +108,24 @@ class SupplierSeeder extends Seeder
             return;
         }
 
+        $imported = 0;
+        $skippedInvalidColumns = 0;
+        $skippedByCode = 0;
+        $finalSoftDeleteByCode = [];
+
         while (($row = fgetcsv($handle, 0, ';')) !== false) {
             if (count($row) < 8) {
+                $skippedInvalidColumns++;
                 continue;
             }
 
             $isActive = strtoupper($normalize($row[8] ?? null) ?? '');
             $isDeleted = strtoupper($normalize($row[9] ?? null) ?? '');
-            if ($isActive !== 'Y' || $isDeleted !== 'N') {
-                continue;
-            }
+            $shouldSoftDelete = $isActive !== 'Y' || $isDeleted !== 'N';
 
             $code = $normalize($row[1] ?? null);
             if ($code === null) {
+                $skippedByCode++;
                 continue;
             }
 
@@ -118,11 +142,27 @@ class SupplierSeeder extends Seeder
                     'created_by' => 1,
                     'created_at' => now(),
                     'updated_at' => now(),
+                    'deleted_at' => $shouldSoftDelete ? now() : null,
                 ]
             );
+
+            $imported++;
+            $finalSoftDeleteByCode[$code] = $shouldSoftDelete;
         }
 
         fclose($handle);
+
+        $importedUnique = count($finalSoftDeleteByCode);
+        $softDeleted = count(array_filter($finalSoftDeleteByCode));
+
+        $this->command?->info("✓ Imported {$importedUnique} suppliers (csv, unique codes)");
+        if ($imported !== $importedUnique) {
+            $this->command?->warn("⚠ Duplicate supplier codes in source (csv): " . ($imported - $importedUnique));
+        }
+        $this->command?->info("ℹ Soft-deleted suppliers (csv): {$softDeleted}");
+        if ($skippedInvalidColumns > 0 || $skippedByCode > 0) {
+            $this->command?->warn("⚠ Skipped suppliers (csv) - invalid columns: {$skippedInvalidColumns}, missing code: {$skippedByCode}");
+        }
     }
 
     private function normalizeValue(?string $value): ?string

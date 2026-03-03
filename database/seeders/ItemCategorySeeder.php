@@ -23,6 +23,9 @@ class ItemCategorySeeder extends Seeder
 
         if ($this->isLegacySource() && !empty($legacyRows)) {
             $this->logImportSource('product_category', 'legacy');
+            $this->command?->info('ℹ [product_category] rows loaded: ' . count($legacyRows));
+
+            $imported = 0;
 
             foreach ($legacyRows as $data) {
                 $createdDate = trim((string) ($data['created_date'] ?? ''));
@@ -41,7 +44,11 @@ class ItemCategorySeeder extends Seeder
                     'created_at' => $createdAt,
                     'updated_at' => $updatedAt,
                 ]);
+
+                $imported++;
             }
+
+            $this->command?->info("✓ [product_category] imported: {$imported}");
 
             return;
         }
@@ -62,9 +69,13 @@ class ItemCategorySeeder extends Seeder
             return;
         }
 
+        $imported = 0;
+        $skippedInvalidColumns = 0;
+
         // 3) Import row by row ke table item_categories sesuai mapping.
         while (($row = fgetcsv($handle, 0, ';')) !== false) {
             if (count($row) !== count($header)) {
+                $skippedInvalidColumns++;
                 continue;
             }
 
@@ -86,8 +97,15 @@ class ItemCategorySeeder extends Seeder
                 'created_at' => $createdAt,
                 'updated_at' => $updatedAt,
             ]);
+
+            $imported++;
         }
 
         fclose($handle);
+
+        $this->command?->info("✓ [product_category] imported: {$imported}");
+        if ($skippedInvalidColumns > 0) {
+            $this->command?->warn("⚠ [product_category] skipped invalid column count: {$skippedInvalidColumns}");
+        }
     }
 }

@@ -47,12 +47,15 @@ class AccountingDataSeeder extends Seeder
     private function importGroupings(): void
     {
         $rows = $this->rowsFromSource('acct_sub_group');
-        $count = 0;
+        $processed = 0;
+        $skippedEmptyCode = 0;
+        $uniqueCodes = [];
 
         foreach ($rows as $row) {
             $code = $this->readValue($row, ['code', 'subgroup_code', 'grouping_code'], 2);
 
             if (empty($code)) {
+                $skippedEmptyCode++;
                 continue;
             }
 
@@ -68,22 +71,33 @@ class AccountingDataSeeder extends Seeder
                 ]
             );
 
-            $count++;
+            $processed++;
+            $uniqueCodes[$code] = true;
         }
 
+        $count = count($uniqueCodes);
         $this->command->info("✓ Imported {$count} Groupings");
+        if ($processed !== $count) {
+            $this->command->warn("⚠ Duplicate Grouping codes in source: " . ($processed - $count));
+        }
+        if ($skippedEmptyCode > 0) {
+            $this->command->warn("⚠ Skipped Groupings (empty code): {$skippedEmptyCode}");
+        }
     }
 
     private function importGroupCodes(): void
     {
         $rows = $this->rowsFromSource('acct_group_codes');
-        $count = 0;
+        $processed = 0;
+        $skippedEmptyCode = 0;
+        $uniqueCodes = [];
 
         foreach ($rows as $row) {
             $groupCode = $this->readValue($row, ['group_code', 'code'], 1);
             $groupDesc = $this->readValue($row, ['group_desc', 'desc', 'description'], 2) ?? '';
 
             if (empty($groupCode)) {
+                $skippedEmptyCode++;
                 continue;
             }
 
@@ -92,22 +106,33 @@ class AccountingDataSeeder extends Seeder
                 ['group_desc' => $groupDesc]
             );
 
-            $count++;
+            $processed++;
+            $uniqueCodes[$groupCode] = true;
         }
 
+        $count = count($uniqueCodes);
         $this->command->info("✓ Imported {$count} Group Codes");
+        if ($processed !== $count) {
+            $this->command->warn("⚠ Duplicate Group Codes in source: " . ($processed - $count));
+        }
+        if ($skippedEmptyCode > 0) {
+            $this->command->warn("⚠ Skipped Group Codes (empty code): {$skippedEmptyCode}");
+        }
     }
 
     private function importAccountingCodes(): void
     {
         $rows = $this->rowsFromSource('accounting_codes');
-        $count = 0;
+        $processed = 0;
+        $skippedEmptyCode = 0;
+        $uniqueCodes = [];
 
         foreach ($rows as $row) {
             $code = $this->readValue($row, ['code', 'acct_code', 'accounting_code'], 1);
             $desc = $this->readValue($row, ['desc', 'description', 'acct_desc'], 2) ?? '';
 
             if (empty($code)) {
+                $skippedEmptyCode++;
                 continue;
             }
 
@@ -116,17 +141,27 @@ class AccountingDataSeeder extends Seeder
                 ['desc' => $desc]
             );
 
-            $count++;
+            $processed++;
+            $uniqueCodes[$code] = true;
         }
 
+        $count = count($uniqueCodes);
         $this->command->info("✓ Imported {$count} Accounting Codes");
+        if ($processed !== $count) {
+            $this->command->warn("⚠ Duplicate Accounting Codes in source: " . ($processed - $count));
+        }
+        if ($skippedEmptyCode > 0) {
+            $this->command->warn("⚠ Skipped Accounting Codes (empty code): {$skippedEmptyCode}");
+        }
     }
 
     private function importBSGroupings(): void
     {
         $rows = $this->rowsFromSource('bs_grouping');
-        $count = 0;
-        $skipped = 0;
+        $processed = 0;
+        $skippedEmptyKeys = 0;
+        $skippedMissingReferences = 0;
+        $uniquePairs = [];
 
         foreach ($rows as $row) {
             $groupCode = $this->readValue($row, ['group_code'], 1);
@@ -135,6 +170,7 @@ class AccountingDataSeeder extends Seeder
             $groupingCode = $this->readValue($row, ['grouping_code', 'subgroup_code'], 4);
 
             if (empty($groupCode) || empty($acctCode)) {
+                $skippedEmptyKeys++;
                 continue;
             }
 
@@ -143,7 +179,7 @@ class AccountingDataSeeder extends Seeder
             $grouping = $groupingCode ? Grouping::where('code', $groupingCode)->first() : null;
 
             if (!$group || !$accountingCode) {
-                $skipped++;
+                $skippedMissingReferences++;
                 continue;
             }
 
@@ -158,13 +194,19 @@ class AccountingDataSeeder extends Seeder
                 ]
             );
 
-            $count++;
+            $processed++;
+            $pairKey = $group->id . ':' . $accountingCode->id;
+            $uniquePairs[$pairKey] = true;
         }
 
+        $count = count($uniquePairs);
         $this->command->info("✓ Imported {$count} BS Groupings");
+        if ($processed !== $count) {
+            $this->command->warn("⚠ Duplicate BS Grouping pairs in source: " . ($processed - $count));
+        }
 
-        if ($skipped > 0) {
-            $this->command->warn("⚠ Skipped {$skipped} records (missing references)");
+        if ($skippedEmptyKeys > 0 || $skippedMissingReferences > 0) {
+            $this->command->warn("⚠ Skipped BS Groupings - empty keys: {$skippedEmptyKeys}, missing references: {$skippedMissingReferences}");
         }
     }
 

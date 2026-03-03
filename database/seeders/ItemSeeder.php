@@ -23,9 +23,12 @@ class ItemSeeder extends Seeder
 
         if ($this->isLegacySource() && !empty($legacyRows)) {
             $this->logImportSource('product', 'legacy');
+            $this->command?->info('ℹ [product] rows loaded: ' . count($legacyRows));
 
             $uomByName = DB::table('unit_of_measures')->pluck('id', 'name');
             $categoryByName = DB::table('item_categories')->pluck('id', 'name');
+            $imported = 0;
+            $skippedMissingRelation = 0;
 
             foreach ($legacyRows as $data) {
                 $uomName = $data['uom_name'] ?? null;
@@ -35,6 +38,7 @@ class ItemSeeder extends Seeder
                 $categoryId = $categoryName !== null ? ($categoryByName[$categoryName] ?? null) : null;
 
                 if (!$unitId || !$categoryId) {
+                    $skippedMissingRelation++;
                     continue;
                 }
 
@@ -64,6 +68,13 @@ class ItemSeeder extends Seeder
                     'created_at' => $createdAt,
                     'updated_at' => $updatedAt,
                 ]);
+
+                $imported++;
+            }
+
+            $this->command?->info("✓ [product] imported: {$imported}");
+            if ($skippedMissingRelation > 0) {
+                $this->command?->warn("⚠ [product] skipped missing relation: {$skippedMissingRelation}");
             }
 
             return;
@@ -89,9 +100,14 @@ class ItemSeeder extends Seeder
             return;
         }
 
+        $imported = 0;
+        $skippedInvalidColumns = 0;
+        $skippedMissingRelation = 0;
+
         // 4) Import row by row ke table items sesuai mapping.
         while (($row = fgetcsv($handle, 0, ';')) !== false) {
             if (count($row) !== count($header)) {
+                $skippedInvalidColumns++;
                 continue;
             }
 
@@ -103,6 +119,7 @@ class ItemSeeder extends Seeder
             $categoryId = $categoryName !== null ? ($categoryByName[$categoryName] ?? null) : null;
 
             if (!$unitId || !$categoryId) {
+                $skippedMissingRelation++;
                 continue;
             }
 
@@ -132,8 +149,15 @@ class ItemSeeder extends Seeder
                 'created_at' => $createdAt,
                 'updated_at' => $updatedAt,
             ]);
+
+            $imported++;
         }
 
         fclose($handle);
+
+        $this->command?->info("✓ [product] imported: {$imported}");
+        if ($skippedInvalidColumns > 0 || $skippedMissingRelation > 0) {
+            $this->command?->warn("⚠ [product] skipped invalid columns: {$skippedInvalidColumns}, missing relation: {$skippedMissingRelation}");
+        }
     }
 }

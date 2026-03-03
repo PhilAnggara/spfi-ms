@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
+use App\Services\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class ReceivingReportController extends Controller
@@ -96,7 +98,7 @@ class ReceivingReportController extends Controller
             'items.*.qty_bad' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $purchaseOrder = PurchaseOrder::with(['items'])
+        $purchaseOrder = PurchaseOrder::with(['items.item'])
             ->findOrFail($validated['purchase_order_id']);
 
         $poItemIds = $purchaseOrder->items->pluck('id')->all();
@@ -122,6 +124,7 @@ class ReceivingReportController extends Controller
             ->pluck('qty_received', 'receiving_report_items.purchase_order_item_id');
 
         $poItemsById = $purchaseOrder->items->keyBy('id');
+        $currentStockLines = $this->buildStockLinesFromSelectedRows($selectedRows, $poItemsById);
 
         foreach ($selectedRows as $row) {
             $poItemId = (int) $row['purchase_order_item_id'];
@@ -153,7 +156,7 @@ class ReceivingReportController extends Controller
             }
         }
 
-        DB::transaction(function () use ($validated, $selectedRows, $request) {
+        DB::transaction(function () use ($validated, $selectedRows, $request, $currentStockLines) {
             $receivingReport = ReceivingReport::create([
                 'rr_number' => $validated['rr_number'],
                 'purchase_order_id' => $validated['purchase_order_id'],
@@ -170,6 +173,13 @@ class ReceivingReportController extends Controller
                     'qty_bad' => (float) ($row['qty_bad'] ?? 0),
                 ]);
             }
+
+            app(StockService::class)->applyReceivingReportAdjustment(
+                receivingReport: $receivingReport,
+                currentLines: $currentStockLines,
+                previousLines: [],
+                userId: $request->user()->id,
+            );
 
             // Trigger PRS status check for all affected items
             $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
@@ -193,12 +203,14 @@ class ReceivingReportController extends Controller
         ]);
 
         $receivingReport->load([
-            'purchaseOrder.items',
+            'purchaseOrder.items.item',
+            'items.purchaseOrderItem.item',
         ]);
 
         $poItems = $receivingReport->purchaseOrder->items;
         $poItemIds = $poItems->pluck('id')->all();
         $poItemsById = $poItems->keyBy('id');
+        $previousStockLines = $this->buildStockLinesFromReceivingReportItems($receivingReport->items);
 
         $selectedRows = collect($validated['items'])
             ->filter(function ($row) {
@@ -211,6 +223,8 @@ class ReceivingReportController extends Controller
                 'items' => 'Please select at least one item to receive.',
             ])->withInput();
         }
+
+        $currentStockLines = $this->buildStockLinesFromSelectedRows($selectedRows, $poItemsById);
 
         $receivedMapExcludingCurrent = ReceivingReportItem::query()
             ->join('receiving_reports', 'receiving_reports.id', '=', 'receiving_report_items.receiving_report_id')
@@ -251,7 +265,7 @@ class ReceivingReportController extends Controller
             }
         }
 
-        DB::transaction(function () use ($receivingReport, $validated, $selectedRows) {
+        DB::transaction(function () use ($receivingReport, $validated, $selectedRows, $request, $currentStockLines, $previousStockLines) {
             $receivingReport->update([
                 'received_date' => $validated['received_date'],
                 'notes' => $validated['notes'] ?? null,
@@ -268,6 +282,13 @@ class ReceivingReportController extends Controller
                 ]);
             }
 
+            app(StockService::class)->applyReceivingReportAdjustment(
+                receivingReport: $receivingReport,
+                currentLines: $currentStockLines,
+                previousLines: $previousStockLines,
+                userId: $request->user()->id,
+            );
+
             // Trigger PRS status check for all affected items
             $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
         });
@@ -279,7 +300,24 @@ class ReceivingReportController extends Controller
 
     public function destroy(ReceivingReport $receivingReport)
     {
-        $receivingReport->delete();
+        $receivingReport->load([
+            'items.purchaseOrderItem.item',
+        ]);
+
+        $previousStockLines = $this->buildStockLinesFromReceivingReportItems($receivingReport->items);
+
+        DB::transaction(function () use ($receivingReport, $previousStockLines) {
+            $receivingReport->delete();
+
+            app(StockService::class)->applyReceivingReportAdjustment(
+                receivingReport: $receivingReport,
+                currentLines: [],
+                previousLines: $previousStockLines,
+                userId: Auth::id(),
+            );
+
+            $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
+        });
 
         return redirect()
             ->route('receiving-reports.index')
@@ -330,5 +368,71 @@ class ReceivingReportController extends Controller
         foreach ($prsRecords as $prs) {
             $prs->checkAndUpdateDeliveryStatus();
         }
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $selectedRows
+     * @param  \Illuminate\Support\Collection<int, \App\Models\PurchaseOrderItem>  $poItemsById
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildStockLinesFromSelectedRows($selectedRows, $poItemsById): array
+    {
+        $lines = [];
+
+        foreach ($selectedRows as $row) {
+            $purchaseOrderItemId = (int) ($row['purchase_order_item_id'] ?? 0);
+            if ($purchaseOrderItemId <= 0 || ! isset($poItemsById[$purchaseOrderItemId])) {
+                continue;
+            }
+
+            $purchaseOrderItem = $poItemsById[$purchaseOrderItemId];
+            $item = $purchaseOrderItem->item;
+
+            if (! $item) {
+                continue;
+            }
+
+            $lines[$purchaseOrderItemId] = [
+                'purchase_order_item_id' => $purchaseOrderItemId,
+                'item_id' => (int) $item->id,
+                'product_code' => (string) $item->code,
+                'qty_good' => (float) ($row['qty_good'] ?? 0),
+                'unit_price' => (float) ($purchaseOrderItem->unit_price ?? 0),
+                'wh_code' => 'MAIN',
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \App\Models\ReceivingReportItem>  $receivingReportItems
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildStockLinesFromReceivingReportItems($receivingReportItems): array
+    {
+        $lines = [];
+
+        foreach ($receivingReportItems as $receivingReportItem) {
+            $purchaseOrderItem = $receivingReportItem->purchaseOrderItem;
+            $item = $purchaseOrderItem?->item;
+
+            if (! $purchaseOrderItem || ! $item) {
+                continue;
+            }
+
+            $purchaseOrderItemId = (int) $purchaseOrderItem->id;
+
+            $lines[$purchaseOrderItemId] = [
+                'purchase_order_item_id' => $purchaseOrderItemId,
+                'item_id' => (int) $item->id,
+                'product_code' => (string) $item->code,
+                'qty_good' => (float) $receivingReportItem->qty_good,
+                'unit_price' => (float) ($purchaseOrderItem->unit_price ?? 0),
+                'wh_code' => 'MAIN',
+            ];
+        }
+
+        return $lines;
     }
 }

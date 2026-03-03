@@ -23,6 +23,9 @@ class UnitOfMeasureSeeder extends Seeder
 
         if ($this->isLegacySource() && !empty($legacyRows)) {
             $this->logImportSource('uom', 'legacy');
+            $this->command?->info('ℹ [uom] rows loaded: ' . count($legacyRows));
+
+            $imported = 0;
 
             foreach ($legacyRows as $data) {
                 $remarks = trim((string) ($data['remarks'] ?? ''));
@@ -45,7 +48,11 @@ class UnitOfMeasureSeeder extends Seeder
                     'created_at' => $createdAt,
                     'updated_at' => $updatedAt,
                 ]);
+
+                $imported++;
             }
+
+            $this->command?->info("✓ [uom] imported: {$imported}");
 
             return;
         }
@@ -66,9 +73,13 @@ class UnitOfMeasureSeeder extends Seeder
             return;
         }
 
+        $imported = 0;
+        $skippedInvalidColumns = 0;
+
         // 3) Import row by row ke table unit_of_measures sesuai mapping.
         while (($row = fgetcsv($handle, 0, ';')) !== false) {
             if (count($row) !== count($header)) {
+                $skippedInvalidColumns++;
                 continue;
             }
 
@@ -93,8 +104,15 @@ class UnitOfMeasureSeeder extends Seeder
                 'created_at' => $createdAt,
                 'updated_at' => $updatedAt,
             ]);
+
+            $imported++;
         }
 
         fclose($handle);
+
+        $this->command?->info("✓ [uom] imported: {$imported}");
+        if ($skippedInvalidColumns > 0) {
+            $this->command?->warn("⚠ [uom] skipped invalid column count: {$skippedInvalidColumns}");
+        }
     }
 }
