@@ -15,7 +15,7 @@
             <div class="col-12 col-lg-7">
                 <div class="prs-hero">
                     <h3 class="mb-1">Receiving Reports</h3>
-                    <p class="text-muted mb-0">Pantau semua penerimaan barang, lihat detail PO, dan kelola RR tanpa pindah halaman.</p>
+                    <p class="text-muted mb-0">Track all incoming goods, review PO details, and manage receiving reports in one place.</p>
                 </div>
             </div>
             @role('administrator|im-manager|im-supervisor|im-staff')
@@ -49,7 +49,7 @@
             <div class="card-body">
                 <div class="row g-3 align-items-end" id="rr-filter-form">
                     <div class="col-12 col-md-5">
-                        <label for="filter-rr-keyword" class="form-label mb-1">Cari RR</label>
+                        <label for="filter-rr-keyword" class="form-label mb-1">Search RR</label>
                         <input type="text" id="filter-rr-keyword" class="form-control" placeholder="RR Number / PO Number / Supplier / Creator">
                     </div>
                     <div class="col-6 col-md-3">
@@ -70,8 +70,8 @@
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h5 class="card-title mb-0">RR Data</h5>
-                    <span class="badge bg-light-primary" id="rr-filter-result">{{ $receivingReports->count() }} data</span>
+                    <h5 class="card-title mb-0">RR Records</h5>
+                    <span class="badge bg-light-primary" id="rr-filter-result">{{ $receivingReports->count() }} records</span>
                 </div>
 
                 @if ($receivingReports->isEmpty())
@@ -151,7 +151,7 @@
                     </div>
                     <div id="rr-empty-filter" class="text-center text-muted py-4 d-none">
                         <i class="fa-duotone fa-solid fa-magnifying-glass"></i>
-                        <p class="mb-0 mt-2">No matching result.</p>
+                        <p class="mb-0 mt-2">No matching results.</p>
                     </div>
                 @endif
             </div>
@@ -193,11 +193,56 @@
                                 </div>
                             </div>
 
+                            <div class="rr-modern-block mt-3" id="create-customs-section">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                                    <div>
+                                        <h6 class="mb-1">Customs Document Setup</h6>
+                                        <p class="text-muted small mb-0">Choose whether this receiving report requires customs document details.</p>
+                                    </div>
+                                </div>
+
+                                <div class="rr-customs-toggle" role="radiogroup" aria-label="Customs document requirement">
+                                    <input type="radio" class="btn-check create-customs-choice" name="requires_customs_document" id="create-customs-no" value="0" checked>
+                                    <label class="btn btn-outline-secondary" for="create-customs-no">
+                                        <i class="fa-regular fa-circle-xmark me-1"></i>
+                                        No Customs Document
+                                    </label>
+
+                                    <input type="radio" class="btn-check create-customs-choice" name="requires_customs_document" id="create-customs-yes" value="1">
+                                    <label class="btn btn-outline-primary" for="create-customs-yes">
+                                        <i class="fa-regular fa-file-lines me-1"></i>
+                                        Requires Customs Document
+                                    </label>
+                                </div>
+
+                                <div class="d-none mt-3" id="create-customs-fields">
+                                    <div class="row g-3">
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label">Customs Document Number <span class="text-danger">*</span></label>
+                                            <input type="text" name="customs_document_number" id="create_customs_document_number" class="form-control" placeholder="e.g. BC-123456">
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label">Customs Document Type <span class="text-danger">*</span></label>
+                                            <select name="customs_document_type_id" id="create_customs_document_type_id" class="form-select">
+                                                <option value="">Select type</option>
+                                                @foreach ($customsDocumentTypes as $customsDocumentType)
+                                                    <option value="{{ $customsDocumentType->id }}">{{ $customsDocumentType->bc_field ? ' (' . $customsDocumentType->bc_field . ') ' : '' }}{{ $customsDocumentType->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label">Customs Document Date <span class="text-danger">*</span></label>
+                                            <input type="date" name="customs_document_date" id="create_customs_document_date" class="form-control">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div id="create-po-error" class="alert alert-danger mt-3 d-none"></div>
 
                             <div id="create-po-details" class="mt-4 d-none">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                                    <div class="small text-muted">Pilih item yang datang, lalu isi qty good / bad.</div>
+                                    <div class="small text-muted">Select received items, then enter good and bad quantities.</div>
                                     <div class="d-flex gap-2">
                                         <button type="button" id="create-select-all" class="btn btn-sm btn-outline-success">Select All</button>
                                         <button type="button" id="create-clear-all" class="btn btn-sm btn-outline-secondary">Clear</button>
@@ -252,6 +297,7 @@
             $po = $rr->purchaseOrder;
             $rrGood = (float) $rr->items->sum('qty_good');
             $rrBad = (float) $rr->items->sum('qty_bad');
+            $customsDocType = $rr->customsDocumentType;
         @endphp
 
         <div class="modal fade" id="rr-view-modal-{{ $rr->id }}" tabindex="-1" aria-hidden="true">
@@ -266,6 +312,14 @@
                             <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">PO Number</small><div class="fw-semibold">{{ $po?->po_number ?? '-' }}</div></div></div>
                             <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Supplier</small><div class="fw-semibold">{{ $po?->supplier?->name ?? '-' }}</div></div></div>
                             <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Received Date</small><div class="fw-semibold">{{ optional($rr->received_date)->format('d M Y') }}</div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Need Customs Document</small><div class="fw-semibold">{{ $rr->requires_customs_document ? 'Yes' : 'No' }}</div></div></div>
+                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Customs Document Number</small><div class="fw-semibold">{{ $rr->customs_document_number ?: '-' }}</div></div></div>
+                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Customs Document Type</small><div class="fw-semibold">{{ $customsDocType ? ($customsDocType->code . ' - ' . $customsDocType->name) : '-' }}</div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Customs Document Date</small><div class="fw-semibold">{{ optional($rr->customs_document_date)->format('d M Y') ?: '-' }}</div></div></div>
                         </div>
                         <div class="mb-3"><small class="text-muted">Notes</small><div class="fw-semibold">{{ $rr->notes ?: '-' }}</div></div>
                         <div class="table-responsive">
@@ -330,6 +384,49 @@
                                 <div class="mb-3">
                                     <label class="form-label">Notes</label>
                                     <input type="text" name="notes" class="form-control" value="{{ $rr->notes }}">
+                                </div>
+
+                                <div class="rr-modern-block mb-3 rr-edit-customs-section" data-rr-id="{{ $rr->id }}">
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                                        <div>
+                                            <h6 class="mb-1">Customs Document Setup</h6>
+                                            <p class="text-muted small mb-0">Choose whether this receiving report requires customs document details.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="rr-customs-toggle rr-edit-customs-toggle" data-target="#edit-customs-fields-{{ $rr->id }}" role="radiogroup" aria-label="Customs document requirement">
+                                        <input type="radio" class="btn-check rr-edit-customs-choice" name="requires_customs_document" id="edit-customs-no-{{ $rr->id }}" value="0" @checked(! $rr->requires_customs_document)>
+                                        <label class="btn btn-outline-secondary" for="edit-customs-no-{{ $rr->id }}">
+                                            <i class="fa-regular fa-circle-xmark me-1"></i>
+                                            No Customs Document
+                                        </label>
+
+                                        <input type="radio" class="btn-check rr-edit-customs-choice" name="requires_customs_document" id="edit-customs-yes-{{ $rr->id }}" value="1" @checked($rr->requires_customs_document)>
+                                        <label class="btn btn-outline-primary" for="edit-customs-yes-{{ $rr->id }}">
+                                            <i class="fa-regular fa-file-lines me-1"></i>
+                                            Requires Customs Document
+                                        </label>
+                                    </div>
+
+                                    <div class="row g-3 mt-1 {{ $rr->requires_customs_document ? '' : 'd-none' }}" id="edit-customs-fields-{{ $rr->id }}">
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label">Customs Document Number <span class="text-danger">*</span></label>
+                                            <input type="text" name="customs_document_number" class="form-control rr-edit-customs-number" value="{{ $rr->customs_document_number }}">
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label">Customs Document Type <span class="text-danger">*</span></label>
+                                            <select name="customs_document_type_id" class="form-select rr-edit-customs-type">
+                                                <option value="">Select type</option>
+                                                @foreach ($customsDocumentTypes as $customsDocumentType)
+                                                    <option value="{{ $customsDocumentType->id }}" @selected((int) $rr->customs_document_type_id === (int) $customsDocumentType->id)>{{ $customsDocumentType->bc_field ? ' (' . $customsDocumentType->bc_field . ') ' : '' }}{{ $customsDocumentType->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label">Customs Document Date <span class="text-danger">*</span></label>
+                                            <input type="date" name="customs_document_date" class="form-control rr-edit-customs-date" value="{{ optional($rr->customs_document_date)->format('Y-m-d') }}">
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="table-responsive">

@@ -7,7 +7,95 @@ document.addEventListener('DOMContentLoaded', function () {
     initRrDataTable();
     initRrDeleteAction();
     initRrCreateModal(rrPage.dataset.poLookupUrl || '');
+    initRrCustomsDocumentFields();
 });
+
+function initRrCustomsDocumentFields() {
+    const createToggles = document.querySelectorAll('.create-customs-choice');
+    const createFields = document.getElementById('create-customs-fields');
+    const createNumber = document.getElementById('create_customs_document_number');
+    const createType = document.getElementById('create_customs_document_type_id');
+    const createDate = document.getElementById('create_customs_document_date');
+
+    const syncCreateCustomsFields = function () {
+        if (!createToggles.length || !createFields || !createNumber || !createType || !createDate) {
+            return;
+        }
+
+        const selectedToggle = Array.from(createToggles).find((input) => input.checked);
+        const isRequired = selectedToggle ? selectedToggle.value === '1' : false;
+
+        createFields.classList.toggle('d-none', !isRequired);
+        createNumber.required = isRequired;
+        createType.required = isRequired;
+        createDate.required = isRequired;
+
+        if (!isRequired) {
+            createNumber.value = '';
+            createType.value = '';
+            createDate.value = '';
+        }
+    };
+
+    createToggles.forEach((input) => {
+        input.addEventListener('change', syncCreateCustomsFields);
+    });
+    syncCreateCustomsFields();
+
+    document.querySelectorAll('.rr-edit-customs-toggle').forEach((toggleGroup) => {
+        const targetSelector = toggleGroup.getAttribute('data-target');
+        if (!targetSelector) {
+            return;
+        }
+
+        const target = document.querySelector(targetSelector);
+        if (!target) {
+            return;
+        }
+
+        const toggleInputs = toggleGroup.querySelectorAll('.rr-edit-customs-choice');
+        if (!toggleInputs.length) {
+            return;
+        }
+
+        const numberInput = target.querySelector('.rr-edit-customs-number');
+        const typeInput = target.querySelector('.rr-edit-customs-type');
+        const dateInput = target.querySelector('.rr-edit-customs-date');
+
+        const syncEditCustomsFields = function () {
+            const selectedToggle = Array.from(toggleInputs).find((input) => input.checked);
+            const isRequired = selectedToggle ? selectedToggle.value === '1' : false;
+
+            target.classList.toggle('d-none', !isRequired);
+
+            if (numberInput) {
+                numberInput.required = isRequired;
+                if (!isRequired) {
+                    numberInput.value = '';
+                }
+            }
+
+            if (typeInput) {
+                typeInput.required = isRequired;
+                if (!isRequired) {
+                    typeInput.value = '';
+                }
+            }
+
+            if (dateInput) {
+                dateInput.required = isRequired;
+                if (!isRequired) {
+                    dateInput.value = '';
+                }
+            }
+        };
+
+        toggleInputs.forEach((input) => {
+            input.addEventListener('change', syncEditCustomsFields);
+        });
+        syncEditCustomsFields();
+    });
+}
 
 function initRrDataTable() {
     const tableEl = document.getElementById('rr-table');
@@ -69,13 +157,13 @@ function initRrDataTable() {
                 previous: 'Prev',
                 next: 'Next'
             },
-            info: 'Showing _START_ to _END_ of _TOTAL_ data',
-            lengthMenu: 'Show _MENU_ data'
+            info: 'Showing _START_ to _END_ of _TOTAL_ records',
+            lengthMenu: 'Show _MENU_ records'
         }
     });
 
     const updateResult = function () {
-        resultBadge.textContent = dataTable.rows({ search: 'applied' }).count() + ' data';
+        resultBadge.textContent = dataTable.rows({ search: 'applied' }).count() + ' records';
     };
 
     keywordInput.addEventListener('input', function () {
@@ -105,7 +193,7 @@ function initRrDeleteAction() {
     window.confirmDeleteRr = function (rrId, rrNumber) {
         Swal.fire({
             title: 'Delete RR',
-            text: 'Are you sure want to delete RR ' + rrNumber + '?',
+            text: 'Are you sure you want to delete RR ' + rrNumber + '?',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Yes, delete it',

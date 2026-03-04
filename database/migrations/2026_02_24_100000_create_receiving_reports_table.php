@@ -16,6 +16,10 @@ return new class extends Migration
             $table->string('rr_number')->nullable()->unique();
             $table->foreignId('purchase_order_id')->constrained('purchase_orders')->onDelete(fk_on_delete('restrict'));
             $table->date('received_date');
+            $table->boolean('requires_customs_document')->default(false);
+            $table->string('customs_document_number')->nullable()->index();
+            $table->unsignedBigInteger('customs_document_type_id')->nullable()->index();
+            $table->date('customs_document_date')->nullable();
             $table->text('notes')->nullable();
             $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
             $table->timestamps();

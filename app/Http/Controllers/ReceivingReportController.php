@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CustomsDocumentType;
 use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
@@ -19,6 +20,7 @@ class ReceivingReportController extends Controller
             'purchaseOrder.supplier',
             'purchaseOrder.items.item.unit',
             'items.purchaseOrderItem.item.unit',
+            'customsDocumentType',
             'createdBy',
         ])
             ->orderByDesc('id')
@@ -26,6 +28,11 @@ class ReceivingReportController extends Controller
 
         return view('pages.receiving-reports.index', [
             'receivingReports' => $receivingReports,
+            'customsDocumentTypes' => CustomsDocumentType::query()
+                ->orderBy('name')
+                ->whereLike('name', '%Pemasukan%')
+                ->orWhere('bc_field', 'BC 2.7')
+                ->get(['id', 'name', 'code', 'bc_field']),
         ]);
     }
 
@@ -90,6 +97,10 @@ class ReceivingReportController extends Controller
             'rr_number' => ['required', 'string', 'max:50', 'unique:receiving_reports,rr_number'],
             'purchase_order_id' => ['required', 'exists:purchase_orders,id'],
             'received_date' => ['required', 'date'],
+            'requires_customs_document' => ['required', 'in:0,1'],
+            'customs_document_number' => ['nullable', 'required_if:requires_customs_document,1', 'string', 'max:100'],
+            'customs_document_type_id' => ['nullable', 'required_if:requires_customs_document,1', 'integer', 'exists:customs_document_types,id'],
+            'customs_document_date' => ['nullable', 'required_if:requires_customs_document,1', 'date'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.purchase_order_item_id' => ['required', 'exists:purchase_order_items,id'],
@@ -97,6 +108,8 @@ class ReceivingReportController extends Controller
             'items.*.qty_good' => ['nullable', 'numeric', 'min:0'],
             'items.*.qty_bad' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $requiresCustomsDocument = ($validated['requires_customs_document'] ?? '0') === '1';
 
         $purchaseOrder = PurchaseOrder::with(['items.item'])
             ->findOrFail($validated['purchase_order_id']);
@@ -156,11 +169,15 @@ class ReceivingReportController extends Controller
             }
         }
 
-        DB::transaction(function () use ($validated, $selectedRows, $request, $currentStockLines) {
+        DB::transaction(function () use ($validated, $selectedRows, $request, $currentStockLines, $requiresCustomsDocument) {
             $receivingReport = ReceivingReport::create([
                 'rr_number' => $validated['rr_number'],
                 'purchase_order_id' => $validated['purchase_order_id'],
                 'received_date' => $validated['received_date'],
+                'requires_customs_document' => $requiresCustomsDocument,
+                'customs_document_number' => $requiresCustomsDocument ? ($validated['customs_document_number'] ?? null) : null,
+                'customs_document_type_id' => $requiresCustomsDocument ? ($validated['customs_document_type_id'] ?? null) : null,
+                'customs_document_date' => $requiresCustomsDocument ? ($validated['customs_document_date'] ?? null) : null,
                 'notes' => $validated['notes'] ?? null,
                 'created_by' => $request->user()->id,
             ]);
@@ -194,6 +211,10 @@ class ReceivingReportController extends Controller
     {
         $validated = $request->validate([
             'received_date' => ['required', 'date'],
+            'requires_customs_document' => ['required', 'in:0,1'],
+            'customs_document_number' => ['nullable', 'required_if:requires_customs_document,1', 'string', 'max:100'],
+            'customs_document_type_id' => ['nullable', 'required_if:requires_customs_document,1', 'integer', 'exists:customs_document_types,id'],
+            'customs_document_date' => ['nullable', 'required_if:requires_customs_document,1', 'date'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.purchase_order_item_id' => ['required', 'exists:purchase_order_items,id'],
@@ -201,6 +222,8 @@ class ReceivingReportController extends Controller
             'items.*.qty_good' => ['nullable', 'numeric', 'min:0'],
             'items.*.qty_bad' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $requiresCustomsDocument = ($validated['requires_customs_document'] ?? '0') === '1';
 
         $receivingReport->load([
             'purchaseOrder.items.item',
@@ -265,9 +288,13 @@ class ReceivingReportController extends Controller
             }
         }
 
-        DB::transaction(function () use ($receivingReport, $validated, $selectedRows, $request, $currentStockLines, $previousStockLines) {
+        DB::transaction(function () use ($receivingReport, $validated, $selectedRows, $request, $currentStockLines, $previousStockLines, $requiresCustomsDocument) {
             $receivingReport->update([
                 'received_date' => $validated['received_date'],
+                'requires_customs_document' => $requiresCustomsDocument,
+                'customs_document_number' => $requiresCustomsDocument ? ($validated['customs_document_number'] ?? null) : null,
+                'customs_document_type_id' => $requiresCustomsDocument ? ($validated['customs_document_type_id'] ?? null) : null,
+                'customs_document_date' => $requiresCustomsDocument ? ($validated['customs_document_date'] ?? null) : null,
                 'notes' => $validated['notes'] ?? null,
             ]);
 
@@ -330,6 +357,7 @@ class ReceivingReportController extends Controller
             'purchaseOrder.supplier',
             'items.purchaseOrderItem.item.unit',
             'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
             'createdBy',
         ]);
 

@@ -119,6 +119,22 @@
             <td class="label">Address</td>
             <td colspan="3">: {{ $supplier?->address ?? '-' }}</td>
         </tr>
+        <tr>
+            <td class="label">Customs Document</td>
+            <td colspan="3">: {{ $receivingReport->requires_customs_document ? 'Yes' : 'No' }}</td>
+        </tr>
+        @if($receivingReport->requires_customs_document)
+        <tr>
+            <td class="label">Customs Number</td>
+            <td>: {{ $receivingReport->customs_document_number ?? '-' }}</td>
+            <td class="label text-right">Customs Date</td>
+            <td class="text-right">: {{ format_date($receivingReport->customs_document_date) }}</td>
+        </tr>
+        <tr>
+            <td class="label">Customs Type</td>
+            <td colspan="3">: {{ $receivingReport->customsDocumentType ? ($receivingReport->customsDocumentType->code . ' - ' . $receivingReport->customsDocumentType->name) : '-' }}</td>
+        </tr>
+        @endif
         @if($receivingReport->notes)
         <tr>
             <td class="label">Notes</td>

@@ -682,3 +682,37 @@
         grid-template-columns: repeat(1, minmax(0, 1fr));
     }
 }
+
+#rr-page .rr-modern-block {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.9rem;
+    background: var(--bs-tertiary-bg);
+    padding: 1rem;
+}
+
+#rr-page .rr-customs-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+#rr-page .rr-customs-toggle .btn {
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    font-weight: 600;
+}
+
+#rr-page .rr-customs-toggle .btn-check:focus + .btn {
+    box-shadow: none;
+}
+
+@media (max-width: 767.98px) {
+    #rr-page .rr-customs-toggle {
+        width: 100%;
+    }
+
+    #rr-page .rr-customs-toggle .btn {
+        width: 100%;
+    }
+}
