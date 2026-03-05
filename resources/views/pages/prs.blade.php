@@ -2,6 +2,7 @@
 @section('title', ' | PRS')
 
 @section('content')
+<div id="prs-page-container">
 <div class="page-heading prs-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
@@ -32,49 +33,49 @@
                 <div class="row g-3 align-items-end prs-filter-grid" id="prs-filter-form">
                     <div class="col-12 col-md-6 col-xl-{{ $canFilterDepartment ? 3 : 2 }}">
                         <label for="filter-keyword" class="form-label mb-1">Cari PRS</label>
-                        <input type="text" id="filter-keyword" class="form-control" placeholder="PRS number / remarks{{ $canFilterDepartment ? ' / department' : '' }}">
+                        <input type="text" id="filter-keyword" class="form-control" value="{{ request('keyword') }}" placeholder="PRS number / remarks{{ $canFilterDepartment ? ' / department' : '' }}">
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-status" class="form-label mb-1">Status</label>
                         <select id="filter-status" class="form-select">
-                            <option value="">Semua</option>
-                            <option value="DRAFT">DRAFT</option>
-                            <option value="SUBMITTED">SUBMITTED</option>
-                            <option value="ON_HOLD">ON_HOLD</option>
-                            <option value="RESUBMITTED">RESUBMITTED</option>
-                            <option value="CANVASING">CANVASING</option>
-                            <option value="DELIVERY_PENDING">DELIVERY_PENDING</option>
-                            <option value="PARTIAL_DELIVERY">PARTIAL_DELIVERY</option>
-                            <option value="DELIVERY_COMPLETE">DELIVERY_COMPLETE</option>
-                            <option value="REJECTED">REJECTED</option>
+                            <option value="" @selected(request('status') === null || request('status') === '')>Semua</option>
+                            <option value="DRAFT" @selected(request('status') === 'DRAFT')>DRAFT</option>
+                            <option value="SUBMITTED" @selected(request('status') === 'SUBMITTED')>SUBMITTED</option>
+                            <option value="ON_HOLD" @selected(request('status') === 'ON_HOLD')>ON_HOLD</option>
+                            <option value="RESUBMITTED" @selected(request('status') === 'RESUBMITTED')>RESUBMITTED</option>
+                            <option value="CANVASING" @selected(request('status') === 'CANVASING')>CANVASING</option>
+                            <option value="DELIVERY_PENDING" @selected(request('status') === 'DELIVERY_PENDING')>DELIVERY_PENDING</option>
+                            <option value="PARTIAL_DELIVERY" @selected(request('status') === 'PARTIAL_DELIVERY')>PARTIAL_DELIVERY</option>
+                            <option value="DELIVERY_COMPLETE" @selected(request('status') === 'DELIVERY_COMPLETE')>DELIVERY_COMPLETE</option>
+                            <option value="REJECTED" @selected(request('status') === 'REJECTED')>REJECTED</option>
                         </select>
                     </div>
                     @if ($canFilterDepartment)
                         <div class="col-6 col-md-3 col-xl-3">
                             <label for="filter-department" class="form-label mb-1">Department</label>
                             <select id="filter-department" class="form-select">
-                                <option value="">Semua</option>
+                                <option value="" @selected(request('department') === null || request('department') === '')>Semua</option>
                                 @foreach ($filterDepartments as $department)
-                                    <option value="{{ $department->name }}">{{ $department->name }}</option>
+                                    <option value="{{ $department->name }}" @selected(request('department') === $department->name)>{{ $department->name }}</option>
                                 @endforeach
                             </select>
                         </div>
                     @endif
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-prs-start" class="form-label mb-1">PRS Date (from)</label>
-                        <input type="date" id="filter-prs-start" class="form-control">
+                        <input type="date" id="filter-prs-start" class="form-control" value="{{ request('prs_start') }}">
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-prs-end" class="form-label mb-1">PRS Date (to)</label>
-                        <input type="date" id="filter-prs-end" class="form-control">
+                        <input type="date" id="filter-prs-end" class="form-control" value="{{ request('prs_end') }}">
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-needed-start" class="form-label mb-1">Needed (from)</label>
-                        <input type="date" id="filter-needed-start" class="form-control">
+                        <input type="date" id="filter-needed-start" class="form-control" value="{{ request('needed_start') }}">
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-needed-end" class="form-label mb-1">Needed (to)</label>
-                        <input type="date" id="filter-needed-end" class="form-control">
+                        <input type="date" id="filter-needed-end" class="form-control" value="{{ request('needed_end') }}">
                     </div>
                     <div class="col-12 col-md-6 col-xl-3">
                         <div class="d-flex gap-2">
@@ -89,10 +90,16 @@
         </div>
 
         <div class="card shadow-sm border-0">
-            <div class="card-body">
+            <div class="card-body position-relative">
+                <div id="prs-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                        <div class="mt-2 text-muted">Loading data...</div>
+                    </div>
+                </div>
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <h5 class="card-title mb-0">PRS Data</h5>
-                    <span class="badge bg-light-primary" id="prs-filter-result">{{ $items->count() }} data</span>
+                    <span class="badge bg-light-primary" id="prs-filter-result">{{ $items->total() }} data</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped text-center text-nowrap" id="table1">
@@ -179,12 +186,17 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div class="mt-3 d-flex justify-content-end">
+                    {{ $items->onEachSide(1)->links('pagination::bootstrap-5') }}
+                </div>
             </div>
         </div>
     </section>
 </div>
 @include('includes.modals.prs-modal')
 @include('includes.modals.prs-export')
+</div>
 @endsection
 
 @push('prepend-style')
@@ -197,6 +209,87 @@
     <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
     <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/prs-modern.js') }}"></script>
+    <script>
+        (function () {
+            let isLoading = false;
+
+            function setLoading(active) {
+                const loadingEl = document.getElementById('prs-page-loading');
+                if (!loadingEl) {
+                    return;
+                }
+
+                loadingEl.classList.toggle('d-none', !active);
+                loadingEl.classList.toggle('d-flex', active);
+            }
+
+            async function replacePageContent(url, pushState = true) {
+                if (isLoading) {
+                    return;
+                }
+
+                isLoading = true;
+                setLoading(true);
+
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        window.location.href = url;
+                        return;
+                    }
+
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newContainer = doc.querySelector('#prs-page-container');
+                    const currentContainer = document.querySelector('#prs-page-container');
+
+                    if (!newContainer || !currentContainer) {
+                        window.location.href = url;
+                        return;
+                    }
+
+                    currentContainer.replaceWith(newContainer);
+
+                    if (pushState) {
+                        window.history.pushState({}, '', url);
+                    }
+
+                    if (typeof initPrsFilters === 'function') {
+                        initPrsFilters();
+                    }
+
+                    if (window.feather && typeof window.feather.replace === 'function') {
+                        window.feather.replace();
+                    }
+                } catch (_) {
+                    window.location.href = url;
+                } finally {
+                    isLoading = false;
+                    setLoading(false);
+                }
+            }
+
+            window.prsReplacePageContent = replacePageContent;
+
+            document.addEventListener('click', function (event) {
+                const link = event.target.closest('#prs-page-container a[href*="page="]');
+                if (!link) return;
+
+                event.preventDefault();
+                replacePageContent(link.href, true);
+            });
+
+            window.addEventListener('popstate', function () {
+                replacePageContent(window.location.href, false);
+            });
+        })();
+    </script>
 @endpush
 
 {{-- New Version DataTables --}}

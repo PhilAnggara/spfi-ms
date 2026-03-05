@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Prs;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class PrsApprovalController extends Controller
@@ -14,9 +15,7 @@ class PrsApprovalController extends Controller
      */
     public function index()
     {
-        $items = Prs::with(['department', 'user', 'items.item', 'items.canvaser', 'items.canvasingItems', 'items.selectedCanvasingItem', 'items.purchaseOrderItem.receivingReportItems', 'logs' => function ($query) {
-            $query->latest();
-        }])->orderByDesc('id')->get();
+        $items = $this->paginatePrsForSqlServer(perPage: 20);
         $canvasers = User::role('purchasing-staff')->orderBy('name')->get();
         return view('pages.prs-approval', [
             'items' => $items,
@@ -105,5 +104,63 @@ class PrsApprovalController extends Controller
         });
 
         return redirect()->back()->with('success', 'PRS has been approved and assigned.');
+    }
+
+    /**
+     * SQL Server-compatible pagination without OFFSET/FETCH.
+     */
+    private function paginatePrsForSqlServer(int $perPage = 20): LengthAwarePaginator
+    {
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $currentPage = max(1, (int) $currentPage);
+
+        $baseQuery = Prs::query();
+        $total = (clone $baseQuery)->count();
+
+        $startRow = (($currentPage - 1) * $perPage) + 1;
+        $endRow = $currentPage * $perPage;
+
+        $rankedIdsQuery = (clone $baseQuery)
+            ->selectRaw('id, ROW_NUMBER() OVER (ORDER BY id DESC) as row_num');
+
+        $ids = DB::query()
+            ->fromSub($rankedIdsQuery, 'ranked_prs')
+            ->whereBetween('row_num', [$startRow, $endRow])
+            ->orderBy('row_num')
+            ->pluck('id')
+            ->all();
+
+        $collection = collect();
+
+        if (! empty($ids)) {
+            $itemsById = Prs::with([
+                'department',
+                'user',
+                'items.item',
+                'items.canvaser',
+                'items.canvasingItems',
+                'items.selectedCanvasingItem',
+                'items.purchaseOrderItem.receivingReportItems',
+                'logs' => function ($query) {
+                    $query->latest();
+                },
+            ])->whereIn('id', $ids)->get()->keyBy('id');
+
+            $collection = collect($ids)
+                ->map(fn ($id) => $itemsById->get($id))
+                ->filter()
+                ->values();
+        }
+
+        return new LengthAwarePaginator(
+            items: $collection,
+            total: $total,
+            perPage: $perPage,
+            currentPage: $currentPage,
+            options: [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ],
+        );
     }
 }

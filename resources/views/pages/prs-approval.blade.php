@@ -2,6 +2,7 @@
 @section('title', ' | Canvasser Assignment')
 
 @section('content')
+<div id="prs-approval-page-container">
 <div class="page-heading">
     <div class="page-title">
         <div class="row mb-4">
@@ -74,6 +75,10 @@
                         @endforeach
                     </tbody>
                 </table>
+
+                <div class="mt-3 d-flex justify-content-end">
+                    {{ $items->onEachSide(1)->links('pagination::bootstrap-5') }}
+                </div>
             </div>
         </div>
 
@@ -357,18 +362,76 @@
         </div>
     </div>
 @endforeach
+</div>
 @endsection
 
 @push('prepend-style')
     <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
 @endpush
-@push('addon-style')
-    <link rel="stylesheet" href="{{ url('assets/extensions/simple-datatables/style.css') }}">
-    <link rel="stylesheet" href="{{ url('assets/compiled/css/table-datatable.css') }}">
-@endpush
 @push('addon-script')
-    <script src="{{ url('assets/extensions/simple-datatables/umd/simple-datatables.js') }}"></script>
-    <script src="{{ url('assets/static/js/pages/simple-datatables.js') }}"></script>
     <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
     <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
+    <script>
+        (function () {
+            let isLoading = false;
+
+            async function replacePageContent(url, pushState = true) {
+                if (isLoading) {
+                    return;
+                }
+
+                isLoading = true;
+
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        window.location.href = url;
+                        return;
+                    }
+
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newContainer = doc.querySelector('#prs-approval-page-container');
+                    const currentContainer = document.querySelector('#prs-approval-page-container');
+
+                    if (!newContainer || !currentContainer) {
+                        window.location.href = url;
+                        return;
+                    }
+
+                    currentContainer.replaceWith(newContainer);
+
+                    if (pushState) {
+                        window.history.pushState({}, '', url);
+                    }
+
+                    if (window.feather && typeof window.feather.replace === 'function') {
+                        window.feather.replace();
+                    }
+                } catch (_) {
+                    window.location.href = url;
+                } finally {
+                    isLoading = false;
+                }
+            }
+
+            document.addEventListener('click', function (event) {
+                const link = event.target.closest('#prs-approval-page-container a[href*="page="]');
+                if (!link) return;
+
+                event.preventDefault();
+                replacePageContent(link.href, true);
+            });
+
+            window.addEventListener('popstate', function () {
+                replacePageContent(window.location.href, false);
+            });
+        })();
+    </script>
 @endpush

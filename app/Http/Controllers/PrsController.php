@@ -11,7 +11,9 @@ use App\Models\User;
 use App\Notifications\PrsSubmittedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
 class PrsController extends Controller
@@ -19,7 +21,7 @@ class PrsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         $canViewAll = $user && $user->hasAnyRole([
@@ -29,24 +31,22 @@ class PrsController extends Controller
             'purchasing-staff',
         ]);
 
-        $itemsQuery = Prs::with([
-            'department',
-            'user',
-            'items.item',
-            'items.canvaser',
-            'items.canvasingItems',
-            'items.selectedCanvasingItem',
-            'items.purchaseOrderItem.receivingReportItems',
-            'logs' => function ($query) {
-                $query->latest();
-            }
-        ])->orderByDesc('id');
+        $filters = [
+            'keyword' => trim((string) $request->query('keyword', '')),
+            'status' => trim((string) $request->query('status', '')),
+            'department' => trim((string) $request->query('department', '')),
+            'prs_start' => trim((string) $request->query('prs_start', '')),
+            'prs_end' => trim((string) $request->query('prs_end', '')),
+            'needed_start' => trim((string) $request->query('needed_start', '')),
+            'needed_end' => trim((string) $request->query('needed_end', '')),
+        ];
 
-        if (! $canViewAll) {
-            $itemsQuery->where('user_id', $user?->id);
-        }
-
-        $items = $itemsQuery->get();
+        $items = $this->paginatePrsForSqlServer(
+            canViewAll: $canViewAll,
+            userId: $user?->id,
+            filters: $filters,
+            perPage: 10,
+        );
         $departments = Department::all();
         $filterDepartments = $canViewAll ? $departments : collect();
         return view('pages.prs', [
@@ -354,5 +354,115 @@ class PrsController extends Controller
         $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT); // tambahkan 1 dan pad dengan nol di kiri hingga panjang 3 (mis. "001")
 
         return $departmentCode . '-' . $day . $month . $year . '-' . $newNumber; // bangun dan kembalikan format nomor PRS: DEPT-ddmmyy-###
+    }
+
+    /**
+     * SQL Server-compatible pagination without OFFSET/FETCH.
+     */
+    private function paginatePrsForSqlServer(bool $canViewAll, ?int $userId, array $filters = [], int $perPage = 50): LengthAwarePaginator
+    {
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $currentPage = max(1, (int) $currentPage);
+
+        $baseQuery = Prs::query();
+        if (! $canViewAll) {
+            $baseQuery->where('user_id', $userId);
+        }
+
+        $keyword = trim((string) ($filters['keyword'] ?? ''));
+        $status = strtoupper(trim((string) ($filters['status'] ?? '')));
+        $department = trim((string) ($filters['department'] ?? ''));
+        $prsStart = trim((string) ($filters['prs_start'] ?? ''));
+        $prsEnd = trim((string) ($filters['prs_end'] ?? ''));
+        $neededStart = trim((string) ($filters['needed_start'] ?? ''));
+        $neededEnd = trim((string) ($filters['needed_end'] ?? ''));
+
+        if ($keyword !== '') {
+            $baseQuery->where(function ($query) use ($keyword) {
+                $query->where('prs_number', 'like', "%{$keyword}%")
+                    ->orWhere('remarks', 'like', "%{$keyword}%")
+                    ->orWhereHas('department', function ($departmentQuery) use ($keyword) {
+                        $departmentQuery->where('name', 'like', "%{$keyword}%");
+                    });
+            });
+        }
+
+        if ($status !== '') {
+            // Untuk status delivery turunan, fallback ke status dasar agar tetap kompatibel query DB.
+            $statusMap = [
+                'DELIVERY_PENDING' => 'APPROVED',
+                'PARTIAL_DELIVERY' => 'APPROVED',
+                'DELIVERY_COMPLETE' => 'DELIVERY_COMPLETE',
+            ];
+            $statusToUse = $statusMap[$status] ?? $status;
+            $baseQuery->where('status', $statusToUse);
+        }
+
+        if ($department !== '') {
+            $baseQuery->whereHas('department', function ($query) use ($department) {
+                $query->where('name', $department);
+            });
+        }
+
+        if ($prsStart !== '') {
+            $baseQuery->whereDate('prs_date', '>=', $prsStart);
+        }
+        if ($prsEnd !== '') {
+            $baseQuery->whereDate('prs_date', '<=', $prsEnd);
+        }
+
+        if ($neededStart !== '') {
+            $baseQuery->whereDate('date_needed', '>=', $neededStart);
+        }
+        if ($neededEnd !== '') {
+            $baseQuery->whereDate('date_needed', '<=', $neededEnd);
+        }
+
+        $total = (clone $baseQuery)->count();
+        $startRow = (($currentPage - 1) * $perPage) + 1;
+        $endRow = $currentPage * $perPage;
+
+        $rankedIdsQuery = (clone $baseQuery)
+            ->selectRaw('id, ROW_NUMBER() OVER (ORDER BY id DESC) as row_num');
+
+        $ids = DB::query()
+            ->fromSub($rankedIdsQuery, 'ranked_prs')
+            ->whereBetween('row_num', [$startRow, $endRow])
+            ->orderBy('row_num')
+            ->pluck('id')
+            ->all();
+
+        $collection = collect();
+
+        if (! empty($ids)) {
+            $itemsById = Prs::with([
+                'department',
+                'user',
+                'items.item',
+                'items.canvaser',
+                'items.canvasingItems',
+                'items.selectedCanvasingItem',
+                'items.purchaseOrderItem.receivingReportItems',
+                'logs' => function ($query) {
+                    $query->latest();
+                },
+            ])->whereIn('id', $ids)->get()->keyBy('id');
+
+            $collection = collect($ids)
+                ->map(fn ($id) => $itemsById->get($id))
+                ->filter()
+                ->values();
+        }
+
+        return new LengthAwarePaginator(
+            items: $collection,
+            total: $total,
+            perPage: $perPage,
+            currentPage: $currentPage,
+            options: [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ],
+        );
     }
 }

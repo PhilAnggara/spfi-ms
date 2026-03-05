@@ -1,11 +1,13 @@
 <?php
 
 return [
-    // Sumber utama seeding: csv atau legacy.
-    'source' => env('SEED_SOURCE', 'csv'),
+    // Sumber utama seeding: 'local' (seeder manual/csv) atau 'legacy' (database lama).
+    'source' => env('SEED_SOURCE', 'local'),
 
-    // Jika legacy gagal konek/query, otomatis fallback ke CSV.
-    'fallback_to_csv' => env('SEED_SOURCE_FALLBACK_TO_CSV', true),
+    // Jika legacy gagal konek/query, otomatis fallback ke local seeder.
+    'fallback_to_local' => env('SEED_SOURCE_FALLBACK_TO_LOCAL',
+        env('SEED_SOURCE_FALLBACK_TO_CSV', true) // backward compat
+    ),
 
     // Koneksi default legacy jika dataset tidak override connection.
     'default_connection' => env('LEGACY_DB_DEFAULT_CONNECTION', 'legacy_sqlsrv_1'),
@@ -56,6 +58,14 @@ return [
             'csv_path' => 'document/csv/tbl_BSGrouping.csv',
             'connection' => env('LEGACY_DB_BS_GROUPING_CONNECTION', 'legacy_sqlsrv_3'),
             'table' => env('LEGACY_DB_BS_GROUPING_TABLE', 'tbl_BSGrouping'),
+        ],
+        'prs' => [
+            'connection' => env('LEGACY_DB_PRS_CONNECTION'),
+            'table' => env('LEGACY_DB_PRS_TABLE', 'prs'),
+        ],
+        'prs_detail' => [
+            'connection' => env('LEGACY_DB_PRS_DETAIL_CONNECTION'),
+            'table' => env('LEGACY_DB_PRS_DETAIL_TABLE', 'prs_detail'),
         ],
     ],
 ];

@@ -6,13 +6,15 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function initPrsFilters() {
-    const tableBody = document.getElementById('prs-table-body');
-    if (!tableBody) {
+    const filterForm = document.getElementById('prs-filter-form');
+    if (!filterForm) {
         return;
     }
 
-    const rows = Array.from(tableBody.querySelectorAll('tr'));
-    const resultEl = document.getElementById('prs-filter-result');
+    if (filterForm.dataset.filterInitialized === '1') {
+        return;
+    }
+    filterForm.dataset.filterInitialized = '1';
 
     const filterElements = {
         keyword: document.getElementById('filter-keyword'),
@@ -25,90 +27,88 @@ function initPrsFilters() {
         reset: document.getElementById('reset-prs-filter'),
     };
 
-    const inRange = (dateValue, start, end) => {
-        if (!dateValue) return false;
-        if (start && dateValue < start) return false;
-        if (end && dateValue > end) return false;
-        return true;
-    };
-
-    const runFilter = () => {
-        const keyword = (filterElements.keyword?.value || '').trim().toLowerCase();
-        const status = (filterElements.status?.value || '').trim().toUpperCase();
-        const department = (filterElements.department?.value || '').trim().toLowerCase();
-
-        const prsStart = filterElements.prsStart?.value || '';
-        const prsEnd = filterElements.prsEnd?.value || '';
-        const neededStart = filterElements.neededStart?.value || '';
-        const neededEnd = filterElements.neededEnd?.value || '';
-
-        let visibleCount = 0;
-
-        rows.forEach((row) => {
-            const dataPrs = row.dataset.prsNumber || '';
-            const dataDepartment = row.dataset.department || '';
-            const dataStatus = row.dataset.status || '';
-            const dataPrsDate = row.dataset.prsDate || '';
-            const dataNeededDate = row.dataset.neededDate || '';
-            const dataRemarks = row.dataset.remarks || '';
-
-            const keywordText = `${dataPrs} ${dataDepartment} ${dataRemarks}`;
-
-            const passKeyword = !keyword || keywordText.includes(keyword);
-            const passStatus = !status || dataStatus === status;
-            const passDepartment = !department || dataDepartment === department;
-            const passPrsDate = inRange(dataPrsDate, prsStart, prsEnd);
-            const passNeededDate = inRange(dataNeededDate, neededStart, neededEnd);
-
-            const visible = passKeyword && passStatus && passDepartment && passPrsDate && passNeededDate;
-            row.style.display = visible ? '' : 'none';
-
-            if (visible) {
-                visibleCount++;
-            }
-        });
-
-        if (resultEl) {
-            resultEl.textContent = `${visibleCount} data`;
+    const setQueryParam = (searchParams, key, value) => {
+        const normalizedValue = String(value || '').trim();
+        if (normalizedValue === '') {
+            searchParams.delete(key);
+            return;
         }
+
+        searchParams.set(key, normalizedValue);
     };
 
-    [
-        filterElements.keyword,
-        filterElements.status,
-        filterElements.department,
-        filterElements.prsStart,
-        filterElements.prsEnd,
-        filterElements.neededStart,
-        filterElements.neededEnd,
-    ].forEach((el) => {
-        if (!el) return;
-        el.addEventListener('input', runFilter);
-        el.addEventListener('change', runFilter);
-    });
+    const buildFilterUrl = () => {
+        const url = new URL(window.location.href);
+
+        setQueryParam(url.searchParams, 'keyword', filterElements.keyword?.value);
+        setQueryParam(url.searchParams, 'status', filterElements.status?.value);
+        setQueryParam(url.searchParams, 'department', filterElements.department?.value);
+        setQueryParam(url.searchParams, 'prs_start', filterElements.prsStart?.value);
+        setQueryParam(url.searchParams, 'prs_end', filterElements.prsEnd?.value);
+        setQueryParam(url.searchParams, 'needed_start', filterElements.neededStart?.value);
+        setQueryParam(url.searchParams, 'needed_end', filterElements.neededEnd?.value);
+
+        url.searchParams.delete('page');
+
+        return url.toString();
+    };
+
+    let debounceTimer = null;
+    const applyServerFilter = (useDebounce = false) => {
+        const doRequest = () => {
+            const url = buildFilterUrl();
+            if (typeof window.prsReplacePageContent === 'function') {
+                window.prsReplacePageContent(url, true);
+                return;
+            }
+
+            window.location.href = url;
+        };
+
+        if (!useDebounce) {
+            doRequest();
+            return;
+        }
+
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(doRequest, 400);
+    };
+
+    if (filterElements.keyword) {
+        filterElements.keyword.addEventListener('input', () => applyServerFilter(true));
+    }
+    if (filterElements.status) {
+        filterElements.status.addEventListener('change', () => applyServerFilter(false));
+    }
+    if (filterElements.department) {
+        filterElements.department.addEventListener('change', () => applyServerFilter(false));
+    }
+    if (filterElements.prsStart) {
+        filterElements.prsStart.addEventListener('change', () => applyServerFilter(false));
+    }
+    if (filterElements.prsEnd) {
+        filterElements.prsEnd.addEventListener('change', () => applyServerFilter(false));
+    }
+    if (filterElements.neededStart) {
+        filterElements.neededStart.addEventListener('change', () => applyServerFilter(false));
+    }
+    if (filterElements.neededEnd) {
+        filterElements.neededEnd.addEventListener('change', () => applyServerFilter(false));
+    }
 
     if (filterElements.reset) {
         filterElements.reset.addEventListener('click', () => {
-            Object.values(filterElements).forEach((el) => {
-                if (!el || el.tagName !== 'INPUT' && el.tagName !== 'SELECT') {
-                    return;
-                }
-                el.value = '';
-            });
+            if (filterElements.keyword) filterElements.keyword.value = '';
+            if (filterElements.status) filterElements.status.value = '';
+            if (filterElements.department) filterElements.department.value = '';
+            if (filterElements.prsStart) filterElements.prsStart.value = '';
+            if (filterElements.prsEnd) filterElements.prsEnd.value = '';
+            if (filterElements.neededStart) filterElements.neededStart.value = '';
+            if (filterElements.neededEnd) filterElements.neededEnd.value = '';
 
-            if (filterElements.status) {
-                filterElements.status.value = '';
-            }
-
-            if (filterElements.department) {
-                filterElements.department.value = '';
-            }
-
-            runFilter();
+            applyServerFilter(false);
         });
     }
-
-    runFilter();
 }
 
 function initPrsCartPopup() {
