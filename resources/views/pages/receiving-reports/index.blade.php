@@ -226,7 +226,7 @@
                                             <select name="customs_document_type_id" id="create_customs_document_type_id" class="form-select">
                                                 <option value="">Select type</option>
                                                 @foreach ($customsDocumentTypes as $customsDocumentType)
-                                                    <option value="{{ $customsDocumentType->id }}">{{ $customsDocumentType->bc_field ? ' (' . $customsDocumentType->bc_field . ') ' : '' }}{{ $customsDocumentType->name }}</option>
+                                                    <option value="{{ $customsDocumentType->id }}">{{ $customsDocumentType->code ? ' (' . $customsDocumentType->code . ') ' : '' }}{{ $customsDocumentType->name }}</option>
                                                 @endforeach
                                             </select>
                                         </div>
@@ -418,7 +418,7 @@
                                             <select name="customs_document_type_id" class="form-select rr-edit-customs-type">
                                                 <option value="">Select type</option>
                                                 @foreach ($customsDocumentTypes as $customsDocumentType)
-                                                    <option value="{{ $customsDocumentType->id }}" @selected((int) $rr->customs_document_type_id === (int) $customsDocumentType->id)>{{ $customsDocumentType->bc_field ? ' (' . $customsDocumentType->bc_field . ') ' : '' }}{{ $customsDocumentType->name }}</option>
+                                                    <option value="{{ $customsDocumentType->id }}" @selected((int) $rr->customs_document_type_id === (int) $customsDocumentType->id)>{{ $customsDocumentType->code ? ' (' . $customsDocumentType->code . ') ' : '' }}{{ $customsDocumentType->name }}</option>
                                                 @endforeach
                                             </select>
                                         </div>

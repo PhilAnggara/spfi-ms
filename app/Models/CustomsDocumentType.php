@@ -16,7 +16,6 @@ class CustomsDocumentType extends Model
     protected $fillable = [
         'name',
         'code',
-        'bc_field',
     ];
 
     protected $casts = [

@@ -14,8 +14,7 @@ return new class extends Migration
         Schema::create('customs_document_types', function (Blueprint $table) {
             $table->id();
             $table->string('name')->index();
-            $table->string('code')->unique();
-            $table->string('bc_field')->nullable()->index();
+            $table->string('code')->nullable()->index();
             $table->timestamps();
             $table->softDeletes();
         });

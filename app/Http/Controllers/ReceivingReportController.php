@@ -31,8 +31,8 @@ class ReceivingReportController extends Controller
             'customsDocumentTypes' => CustomsDocumentType::query()
                 ->orderBy('name')
                 ->whereLike('name', '%Pemasukan%')
-                ->orWhere('bc_field', 'BC 2.7')
-                ->get(['id', 'name', 'code', 'bc_field']),
+                ->orWhere('code', 'BC 2.7')
+                ->get(['id', 'name', 'code']),
         ]);
     }
 

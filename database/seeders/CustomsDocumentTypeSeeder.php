@@ -69,7 +69,7 @@ class CustomsDocumentTypeSeeder extends Seeder
         $skippedByCode = 0;
 
         foreach ($rows as $row) {
-            $code = $this->normalizeValue($row['Code'] ?? $row['code'] ?? null);
+            $code = $this->normalizeValue($row['BCfield'] ?? $row['bcfield'] ?? $row['bc_field'] ?? $row['code'] ?? $row['Code'] ?? null);
 
             if ($code === null) {
                 $skippedByCode++;
@@ -77,16 +77,16 @@ class CustomsDocumentTypeSeeder extends Seeder
             }
 
             $rawName = $this->normalizeValue($row['BCName'] ?? $row['bcname'] ?? $row['name'] ?? null);
-            $bcField = $this->normalizeValue($row['BCfield'] ?? $row['bcfield'] ?? $row['bc_field'] ?? null);
             $name = $rawName === null
                 ? $code
-                : $this->stripBcFieldPrefixFromName($rawName, $bcField);
+                : $this->stripCodePrefixFromName($rawName, $code);
 
             DB::table('customs_document_types')->updateOrInsert(
-                ['code' => $code],
                 [
+                    'code' => $code,
                     'name' => $name,
-                    'bc_field' => $bcField,
+                ],
+                [
                     'updated_at' => now(),
                     'created_at' => now(),
                 ]
@@ -116,25 +116,25 @@ class CustomsDocumentTypeSeeder extends Seeder
         return $normalized;
     }
 
-    private function stripBcFieldPrefixFromName(string $name, ?string $bcField): string
+    private function stripCodePrefixFromName(string $name, ?string $code): string
     {
         $normalizedName = trim($name);
 
-        if ($bcField === null) {
+        if ($code === null) {
             return $normalizedName;
         }
 
-        $normalizedBcField = trim($bcField);
-        if ($normalizedBcField === '') {
+        $normalizedCode = trim($code);
+        if ($normalizedCode === '') {
             return $normalizedName;
         }
 
-        $prefixPattern = '/^' . preg_quote($normalizedBcField, '/') . '(?=\s|$)/iu';
+        $prefixPattern = '/^' . preg_quote($normalizedCode, '/') . '(?=\s|$)/iu';
         if (!preg_match($prefixPattern, $normalizedName)) {
             return $normalizedName;
         }
 
-        $stripped = preg_replace('/^' . preg_quote($normalizedBcField, '/') . '(?=\s|$)\s*/iu', '', $normalizedName);
+        $stripped = preg_replace('/^' . preg_quote($normalizedCode, '/') . '(?=\s|$)\s*/iu', '', $normalizedName);
         $stripped = trim((string) $stripped);
 
         return $stripped !== '' ? $stripped : $normalizedName;
