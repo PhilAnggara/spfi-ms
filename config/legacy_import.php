@@ -67,5 +67,15 @@ return [
             'connection' => env('LEGACY_DB_PRS_DETAIL_CONNECTION'),
             'table' => env('LEGACY_DB_PRS_DETAIL_TABLE', 'prs_detail'),
         ],
+        'po' => [
+            'csv_path' => 'document/csv/po.csv',
+            'connection' => env('LEGACY_DB_PO_CONNECTION'),
+            'table' => env('LEGACY_DB_PO_TABLE', 'po'),
+        ],
+        'po_detail' => [
+            'csv_path' => 'document/csv/po_detail.csv',
+            'connection' => env('LEGACY_DB_PO_DETAIL_CONNECTION'),
+            'table' => env('LEGACY_DB_PO_DETAIL_TABLE', 'po_detail'),
+        ],
     ],
 ];

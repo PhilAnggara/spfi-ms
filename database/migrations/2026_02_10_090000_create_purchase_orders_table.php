@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('supplier_id')->constrained('suppliers')->onDelete(fk_on_delete('restrict'));
             $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
             $table->string('status')->default('DRAFT');
-            $table->string('po_number')->nullable();
+            $table->string('po_number')->nullable()->unique();
             $table->decimal('subtotal', 15, 2)->default(0);
             $table->decimal('tax_rate', 5, 2)->default(0);
             $table->decimal('tax_amount', 15, 2)->default(0);
@@ -31,6 +31,8 @@ return new class extends Migration
             $table->json('signature_meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index(['status', 'submitted_at'], 'purchase_orders_status_submitted_index');
         });
     }
 

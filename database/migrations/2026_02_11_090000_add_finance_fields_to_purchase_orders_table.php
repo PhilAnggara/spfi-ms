@@ -20,7 +20,7 @@ return new class extends Migration
             $table->decimal('pph_rate', 5, 2)->default(0);
             $table->decimal('pph_amount', 15, 2)->default(0);
             $table->string('remark_type')->nullable();
-            $table->string('remark_text')->nullable();
+            $table->text('remark_text')->nullable();
         });
     }
 

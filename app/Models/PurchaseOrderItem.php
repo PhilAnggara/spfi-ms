@@ -34,6 +34,16 @@ class PurchaseOrderItem extends Model
         'purchase_order_id' => 'integer',
         'prs_item_id' => 'integer',
         'item_id' => 'integer',
+        'quantity' => 'decimal:2',
+        'unit_price' => 'decimal:2',
+        'line_subtotal' => 'decimal:2',
+        'discount_rate' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
+        'ppn_rate' => 'decimal:2',
+        'ppn_amount' => 'decimal:2',
+        'pph_rate' => 'decimal:2',
+        'pph_amount' => 'decimal:2',
+        'total' => 'decimal:2',
         // Holds PR/canvasing snapshot (terms, lead time).
         'meta' => 'array',
     ];
