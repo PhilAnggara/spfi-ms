@@ -729,7 +729,15 @@ class PurchaseOrderSeeder extends Seeder
         }
 
         try {
-            return Carbon::parse($normalized);
+            $date = Carbon::parse($normalized);
+
+            // Reject dates before 1970-01-01 as they're likely placeholder dates
+            // MySQL may reject very old dates depending on configuration
+            if ($date->year < 1970) {
+                return null;
+            }
+
+            return $date;
         } catch (\Throwable) {
             return null;
         }
