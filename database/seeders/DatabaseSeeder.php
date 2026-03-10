@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Database\Seeders\PurchaseOrderSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -30,6 +29,9 @@ class DatabaseSeeder extends Seeder
             PrsItemSeeder::class,
             CurrencySeeder::class,
             PurchaseOrderSeeder::class,
+            ReceivingReportSeeder::class,
+            StockInventorySeeder::class,
+            StockBalanceSeeder::class,
             BuyerSeeder::class,
             FishSupplierSeeder::class,
             VesselSeeder::class,

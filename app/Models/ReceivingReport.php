@@ -24,6 +24,7 @@ class ReceivingReport extends Model
         'customs_document_type_id',
         'customs_document_date',
         'notes',
+        'meta',
         'created_by',
     ];
 
@@ -35,6 +36,7 @@ class ReceivingReport extends Model
         'created_by' => 'integer',
         'received_date' => 'date',
         'customs_document_date' => 'date',
+        'meta' => 'array',
     ];
 
     public function purchaseOrder()

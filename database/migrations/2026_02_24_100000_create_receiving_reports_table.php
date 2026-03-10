@@ -21,6 +21,8 @@ return new class extends Migration
             $table->unsignedBigInteger('customs_document_type_id')->nullable()->index();
             $table->date('customs_document_date')->nullable();
             $table->text('notes')->nullable();
+            // Keep non-core legacy attributes without affecting new workflow columns.
+            $table->json('meta')->nullable();
             $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
             $table->timestamps();
             $table->softDeletes();

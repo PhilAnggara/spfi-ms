@@ -77,5 +77,25 @@ return [
             'connection' => env('LEGACY_DB_PO_DETAIL_CONNECTION'),
             'table' => env('LEGACY_DB_PO_DETAIL_TABLE', 'po_detail'),
         ],
+        'rr' => [
+            'csv_path' => 'document/csv/rr.csv',
+            'connection' => env('LEGACY_DB_RR_CONNECTION'),
+            'table' => env('LEGACY_DB_RR_TABLE', 'rr'),
+        ],
+        'rr_detail' => [
+            'csv_path' => 'document/csv/rr_detail.csv',
+            'connection' => env('LEGACY_DB_RR_DETAIL_CONNECTION'),
+            'table' => env('LEGACY_DB_RR_DETAIL_TABLE', 'rr_detail'),
+        ],
+        'stock_inventory' => [
+            'csv_path' => 'document/csv/stock_inventory.csv',
+            'connection' => env('LEGACY_DB_STOCK_INVENTORY_CONNECTION'),
+            'table' => env('LEGACY_DB_STOCK_INVENTORY_TABLE', 'stock_inventory'),
+        ],
+        'stock_balance' => [
+            'csv_path' => 'document/csv/stock_balance.csv',
+            'connection' => env('LEGACY_DB_STOCK_BALANCE_CONNECTION'),
+            'table' => env('LEGACY_DB_STOCK_BALANCE_TABLE', 'stock_balance'),
+        ],
     ],
 ];

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Carbon\Carbon;
 use Database\Seeders\Concerns\ResolvesLegacyImport;
+use Database\Seeders\Concerns\ResolvesLegacyUserLookup;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +13,7 @@ use Illuminate\Support\Str;
 class PrsSeeder extends Seeder
 {
     use ResolvesLegacyImport;
+    use ResolvesLegacyUserLookup;
 
     /**
      * Mapping department code -> id.
@@ -24,63 +26,6 @@ class PrsSeeder extends Seeder
         '7050' => 21, '7052' => 22, '7060' => 23, '7061' => 24, '7062' => 25,
         '7063' => 26, '7064' => 27, '7033E' => 28, '7033C' => 29, '7033D' => 30,
         '7033F' => 31, '7033G' => 32, '8000' => 33, '001' => 34,
-    ];
-
-    /**
-     * Mapping user name -> id (first occurrence wins for duplicates).
-     * Duplicate keys in PHP arrays are overwritten, so duplicates are commented
-     * and the first id is kept intentionally.
-     */
-    protected array $userIdByName = [
-        'Phil Bawole' => 1,
-        'System Administrator' => 2,
-        'SPFI IT Division' => 3,
-        'Fish Staff for Test' => 4,
-        'James' => 5,
-        'Staff Purchasing' => 6,
-        'Denny Tuhatelu' => 7,
-        'Jeffry Lantang' => 8,
-        'Erni Ending' => 9,
-        'Rommy Tendean' => 10,
-        'Ivonne Peleh' => 11,
-        'Swingly Boham' => 12,
-        'Irwan' => 13,
-        'Jellyta' => 14,
-        'Wiske' => 15,
-        'Daniel Watuna' => 16,
-        'Ferdie Tobangen' => 17,
-        'Wasis Wiyono' => 18,
-        'Greity Selaindoong' => 19,
-        'Max Pangkey' => 20,
-        'Wensi Saranggi' => 21,  // duplicate name exists (id=27), first wins
-        'Viven Pungus' => 22,
-        'Rommy Makagiansar' => 23,
-        'Venensi Lumempouw' => 24,
-        'S.C. Calamba, Jr' => 25,
-        'Taufik Ramadhani' => 26,
-        'Rudy Mandagie' => 28,
-        'Eduard Luas' => 29,     // duplicate name exists (id=50), first wins
-        'Budi Satriyo' => 30,
-        'James Runtukahu' => 31, // duplicate name exists (id=33), first wins
-        'Dewi Ria' => 32,
-        'Stainly Langkay' => 34,
-        'Evita Patanduk' => 35,
-        'Rizal Sinadia' => 36,
-        'Yongki Lahea' => 37,
-        'sherly tatontos' => 38,
-        'Rendy Patandung' => 39,
-        'Garry' => 40,
-        'Rostefince Saberatu' => 41,
-        'Johanes Tahulending' => 42,
-        'testfish' => 43,
-        'ITDept' => 44,
-        'spgTv' => 45,
-        'Angelika Angkow' => 46,
-        'Bea Cukai' => 47,
-        'Jefny Jacobus' => 48,
-        'Sherly Tatontos' => 49,
-        'Surya Kumakaw' => 51,
-        'Anis Usman' => 52,
     ];
 
     /**
@@ -108,6 +53,9 @@ class PrsSeeder extends Seeder
         $this->logImportSource('prs', 'legacy');
         $this->command?->info("ℹ [prs] rows loaded: " . count($legacyRows));
 
+        $this->prepareLegacyUserLookup();
+        $defaultUserId = $this->resolveLegacyFallbackUserId(2);
+
         $inserted = 0;
         $skipped = 0;
 
@@ -126,7 +74,7 @@ class PrsSeeder extends Seeder
 
             // --- resolve user_id ---
             $createdBy = trim((string) ($data['createdby'] ?? ''));
-            $userId = $this->resolveUserId($createdBy, $prsNumber);
+            $userId = $this->resolveLegacyUserId($createdBy, $defaultUserId) ?? $defaultUserId;
 
             // --- parse dates ---
             $createdDate = $this->parseDate($data['created_date'] ?? null);
@@ -227,29 +175,6 @@ class PrsSeeder extends Seeder
         }
 
         return null;
-    }
-
-    /**
-     * Resolve user ID from name. Falls back to System Administrator (id=2).
-     */
-    protected function resolveUserId(string $name, string $context): int
-    {
-        $defaultUserId = 2; // System Administrator
-
-        if ($name === '') {
-            $this->warn("User name empty for PRS '{$context}', defaulting to System Administrator (id={$defaultUserId})");
-            return $defaultUserId;
-        }
-
-        // Case-insensitive exact match
-        foreach ($this->userIdByName as $userName => $id) {
-            if (strcasecmp($userName, $name) === 0) {
-                return $id;
-            }
-        }
-
-        $this->warn("User '{$name}' not found for PRS '{$context}', defaulting to System Administrator (id={$defaultUserId})");
-        return $defaultUserId;
     }
 
     protected function parseDate($value): ?Carbon

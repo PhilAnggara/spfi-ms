@@ -17,6 +17,8 @@ return new class extends Migration
             $table->foreignId('purchase_order_item_id')->constrained('purchase_order_items')->onDelete(fk_on_delete('restrict'));
             $table->decimal('qty_good', 15, 2)->default(0);
             $table->decimal('qty_bad', 15, 2)->default(0);
+            // Preserve legacy row context for traceability and reconciliation.
+            $table->json('meta')->nullable();
             $table->timestamps();
 
             $table->unique(['receiving_report_id', 'purchase_order_item_id'], 'rr_items_rrid_poid_unique');

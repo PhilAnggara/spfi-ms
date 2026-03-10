@@ -14,21 +14,58 @@ use Illuminate\Support\Facades\DB;
 
 class ReceivingReportController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $receivingReports = ReceivingReport::with([
+        $keyword  = $request->input('keyword');
+        $dateFrom = $request->input('date_from');
+        $dateTo   = $request->input('date_to');
+
+        $query = ReceivingReport::with([
             'purchaseOrder.supplier',
             'purchaseOrder.items.item.unit',
             'items.purchaseOrderItem.item.unit',
             'customsDocumentType',
             'createdBy',
-        ])
-            ->orderByDesc('id')
-            ->get();
+        ])->orderByDesc('id');
+
+        if ($keyword) {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('rr_number', 'like', "%{$keyword}%")
+                    ->orWhereHas('purchaseOrder', function ($q2) use ($keyword) {
+                        $q2->where('po_number', 'like', "%{$keyword}%")
+                            ->orWhereHas('supplier', function ($q3) use ($keyword) {
+                                $q3->where('name', 'like', "%{$keyword}%");
+                            });
+                    })
+                    ->orWhereHas('createdBy', function ($q2) use ($keyword) {
+                        $q2->where('name', 'like', "%{$keyword}%");
+                    });
+            });
+        }
+
+        if ($dateFrom) {
+            $query->where('received_date', '>=', $dateFrom);
+        }
+
+        if ($dateTo) {
+            $query->where('received_date', '<=', $dateTo);
+        }
+
+        $receivingReports = $query->paginate(50)->withQueryString();
+
+        $totals = DB::table('receiving_report_items')
+            ->join('receiving_reports', 'receiving_reports.id', '=', 'receiving_report_items.receiving_report_id')
+            ->whereNull('receiving_reports.deleted_at')
+            ->selectRaw('SUM(qty_good) as total_good, SUM(qty_bad) as total_bad')
+            ->first();
 
         return view('pages.receiving-reports.index', [
-            'receivingReports' => $receivingReports,
-            'customsDocumentTypes' => CustomsDocumentType::query()
+            'receivingReports'      => $receivingReports,
+            'totalRr'               => ReceivingReport::count(),
+            'todayRr'               => ReceivingReport::whereDate('received_date', now()->toDateString())->count(),
+            'totalGood'             => (float) ($totals->total_good ?? 0),
+            'totalBad'              => (float) ($totals->total_bad ?? 0),
+            'customsDocumentTypes'  => CustomsDocumentType::query()
                 ->orderBy('name')
                 ->whereLike('name', '%Pemasukan%')
                 ->orWhere('code', 'BC 2.7')

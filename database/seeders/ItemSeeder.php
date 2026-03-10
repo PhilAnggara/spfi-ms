@@ -57,6 +57,10 @@ class ItemSeeder extends Seeder
                     $type = null;
                 }
 
+                $isActive = ! $this->isNegativeFlag($data['is_active'] ?? 'Y');
+                $isDeleted = $this->isAffirmativeFlag($data['is_delete'] ?? 'N');
+                $deletedAt = ($isDeleted || ! $isActive) ? $updatedAt : null;
+
                 DB::table('items')->insert([
                     'name' => $data['product_name'] ?? null,
                     'code' => $data['product_code'] ?? null,
@@ -64,9 +68,10 @@ class ItemSeeder extends Seeder
                     'category_id' => $categoryId,
                     'type' => $type,
                     'stock_on_hand' => 0,
-                    'is_active' => true,
+                    'is_active' => $isActive,
                     'created_at' => $createdAt,
                     'updated_at' => $updatedAt,
+                    'deleted_at' => $deletedAt,
                 ]);
 
                 $imported++;
@@ -138,6 +143,10 @@ class ItemSeeder extends Seeder
                 $type = null;
             }
 
+            $isActive = ! $this->isNegativeFlag($data['is_active'] ?? 'Y');
+            $isDeleted = $this->isAffirmativeFlag($data['is_delete'] ?? 'N');
+            $deletedAt = ($isDeleted || ! $isActive) ? $updatedAt : null;
+
             DB::table('items')->insert([
                 'name' => $data['product_name'] ?? null,
                 'code' => $data['product_code'] ?? null,
@@ -145,9 +154,10 @@ class ItemSeeder extends Seeder
                 'category_id' => $categoryId,
                 'type' => $type,
                 'stock_on_hand' => 0,
-                'is_active' => true,
+                'is_active' => $isActive,
                 'created_at' => $createdAt,
                 'updated_at' => $updatedAt,
+                'deleted_at' => $deletedAt,
             ]);
 
             $imported++;
@@ -159,5 +169,19 @@ class ItemSeeder extends Seeder
         if ($skippedInvalidColumns > 0 || $skippedMissingRelation > 0) {
             $this->command?->warn("⚠ [product] skipped invalid columns: {$skippedInvalidColumns}, missing relation: {$skippedMissingRelation}");
         }
+    }
+
+    private function isAffirmativeFlag(mixed $value): bool
+    {
+        $normalized = Str::upper(trim((string) $value));
+
+        return in_array($normalized, ['Y', 'YES', 'TRUE', '1'], true);
+    }
+
+    private function isNegativeFlag(mixed $value): bool
+    {
+        $normalized = Str::upper(trim((string) $value));
+
+        return in_array($normalized, ['N', 'NO', 'FALSE', '0'], true);
     }
 }

@@ -3,13 +3,6 @@
 
 @section('content')
 <div class="page-heading prs-page" id="rr-page" data-po-lookup-url="{{ route('receiving-reports.po-by-number') }}">
-    @php
-        $totalRr = $receivingReports->count();
-        $todayRr = $receivingReports->where('received_date', now()->toDateString())->count();
-        $totalGood = (float) $receivingReports->sum(fn ($rr) => $rr->items->sum('qty_good'));
-        $totalBad = (float) $receivingReports->sum(fn ($rr) => $rr->items->sum('qty_bad'));
-    @endphp
-
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
             <div class="col-12 col-lg-7">
@@ -47,23 +40,28 @@
     <section class="section">
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
-                <div class="row g-3 align-items-end" id="rr-filter-form">
-                    <div class="col-12 col-md-5">
-                        <label for="filter-rr-keyword" class="form-label mb-1">Search RR</label>
-                        <input type="text" id="filter-rr-keyword" class="form-control" placeholder="RR Number / PO Number / Supplier / Creator">
+                <form method="GET" action="{{ route('receiving-reports.index') }}" id="rr-filter-form">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12 col-md-5">
+                            <label for="filter-rr-keyword" class="form-label mb-1">Search RR</label>
+                            <input type="text" id="filter-rr-keyword" name="keyword" class="form-control" placeholder="RR Number / PO Number / Supplier / Creator" value="{{ request('keyword') }}">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label for="filter-rr-date-start" class="form-label mb-1">Received Date (from)</label>
+                            <input type="date" id="filter-rr-date-start" name="date_from" class="form-control" value="{{ request('date_from') }}">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label for="filter-rr-date-end" class="form-label mb-1">Received Date (to)</label>
+                            <input type="date" id="filter-rr-date-end" name="date_to" class="form-control" value="{{ request('date_to') }}">
+                        </div>
+                        <div class="col-6 col-md-2 d-grid">
+                            <button type="submit" class="btn btn-primary">Search</button>
+                        </div>
+                        <div class="col-6 col-md-1 d-grid">
+                            <a href="{{ route('receiving-reports.index') }}" class="btn btn-light-secondary">Reset</a>
+                        </div>
                     </div>
-                    <div class="col-6 col-md-3">
-                        <label for="filter-rr-date-start" class="form-label mb-1">Received Date (from)</label>
-                        <input type="date" id="filter-rr-date-start" class="form-control">
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label for="filter-rr-date-end" class="form-label mb-1">Received Date (to)</label>
-                        <input type="date" id="filter-rr-date-end" class="form-control">
-                    </div>
-                    <div class="col-12 col-md-1 d-grid">
-                        <button type="button" id="reset-rr-filter" class="btn btn-light-secondary">Reset</button>
-                    </div>
-                </div>
+                </form>
             </div>
         </div>
 
@@ -71,7 +69,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <h5 class="card-title mb-0">RR Records</h5>
-                    <span class="badge bg-light-primary" id="rr-filter-result">{{ $receivingReports->count() }} records</span>
+                    <span class="badge bg-light-primary" id="rr-filter-result">{{ number_format($receivingReports->total()) }} records</span>
                 </div>
 
                 @if ($receivingReports->isEmpty())
@@ -102,11 +100,7 @@
                                         $qtyBad = (float) $rr->items->sum('qty_bad');
                                         $po = $rr->purchaseOrder;
                                     @endphp
-                                    <tr
-                                        class="rr-row"
-                                        data-keyword="{{ strtolower(($rr->rr_number ?? ('#' . $rr->id)) . ' ' . ($po?->po_number ?? '') . ' ' . ($po?->supplier?->name ?? '') . ' ' . ($rr->createdBy?->name ?? '')) }}"
-                                        data-received-date="{{ optional($rr->received_date)->format('Y-m-d') }}"
-                                    >
+                                    <tr>
                                         <td>{{ $rr->rr_number ?? ('#' . $rr->id) }}</td>
                                         <td>
                                             @if ($po)
@@ -149,9 +143,8 @@
                             </tbody>
                         </table>
                     </div>
-                    <div id="rr-empty-filter" class="text-center text-muted py-4 d-none">
-                        <i class="fa-duotone fa-solid fa-magnifying-glass"></i>
-                        <p class="mb-0 mt-2">No matching results.</p>
+                    <div class="mt-3">
+                        {{ $receivingReports->links() }}
                     </div>
                 @endif
             </div>
@@ -516,12 +509,8 @@
 
 @push('addon-style')
     <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
 @endpush
 
 @push('addon-script')
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
     <script src="{{ url('assets/scripts/modules/rr-modern.js') }}"></script>
 @endpush

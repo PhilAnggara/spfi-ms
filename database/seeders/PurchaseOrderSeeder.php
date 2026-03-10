@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Carbon\Carbon;
 use Database\Seeders\Concerns\ResolvesLegacyImport;
+use Database\Seeders\Concerns\ResolvesLegacyUserLookup;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -11,28 +12,14 @@ use Illuminate\Support\Facades\Log;
 class PurchaseOrderSeeder extends Seeder
 {
     use ResolvesLegacyImport;
+    use ResolvesLegacyUserLookup;
 
     private const DEFAULT_STATUS = 'DRAFT';
-
-    /**
-     * @var array<string, int>
-     */
-    private array $userIdByName = [];
-
-    /**
-     * @var array<string, int>
-     */
-    private array $userIdByUsername = [];
 
     /**
      * @var array<int, array{name: string, role: string|null}>
      */
     private array $userProfileById = [];
-
-    /**
-     * @var array<int, bool>
-     */
-    private array $userIds = [];
 
     /**
      * Run the database seeds.
@@ -47,9 +34,17 @@ class PurchaseOrderSeeder extends Seeder
             return;
         }
 
-        $this->prepareUserLookup();
+        $this->prepareLegacyUserLookup(['role']);
+        $this->userProfileById = [];
 
-        $defaultUserId = $this->resolveFallbackUserId();
+        foreach ($this->getLegacyUserLookupRowsById() as $id => $user) {
+            $this->userProfileById[(int) $id] = [
+                'name' => $this->normalizeValue($user['name'] ?? null) ?? 'Unknown',
+                'role' => $this->normalizeValue($user['role'] ?? null),
+            ];
+        }
+
+        $defaultUserId = $this->resolveLegacyFallbackUserId(2);
         $defaultCurrencyId = (int) (DB::table('currencies')->orderBy('id')->value('id') ?? 1);
 
         $supplierIdByCode = $this->buildCodeLookup(DB::table('suppliers')->pluck('id', 'code')->all());
@@ -92,9 +87,9 @@ class PurchaseOrderSeeder extends Seeder
                 ?? $this->resolveByCode($currencyIdByName, $poRow['currency'] ?? null)
                 ?? $defaultCurrencyId;
 
-            $createdById = $this->resolveUserId($poRow['created_by'] ?? null, $defaultUserId);
-            $certifiedById = $this->resolveUserId($poRow['certified_by'] ?? null, $defaultUserId, true);
-            $approvedById = $this->resolveUserId($poRow['approved_by'] ?? null, $defaultUserId, true);
+            $createdById = $this->resolveLegacyUserId($poRow['created_by'] ?? null, $defaultUserId) ?? $defaultUserId;
+            $certifiedById = $this->resolveLegacyUserId($poRow['certified_by'] ?? null, $defaultUserId, true);
+            $approvedById = $this->resolveLegacyUserId($poRow['approved_by'] ?? null, $defaultUserId, true);
 
             $discountRate = $this->normalizeRate($poRow['discount'] ?? 0);
             $ppnRate = $this->normalizeRate($poRow['ppn'] ?? 0);
@@ -411,43 +406,6 @@ class PurchaseOrderSeeder extends Seeder
         return $rows;
     }
 
-    private function prepareUserLookup(): void
-    {
-        $users = DB::table('users')
-            ->select(['id', 'name', 'username', 'role'])
-            ->orderBy('id')
-            ->get();
-
-        foreach ($users as $user) {
-            $id = (int) $user->id;
-            $this->userIds[$id] = true;
-
-            $name = $this->normalizeValue($user->name ?? null);
-            if ($name !== null && ! isset($this->userIdByName[$this->normalizeLookupText($name)])) {
-                $this->userIdByName[$this->normalizeLookupText($name)] = $id;
-            }
-
-            $username = $this->normalizeValue($user->username ?? null);
-            if ($username !== null && ! isset($this->userIdByUsername[$this->normalizeLookupText($username)])) {
-                $this->userIdByUsername[$this->normalizeLookupText($username)] = $id;
-            }
-
-            $this->userProfileById[$id] = [
-                'name' => $name ?? 'Unknown',
-                'role' => $this->normalizeValue($user->role ?? null),
-            ];
-        }
-    }
-
-    private function resolveFallbackUserId(): int
-    {
-        if (isset($this->userIds[1])) {
-            return 1;
-        }
-
-        $firstUserId = array_key_first($this->userIds);
-        return $firstUserId !== null ? (int) $firstUserId : 1;
-    }
 
     /**
      * @param  array<string, int>  $codeLookup
@@ -497,44 +455,6 @@ class PurchaseOrderSeeder extends Seeder
         }
 
         return $lookup;
-    }
-
-    private function resolveUserId(mixed $rawUser, int $defaultUserId, bool $nullable = false): ?int
-    {
-        $value = $this->normalizeValue($rawUser);
-        if ($value === null) {
-            return $nullable ? null : $defaultUserId;
-        }
-
-        if (is_numeric($value)) {
-            $asId = (int) $value;
-            if (isset($this->userIds[$asId])) {
-                return $asId;
-            }
-        }
-
-        $needle = $this->normalizeLookupText($value);
-
-        if (isset($this->userIdByUsername[$needle])) {
-            return $this->userIdByUsername[$needle];
-        }
-
-        if (isset($this->userIdByName[$needle])) {
-            return $this->userIdByName[$needle];
-        }
-
-        $matches = [];
-        foreach ($this->userIdByName as $name => $id) {
-            if (str_contains($name, $needle) || str_contains($needle, $name)) {
-                $matches[$id] = true;
-            }
-        }
-
-        if (count($matches) === 1) {
-            return (int) array_key_first($matches);
-        }
-
-        return $nullable ? null : $defaultUserId;
     }
 
     /**
