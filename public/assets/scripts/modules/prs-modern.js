@@ -186,7 +186,7 @@ function initPrsCatalog() {
 
     const renderGrid = (items) => {
         if (!Array.isArray(items) || items.length === 0) {
-            grid.innerHTML = '<div class="text-muted">Item tidak ditemukan.</div>';
+            grid.innerHTML = '<div class="text-muted">No items found.</div>';
             return;
         }
 
@@ -219,18 +219,18 @@ function initPrsCatalog() {
                         </div>
                         <div class="prs-item-meta text-muted">${itemCategory}</div>
                         <div class="prs-item-actions">
-                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Kurangi qty">
+                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
                                 <i class="fa-light fa-minus"></i>
                             </button>
                             <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
-                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Tambah qty">
+                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
                                 <i class="fa-light fa-plus"></i>
                             </button>
                             <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="${item.id}">
                                 <i class="fa-light fa-plus"></i>
                                 Add
                             </button>
-                            <span class="prs-in-cart-label d-none">Sudah di cart</span>
+                            <span class="prs-in-cart-label d-none">Already in cart</span>
                         </div>
                     </div>
                 </div>

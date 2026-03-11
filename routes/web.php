@@ -25,6 +25,7 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\ReceivingReportController;
 use App\Http\Controllers\SupplierComparisonController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\StoreWithdrawalController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VesselController;
 use Illuminate\Support\Facades\Route;
@@ -135,6 +136,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [ReceivingReportController::class, 'store'])->name('store');
         Route::put('/{receivingReport}', [ReceivingReportController::class, 'update'])->name('update');
         Route::delete('/{receivingReport}', [ReceivingReportController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::middleware('role:administrator|im-manager|im-supervisor|im-staff')->prefix('stores-withdrawals')->name('stores-withdrawals.')->group(function () {
+        Route::get('/', [StoreWithdrawalController::class, 'index'])->name('index');
+        Route::get('/create', [StoreWithdrawalController::class, 'create'])->name('create');
+        Route::post('/', [StoreWithdrawalController::class, 'store'])->name('store');
+        Route::get('/{storeWithdrawal}', [StoreWithdrawalController::class, 'show'])->name('show');
+        Route::get('/{storeWithdrawal}/edit', [StoreWithdrawalController::class, 'edit'])->name('edit');
+        Route::put('/{storeWithdrawal}', [StoreWithdrawalController::class, 'update'])->name('update');
+        Route::delete('/{storeWithdrawal}', [StoreWithdrawalController::class, 'destroy'])->name('destroy');
     });
 
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');

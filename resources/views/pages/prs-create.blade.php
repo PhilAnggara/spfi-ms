@@ -7,7 +7,7 @@
         <div class="row g-3 align-items-center">
             <div class="col-12 col-lg-7">
                 <h3 class="mb-1">Create Purchase Requisition Slip</h3>
-                <p class="text-muted mb-0">Cari item, atur qty, lalu tambahkan ke cart sebelum submit PRS.</p>
+                <p class="text-muted mb-0">Search items, set quantities, and add them to the cart before submitting.</p>
             </div>
             <div class="col-12 col-lg-5">
                 <div class="prs-create-actions">
@@ -35,11 +35,11 @@
                             <div class="prs-catalog-toolbar" id="prs-catalog-filter-form" data-base-url="{{ route('prs.create') }}">
                                 <div class="prs-search">
                                     <i class="fa-regular fa-magnifying-glass"></i>
-                                    <input type="text" class="form-control" id="prs-item-search" name="search" value="{{ $search ?? '' }}" placeholder="Cari item berdasarkan nama atau kode">
+                                    <input type="text" class="form-control" id="prs-item-search" name="search" value="{{ $search ?? '' }}" placeholder="Search by item name or code">
                                 </div>
                                 <div class="prs-filter d-flex gap-2 align-items-center">
                                     <select class="form-select" id="prs-category-filter" name="category">
-                                        <option value="">Semua kategori</option>
+                                        <option value="">All categories</option>
                                         @foreach ($categories as $category)
                                             <option value="{{ $category->id }}" @selected((string) ($selectedCategory ?? '') === (string) $category->id)>{{ $category->name }}</option>
                                         @endforeach
@@ -63,11 +63,11 @@
                                             </div>
                                             <div class="prs-item-meta text-muted">{{ $item->category?->name ?? 'Uncategorized' }}</div>
                                             <div class="prs-item-actions">
-                                                <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Kurangi qty">
+                                                <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
                                                     <i class="fa-light fa-minus"></i>
                                                 </button>
                                                 <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
-                                                <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Tambah qty">
+                                                <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
                                                     <i class="fa-light fa-plus"></i>
                                                 </button>
                                                 <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="{{ $item->id }}">
@@ -95,7 +95,7 @@
                 <div class="prs-cart-header">
                     <div>
                         <h5 class="mb-0">Item Cart</h5>
-                        <small class="text-muted">Kelola item PRS Anda</small>
+                        <small class="text-muted">Manage your PRS items</small>
                     </div>
                     <button type="button" class="btn btn-sm btn-light-secondary" id="hide-prs-cart">
                         <i class="fa-light fa-xmark"></i>
@@ -123,7 +123,7 @@
                                 </div>
                                 <div class="col-12">
                                     <label for="remarks" class="form-label">Remarks</label>
-                                    <textarea class="form-control" id="remarks" name="remarks" rows="2" placeholder="Tambahkan catatan bila diperlukan"></textarea>
+                                    <textarea class="form-control" id="remarks" name="remarks" rows="2" placeholder="Add notes if needed"></textarea>
                                 </div>
                             </div>
                         </div>

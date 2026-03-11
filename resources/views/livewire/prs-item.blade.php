@@ -3,7 +3,7 @@
         @if (empty($prsItems))
             <div class="prs-cart-empty text-center">
                 <i class="fa-light fa-basket-shopping fa-2x text-muted mb-2"></i>
-                <p class="mb-0 text-muted">Cart masih kosong. Tambahkan item dari katalog.</p>
+                <p class="mb-0 text-muted">Cart is empty. Add items from the catalog.</p>
             </div>
         @endif
 
