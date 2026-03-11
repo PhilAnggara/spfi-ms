@@ -97,5 +97,15 @@ return [
             'connection' => env('LEGACY_DB_STOCK_BALANCE_CONNECTION'),
             'table' => env('LEGACY_DB_STOCK_BALANCE_TABLE', 'stock_balance'),
         ],
+        'sws' => [
+            'csv_path' => 'document/csv/sws.csv',
+            'connection' => env('LEGACY_DB_SWS_CONNECTION'),
+            'table' => env('LEGACY_DB_SWS_TABLE', 'sws'),
+        ],
+        'sws_detail' => [
+            'csv_path' => 'document/csv/sws_detail.csv',
+            'connection' => env('LEGACY_DB_SWS_DETAIL_CONNECTION'),
+            'table' => env('LEGACY_DB_SWS_DETAIL_TABLE', 'sws_detail'),
+        ],
     ],
 ];

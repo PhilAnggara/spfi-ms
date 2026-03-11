@@ -17,13 +17,12 @@ return new class extends Migration
             $table->date('sws_date'); // legacy: sws_date
             $table->foreignId('department_id')->constrained('departments')->onDelete(fk_on_delete('restrict'));
             $table->string('department_code', 30)->index(); // snapshot for legacy mapping
-            $table->string('type', 20)->default('NORMAL'); // NORMAL, CONFIRMATORY
+            $table->string('type', 20)->default('normal'); // normal, confirmatory
             $table->text('info')->nullable(); // legacy: sws_info
             $table->foreignId('approved_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->timestamp('approved_at')->nullable();
-            $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
+            $table->foreignId('created_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
-            $table->boolean('is_active')->default(true);
             $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
@@ -42,7 +41,6 @@ return new class extends Migration
             $table->string('uom', 50)->nullable(); // legacy: uom
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
-            $table->boolean('is_active')->default(true);
             $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();

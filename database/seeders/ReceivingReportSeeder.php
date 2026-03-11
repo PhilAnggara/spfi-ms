@@ -109,7 +109,7 @@ class ReceivingReportSeeder extends Seeder
 
             $detailRows = $detailsByRrCode[$rrNumber] ?? [];
 
-            DB::transaction(function () use (
+            $persistReceivingReport = function () use (
                 $rrNumber,
                 $headerPayload,
                 $detailRows,
@@ -163,7 +163,13 @@ class ReceivingReportSeeder extends Seeder
 
                     $itemInserted++;
                 }
-            });
+            };
+
+            if ($this->isSqlServer()) {
+                $this->runWithSqlServerReconnect($persistReceivingReport, "rr_code {$rrNumber}");
+            } else {
+                DB::transaction($persistReceivingReport);
+            }
 
             $headerInserted++;
         }
@@ -627,6 +633,39 @@ class ReceivingReportSeeder extends Seeder
     private function laterOf(Carbon $first, Carbon $second): Carbon
     {
         return $first->greaterThanOrEqualTo($second) ? $first : $second;
+    }
+
+    private function isSqlServer(): bool
+    {
+        return DB::connection()->getDriverName() === 'sqlsrv';
+    }
+
+    private function runWithSqlServerReconnect(callable $callback, string $context): void
+    {
+        try {
+            $callback();
+            return;
+        } catch (\Throwable $e) {
+            if (! $this->isCommunicationLinkFailure($e)) {
+                throw $e;
+            }
+
+            $this->warn("SQL Server communication link failure detected while importing {$context}, retrying once...");
+
+            DB::disconnect();
+            DB::reconnect();
+        }
+
+        $callback();
+    }
+
+    private function isCommunicationLinkFailure(\Throwable $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'communication link failure')
+            || str_contains($message, 'sqlstate[08s01]')
+            || str_contains($message, 'connection is no longer usable');
     }
 
     private function warn(string $message): void

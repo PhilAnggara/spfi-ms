@@ -83,7 +83,12 @@ trait ResolvesLegacyUserLookup
         return $firstUserId !== null ? (int) $firstUserId : $preferredId;
     }
 
-    protected function resolveLegacyUserId(mixed $rawUser, int $fallbackUserId, bool $nullableIfEmpty = false): ?int
+    protected function resolveLegacyUserId(
+        mixed $rawUser,
+        int $fallbackUserId,
+        bool $nullableIfEmpty = false,
+        bool $nullableIfUnmatched = false,
+    ): ?int
     {
         $value = $this->normalizeLegacyUserValue($rawUser);
 
@@ -120,7 +125,7 @@ trait ResolvesLegacyUserLookup
             return (int) array_key_first($matches);
         }
 
-        return $fallbackUserId;
+        return $nullableIfUnmatched ? null : $fallbackUserId;
     }
 
     /**

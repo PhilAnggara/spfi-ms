@@ -8,6 +8,7 @@ use Database\Seeders\Concerns\ResolvesLegacyUserLookup;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class PurchaseOrderSeeder extends Seeder
 {
@@ -50,7 +51,7 @@ class PurchaseOrderSeeder extends Seeder
         $supplierIdByCode = $this->buildCodeLookup(DB::table('suppliers')->pluck('id', 'code')->all());
         $currencyIdByCode = $this->buildCodeLookup(DB::table('currencies')->pluck('id', 'code')->all());
         $currencyIdByName = $this->buildCodeLookup(DB::table('currencies')->pluck('id', 'name')->all());
-        $itemIdByCode = $this->buildCodeLookup(DB::table('items')->pluck('id', 'code')->all());
+        $itemIdByCode = $this->buildItemLookup();
 
         $prsCandidates = $this->buildPrsItemCandidates();
 
@@ -208,7 +209,7 @@ class PurchaseOrderSeeder extends Seeder
                 $signatureMeta['approved_by'] = $this->buildSignatureUserMeta($approvedById);
             }
 
-            DB::transaction(function () use (
+            $persistPurchaseOrder = function () use (
                 $poCode,
                 $supplierId,
                 $createdById,
@@ -306,7 +307,13 @@ class PurchaseOrderSeeder extends Seeder
                         $skippedDetail++;
                     }
                 }
-            });
+            };
+
+            if ($this->isSqlServer()) {
+                $this->runWithSqlServerReconnect($persistPurchaseOrder, "po_code {$poCode}");
+            } else {
+                DB::transaction($persistPurchaseOrder);
+            }
 
             $insertedPo++;
         }
@@ -455,6 +462,54 @@ class PurchaseOrderSeeder extends Seeder
         }
 
         return $lookup;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function buildItemLookup(): array
+    {
+        $lookup = $this->buildCodeLookup(DB::table('items')->pluck('id', 'code')->all());
+
+        if (Schema::hasColumn('items', 'product_code')) {
+            $productCodeLookup = $this->buildCodeLookup(DB::table('items')->pluck('id', 'product_code')->all());
+
+            foreach ($productCodeLookup as $code => $id) {
+                if (! isset($lookup[$code])) {
+                    $lookup[$code] = $id;
+                }
+            }
+        }
+
+        return $lookup;
+    }
+
+    private function runWithSqlServerReconnect(callable $callback, string $context): void
+    {
+        try {
+            $callback();
+            return;
+        } catch (\Throwable $e) {
+            if (! $this->isCommunicationLinkFailure($e)) {
+                throw $e;
+            }
+
+            $this->warn("SQL Server communication link failure detected while importing {$context}, retrying once...");
+
+            DB::disconnect();
+            DB::reconnect();
+        }
+
+        $callback();
+    }
+
+    private function isCommunicationLinkFailure(\Throwable $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'communication link failure')
+            || str_contains($message, 'sqlstate[08s01]')
+            || str_contains($message, 'connection is no longer usable');
     }
 
     /**

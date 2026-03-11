@@ -3,30 +3,18 @@
 namespace Database\Seeders;
 
 use Carbon\Carbon;
+use Database\Seeders\Concerns\ResolvesLegacyDepartmentLookup;
 use Database\Seeders\Concerns\ResolvesLegacyImport;
 use Database\Seeders\Concerns\ResolvesLegacyUserLookup;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class PrsSeeder extends Seeder
 {
+    use ResolvesLegacyDepartmentLookup;
     use ResolvesLegacyImport;
     use ResolvesLegacyUserLookup;
-
-    /**
-     * Mapping department code -> id.
-     */
-    protected array $departmentIdByCode = [
-        '7056' => 1, '7054' => 2, '7000' => 3, '7010' => 4, '7029' => 5,
-        '7030' => 6, '7031' => 7, '7032' => 8, '7033' => 9, '7034' => 10,
-        '7035' => 11, '7036' => 12, '7037' => 13, '7038' => 14, '7039' => 15,
-        '7040' => 16, '7042' => 17, '7044' => 18, '7046' => 19, '7048' => 20,
-        '7050' => 21, '7052' => 22, '7060' => 23, '7061' => 24, '7062' => 25,
-        '7063' => 26, '7064' => 27, '7033E' => 28, '7033C' => 29, '7033D' => 30,
-        '7033F' => 31, '7033G' => 32, '8000' => 33, '001' => 34,
-    ];
 
     /**
      * Run the database seeds.
@@ -54,6 +42,7 @@ class PrsSeeder extends Seeder
         $this->command?->info("ℹ [prs] rows loaded: " . count($legacyRows));
 
         $this->prepareLegacyUserLookup();
+        $this->prepareLegacyDepartmentLookup();
         $defaultUserId = $this->resolveLegacyFallbackUserId(2);
 
         $inserted = 0;
@@ -64,7 +53,7 @@ class PrsSeeder extends Seeder
 
             // --- resolve department_id ---
             $departmentCode = trim((string) ($data['department_name'] ?? ''));
-            $departmentId = $this->resolveDepartmentId($departmentCode);
+            $departmentId = $this->resolveLegacyDepartmentId($departmentCode);
 
             if ($departmentId === null) {
                 $this->warn("PRS skipped: department_name '{$departmentCode}' not found in mapping (prsnumber: {$prsNumber})");
@@ -153,29 +142,6 @@ class PrsSeeder extends Seeder
     }
 
     // ─── helpers ────────────────────────────────────────────────────────
-
-    /**
-     * Resolve department ID from code. Tries exact match first, then prefix match.
-     */
-    protected function resolveDepartmentId(string $code): ?int
-    {
-        if (isset($this->departmentIdByCode[$code])) {
-            return $this->departmentIdByCode[$code];
-        }
-
-        // Prefix fallback: sort longest-first so '7033E' is tried before '7033'.
-        $sorted = $this->departmentIdByCode;
-        uksort($sorted, fn ($a, $b) => strlen($b) <=> strlen($a));
-
-        foreach ($sorted as $knownCode => $id) {
-            if (Str::startsWith($code, $knownCode)) {
-                $this->warn("Department '{$code}' matched via prefix '{$knownCode}' (id={$id})");
-                return $id;
-            }
-        }
-
-        return null;
-    }
 
     protected function parseDate($value): ?Carbon
     {
