@@ -9,7 +9,7 @@
             <div class="col-12 col-lg-7">
                 <div class="prs-hero">
                     <h3 class="mb-1">Purchase Requisition Slip</h3>
-                    <p class="text-muted mb-0">Kelola pengajuan PRS lebih cepat dengan filter lengkap dan tampilan yang responsif.</p>
+                    <p class="text-muted mb-0">Manage PRS submissions faster with comprehensive filters and a responsive layout.</p>
                 </div>
             </div>
             <div class="col-12 col-lg-5">
@@ -32,13 +32,13 @@
             <div class="card-body">
                 <div class="row g-3 align-items-end prs-filter-grid" id="prs-filter-form">
                     <div class="col-12 col-md-6 col-xl-{{ $canFilterDepartment ? 3 : 2 }}">
-                        <label for="filter-keyword" class="form-label mb-1">Cari PRS</label>
+                        <label for="filter-keyword" class="form-label mb-1">Search PRS</label>
                         <input type="text" id="filter-keyword" class="form-control" value="{{ request('keyword') }}" placeholder="PRS number / remarks{{ $canFilterDepartment ? ' / department' : '' }}">
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-status" class="form-label mb-1">Status</label>
                         <select id="filter-status" class="form-select">
-                            <option value="" @selected(request('status') === null || request('status') === '')>Semua</option>
+                            <option value="" @selected(request('status') === null || request('status') === '')>All</option>
                             <option value="DRAFT" @selected(request('status') === 'DRAFT')>DRAFT</option>
                             <option value="SUBMITTED" @selected(request('status') === 'SUBMITTED')>SUBMITTED</option>
                             <option value="ON_HOLD" @selected(request('status') === 'ON_HOLD')>ON_HOLD</option>
@@ -54,7 +54,7 @@
                         <div class="col-6 col-md-3 col-xl-3">
                             <label for="filter-department" class="form-label mb-1">Department</label>
                             <select id="filter-department" class="form-select">
-                                <option value="" @selected(request('department') === null || request('department') === '')>Semua</option>
+                                <option value="" @selected(request('department') === null || request('department') === '')>All</option>
                                 @foreach ($filterDepartments as $department)
                                     <option value="{{ $department->name }}" @selected(request('department') === $department->name)>{{ $department->name }}</option>
                                 @endforeach
@@ -99,7 +99,7 @@
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <h5 class="card-title mb-0">PRS Data</h5>
-                    <span class="badge bg-light-primary" id="prs-filter-result">{{ $items->total() }} data</span>
+                    <span class="badge bg-light-primary" id="prs-filter-result">{{ $items->total() }} records</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped text-center text-nowrap" id="table1">

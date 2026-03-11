@@ -1,0 +1,160 @@
+.po-page .po-hero h3 {
+    font-weight: 800;
+    letter-spacing: 0.01em;
+}
+
+.po-page .po-hero p {
+    max-width: 56ch;
+}
+
+.po-top-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.po-page .card {
+    border-radius: 1rem;
+}
+
+.po-filter-grid .form-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #576074;
+}
+
+.po-filter-grid .form-control,
+.po-filter-grid .form-select {
+    border-radius: 0.75rem;
+    border-color: #d7dde8;
+}
+
+.po-filter-grid .form-control:focus,
+.po-filter-grid .form-select:focus {
+    border-color: #1f7a8c;
+    box-shadow: 0 0 0 0.2rem rgba(31, 122, 140, 0.14);
+}
+
+.po-status-chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.po-status-chip {
+    border: 1px solid #d7dde8;
+    background: #fff;
+    color: #334155;
+    border-radius: 999px;
+    padding: 0.48rem 0.9rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    transition: all 0.18s ease;
+}
+
+.po-status-chip:hover {
+    border-color: #1f7a8c;
+    color: #1f7a8c;
+}
+
+.po-status-chip.active {
+    border-color: #1f7a8c;
+    background: linear-gradient(135deg, #1f7a8c, #2a9d8f);
+    color: #fff;
+    box-shadow: 0 0.55rem 1.2rem rgba(31, 122, 140, 0.22);
+}
+
+.po-table thead th {
+    border-bottom-width: 1px;
+    border-color: #e3e8f0;
+    color: #506078;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.045em;
+    font-weight: 800;
+    background: #f8fafc;
+}
+
+.po-table tbody td {
+    vertical-align: middle;
+    border-color: #eef2f7;
+}
+
+.po-table tbody tr {
+    transition: background-color 0.16s ease;
+}
+
+.po-table tbody tr:hover {
+    background-color: #f9fcff;
+}
+
+.po-cell-icon {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #eef5fb;
+}
+
+.po-empty-state {
+    border: 1px dashed #cad4e1;
+    border-radius: 0.9rem;
+    background: linear-gradient(160deg, #f8fbff, #f3f9f6);
+}
+
+.po-empty-icon {
+    font-size: 2.1rem;
+    color: #8494ad;
+}
+
+.po-page .pagination {
+    gap: 0.35rem;
+}
+
+.po-page .pagination .page-link {
+    border-radius: 0.55rem;
+    border-color: #d7dde8;
+    color: #3b4b63;
+    font-weight: 600;
+    min-width: 2rem;
+    text-align: center;
+}
+
+.po-page .pagination .page-item.active .page-link {
+    background: #1f7a8c;
+    border-color: #1f7a8c;
+    color: #fff;
+}
+
+.po-page .pagination .page-link:hover {
+    border-color: #1f7a8c;
+    color: #1f7a8c;
+}
+
+@media (max-width: 992px) {
+    .po-top-actions {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 768px) {
+    .po-page .page-title h3 {
+        font-size: 1.4rem;
+    }
+
+    .po-status-chip {
+        font-size: 0.72rem;
+        padding: 0.42rem 0.75rem;
+    }
+
+    .po-filter-grid .btn {
+        font-size: 0.8rem;
+        padding-inline: 0.7rem;
+    }
+}

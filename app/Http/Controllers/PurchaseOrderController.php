@@ -10,6 +10,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Notifications\PoSubmittedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -20,25 +21,119 @@ class PurchaseOrderController extends Controller
      */
     public function index(Request $request)
     {
-        $query = PurchaseOrder::with(['supplier', 'items', 'createdBy'])
-            ->orderByDesc('id');
+        $user = $request->user();
+        $canViewAll = $user->hasAnyRole([
+            'administrator',
+            'purchasing-manager',
+            'general-manager',
+        ]);
 
-        // Limit non-manager users to only their own PO.
-        if (! $request->user()->hasRole('administrator') && ! $request->user()->hasRole('purchasing-manager') && ! $request->user()->hasRole('general-manager')) {
-            $query->where('created_by', $request->user()->id);
-        }
+        $filters = [
+            'keyword' => trim((string) $request->query('keyword', '')),
+            'status' => trim((string) $request->query('status', '')),
+            'created_start' => trim((string) $request->query('created_start', '')),
+            'created_end' => trim((string) $request->query('created_end', '')),
+        ];
 
-        $status = $request->query('status');
-        if ($status) {
-            $query->where('status', $status);
-        }
-
-        $purchaseOrders = $query->get();
+        $purchaseOrders = $this->paginatePurchaseOrdersForSqlServer(
+            canViewAll: $canViewAll,
+            userId: $user->id,
+            filters: $filters,
+            perPage: 10,
+        );
 
         return view('pages.purchase-orders.index', [
             'purchaseOrders' => $purchaseOrders,
-            'status' => $status,
+            'status' => $filters['status'],
+            'filters' => $filters,
         ]);
+    }
+
+    /**
+     * SQL Server-compatible pagination without OFFSET/FETCH for PO list.
+     */
+    private function paginatePurchaseOrdersForSqlServer(bool $canViewAll, int $userId, array $filters = [], int $perPage = 10): LengthAwarePaginator
+    {
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $currentPage = max(1, (int) $currentPage);
+
+        $baseQuery = PurchaseOrder::query();
+
+        if (! $canViewAll) {
+            $baseQuery->where('created_by', $userId);
+        }
+
+        $keyword = trim((string) ($filters['keyword'] ?? ''));
+        $status = strtoupper(trim((string) ($filters['status'] ?? '')));
+        $createdStart = trim((string) ($filters['created_start'] ?? ''));
+        $createdEnd = trim((string) ($filters['created_end'] ?? ''));
+
+        if ($keyword !== '') {
+            $baseQuery->where(function ($query) use ($keyword) {
+                $query->where('po_number', 'like', "%{$keyword}%")
+                    ->orWhereHas('supplier', function ($supplierQuery) use ($keyword) {
+                        $supplierQuery->where('name', 'like', "%{$keyword}%");
+                    })
+                    ->orWhereHas('createdBy', function ($userQuery) use ($keyword) {
+                        $userQuery->where('name', 'like', "%{$keyword}%");
+                    });
+
+                if (is_numeric($keyword)) {
+                    $query->orWhere('id', (int) $keyword);
+                }
+            });
+        }
+
+        if ($status !== '') {
+            $baseQuery->where('status', $status);
+        }
+
+        if ($createdStart !== '') {
+            $baseQuery->whereDate('created_at', '>=', $createdStart);
+        }
+        if ($createdEnd !== '') {
+            $baseQuery->whereDate('created_at', '<=', $createdEnd);
+        }
+
+        $total = (clone $baseQuery)->count();
+        $startRow = (($currentPage - 1) * $perPage) + 1;
+        $endRow = $currentPage * $perPage;
+
+        $rankedIdsQuery = (clone $baseQuery)
+            ->selectRaw('id, ROW_NUMBER() OVER (ORDER BY id DESC) as row_num');
+
+        $ids = DB::query()
+            ->fromSub($rankedIdsQuery, 'ranked_purchase_orders')
+            ->whereBetween('row_num', [$startRow, $endRow])
+            ->orderBy('row_num')
+            ->pluck('id')
+            ->all();
+
+        $collection = collect();
+
+        if (! empty($ids)) {
+            $itemsById = PurchaseOrder::with(['supplier', 'createdBy'])
+                ->withCount('items')
+                ->whereIn('id', $ids)
+                ->get()
+                ->keyBy('id');
+
+            $collection = collect($ids)
+                ->map(fn ($id) => $itemsById->get($id))
+                ->filter()
+                ->values();
+        }
+
+        return new LengthAwarePaginator(
+            items: $collection,
+            total: $total,
+            perPage: $perPage,
+            currentPage: $currentPage,
+            options: [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ],
+        );
     }
     /**
      * Draft PO list grouped by supplier for canvasser.
