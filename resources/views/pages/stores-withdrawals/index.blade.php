@@ -88,7 +88,6 @@
                                     <th>SWS Number</th>
                                     <th>SWS Date</th>
                                     <th>Department Code</th>
-                                    <th>Department Name</th>
                                     <th>Info</th>
                                     <th>Created By</th>
                                     <th>Actions</th>
@@ -96,32 +95,48 @@
                             </thead>
                             <tbody>
                                 @foreach ($storeWithdrawals as $sws)
+                                    @php
+                                        $detailItems = collect($storeWithdrawalItems[$sws->id] ?? []);
+                                        $canRemoveItem = $detailItems->count() > 1;
+                                    @endphp
                                     <tr>
-                                        <td class="fw-semibold">{{ $sws['sws_number'] }}</td>
+                                        <td class="fw-semibold">{{ $sws->sws_number }}</td>
                                         <td>
                                             <i class="fa-duotone fa-solid fa-calendar-days text-danger"></i>
-                                            {{ \Carbon\Carbon::parse($sws['sws_date'])->format('d M Y') }}
+                                            {{ \Carbon\Carbon::parse($sws->sws_date)->format('d M Y') }}
                                         </td>
                                         <td>
-                                            <span class="badge bg-light-primary">{{ $sws['department_code'] }}</span>
+                                            <span
+                                                class="badge bg-light-primary"
+                                                data-bstooltip-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="{{ $sws->department_name ?? '-' }}">{{ $sws->department_code }}</span>
                                         </td>
-                                        <td>{{ $sws['department_name'] }}</td>
-                                        <td>{{ \Illuminate\Support\Str::limit($sws['info'], 50) }}</td>
-                                        <td>{{ $sws['created_by_name'] }}</td>
+                                        <td>{{ \Illuminate\Support\Str::limit($sws->info ?? '-', 50) }}</td>
+                                        <td>{{ $sws->created_by_name ?? '-' }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <a href="{{ route('stores-withdrawals.show', $sws['id']) }}" class="btn btn-outline-secondary" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
-                                                    <i class="fa-light fa-eye"></i>
+                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $sws->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
+                                                    <i class="fa-light fa-eye text-primary"></i>
+                                                </button>
+                                                <a href="{{ route('stores-withdrawals.print', $sws->id) }}" target="_blank" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print Slip">
+                                                    <i class="fa-light fa-print text-primary"></i>
                                                 </a>
-                                                <a href="{{ route('stores-withdrawals.edit', $sws['id']) }}" class="btn btn-outline-primary" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
-                                                    <i class="fa-light fa-pen"></i>
-                                                </a>
-                                                <form action="{{ route('stores-withdrawals.destroy', $sws['id']) }}" method="POST" onsubmit="return confirm('Delete this stores withdrawal?')">
+                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $sws->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                                                    <i class="fa-light fa-edit text-primary"></i>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="btn icon"
+                                                    data-bstooltip-toggle="tooltip"
+                                                    data-bs-placement="top"
+                                                    title="Delete"
+                                                    onclick="hapusData({{ $sws->id }}, 'Delete Stores Withdrawal', 'Are you sure want to delete Stores Withdrawal {{ $sws->sws_number }}?')">
+                                                    <i class="fa-light fa-trash text-secondary"></i>
+                                                </button>
+                                                <form action="{{ route('stores-withdrawals.destroy', $sws->id) }}" id="hapus-{{ $sws->id }}" method="POST">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="btn btn-outline-danger" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
-                                                        <i class="fa-light fa-trash"></i>
-                                                    </button>
                                                 </form>
                                             </div>
                                         </td>
@@ -134,6 +149,183 @@
                     <div class="mt-3 d-flex justify-content-end">
                         {{ $storeWithdrawals->onEachSide(1)->links('pagination::bootstrap-5') }}
                     </div>
+
+                    @foreach ($storeWithdrawals as $sws)
+                        @php
+                            $detailItems = collect($storeWithdrawalItems[$sws->id] ?? []);
+                            $canRemoveItem = $detailItems->count() > 1;
+                        @endphp
+
+                        <div class="modal fade" id="detail-modal-{{ $sws->id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header sws-modal-header">
+                                        <div>
+                                            <h5 class="modal-title mb-1">Detail Stores Withdrawal</h5>
+                                            <small class="text-muted">{{ $sws->sws_number }}</small>
+                                        </div>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="sws-pill-row mb-3">
+                                            <span class="badge bg-light-primary">{{ strtoupper((string) ($sws->type ?? 'NORMAL')) }}</span>
+                                            <span class="badge bg-light-secondary">{{ $detailItems->count() }} item(s)</span>
+                                        </div>
+
+                                        <div class="row g-3 mb-3">
+                                            <div class="col-12 col-md-4">
+                                                <div class="sws-info-card">
+                                                    <small>Date</small>
+                                                    <div>{{ \Carbon\Carbon::parse($sws->sws_date)->format('d M Y') }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-12 col-md-4">
+                                                <div class="sws-info-card">
+                                                    <small>Department</small>
+                                                    <div>{{ $sws->department_code }} - {{ $sws->department_name ?? '-' }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-12 col-md-4">
+                                                <div class="sws-info-card">
+                                                    <small>Created By</small>
+                                                    <div>{{ $sws->created_by_name ?? '-' }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="sws-info-card">
+                                                    <small>Info</small>
+                                                    <div>{{ $sws->info ?? '-' }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-striped table-sm align-middle sws-modal-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>#</th>
+                                                        <th>Item</th>
+                                                        <th>Code</th>
+                                                        <th>Qty</th>
+                                                        <th>UoM</th>
+                                                        <th>SOH Snapshot</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @forelse ($detailItems as $detail)
+                                                        <tr>
+                                                            <td>{{ $loop->iteration }}</td>
+                                                            <td>{{ $detail->item_name ?? '-' }}</td>
+                                                            <td>{{ $detail->item_code ?? $detail->product_code ?? '-' }}</td>
+                                                            <td>{{ rtrim(rtrim(number_format((float) $detail->quantity, 3, '.', ''), '0'), '.') }}</td>
+                                                            <td>{{ $detail->uom ?? '-' }}</td>
+                                                            <td>{{ rtrim(rtrim(number_format((float) $detail->stock_on_hand_snapshot, 3, '.', ''), '0'), '.') }}</td>
+                                                        </tr>
+                                                    @empty
+                                                        <tr>
+                                                            <td colspan="6" class="text-center text-muted">No item detail found.</td>
+                                                        </tr>
+                                                    @endforelse
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <a href="{{ route('stores-withdrawals.print', $sws->id) }}" target="_blank" class="btn btn-outline-primary icon icon-left">
+                                            <i class="fa-light fa-print"></i>
+                                            Print Slip
+                                        </a>
+                                        <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal fade" id="edit-modal-{{ $sws->id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <form method="POST" action="{{ route('stores-withdrawals.update', $sws->id) }}" class="sws-edit-form" data-sws-id="{{ $sws->id }}">
+                                        @csrf
+                                        @method('PUT')
+                                        <div class="modal-header sws-modal-header">
+                                            <div>
+                                                <h5 class="modal-title mb-1">Edit Stores Withdrawal</h5>
+                                                <small class="text-muted">{{ $sws->sws_number }}</small>
+                                            </div>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="alert alert-info border-0 sws-edit-alert">
+                                                <div class="fw-semibold mb-1">Quick Edit Rules</div>
+                                                <div class="small">You can update quantity and remove existing items. Adding new items is disabled in this modal.</div>
+                                            </div>
+
+                                            <div class="table-responsive">
+                                                <table class="table table-striped table-sm align-middle sws-modal-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>#</th>
+                                                            <th>Item</th>
+                                                            <th>Code</th>
+                                                            <th style="width: 180px;">Quantity</th>
+                                                            <th style="width: 160px;">Remove</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @forelse ($detailItems as $detail)
+                                                            <tr data-sws-edit-row>
+                                                                <td>{{ $loop->iteration }}</td>
+                                                                <td>{{ $detail->item_name ?? '-' }}</td>
+                                                                <td>{{ $detail->item_code ?? $detail->product_code ?? '-' }}</td>
+                                                                <td>
+                                                                    <input type="hidden" name="items[{{ $loop->index }}][id]" value="{{ $detail->id }}">
+                                                                    <div class="input-group input-group-sm">
+                                                                        <input
+                                                                            type="number"
+                                                                            class="form-control"
+                                                                            min="0.001"
+                                                                            step="0.001"
+                                                                            name="items[{{ $loop->index }}][quantity]"
+                                                                            value="{{ number_format((float) $detail->quantity, 3, '.', '') }}"
+                                                                            data-sws-qty-input>
+                                                                        <span class="input-group-text">{{ $detail->uom ?? '-' }}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    @if ($canRemoveItem)
+                                                                        <input type="hidden" name="items[{{ $loop->index }}][remove]" value="0">
+                                                                        <div class="form-check m-0">
+                                                                            <input
+                                                                                class="form-check-input"
+                                                                                type="checkbox"
+                                                                                name="items[{{ $loop->index }}][remove]"
+                                                                                value="1"
+                                                                                data-sws-remove-toggle>
+                                                                            <label class="form-check-label">Remove</label>
+                                                                        </div>
+                                                                    @else
+                                                                        <span class="badge bg-light-secondary">Keep (single item)</span>
+                                                                    @endif
+                                                                </td>
+                                                            </tr>
+                                                        @empty
+                                                            <tr>
+                                                                <td colspan="5" class="text-center text-muted">No editable item found.</td>
+                                                            </tr>
+                                                        @endforelse
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-primary" @disabled($detailItems->isEmpty())>Save Changes</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
                 @endif
             </div>
         </div>
@@ -144,6 +336,52 @@
 
 @push('addon-style')
     <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
+    <style>
+        .sws-modal-header {
+            background: linear-gradient(135deg, #f8fafc, #eef2ff);
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .sws-pill-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .sws-info-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 0.65rem 0.8rem;
+            min-height: 72px;
+        }
+
+        .sws-info-card small {
+            color: #64748b;
+            display: block;
+            margin-bottom: 0.2rem;
+        }
+
+        .sws-info-card div {
+            color: #0f172a;
+            font-weight: 600;
+            line-height: 1.35;
+            word-break: break-word;
+        }
+
+        .sws-modal-table thead th {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .sws-edit-alert {
+            background: #eff6ff;
+            color: #1e3a8a;
+        }
+    </style>
 @endpush
 
 @push('addon-script')
@@ -151,6 +389,61 @@
     <script>
         (function () {
             let isLoading = false;
+
+            function initPageTooltips(scope = document) {
+                const tooltipElements = scope.querySelectorAll('[data-bstooltip-toggle="tooltip"]');
+
+                tooltipElements.forEach((el) => {
+                    if (window.bootstrap && window.bootstrap.Tooltip) {
+                        if (window.bootstrap.Tooltip.getInstance(el)) {
+                            return;
+                        }
+
+                        new window.bootstrap.Tooltip(el);
+                    }
+                });
+            }
+
+            function initSwsEditFormBehavior() {
+                document.addEventListener('change', function (event) {
+                    const checkbox = event.target.closest('[data-sws-remove-toggle]');
+                    if (!checkbox) {
+                        return;
+                    }
+
+                    const row = checkbox.closest('[data-sws-edit-row]');
+                    const quantityInput = row ? row.querySelector('[data-sws-qty-input]') : null;
+                    if (quantityInput) {
+                        quantityInput.disabled = checkbox.checked;
+                    }
+
+                    if (row) {
+                        row.classList.toggle('table-danger', checkbox.checked);
+                    }
+                });
+
+                document.addEventListener('submit', function (event) {
+                    const form = event.target.closest('.sws-edit-form');
+                    if (!form) {
+                        return;
+                    }
+
+                    const removeChecks = Array.from(form.querySelectorAll('[data-sws-remove-toggle]'));
+                    if (removeChecks.length === 0) {
+                        return;
+                    }
+
+                    const removeCount = removeChecks.filter((input) => input.checked).length;
+                    if (removeCount >= removeChecks.length) {
+                        event.preventDefault();
+                        window.Swal?.fire({
+                            icon: 'warning',
+                            title: 'Cannot remove all items',
+                            text: 'At least one item must remain in the stores withdrawal.',
+                        });
+                    }
+                });
+            }
 
             function setLoading(active) {
                 const loadingEl = document.getElementById('sws-page-loading');
@@ -203,6 +496,8 @@
                         initStoreWithdrawalFilters();
                     }
 
+                    initPageTooltips(newContainer);
+
                     if (window.feather && typeof window.feather.replace === 'function') {
                         window.feather.replace();
                     }
@@ -227,6 +522,9 @@
             window.addEventListener('popstate', function () {
                 replacePageContent(window.location.href, false);
             });
+
+            initPageTooltips(document);
+            initSwsEditFormBehavior();
         })();
     </script>
 @endpush

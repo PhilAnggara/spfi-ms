@@ -74,13 +74,13 @@
                     <div class="col-12 col-md-6 col-lg-4">
                         <div class="border rounded-3 p-3 h-100 bg-light-subtle">
                             <small class="text-muted d-block mb-1">Submitted by</small>
-                            <div class="fw-semibold"><i class="fa-duotone fa-solid fa-circle-user text-secondary"></i> {{ $item->user->name }}</div>
+                            <div class="fw-semibold"><i class="fa-duotone fa-solid fa-circle-user text-secondary"></i> {{ $item->user?->name ?? '-' }}</div>
                         </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-4">
                         <div class="border rounded-3 p-3 h-100 bg-light-subtle">
                             <small class="text-muted d-block mb-1">Department</small>
-                            <div class="fw-semibold"><i class="fa-duotone fa-solid fa-building-user text-secondary"></i> {{ $item->department->name }}</div>
+                            <div class="fw-semibold"><i class="fa-duotone fa-solid fa-building-user text-secondary"></i> {{ $item->department?->name ?? '-' }}</div>
                         </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-4">
@@ -135,16 +135,27 @@
                         </thead>
                         <tbody>
                             @foreach ($item->items as $itemInfo)
+                                @php
+                                    $catalogItem = $itemInfo->item;
+                                    $itemCode = $catalogItem?->code;
+                                    $itemName = $catalogItem?->name;
+                                    $itemStockOnHand = $catalogItem?->stock_on_hand;
+                                    $itemUnitName = $catalogItem?->unit?->name ?? 'PCS';
+                                @endphp
                                 <tr>
                                     <td>
-                                        <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $itemInfo->item->code }}')">
-                                            {{ $itemInfo->item->code }}
-                                        </button>
+                                        @if ($itemCode)
+                                            <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $itemCode }}')">
+                                                {{ $itemCode }}
+                                            </button>
+                                        @else
+                                            <span class="badge bg-light-secondary">-</span>
+                                        @endif
                                     </td>
-                                    <td>{{ $itemInfo->item->name }}</td>
-                                    <td>{{ $itemInfo->item->stock_on_hand }}</td>
-                                    <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
-                                    <td>{{ $itemInfo->delivered_quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
+                                    <td>{{ $itemName ?? '(item unavailable)' }}</td>
+                                    <td>{{ $itemStockOnHand ?? '-' }}</td>
+                                    <td>{{ $itemInfo->quantity }} {{ $itemUnitName }}</td>
+                                    <td>{{ $itemInfo->delivered_quantity }} {{ $itemUnitName }}</td>
                                     <td>
                                         @php
                                             $status = $itemInfo->delivery_status;

@@ -142,6 +142,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [StoreWithdrawalController::class, 'index'])->name('index');
         Route::get('/create', [StoreWithdrawalController::class, 'create'])->name('create');
         Route::post('/', [StoreWithdrawalController::class, 'store'])->name('store');
+        Route::get('/{storeWithdrawal}/print', [StoreWithdrawalController::class, 'print'])->name('print');
         Route::get('/{storeWithdrawal}', [StoreWithdrawalController::class, 'show'])->name('show');
         Route::get('/{storeWithdrawal}/edit', [StoreWithdrawalController::class, 'edit'])->name('edit');
         Route::put('/{storeWithdrawal}', [StoreWithdrawalController::class, 'update'])->name('update');

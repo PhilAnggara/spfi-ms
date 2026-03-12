@@ -109,7 +109,7 @@ class ReceivingReportSeeder extends Seeder
 
             $detailRows = $detailsByRrCode[$rrNumber] ?? [];
 
-            $persistReceivingReport = function () use (
+            $processed = $this->runWithSqlServerReconnect(function () use (
                 $rrNumber,
                 $headerPayload,
                 $detailRows,
@@ -122,56 +122,75 @@ class ReceivingReportSeeder extends Seeder
                 &$itemSkipped,
                 &$itemMissingPo
             ): void {
-                DB::table('receiving_reports')->updateOrInsert(
-                    ['rr_number' => $rrNumber],
-                    ['rr_number' => $rrNumber] + $headerPayload
-                );
+                $operation = function () use (
+                    $rrNumber,
+                    $headerPayload,
+                    $detailRows,
+                    $purchaseOrderId,
+                    $itemIdByCode,
+                    $poItemCandidates,
+                    $createdAt,
+                    $updatedAt,
+                    &$itemInserted,
+                    &$itemSkipped,
+                    &$itemMissingPo
+                ): void {
+                    DB::table('receiving_reports')->updateOrInsert(
+                        ['rr_number' => $rrNumber],
+                        ['rr_number' => $rrNumber] + $headerPayload
+                    );
 
-                $receivingReportId = DB::table('receiving_reports')
-                    ->where('rr_number', $rrNumber)
-                    ->value('id');
+                    $receivingReportId = DB::table('receiving_reports')
+                        ->where('rr_number', $rrNumber)
+                        ->value('id');
 
-                if (! $receivingReportId) {
+                    if (! $receivingReportId) {
+                        return;
+                    }
+
+                    DB::table('receiving_report_items')
+                        ->where('receiving_report_id', $receivingReportId)
+                        ->delete();
+
+                    $payloads = $this->buildDetailPayloads(
+                        detailRows: $detailRows,
+                        purchaseOrderId: (int) $purchaseOrderId,
+                        itemIdByCode: $itemIdByCode,
+                        poItemCandidates: $poItemCandidates,
+                        fallbackCreatedAt: $createdAt,
+                        fallbackUpdatedAt: $updatedAt,
+                        missingPoItemCount: $itemMissingPo,
+                        skippedCount: $itemSkipped,
+                    );
+
+                    foreach ($payloads as $payload) {
+                        DB::table('receiving_report_items')->insert([
+                            'receiving_report_id' => (int) $receivingReportId,
+                            'purchase_order_item_id' => $payload['purchase_order_item_id'],
+                            'qty_good' => $payload['qty_good'],
+                            'qty_bad' => $payload['qty_bad'],
+                            'meta' => json_encode($payload['meta']),
+                            'created_at' => $payload['created_at'],
+                            'updated_at' => $payload['updated_at'],
+                        ]);
+
+                        $itemInserted++;
+                    }
+                };
+
+                if ($this->isSqlServer()) {
+                    $operation();
                     return;
                 }
 
-                DB::table('receiving_report_items')
-                    ->where('receiving_report_id', $receivingReportId)
-                    ->delete();
+                DB::transaction($operation);
+            }, "rr_code {$rrNumber}");
 
-                $payloads = $this->buildDetailPayloads(
-                    detailRows: $detailRows,
-                    purchaseOrderId: (int) $purchaseOrderId,
-                    itemIdByCode: $itemIdByCode,
-                    poItemCandidates: $poItemCandidates,
-                    fallbackCreatedAt: $createdAt,
-                    fallbackUpdatedAt: $updatedAt,
-                    missingPoItemCount: $itemMissingPo,
-                    skippedCount: $itemSkipped,
-                );
-
-                foreach ($payloads as $payload) {
-                    DB::table('receiving_report_items')->insert([
-                        'receiving_report_id' => (int) $receivingReportId,
-                        'purchase_order_item_id' => $payload['purchase_order_item_id'],
-                        'qty_good' => $payload['qty_good'],
-                        'qty_bad' => $payload['qty_bad'],
-                        'meta' => json_encode($payload['meta']),
-                        'created_at' => $payload['created_at'],
-                        'updated_at' => $payload['updated_at'],
-                    ]);
-
-                    $itemInserted++;
-                }
-            };
-
-            if ($this->isSqlServer()) {
-                $this->runWithSqlServerReconnect($persistReceivingReport, "rr_code {$rrNumber}");
+            if ($processed) {
+                $headerInserted++;
             } else {
-                DB::transaction($persistReceivingReport);
+                $headerSkipped++;
             }
-
-            $headerInserted++;
         }
 
         $this->command?->info("✓ [rr] Inserted/Updated: {$headerInserted}, Skipped: {$headerSkipped}");
@@ -640,32 +659,48 @@ class ReceivingReportSeeder extends Seeder
         return DB::connection()->getDriverName() === 'sqlsrv';
     }
 
-    private function runWithSqlServerReconnect(callable $callback, string $context): void
+    private function runWithSqlServerReconnect(callable $operation, string $context): bool
     {
-        try {
-            $callback();
-            return;
-        } catch (\Throwable $e) {
-            if (! $this->isCommunicationLinkFailure($e)) {
-                throw $e;
+        $maxAttempts = $this->isSqlServer() ? 2 : 1;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $operation();
+                return true;
+            } catch (\Throwable $exception) {
+                $isRetryableDrop = $this->isSqlServer()
+                    && $attempt < $maxAttempts
+                    && $this->isConnectionDroppedException($exception);
+
+                if ($isRetryableDrop) {
+                    $this->warn("SQL Server connection dropped while processing {$context}. Retrying once.");
+                    DB::disconnect();
+                    DB::reconnect();
+                    continue;
+                }
+
+                $this->warn("RR skipped due DB error for {$context}: {$exception->getMessage()}");
+                Log::error('[ReceivingReportSeeder] Row import failed', [
+                    'context' => $context,
+                    'exception' => $exception,
+                ]);
+
+                return false;
             }
-
-            $this->warn("SQL Server communication link failure detected while importing {$context}, retrying once...");
-
-            DB::disconnect();
-            DB::reconnect();
         }
 
-        $callback();
+        return false;
     }
 
-    private function isCommunicationLinkFailure(\Throwable $e): bool
+    private function isConnectionDroppedException(\Throwable $exception): bool
     {
-        $message = strtolower($e->getMessage());
+        $message = strtolower($exception->getMessage());
 
         return str_contains($message, 'communication link failure')
-            || str_contains($message, 'sqlstate[08s01]')
-            || str_contains($message, 'connection is no longer usable');
+            || str_contains($message, '08s01')
+            || str_contains($message, 'server has gone away')
+            || str_contains($message, 'connection is broken')
+            || str_contains($message, 'transport-level error');
     }
 
     private function warn(string $message): void

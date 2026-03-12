@@ -8,7 +8,6 @@ use Database\Seeders\Concerns\ResolvesLegacyUserLookup;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 
 class PurchaseOrderSeeder extends Seeder
 {
@@ -51,7 +50,7 @@ class PurchaseOrderSeeder extends Seeder
         $supplierIdByCode = $this->buildCodeLookup(DB::table('suppliers')->pluck('id', 'code')->all());
         $currencyIdByCode = $this->buildCodeLookup(DB::table('currencies')->pluck('id', 'code')->all());
         $currencyIdByName = $this->buildCodeLookup(DB::table('currencies')->pluck('id', 'name')->all());
-        $itemIdByCode = $this->buildItemLookup();
+        $itemIdByCode = $this->buildCodeLookup(DB::table('items')->pluck('id', 'code')->all());
 
         $prsCandidates = $this->buildPrsItemCandidates();
 
@@ -209,7 +208,7 @@ class PurchaseOrderSeeder extends Seeder
                 $signatureMeta['approved_by'] = $this->buildSignatureUserMeta($approvedById);
             }
 
-            $persistPurchaseOrder = function () use (
+            $processed = $this->runWithSqlServerReconnect(function () use (
                 $poCode,
                 $supplierId,
                 $createdById,
@@ -238,84 +237,119 @@ class PurchaseOrderSeeder extends Seeder
                 &$insertedDetail,
                 &$skippedDetail
             ): void {
-                DB::table('purchase_orders')->updateOrInsert(
-                    ['po_number' => $poCode],
-                    [
-                        'supplier_id' => $supplierId,
-                        'created_by' => $createdById,
-                        'status' => $status,
-                        'subtotal' => round($lineSubtotalTotal, 2),
-                        'tax_rate' => 0,
-                        'tax_amount' => 0,
-                        'fees' => round($feeAmount, 2),
-                        'total' => round($total, 2),
-                        'certified_by_user_id' => $certifiedById,
-                        'approved_by_user_id' => $approvedById,
-                        'submitted_at' => $submittedAt,
-                        'approved_at' => $approvedAt,
-                        'approval_notes' => null,
-                        'signature_meta' => json_encode($signatureMeta),
-                        'created_at' => $createdAt,
-                        'updated_at' => $updatedAt,
-                        'deleted_at' => $isActive ? null : $updatedAt,
-                        'currency_id' => $currencyId,
-                        'discount_rate' => $discountRate,
-                        'discount_amount' => round($discountAmountTotal, 2),
-                        'ppn_rate' => $ppnRate,
-                        'ppn_amount' => round($ppnAmountTotal, 2),
-                        'pph_rate' => $pphRate,
-                        'pph_amount' => round($pphAmountTotal, 2),
-                        'remark_type' => $remarkType,
-                        'remark_text' => $remarks,
-                    ]
-                );
+                $operation = function () use (
+                    $poCode,
+                    $supplierId,
+                    $createdById,
+                    $status,
+                    $lineSubtotalTotal,
+                    $feeAmount,
+                    $total,
+                    $certifiedById,
+                    $approvedById,
+                    $submittedAt,
+                    $approvedAt,
+                    $remarks,
+                    $signatureMeta,
+                    $createdAt,
+                    $updatedAt,
+                    $isActive,
+                    $currencyId,
+                    $discountRate,
+                    $discountAmountTotal,
+                    $ppnRate,
+                    $ppnAmountTotal,
+                    $pphRate,
+                    $pphAmountTotal,
+                    $remarkType,
+                    $detailPayloads,
+                    &$insertedDetail,
+                    &$skippedDetail
+                ): void {
+                    DB::table('purchase_orders')->updateOrInsert(
+                        ['po_number' => $poCode],
+                        [
+                            'supplier_id' => $supplierId,
+                            'created_by' => $createdById,
+                            'status' => $status,
+                            'subtotal' => round($lineSubtotalTotal, 2),
+                            'tax_rate' => 0,
+                            'tax_amount' => 0,
+                            'fees' => round($feeAmount, 2),
+                            'total' => round($total, 2),
+                            'certified_by_user_id' => $certifiedById,
+                            'approved_by_user_id' => $approvedById,
+                            'submitted_at' => $submittedAt,
+                            'approved_at' => $approvedAt,
+                            'approval_notes' => null,
+                            'signature_meta' => json_encode($signatureMeta),
+                            'created_at' => $createdAt,
+                            'updated_at' => $updatedAt,
+                            'deleted_at' => $isActive ? null : $updatedAt,
+                            'currency_id' => $currencyId,
+                            'discount_rate' => $discountRate,
+                            'discount_amount' => round($discountAmountTotal, 2),
+                            'ppn_rate' => $ppnRate,
+                            'ppn_amount' => round($ppnAmountTotal, 2),
+                            'pph_rate' => $pphRate,
+                            'pph_amount' => round($pphAmountTotal, 2),
+                            'remark_type' => $remarkType,
+                            'remark_text' => $remarks,
+                        ]
+                    );
 
-                $purchaseOrderId = DB::table('purchase_orders')
-                    ->where('po_number', $poCode)
-                    ->value('id');
+                    $purchaseOrderId = DB::table('purchase_orders')
+                        ->where('po_number', $poCode)
+                        ->value('id');
 
-                if (! $purchaseOrderId) {
+                    if (! $purchaseOrderId) {
+                        return;
+                    }
+
+                    foreach ($detailPayloads as $payload) {
+                        $legacyId = $payload['legacy_id'];
+                        unset($payload['legacy_id']);
+
+                        $payload['purchase_order_id'] = (int) $purchaseOrderId;
+                        $payload['meta'] = json_encode($payload['meta']);
+
+                        if ($legacyId !== null && ! $this->isSqlServer()) {
+                            DB::table('purchase_order_items')->updateOrInsert(
+                                ['id' => $legacyId],
+                                ['id' => $legacyId] + $payload
+                            );
+                        } else {
+                            DB::table('purchase_order_items')->insert($payload);
+                        }
+
+                        $insertedDetail++;
+
+                        if (! empty($payload['prs_item_id'])) {
+                            DB::table('prs_items')
+                                ->where('id', $payload['prs_item_id'])
+                                ->update([
+                                    'purchase_order_id' => (int) $purchaseOrderId,
+                                    'updated_at' => $payload['updated_at'],
+                                ]);
+                        } else {
+                            $skippedDetail++;
+                        }
+                    }
+                };
+
+                if ($this->isSqlServer()) {
+                    $operation();
                     return;
                 }
 
-                foreach ($detailPayloads as $payload) {
-                    $legacyId = $payload['legacy_id'];
-                    unset($payload['legacy_id']);
+                DB::transaction($operation);
+            }, "po_code {$poCode}");
 
-                    $payload['purchase_order_id'] = (int) $purchaseOrderId;
-                    $payload['meta'] = json_encode($payload['meta']);
-
-                    if ($legacyId !== null && ! $this->isSqlServer()) {
-                        DB::table('purchase_order_items')->updateOrInsert(
-                            ['id' => $legacyId],
-                            ['id' => $legacyId] + $payload
-                        );
-                    } else {
-                        DB::table('purchase_order_items')->insert($payload);
-                    }
-
-                    $insertedDetail++;
-
-                    if (! empty($payload['prs_item_id'])) {
-                        DB::table('prs_items')
-                            ->where('id', $payload['prs_item_id'])
-                            ->update([
-                                'purchase_order_id' => (int) $purchaseOrderId,
-                                'updated_at' => $payload['updated_at'],
-                            ]);
-                    } else {
-                        $skippedDetail++;
-                    }
-                }
-            };
-
-            if ($this->isSqlServer()) {
-                $this->runWithSqlServerReconnect($persistPurchaseOrder, "po_code {$poCode}");
+            if ($processed) {
+                $insertedPo++;
             } else {
-                DB::transaction($persistPurchaseOrder);
+                $skippedPo++;
             }
-
-            $insertedPo++;
         }
 
         $this->command?->info("✓ [po] Inserted/Updated: {$insertedPo}, Skipped: {$skippedPo}");
@@ -462,54 +496,6 @@ class PurchaseOrderSeeder extends Seeder
         }
 
         return $lookup;
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    private function buildItemLookup(): array
-    {
-        $lookup = $this->buildCodeLookup(DB::table('items')->pluck('id', 'code')->all());
-
-        if (Schema::hasColumn('items', 'product_code')) {
-            $productCodeLookup = $this->buildCodeLookup(DB::table('items')->pluck('id', 'product_code')->all());
-
-            foreach ($productCodeLookup as $code => $id) {
-                if (! isset($lookup[$code])) {
-                    $lookup[$code] = $id;
-                }
-            }
-        }
-
-        return $lookup;
-    }
-
-    private function runWithSqlServerReconnect(callable $callback, string $context): void
-    {
-        try {
-            $callback();
-            return;
-        } catch (\Throwable $e) {
-            if (! $this->isCommunicationLinkFailure($e)) {
-                throw $e;
-            }
-
-            $this->warn("SQL Server communication link failure detected while importing {$context}, retrying once...");
-
-            DB::disconnect();
-            DB::reconnect();
-        }
-
-        $callback();
-    }
-
-    private function isCommunicationLinkFailure(\Throwable $e): bool
-    {
-        $message = strtolower($e->getMessage());
-
-        return str_contains($message, 'communication link failure')
-            || str_contains($message, 'sqlstate[08s01]')
-            || str_contains($message, 'connection is no longer usable');
     }
 
     /**
@@ -733,6 +719,50 @@ class PurchaseOrderSeeder extends Seeder
     private function isSqlServer(): bool
     {
         return DB::connection()->getDriverName() === 'sqlsrv';
+    }
+
+    private function runWithSqlServerReconnect(callable $operation, string $context): bool
+    {
+        $maxAttempts = $this->isSqlServer() ? 2 : 1;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $operation();
+                return true;
+            } catch (\Throwable $exception) {
+                $isRetryableDrop = $this->isSqlServer()
+                    && $attempt < $maxAttempts
+                    && $this->isConnectionDroppedException($exception);
+
+                if ($isRetryableDrop) {
+                    $this->warn("SQL Server connection dropped while processing {$context}. Retrying once.");
+                    DB::disconnect();
+                    DB::reconnect();
+                    continue;
+                }
+
+                $this->warn("PO skipped due DB error for {$context}: {$exception->getMessage()}");
+                Log::error('[PurchaseOrderSeeder] Row import failed', [
+                    'context' => $context,
+                    'exception' => $exception,
+                ]);
+
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private function isConnectionDroppedException(\Throwable $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'communication link failure')
+            || str_contains($message, '08s01')
+            || str_contains($message, 'server has gone away')
+            || str_contains($message, 'connection is broken')
+            || str_contains($message, 'transport-level error');
     }
 
     private function warn(string $message): void

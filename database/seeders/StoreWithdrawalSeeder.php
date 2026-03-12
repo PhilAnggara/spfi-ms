@@ -111,7 +111,7 @@ class StoreWithdrawalSeeder extends Seeder
 
             $detailRows = $detailsBySwsCode[$this->normalizeSwsCodeKey($swsNumber)] ?? [];
 
-            $persistStoreWithdrawal = function () use (
+            DB::transaction(function () use (
                 $swsNumber,
                 $headerPayload,
                 $detailRows,
@@ -174,7 +174,9 @@ class StoreWithdrawalSeeder extends Seeder
 
                     $detailIsActive = ! $this->isNegative($detailRow['is_active'] ?? 'Y');
 
-                    $detailPayload = [
+                    DB::table('store_withdrawal_items')->updateOrInsert([
+                        'id' => $legacyDetailId,
+                    ], [
                         'store_withdrawal_id' => (int) $storeWithdrawalId,
                         'item_id' => $itemId,
                         'product_code' => $productCode,
@@ -189,31 +191,11 @@ class StoreWithdrawalSeeder extends Seeder
                         'created_at' => $detailCreatedAt,
                         'updated_at' => $detailUpdatedAt,
                         'deleted_at' => $detailIsActive ? null : $detailUpdatedAt,
-                    ];
-
-                    $exists = DB::table('store_withdrawal_items')
-                        ->where('id', $legacyDetailId)
-                        ->exists();
-
-                    if ($exists) {
-                        DB::table('store_withdrawal_items')
-                            ->where('id', $legacyDetailId)
-                            ->update($detailPayload);
-                    } else {
-                        DB::table('store_withdrawal_items')->insert([
-                            'id' => $legacyDetailId,
-                        ] + $detailPayload);
-                    }
+                    ]);
 
                     $detailInserted++;
                 }
-            };
-
-            if ($this->isSqlServer()) {
-                $this->runWithSqlServerReconnect($persistStoreWithdrawal, "sws_code {$swsNumber}");
-            } else {
-                DB::transaction($persistStoreWithdrawal);
-            }
+            });
 
             $headerInserted++;
         }
@@ -494,34 +476,6 @@ class StoreWithdrawalSeeder extends Seeder
 
         // Use unprepared for SQL Server session-level IDENTITY_INSERT state.
         DB::unprepared("SET IDENTITY_INSERT [store_withdrawal_items] {$state}");
-    }
-
-    private function runWithSqlServerReconnect(callable $callback, string $context): void
-    {
-        try {
-            $callback();
-            return;
-        } catch (\Throwable $e) {
-            if (! $this->isCommunicationLinkFailure($e)) {
-                throw $e;
-            }
-
-            $this->warn("SQL Server communication link failure detected while importing {$context}, retrying once...");
-
-            DB::disconnect();
-            DB::reconnect();
-        }
-
-        $callback();
-    }
-
-    private function isCommunicationLinkFailure(\Throwable $e): bool
-    {
-        $message = strtolower($e->getMessage());
-
-        return str_contains($message, 'communication link failure')
-            || str_contains($message, 'sqlstate[08s01]')
-            || str_contains($message, 'connection is no longer usable');
     }
 
     private function warn(string $message): void

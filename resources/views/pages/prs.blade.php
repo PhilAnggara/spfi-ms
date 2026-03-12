@@ -116,6 +116,9 @@
                         <tbody id="prs-table-body">
                             @foreach ($items as $item)
                                 @php
+                                    $departmentName = $item->department?->name ?? '-';
+                                @endphp
+                                @php
                                     $isDeliveryPhase = in_array($item->status, ['APPROVED', 'DELIVERY_COMPLETE'], true);
                                     if ($isDeliveryPhase) {
                                         $deliveryStatus = $item->overall_delivery_status;
@@ -142,7 +145,7 @@
                                 @endphp
                                 <tr
                                     data-prs-number="{{ strtolower($item->prs_number) }}"
-                                    data-department="{{ strtolower($item->department->name) }}"
+                                    data-department="{{ strtolower($departmentName) }}"
                                     data-status="{{ strtoupper($primaryStatusText) }}"
                                     data-prs-date="{{ $item->prs_date }}"
                                     data-needed-date="{{ $item->date_needed }}"
@@ -153,7 +156,7 @@
                                             {{ $item->prs_number }}
                                         </button>
                                     </td>
-                                    <td>{{ $item->department->name }}</td>
+                                    <td>{{ $departmentName }}</td>
                                     <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
                                     <td>
                                         <span class="badge {{ $primaryStatusColor }}">
