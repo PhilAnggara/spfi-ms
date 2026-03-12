@@ -79,8 +79,7 @@
                                     </div>
                                 @endforeach
                             </div>
-                            {{-- <div class="mt-4 prs-pagination" id="prs-pagination" data-current-page="{{ $items->currentPage() }}" data-last-page="{{ $items->lastPage() }}">
-                            </div> --}}
+                            <div class="mt-4 prs-pagination" id="prs-pagination" data-current-page="{{ $items->currentPage() }}" data-last-page="{{ $items->lastPage() }}"></div>
                         </div>
                     </div>
                 </div>
