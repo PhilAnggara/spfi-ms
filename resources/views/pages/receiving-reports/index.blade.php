@@ -2,84 +2,113 @@
 @section('title', ' | Receiving Reports')
 
 @section('content')
-<div class="page-heading prs-page" id="rr-page" data-po-lookup-url="{{ route('receiving-reports.po-by-number') }}">
+<div id="rr-page-container">
+<div class="page-heading po-page" id="rr-page" data-po-lookup-url="{{ route('receiving-reports.po-by-number') }}">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
             <div class="col-12 col-lg-7">
-                <div class="prs-hero">
+                <div class="po-hero">
                     <h3 class="mb-1">Receiving Reports</h3>
-                    <p class="text-muted mb-0">Track all incoming goods, review PO details, and manage receiving reports in one place.</p>
+                    <p class="text-muted mb-0">Track incoming goods with instant search, live date filters, and dynamic pagination.</p>
                 </div>
             </div>
             @role('administrator|im-manager|im-supervisor|im-staff')
-                <div class="col-12 col-lg-5 text-lg-end">
-                    <button type="button" class="btn btn-success icon icon-left" data-bs-toggle="modal" data-bs-target="#create-rr-modal">
-                        <i class="fa-duotone fa-solid fa-plus"></i>
-                        Create RR
-                    </button>
+                <div class="col-12 col-lg-5">
+                    <div class="po-top-actions text-lg-end">
+                        <button type="button" class="btn btn-success icon icon-left" data-bs-toggle="modal" data-bs-target="#create-rr-modal">
+                            <i class="fa-duotone fa-solid fa-plus"></i>
+                            Create RR
+                        </button>
+                    </div>
                 </div>
             @endrole
         </div>
     </div>
 
-    <div class="row g-3 mb-3">
-        <div class="col-12 col-md-3">
-            <div class="card shadow-sm mb-0"><div class="card-body"><div class="text-muted small">Total RR</div><div class="fs-4 fw-bold">{{ number_format($totalRr) }}</div></div></div>
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card shadow-sm border-0 h-100 mb-0">
+                <div class="card-body">
+                    <div class="text-muted small">Total RR</div>
+                    <div class="fs-4 fw-bold">{{ number_format($totalRr) }}</div>
+                </div>
+            </div>
         </div>
-        <div class="col-12 col-md-3">
-            <div class="card shadow-sm mb-0"><div class="card-body"><div class="text-muted small">RR Today</div><div class="fs-4 fw-bold">{{ number_format($todayRr) }}</div></div></div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card shadow-sm border-0 h-100 mb-0">
+                <div class="card-body">
+                    <div class="text-muted small">RR Today</div>
+                    <div class="fs-4 fw-bold">{{ number_format($todayRr) }}</div>
+                </div>
+            </div>
         </div>
-        <div class="col-12 col-md-3">
-            <div class="card shadow-sm mb-0"><div class="card-body"><div class="text-muted small">Qty Good</div><div class="fs-4 fw-bold text-success">{{ number_format($totalGood, 2) }}</div></div></div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card shadow-sm border-0 h-100 mb-0">
+                <div class="card-body">
+                    <div class="text-muted small">Qty Good</div>
+                    <div class="fs-4 fw-bold text-success">{{ number_format($totalGood, 2) }}</div>
+                </div>
+            </div>
         </div>
-        <div class="col-12 col-md-3">
-            <div class="card shadow-sm mb-0"><div class="card-body"><div class="text-muted small">Qty Bad</div><div class="fs-4 fw-bold text-danger">{{ number_format($totalBad, 2) }}</div></div></div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card shadow-sm border-0 h-100 mb-0">
+                <div class="card-body">
+                    <div class="text-muted small">Qty Bad</div>
+                    <div class="fs-4 fw-bold text-danger">{{ number_format($totalBad, 2) }}</div>
+                </div>
+            </div>
         </div>
     </div>
 
     <section class="section">
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
-                <form method="GET" action="{{ route('receiving-reports.index') }}" id="rr-filter-form">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-12 col-md-5">
-                            <label for="filter-rr-keyword" class="form-label mb-1">Search RR</label>
-                            <input type="text" id="filter-rr-keyword" name="keyword" class="form-control" placeholder="RR Number / PO Number / Supplier / Creator" value="{{ request('keyword') }}">
-                        </div>
-                        <div class="col-6 col-md-2">
-                            <label for="filter-rr-date-start" class="form-label mb-1">Received Date (from)</label>
-                            <input type="date" id="filter-rr-date-start" name="date_from" class="form-control" value="{{ request('date_from') }}">
-                        </div>
-                        <div class="col-6 col-md-2">
-                            <label for="filter-rr-date-end" class="form-label mb-1">Received Date (to)</label>
-                            <input type="date" id="filter-rr-date-end" name="date_to" class="form-control" value="{{ request('date_to') }}">
-                        </div>
-                        <div class="col-6 col-md-2 d-grid">
-                            <button type="submit" class="btn btn-primary">Search</button>
-                        </div>
-                        <div class="col-6 col-md-1 d-grid">
-                            <a href="{{ route('receiving-reports.index') }}" class="btn btn-light-secondary">Reset</a>
-                        </div>
+                <div class="row g-3 align-items-end po-filter-grid" id="rr-filter-form">
+                    <div class="col-12 col-md-6 col-xl-7">
+                        <label for="filter-rr-keyword" class="form-label mb-1">Search RR</label>
+                        <input type="text" id="filter-rr-keyword" class="form-control" placeholder="RR number / PO number / supplier / creator" value="{{ $filters['keyword'] ?? '' }}">
                     </div>
-                </form>
+                    <div class="col-6 col-md-3 col-xl-2">
+                        <label for="filter-rr-date-start" class="form-label mb-1">Received (from)</label>
+                        <input type="date" id="filter-rr-date-start" class="form-control" value="{{ $filters['date_from'] ?? '' }}">
+                    </div>
+                    <div class="col-6 col-md-3 col-xl-2">
+                        <label for="filter-rr-date-end" class="form-label mb-1">Received (to)</label>
+                        <input type="date" id="filter-rr-date-end" class="form-control" value="{{ $filters['date_to'] ?? '' }}">
+                    </div>
+                    <div class="col-6 col-md-3 col-xl-1">
+                        <button type="button" id="reset-rr-filter" class="btn btn-light-secondary w-100">
+                            <i class="fa-regular fa-rotate-left me-1"></i>
+                            Reset
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="card shadow-sm border-0">
-            <div class="card-body">
+            <div class="card-body position-relative">
+                <div id="rr-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                        <div class="mt-2 text-muted">Loading data...</div>
+                    </div>
+                </div>
+
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h5 class="card-title mb-0">RR Records</h5>
+                    <h5 class="card-title mb-0">Receiving Report Data</h5>
                     <span class="badge bg-light-primary" id="rr-filter-result">{{ number_format($receivingReports->total()) }} records</span>
                 </div>
 
                 @if ($receivingReports->isEmpty())
-                    <div class="text-center text-muted py-4">
-                        <i class="fa-duotone fa-solid fa-inbox"></i>
-                        <p class="mb-0 mt-2">No receiving report found.</p>
+                    <div class="po-empty-state text-center text-muted py-5">
+                        <i class="fa-duotone fa-solid fa-file-circle-question po-empty-icon"></i>
+                        <p class="mb-0 mt-2 fw-semibold">No receiving report found.</p>
+                        <small>Try changing your keyword or date filters to see more results.</small>
                     </div>
                 @else
                     <div class="table-responsive">
-                        <table class="table table-striped text-center text-nowrap" id="rr-table">
+                        <table class="table table-striped align-middle po-table text-nowrap" id="rr-table">
                             <thead>
                                 <tr>
                                     <th>RR Number</th>
@@ -90,10 +119,10 @@
                                     <th>Qty Good</th>
                                     <th>Qty Bad</th>
                                     <th>Created By</th>
-                                    <th>Action</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="rr-table-body">
+                            <tbody>
                                 @foreach ($receivingReports as $rr)
                                     @php
                                         $qtyGood = (float) $rr->items->sum('qty_good');
@@ -101,34 +130,47 @@
                                         $po = $rr->purchaseOrder;
                                     @endphp
                                     <tr>
-                                        <td>{{ $rr->rr_number ?? ('#' . $rr->id) }}</td>
+                                        <td>
+                                            <div class="fw-semibold">{{ $rr->rr_number ?? ('#' . $rr->id) }}</div>
+                                            <small class="text-muted">#{{ $rr->id }}</small>
+                                        </td>
                                         <td>
                                             @if ($po)
-                                                <button type="button" class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" data-bs-toggle="modal" data-bs-target="#po-detail-modal-{{ $po->id }}">
+                                                <button type="button" class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" data-bs-toggle="modal" data-bs-target="#po-detail-modal-{{ $po->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="View PO detail">
                                                     <i class="fa-solid fa-file-lines"></i>
                                                     {{ $po->po_number ?? ('PO#' . $po->id) }}
                                                 </button>
                                             @else
-                                                -
+                                                <span class="badge bg-light-secondary">-</span>
                                             @endif
                                         </td>
-                                        <td>{{ $po?->supplier?->name ?? '-' }}</td>
-                                        <td>{{ optional($rr->received_date)->format('d M Y') }}</td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="po-cell-icon text-primary"><i class="fa-duotone fa-solid fa-truck-field"></i></span>
+                                                <span>{{ $po?->supplier?->name ?? '-' }}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <i class="fa-duotone fa-solid fa-calendar-days text-danger"></i>
+                                            {{ optional($rr->received_date)->format('d M Y') }}
+                                        </td>
                                         <td>{{ itemOrItems($rr->items->count()) }}</td>
-                                        <td>{{ number_format($qtyGood, 2) }}</td>
-                                        <td>{{ number_format($qtyBad, 2) }}</td>
+                                        <td class="fw-semibold text-success">{{ number_format($qtyGood, 2) }}</td>
+                                        <td class="fw-semibold text-danger">{{ number_format($qtyBad, 2) }}</td>
                                         <td>{{ $rr->createdBy?->name ?? '-' }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-view-modal-{{ $rr->id }}" title="View">
+                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-view-modal-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
                                                     <i class="fa-light fa-eye text-primary"></i>
                                                 </button>
-
+                                                <a href="{{ route('receiving-reports.print', $rr) }}" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print PDF">
+                                                    <i class="fa-light fa-print text-primary"></i>
+                                                </a>
                                                 @role('administrator|im-manager|im-supervisor|im-staff')
-                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-edit-modal-{{ $rr->id }}" title="Edit">
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-edit-modal-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                         <i class="fa-light fa-edit text-primary"></i>
                                                     </button>
-                                                    <button type="button" class="btn icon" onclick="confirmDeleteRr({{ $rr->id }}, '{{ $rr->rr_number ?? ('#' . $rr->id) }}')" title="Delete">
+                                                    <button type="button" class="btn icon" onclick="confirmDeleteRr({{ $rr->id }}, '{{ $rr->rr_number ?? ('#' . $rr->id) }}')" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
                                                         <i class="fa-light fa-trash text-secondary"></i>
                                                     </button>
                                                     <form action="{{ route('receiving-reports.destroy', $rr) }}" id="hapus-rr-{{ $rr->id }}" method="POST">
@@ -143,8 +185,9 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="mt-3">
-                        {{ $receivingReports->links() }}
+
+                    <div class="mt-3 d-flex justify-content-end">
+                        {{ $receivingReports->onEachSide(1)->links('pagination::bootstrap-5') }}
                     </div>
                 @endif
             </div>
@@ -505,12 +548,115 @@
         @endif
     @endforeach
 </div>
+</div>
 @endsection
 
 @push('addon-style')
+    <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
 @endpush
 
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/rr-modern.js') }}"></script>
+    <script>
+        (function () {
+            let isLoading = false;
+
+            function initPageTooltips(scope = document) {
+                const tooltipElements = scope.querySelectorAll('[data-bstooltip-toggle="tooltip"]');
+
+                tooltipElements.forEach((el) => {
+                    if (window.bootstrap && window.bootstrap.Tooltip) {
+                        if (window.bootstrap.Tooltip.getInstance(el)) {
+                            return;
+                        }
+
+                        new window.bootstrap.Tooltip(el);
+                    }
+                });
+            }
+
+            function setLoading(active) {
+                const loadingEl = document.getElementById('rr-page-loading');
+                if (!loadingEl) {
+                    return;
+                }
+
+                loadingEl.classList.toggle('d-none', !active);
+                loadingEl.classList.toggle('d-flex', active);
+            }
+
+            async function replacePageContent(url, pushState = true) {
+                if (isLoading) {
+                    return;
+                }
+
+                isLoading = true;
+                setLoading(true);
+
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        window.location.href = url;
+                        return;
+                    }
+
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newContainer = doc.querySelector('#rr-page-container');
+                    const currentContainer = document.querySelector('#rr-page-container');
+
+                    if (!newContainer || !currentContainer) {
+                        window.location.href = url;
+                        return;
+                    }
+
+                    currentContainer.replaceWith(newContainer);
+
+                    if (pushState) {
+                        window.history.pushState({}, '', url);
+                    }
+
+                    if (typeof window.initReceivingReportPage === 'function') {
+                        window.initReceivingReportPage();
+                    }
+
+                    initPageTooltips(newContainer);
+
+                    if (window.feather && typeof window.feather.replace === 'function') {
+                        window.feather.replace();
+                    }
+                } catch (_) {
+                    window.location.href = url;
+                } finally {
+                    isLoading = false;
+                    setLoading(false);
+                }
+            }
+
+            window.rrReplacePageContent = replacePageContent;
+
+            document.addEventListener('click', function (event) {
+                const link = event.target.closest('#rr-page-container a[href*="page="]');
+                if (!link) {
+                    return;
+                }
+
+                event.preventDefault();
+                replacePageContent(link.href, true);
+            });
+
+            window.addEventListener('popstate', function () {
+                replacePageContent(window.location.href, false);
+            });
+
+            initPageTooltips(document);
+        })();
+    </script>
 @endpush

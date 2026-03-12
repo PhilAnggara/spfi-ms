@@ -9,6 +9,7 @@ use App\Models\ReceivingReportItem;
 use App\Services\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -16,42 +17,13 @@ class ReceivingReportController extends Controller
 {
     public function index(Request $request)
     {
-        $keyword  = $request->input('keyword');
-        $dateFrom = $request->input('date_from');
-        $dateTo   = $request->input('date_to');
+        $filters = [
+            'keyword' => trim((string) $request->query('keyword', '')),
+            'date_from' => trim((string) $request->query('date_from', '')),
+            'date_to' => trim((string) $request->query('date_to', '')),
+        ];
 
-        $query = ReceivingReport::with([
-            'purchaseOrder.supplier',
-            'purchaseOrder.items.item.unit',
-            'items.purchaseOrderItem.item.unit',
-            'customsDocumentType',
-            'createdBy',
-        ])->orderByDesc('id');
-
-        if ($keyword) {
-            $query->where(function ($q) use ($keyword) {
-                $q->where('rr_number', 'like', "%{$keyword}%")
-                    ->orWhereHas('purchaseOrder', function ($q2) use ($keyword) {
-                        $q2->where('po_number', 'like', "%{$keyword}%")
-                            ->orWhereHas('supplier', function ($q3) use ($keyword) {
-                                $q3->where('name', 'like', "%{$keyword}%");
-                            });
-                    })
-                    ->orWhereHas('createdBy', function ($q2) use ($keyword) {
-                        $q2->where('name', 'like', "%{$keyword}%");
-                    });
-            });
-        }
-
-        if ($dateFrom) {
-            $query->where('received_date', '>=', $dateFrom);
-        }
-
-        if ($dateTo) {
-            $query->where('received_date', '<=', $dateTo);
-        }
-
-        $receivingReports = $query->paginate(50)->withQueryString();
+        $receivingReports = $this->paginateReceivingReports($filters, 10);
 
         $totals = DB::table('receiving_report_items')
             ->join('receiving_reports', 'receiving_reports.id', '=', 'receiving_report_items.receiving_report_id')
@@ -65,6 +37,7 @@ class ReceivingReportController extends Controller
             'todayRr'               => ReceivingReport::whereDate('received_date', now()->toDateString())->count(),
             'totalGood'             => (float) ($totals->total_good ?? 0),
             'totalBad'              => (float) ($totals->total_bad ?? 0),
+            'filters'              => $filters,
             'customsDocumentTypes'  => CustomsDocumentType::query()
                 ->orderBy('name')
                 ->whereLike('name', '%Pemasukan%')
@@ -499,5 +472,104 @@ class ReceivingReportController extends Controller
         }
 
         return $lines;
+    }
+
+    /**
+     * SQL Server-safe pagination for receiving reports.
+     */
+    private function paginateReceivingReports(array $filters = [], int $perPage = 10): LengthAwarePaginator
+    {
+        $currentPage = max(1, (int) LengthAwarePaginator::resolveCurrentPage());
+
+        $keyword = mb_strtolower(trim((string) ($filters['keyword'] ?? '')));
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        $keywordLike = "%{$keyword}%";
+
+        $query = DB::table('receiving_reports as rr')
+            ->leftJoin('purchase_orders as po', 'po.id', '=', 'rr.purchase_order_id')
+            ->leftJoin('suppliers as s', 's.id', '=', 'po.supplier_id')
+            ->leftJoin('users as u', 'u.id', '=', 'rr.created_by')
+            ->whereNull('rr.deleted_at')
+            ->select('rr.id as id')
+            ->when($keyword !== '', function ($subQuery) use ($keywordLike) {
+                $subQuery->where(function ($keywordQuery) use ($keywordLike) {
+                    $keywordQuery->whereRaw("LOWER(COALESCE(rr.rr_number, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(po.po_number, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(s.name, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(u.name, '')) LIKE ?", [$keywordLike]);
+                });
+            })
+            ->when($dateFrom !== '', function ($subQuery) use ($dateFrom) {
+                $subQuery->whereDate('rr.received_date', '>=', $dateFrom);
+            })
+            ->when($dateTo !== '', function ($subQuery) use ($dateTo) {
+                $subQuery->whereDate('rr.received_date', '<=', $dateTo);
+            })
+            ->orderByDesc('rr.received_date')
+            ->orderByDesc('rr.id');
+
+        $total = (clone $query)->reorder()->count();
+        $ids = [];
+
+        if ($this->isSqlServer()) {
+            $startRow = (($currentPage - 1) * $perPage) + 1;
+            $endRow = $currentPage * $perPage;
+
+            $rankedIdsQuery = (clone $query)
+                ->reorder()
+                ->select('rr.id as id')
+                ->selectRaw('ROW_NUMBER() OVER (ORDER BY rr.received_date DESC, rr.id DESC) as row_num');
+
+            $ids = DB::query()
+                ->fromSub($rankedIdsQuery, 'ranked_rr')
+                ->whereBetween('row_num', [$startRow, $endRow])
+                ->orderBy('row_num')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        } else {
+            $ids = (clone $query)
+                ->forPage($currentPage, $perPage)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        $collection = collect();
+
+        if (! empty($ids)) {
+            $itemsById = ReceivingReport::with([
+                'purchaseOrder.supplier',
+                'purchaseOrder.items.item.unit',
+                'items.purchaseOrderItem.item.unit',
+                'customsDocumentType',
+                'createdBy',
+            ])
+                ->whereIn('id', $ids)
+                ->get()
+                ->keyBy('id');
+
+            $collection = collect($ids)
+                ->map(fn (int $id) => $itemsById->get($id))
+                ->filter()
+                ->values();
+        }
+
+        return new LengthAwarePaginator(
+            items: $collection,
+            total: $total,
+            perPage: $perPage,
+            currentPage: $currentPage,
+            options: [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ],
+        );
+    }
+
+    private function isSqlServer(): bool
+    {
+        return DB::connection()->getDriverName() === 'sqlsrv';
     }
 }

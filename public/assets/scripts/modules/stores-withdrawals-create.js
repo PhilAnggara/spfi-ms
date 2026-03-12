@@ -84,6 +84,47 @@ function initSwsCatalogAndCart() {
         return Number(stockValue) > 0;
     };
 
+    const getAllowedQuantity = (stockValue, requestedQuantity) => {
+        const normalizedQuantity = Math.max(1, Number(requestedQuantity) || 1);
+        if (isConfirmatoryType()) {
+            return normalizedQuantity;
+        }
+
+        const normalizedStock = Number(stockValue) || 0;
+        if (normalizedStock <= 0) {
+            return 0;
+        }
+
+        return Math.min(normalizedQuantity, normalizedStock);
+    };
+
+    const syncCatalogQuantityInput = (card) => {
+        const qtyInput = card?.querySelector('.prs-item-qty');
+        if (!qtyInput) {
+            return;
+        }
+
+        const payload = getCardPayload(card);
+        const allowedQuantity = getAllowedQuantity(payload.stock, qtyInput.value);
+
+        qtyInput.min = '1';
+
+        if (isConfirmatoryType()) {
+            qtyInput.removeAttribute('max');
+        } else if (payload.stock > 0) {
+            qtyInput.max = String(payload.stock);
+        } else {
+            qtyInput.max = '1';
+        }
+
+        if (allowedQuantity <= 0) {
+            qtyInput.value = '1';
+            return;
+        }
+
+        qtyInput.value = String(allowedQuantity);
+    };
+
     const showStockRuleHint = (message = '') => {
         if (!stockRuleHint) {
             return;
@@ -123,6 +164,7 @@ function initSwsCatalogAndCart() {
         getCards().forEach((card) => {
             const payload = getCardPayload(card);
             const addButton = card.querySelector('.prs-item-add');
+            syncCatalogQuantityInput(card);
             if (!addButton || !payload.itemId) {
                 return;
             }
@@ -191,6 +233,9 @@ function initSwsCatalogAndCart() {
 
         cartItemsContainer.innerHTML = cartItems.map((item) => {
             const stockLabelClass = Number(item.stock) <= 0 ? 'text-danger fw-semibold' : 'text-muted';
+            const quantityMaxAttribute = !isConfirmatoryType() && Number(item.stock) > 0
+                ? `max="${item.stock}"`
+                : '';
 
             return `
                 <div class="prs-cart-item" data-item-id="${item.itemId}">
@@ -209,7 +254,7 @@ function initSwsCatalogAndCart() {
                                 <button type="button" class="btn btn-light-secondary sws-cart-decrement" data-item-id="${item.itemId}" aria-label="Decrease quantity">
                                     <i class="fa-light fa-minus"></i>
                                 </button>
-                                <input type="number" min="1" class="form-control sws-cart-qty" value="${item.quantity}" data-item-id="${item.itemId}">
+                                <input type="number" min="1" ${quantityMaxAttribute} class="form-control sws-cart-qty" value="${item.quantity}" data-item-id="${item.itemId}">
                                 <button type="button" class="btn btn-light-secondary sws-cart-increment" data-item-id="${item.itemId}" aria-label="Increase quantity">
                                     <i class="fa-light fa-plus"></i>
                                 </button>
@@ -258,6 +303,51 @@ function initSwsCatalogAndCart() {
         }
     };
 
+    const normalizeCartForStockRules = () => {
+        if (isConfirmatoryType()) {
+            showStockRuleHint('');
+            return;
+        }
+
+        let removedCount = 0;
+        let adjustedCount = 0;
+
+        Array.from(state.cart.entries()).forEach(([itemId, item]) => {
+            const allowedQuantity = getAllowedQuantity(item.stock, item.quantity);
+
+            if (allowedQuantity <= 0) {
+                state.cart.delete(itemId);
+                removedCount += 1;
+                return;
+            }
+
+            if (Number(item.quantity) !== allowedQuantity) {
+                state.cart.set(itemId, {
+                    ...item,
+                    quantity: allowedQuantity,
+                });
+                adjustedCount += 1;
+            }
+        });
+
+        if (removedCount > 0 && adjustedCount > 0) {
+            showStockRuleHint(`Normal type is active. ${removedCount} zero-stock item(s) were removed and ${adjustedCount} item quantity was adjusted to available stock.`);
+            return;
+        }
+
+        if (removedCount > 0) {
+            showStockRuleHint(`Normal type is active. ${removedCount} zero-stock item(s) were removed from the cart.`);
+            return;
+        }
+
+        if (adjustedCount > 0) {
+            showStockRuleHint(`Normal type is active. ${adjustedCount} item quantity was adjusted to available stock.`);
+            return;
+        }
+
+        showStockRuleHint('');
+    };
+
     const addToCart = (payload, quantity) => {
         if (!payload.itemId) {
             return;
@@ -268,12 +358,22 @@ function initSwsCatalogAndCart() {
             return;
         }
 
-        showStockRuleHint('');
+        const allowedQuantity = getAllowedQuantity(payload.stock, quantity);
+        if (allowedQuantity <= 0) {
+            showStockRuleHint('Normal type does not allow zero-stock items. Switch to Confirmatory if needed.');
+            return;
+        }
+
+        if (!isConfirmatoryType() && Number(quantity) > allowedQuantity) {
+            showStockRuleHint('Normal type quantity cannot exceed available stock. Quantity was adjusted automatically.');
+        } else {
+            showStockRuleHint('');
+        }
 
         const current = state.cart.get(payload.itemId);
         state.cart.set(payload.itemId, {
             ...payload,
-            quantity: Math.max(1, Number(quantity) || 1),
+            quantity: allowedQuantity,
             quantityInputValue: current?.quantityInputValue,
         });
 
@@ -493,8 +593,15 @@ function initSwsCatalogAndCart() {
             const card = plus.closest('.prs-item-card');
             const qtyInput = card?.querySelector('.prs-item-qty');
             if (qtyInput) {
-                const current = parseInt(qtyInput.value || '1', 10);
-                qtyInput.value = Number.isNaN(current) ? 1 : current + 1;
+                const payload = card ? getCardPayload(card) : null;
+                const current = Number(qtyInput.value || '1');
+                const nextValue = (Number.isNaN(current) ? 1 : current + 1);
+                const allowedQuantity = payload ? getAllowedQuantity(payload.stock, nextValue) : nextValue;
+                qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
+
+                if (!isConfirmatoryType() && payload && nextValue > allowedQuantity) {
+                    showStockRuleHint('Normal type quantity cannot exceed available stock.');
+                }
             }
             return;
         }
@@ -522,13 +629,31 @@ function initSwsCatalogAndCart() {
 
         const payload = getCardPayload(card);
         const qtyInput = card.querySelector('.prs-item-qty');
-        const quantity = Math.max(1, parseInt(qtyInput?.value || '1', 10) || 1);
+        const quantity = Math.max(1, Number(qtyInput?.value || '1') || 1);
 
         if (qtyInput) {
-            qtyInput.value = String(quantity);
+            qtyInput.value = String(getAllowedQuantity(payload.stock, quantity) || 1);
         }
 
         addToCart(payload, quantity);
+    });
+
+    grid.addEventListener('input', (event) => {
+        const qtyInput = event.target.closest('.prs-item-qty');
+        if (!qtyInput) {
+            return;
+        }
+
+        const card = qtyInput.closest('.prs-item-card');
+        const payload = card ? getCardPayload(card) : null;
+        const quantity = Math.max(1, Number(qtyInput.value || '1') || 1);
+        const allowedQuantity = payload ? getAllowedQuantity(payload.stock, quantity) : quantity;
+
+        qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
+
+        if (!isConfirmatoryType() && payload && quantity > allowedQuantity) {
+            showStockRuleHint('Normal type quantity cannot exceed available stock.');
+        }
     });
 
     if (cartItemsContainer) {
@@ -543,14 +668,19 @@ function initSwsCatalogAndCart() {
                 return;
             }
 
-            const quantity = Math.max(1, parseInt(qtyInput.value || '1', 10) || 1);
-            qtyInput.value = String(quantity);
-
             const current = state.cart.get(itemId);
+            const quantity = Math.max(1, Number(qtyInput.value || '1') || 1);
+            const allowedQuantity = getAllowedQuantity(current.stock, quantity);
+            qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
+
             state.cart.set(itemId, {
                 ...current,
-                quantity,
+                quantity: allowedQuantity <= 0 ? 1 : allowedQuantity,
             });
+
+            if (!isConfirmatoryType() && quantity > allowedQuantity) {
+                showStockRuleHint('Normal type quantity cannot exceed available stock.');
+            }
 
             renderCart();
         });
@@ -564,9 +694,15 @@ function initSwsCatalogAndCart() {
                 }
 
                 const current = state.cart.get(itemId);
+                const nextQuantity = getAllowedQuantity(current.stock, Number(current.quantity || 1) + 1);
+
+                if (!isConfirmatoryType() && nextQuantity === Number(current.quantity || 1)) {
+                    showStockRuleHint('Normal type quantity cannot exceed available stock.');
+                }
+
                 state.cart.set(itemId, {
                     ...current,
-                    quantity: Math.max(1, Number(current.quantity || 1) + 1),
+                    quantity: nextQuantity <= 0 ? 1 : nextQuantity,
                 });
 
                 renderCart();
@@ -608,6 +744,7 @@ function initSwsCatalogAndCart() {
     if (typeSelect) {
         typeSelect.addEventListener('change', () => {
             removeZeroStockItemsIfNormal();
+            normalizeCartForStockRules();
             renderCart();
             updateCatalogButtons();
         });
@@ -626,6 +763,15 @@ function initSwsCatalogAndCart() {
                 if (hasZeroStock) {
                     event.preventDefault();
                     showStockRuleHint('Normal type cannot contain zero-stock items.');
+                    return;
+                }
+
+                const hasOverStock = Array.from(state.cart.values()).some((item) => Number(item.quantity) > Number(item.stock || 0));
+                if (hasOverStock) {
+                    event.preventDefault();
+                    normalizeCartForStockRules();
+                    renderCart();
+                    showStockRuleHint('Normal type quantity cannot exceed available stock. Review the adjusted cart and submit again.');
                 }
             }
         });

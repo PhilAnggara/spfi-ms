@@ -189,10 +189,24 @@ class StoreWithdrawalController extends Controller
                 })
                 ->pluck('item_id');
 
+            $overStockIds = $requestedItems
+                ->filter(function (array $row) use ($itemRows): bool {
+                    $stock = round((float) (($itemRows[$row['item_id']]->stock_on_hand ?? 0)), 3);
+                    return $row['quantity'] > $stock;
+                })
+                ->pluck('item_id');
+
             if ($zeroStockIds->isNotEmpty()) {
                 return redirect()->back()->withInput()
                     ->withErrors([
                         'items' => 'Normal type does not allow zero-stock items. Use Confirmatory if needed.',
+                    ]);
+            }
+
+            if ($overStockIds->isNotEmpty()) {
+                return redirect()->back()->withInput()
+                    ->withErrors([
+                        'items' => 'Normal type does not allow quantity to exceed available stock. Reduce the quantity or switch to Confirmatory.',
                     ]);
             }
         }

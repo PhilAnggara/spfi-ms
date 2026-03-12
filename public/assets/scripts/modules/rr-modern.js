@@ -1,21 +1,125 @@
 document.addEventListener('DOMContentLoaded', function () {
+    initReceivingReportPage();
+});
+
+window.initReceivingReportPage = initReceivingReportPage;
+window.initReceivingReportFilters = initReceivingReportFilters;
+
+function initReceivingReportPage() {
     const rrPage = document.getElementById('rr-page');
     if (!rrPage) {
         return;
     }
 
-    initRrDataTable();
+    initReceivingReportFilters();
     initRrDeleteAction();
     initRrCreateModal(rrPage.dataset.poLookupUrl || '');
     initRrCustomsDocumentFields();
-});
+}
+
+function initReceivingReportFilters() {
+    const filterForm = document.getElementById('rr-filter-form');
+    if (!filterForm) {
+        return;
+    }
+
+    if (filterForm.dataset.filterInitialized === '1') {
+        return;
+    }
+    filterForm.dataset.filterInitialized = '1';
+
+    const filterElements = {
+        keyword: document.getElementById('filter-rr-keyword'),
+        dateStart: document.getElementById('filter-rr-date-start'),
+        dateEnd: document.getElementById('filter-rr-date-end'),
+        reset: document.getElementById('reset-rr-filter'),
+    };
+
+    const setQueryParam = (searchParams, key, value) => {
+        const normalizedValue = String(value || '').trim();
+        if (normalizedValue === '') {
+            searchParams.delete(key);
+            return;
+        }
+
+        searchParams.set(key, normalizedValue);
+    };
+
+    const buildFilterUrl = () => {
+        const url = new URL(window.location.href);
+
+        setQueryParam(url.searchParams, 'keyword', filterElements.keyword?.value);
+        setQueryParam(url.searchParams, 'date_from', filterElements.dateStart?.value);
+        setQueryParam(url.searchParams, 'date_to', filterElements.dateEnd?.value);
+
+        url.searchParams.delete('page');
+
+        return url.toString();
+    };
+
+    let debounceTimer = null;
+    const applyServerFilter = (useDebounce = false) => {
+        const doRequest = () => {
+            const url = buildFilterUrl();
+
+            if (typeof window.rrReplacePageContent === 'function') {
+                window.rrReplacePageContent(url, true);
+                return;
+            }
+
+            window.location.href = url;
+        };
+
+        if (!useDebounce) {
+            doRequest();
+            return;
+        }
+
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(doRequest, 350);
+    };
+
+    if (filterElements.keyword) {
+        filterElements.keyword.addEventListener('input', () => applyServerFilter(true));
+    }
+
+    if (filterElements.dateStart) {
+        filterElements.dateStart.addEventListener('change', () => applyServerFilter(false));
+    }
+
+    if (filterElements.dateEnd) {
+        filterElements.dateEnd.addEventListener('change', () => applyServerFilter(false));
+    }
+
+    if (filterElements.reset) {
+        filterElements.reset.addEventListener('click', function () {
+            if (filterElements.keyword) filterElements.keyword.value = '';
+            if (filterElements.dateStart) filterElements.dateStart.value = '';
+            if (filterElements.dateEnd) filterElements.dateEnd.value = '';
+
+            applyServerFilter(false);
+        });
+    }
+}
 
 function initRrCustomsDocumentFields() {
+    const rrPage = document.getElementById('rr-page');
+    if (!rrPage) {
+        return;
+    }
+
     const createToggles = document.querySelectorAll('.create-customs-choice');
     const createFields = document.getElementById('create-customs-fields');
     const createNumber = document.getElementById('create_customs_document_number');
     const createType = document.getElementById('create_customs_document_type_id');
     const createDate = document.getElementById('create_customs_document_date');
+
+    if (createFields && createFields.dataset.customsInitialized === '1') {
+        return;
+    }
+    if (createFields) {
+        createFields.dataset.customsInitialized = '1';
+    }
 
     const syncCreateCustomsFields = function () {
         if (!createToggles.length || !createFields || !createNumber || !createType || !createDate) {
@@ -43,6 +147,11 @@ function initRrCustomsDocumentFields() {
     syncCreateCustomsFields();
 
     document.querySelectorAll('.rr-edit-customs-toggle').forEach((toggleGroup) => {
+        if (toggleGroup.dataset.customsInitialized === '1') {
+            return;
+        }
+        toggleGroup.dataset.customsInitialized = '1';
+
         const targetSelector = toggleGroup.getAttribute('data-target');
         if (!targetSelector) {
             return;
@@ -97,98 +206,6 @@ function initRrCustomsDocumentFields() {
     });
 }
 
-function initRrDataTable() {
-    const tableEl = document.getElementById('rr-table');
-    const keywordInput = document.getElementById('filter-rr-keyword');
-    const startDateInput = document.getElementById('filter-rr-date-start');
-    const endDateInput = document.getElementById('filter-rr-date-end');
-    const resetButton = document.getElementById('reset-rr-filter');
-    const resultBadge = document.getElementById('rr-filter-result');
-
-    if (!tableEl || !keywordInput || !startDateInput || !endDateInput || !resetButton || !resultBadge) {
-        return;
-    }
-
-    if (typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.DataTable === 'undefined') {
-        return;
-    }
-
-    const $ = window.jQuery;
-    const $table = $('#rr-table');
-
-    const dateFilterFn = function (settings, data, dataIndex) {
-        if (settings.nTable !== tableEl) {
-            return true;
-        }
-
-        const startDate = startDateInput.value;
-        const endDate = endDateInput.value;
-        if (!startDate && !endDate) {
-            return true;
-        }
-
-        const rowNode = settings.aoData[dataIndex]?.nTr;
-        const rowDate = rowNode?.dataset.receivedDate || '';
-
-        if (!rowDate) {
-            return false;
-        }
-
-        if (startDate && rowDate < startDate) {
-            return false;
-        }
-
-        if (endDate && rowDate > endDate) {
-            return false;
-        }
-
-        return true;
-    };
-
-    $.fn.dataTable.ext.search.push(dateFilterFn);
-
-    const dataTable = $table.DataTable({
-        order: [[3, 'desc']],
-        pageLength: 10,
-        lengthMenu: [10, 25, 50, 100],
-        dom: 'rt<"d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2"lip>',
-        language: {
-            paginate: {
-                previous: 'Prev',
-                next: 'Next'
-            },
-            info: 'Showing _START_ to _END_ of _TOTAL_ records',
-            lengthMenu: 'Show _MENU_ records'
-        }
-    });
-
-    const updateResult = function () {
-        resultBadge.textContent = dataTable.rows({ search: 'applied' }).count() + ' records';
-    };
-
-    keywordInput.addEventListener('input', function () {
-        dataTable.search(keywordInput.value || '').draw();
-    });
-
-    startDateInput.addEventListener('change', function () {
-        dataTable.draw();
-    });
-
-    endDateInput.addEventListener('change', function () {
-        dataTable.draw();
-    });
-
-    resetButton.addEventListener('click', function () {
-        keywordInput.value = '';
-        startDateInput.value = '';
-        endDateInput.value = '';
-        dataTable.search('').draw();
-    });
-
-    $table.on('draw.dt', updateResult);
-    updateResult();
-}
-
 function initRrDeleteAction() {
     window.confirmDeleteRr = function (rrId, rrNumber) {
         Swal.fire({
@@ -211,6 +228,12 @@ function initRrDeleteAction() {
 }
 
 function initRrCreateModal(poLookupUrl) {
+    const createForm = document.getElementById('create-rr-form');
+    if (!createForm || createForm.dataset.rrCreateInitialized === '1') {
+        return;
+    }
+    createForm.dataset.rrCreateInitialized = '1';
+
     const createPoNumberInput = document.getElementById('create_po_number');
     const createLoadPoButton = document.getElementById('create-load-po');
     const createPoError = document.getElementById('create-po-error');
