@@ -98,6 +98,7 @@
                                     @php
                                         $detailItems = collect($storeWithdrawalItems[$sws->id] ?? []);
                                         $canRemoveItem = $detailItems->count() > 1;
+                                        $isLocked = (bool) ($lockedStoreWithdrawalLookup[$sws->id] ?? false);
                                     @endphp
                                     <tr>
                                         <td>
@@ -127,18 +128,24 @@
                                                 <a href="{{ route('stores-withdrawals.print', $sws->id) }}" target="_blank" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print Slip">
                                                     <i class="fa-light fa-print text-primary"></i>
                                                 </a>
-                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $sws->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
-                                                    <i class="fa-light fa-edit text-primary"></i>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    class="btn icon"
-                                                    data-bstooltip-toggle="tooltip"
-                                                    data-bs-placement="top"
-                                                    title="Delete"
-                                                    onclick="hapusData({{ $sws->id }}, 'Delete Stores Withdrawal', 'Are you sure want to delete Stores Withdrawal {{ $sws->sws_number }}?')">
-                                                    <i class="fa-light fa-trash text-secondary"></i>
-                                                </button>
+                                                @if ($isLocked)
+                                                    <button type="button" class="btn icon" disabled data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Locked: transfer slip already created">
+                                                        <i class="fa-light fa-lock text-secondary"></i>
+                                                    </button>
+                                                @else
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $sws->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                                                        <i class="fa-light fa-edit text-primary"></i>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        class="btn icon"
+                                                        data-bstooltip-toggle="tooltip"
+                                                        data-bs-placement="top"
+                                                        title="Delete"
+                                                        onclick="hapusData({{ $sws->id }}, 'Delete Stores Withdrawal', 'Are you sure want to delete Stores Withdrawal {{ $sws->sws_number }}?')">
+                                                        <i class="fa-light fa-trash text-secondary"></i>
+                                                    </button>
+                                                @endif
                                                 <form action="{{ route('stores-withdrawals.destroy', $sws->id) }}" id="hapus-{{ $sws->id }}" method="POST">
                                                     @csrf
                                                     @method('DELETE')
@@ -159,6 +166,7 @@
                         @php
                             $detailItems = collect($storeWithdrawalItems[$sws->id] ?? []);
                             $canRemoveItem = $detailItems->count() > 1;
+                            $isLocked = (bool) ($lockedStoreWithdrawalLookup[$sws->id] ?? false);
                         @endphp
 
                         <div class="modal fade" id="detail-modal-{{ $sws->id }}" tabindex="-1" aria-hidden="true">
@@ -260,6 +268,12 @@
                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                         </div>
                                         <div class="modal-body">
+                                            @if ($isLocked)
+                                                <div class="alert alert-warning border-0 sws-edit-alert mb-3">
+                                                    <div class="fw-semibold mb-1">Edit Locked</div>
+                                                    <div class="small">Stores withdrawal ini sudah dipakai di transfer slip, jadi tidak bisa diedit lagi.</div>
+                                                </div>
+                                            @endif
                                             <div class="alert alert-info border-0 sws-edit-alert">
                                                 <div class="fw-semibold mb-1">Quick Edit Rules</div>
                                                 <div class="small">You can update quantity and remove existing items. Adding new items is disabled in this modal.</div>
@@ -292,6 +306,7 @@
                                                                             step="0.001"
                                                                             name="items[{{ $loop->index }}][quantity]"
                                                                             value="{{ number_format((float) $detail->quantity, 3, '.', '') }}"
+                                                                            @disabled($isLocked)
                                                                             data-sws-qty-input>
                                                                         <span class="input-group-text">{{ $detail->uom ?? '-' }}</span>
                                                                     </div>
@@ -305,6 +320,7 @@
                                                                                 type="checkbox"
                                                                                 name="items[{{ $loop->index }}][remove]"
                                                                                 value="1"
+                                                                                @disabled($isLocked)
                                                                                 data-sws-remove-toggle>
                                                                             <label class="form-check-label">Remove</label>
                                                                         </div>
@@ -324,7 +340,7 @@
                                         </div>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
-                                            <button type="submit" class="btn btn-primary" @disabled($detailItems->isEmpty())>Save Changes</button>
+                                            <button type="submit" class="btn btn-primary" @disabled($detailItems->isEmpty() || $isLocked)>Save Changes</button>
                                         </div>
                                     </form>
                                 </div>

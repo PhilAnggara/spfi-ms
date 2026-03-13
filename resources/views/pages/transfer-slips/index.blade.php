@@ -293,12 +293,21 @@
                                     <input type="date" class="form-control" id="create_ts_date" name="ts_date" value="{{ old('ts_date', now()->toDateString()) }}" required>
                                 </div>
                                 <div class="col-md-4">
-                                    <label for="create_for_production" class="form-label">For Production</label>
-                                    <select class="form-select" id="create_for_production" name="for_production" required>
-                                        <option value="1" @selected(old('for_production', '0') === '1')>Yes</option>
-                                        <option value="0" @selected(old('for_production', '0') === '0')>No</option>
-                                    </select>
-                                    <div class="form-text" id="create-production-help">If select yes, this transfer slip will be counted on iCore Template - Consumption report.</div>
+                                    <label class="form-label d-block">For Production</label>
+                                    <div class="ts-production-toggle" role="radiogroup" aria-label="For production option">
+                                        <input type="radio" class="btn-check create-production-choice" name="for_production" id="create-for-production-yes" value="1" @checked(old('for_production', '0') === '1')>
+                                        <label class="btn btn-outline-success" for="create-for-production-yes">
+                                            <i class="fa-regular fa-industry me-1"></i>
+                                            Yes
+                                        </label>
+
+                                        <input type="radio" class="btn-check create-production-choice" name="for_production" id="create-for-production-no" value="0" @checked(old('for_production', '0') === '0')>
+                                        <label class="btn btn-outline-secondary" for="create-for-production-no">
+                                            <i class="fa-regular fa-ban me-1"></i>
+                                            No
+                                        </label>
+                                    </div>
+                                    <div class="form-text" id="create-production-help">If set to Yes, this transfer slip will be counted on iCore Template - Consumption report.</div>
                                 </div>
                                 <div class="col-12">
                                     <label for="create_remarks" class="form-label">Remarks</label>
@@ -311,7 +320,7 @@
                                     <div class="row g-3 align-items-end">
                                         <div class="col-md-8">
                                             <label for="create_sws_number" class="form-label">SWS Code</label>
-                                            <input type="text" class="form-control" id="create_sws_number" name="sws_number" value="{{ old('sws_number') }}" placeholder="Input SWS number, for example 7056-120326-001" required>
+                                            <input type="text" class="form-control" id="create_sws_number" name="sws_number" value="{{ old('sws_number') }}" placeholder="Input SWS number, for example DEP0000001" required>
                                             <input type="hidden" id="create_store_withdrawal_id" name="store_withdrawal_id" value="{{ old('store_withdrawal_id') }}">
                                         </div>
                                         <div class="col-md-4">
@@ -355,6 +364,20 @@
                                         <small>Info</small>
                                         <div id="create-sws-detail-info">-</div>
                                     </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 mt-1 ts-qty-tools">
+                                <small class="text-muted">Quick action for many items: fill all lines with remaining quantity, or clear all quantities.</small>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Qty quick actions">
+                                    <button type="button" class="btn btn-outline-success" id="create-ts-fill-remaining">
+                                        <i class="fa-regular fa-wand-magic-sparkles me-1"></i>
+                                        Fill All Remaining
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="create-ts-clear-qty">
+                                        <i class="fa-regular fa-eraser me-1"></i>
+                                        Clear Qty
+                                    </button>
                                 </div>
                             </div>
 
@@ -455,6 +478,60 @@
 
         .ts-qty-input {
             min-width: 140px;
+        }
+
+        /* Fix: form wraps modal-header + modal-body + modal-footer inside modal-dialog-scrollable.
+           Bootstrap flex only targets direct children of .modal-content, so we must make the
+           form behave the same way — a flex column that fills available height and lets
+           .modal-body overflow-scroll independently. */
+        #create-ts-modal .modal-content {
+            display: flex;
+            flex-direction: column;
+            max-height: 100%;
+            overflow: hidden;
+        }
+
+        #create-ts-modal .modal-content > form {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        #create-ts-modal .modal-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        #create-ts-modal .modal-header,
+        #create-ts-modal .modal-footer {
+            flex-shrink: 0;
+        }
+
+        .ts-production-toggle {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .ts-production-toggle .btn {
+            flex: 1;
+            border-radius: 0.65rem;
+            font-weight: 600;
+        }
+
+        .ts-qty-tools {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 0.6rem 0.75rem;
+        }
+
+        @media (max-width: 767.98px) {
+            .ts-production-toggle {
+                flex-direction: column;
+            }
         }
     </style>
 @endpush

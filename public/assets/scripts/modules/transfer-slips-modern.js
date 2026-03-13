@@ -153,8 +153,10 @@ function initTransferSlipCreateModal(swsLookupUrl) {
     const createSummaryLines = document.getElementById('create-ts-summary-lines');
     const createSummaryQty = document.getElementById('create-ts-summary-qty');
     const createSummaryProduction = document.getElementById('create-ts-summary-production');
-    const createForProduction = document.getElementById('create_for_production');
+    const createProductionChoices = Array.from(createForm.querySelectorAll('.create-production-choice'));
     const createProductionHelp = document.getElementById('create-production-help');
+    const createFillRemainingButton = document.getElementById('create-ts-fill-remaining');
+    const createClearQtyButton = document.getElementById('create-ts-clear-qty');
     const createSaveButton = document.getElementById('create-ts-save-btn');
 
     if (createSaveButton) {
@@ -178,6 +180,11 @@ function initTransferSlipCreateModal(swsLookupUrl) {
         shouldOpenModal: false,
         swsNumber: '',
         items: [],
+    };
+
+    const getProductionValue = () => {
+        const selectedOption = createForm.querySelector('.create-production-choice:checked');
+        return selectedOption ? selectedOption.value : '0';
     };
 
     const formatNumber = (value) => Number(value || 0).toLocaleString('en-US', {
@@ -204,7 +211,7 @@ function initTransferSlipCreateModal(swsLookupUrl) {
     };
 
     const syncProductionSummary = () => {
-        const isProduction = createForProduction && createForProduction.value === '1';
+        const isProduction = getProductionValue() === '1';
 
         if (createSummaryProduction) {
             createSummaryProduction.textContent = isProduction ? 'Yes' : 'No';
@@ -214,6 +221,16 @@ function initTransferSlipCreateModal(swsLookupUrl) {
             createProductionHelp.textContent = isProduction
                 ? 'If select yes, this transfer slip will be counted on iCore Template - Consumption report.'
                 : 'If select no, this transfer slip will not be counted on iCore Template - Consumption report.';
+        }
+    };
+
+    const setQtyQuickActionsDisabled = (disabled) => {
+        if (createFillRemainingButton) {
+            createFillRemainingButton.disabled = disabled;
+        }
+
+        if (createClearQtyButton) {
+            createClearQtyButton.disabled = disabled;
         }
     };
 
@@ -260,6 +277,7 @@ function initTransferSlipCreateModal(swsLookupUrl) {
         if (createSwsDetails) {
             createSwsDetails.classList.add('d-none');
         }
+        setQtyQuickActionsDisabled(true);
         updateSummary();
     };
 
@@ -292,6 +310,8 @@ function initTransferSlipCreateModal(swsLookupUrl) {
             renderEmptyState('This SWS has no active item to transfer.');
             return;
         }
+
+        setQtyQuickActionsDisabled(false);
 
         createItemsBody.innerHTML = payload.items.map((item, index) => {
             const preservedQty = preservedMap.get(Number(item.store_withdrawal_item_id)) ?? 0;
@@ -363,12 +383,52 @@ function initTransferSlipCreateModal(swsLookupUrl) {
             showSwsError(error.message || 'Failed to load SWS data.');
         } finally {
             createLoadSwsButton.disabled = false;
+
+            if (createSaveButton) {
+                createSaveButton.classList.remove('d-none');
+                createSaveButton.style.removeProperty('display');
+            }
         }
     };
 
     createLoadSwsButton.addEventListener('click', function () {
         loadSws();
     });
+
+    if (createFillRemainingButton) {
+        createFillRemainingButton.addEventListener('click', function () {
+            const qtyInputs = Array.from(createForm.querySelectorAll('.ts-qty-input'));
+            if (qtyInputs.length === 0) {
+                showSwsError('Load an SWS number first before using quick fill.');
+                return;
+            }
+
+            qtyInputs.forEach((input) => {
+                const max = Number(input.dataset.max || 0);
+                input.value = max.toFixed(3);
+            });
+
+            hideSwsError();
+            updateSummary();
+        });
+    }
+
+    if (createClearQtyButton) {
+        createClearQtyButton.addEventListener('click', function () {
+            const qtyInputs = Array.from(createForm.querySelectorAll('.ts-qty-input'));
+            if (qtyInputs.length === 0) {
+                showSwsError('Load an SWS number first before clearing quantities.');
+                return;
+            }
+
+            qtyInputs.forEach((input) => {
+                input.value = '0.000';
+            });
+
+            hideSwsError();
+            updateSummary();
+        });
+    }
 
     createSwsNumberInput.addEventListener('keydown', function (event) {
         if (event.key === 'Enter') {
@@ -390,9 +450,11 @@ function initTransferSlipCreateModal(swsLookupUrl) {
         hideSwsError();
     });
 
-    if (createForProduction) {
-        createForProduction.addEventListener('change', syncProductionSummary);
-    }
+    createProductionChoices.forEach((input) => {
+        input.addEventListener('change', syncProductionSummary);
+    });
+
+    setQtyQuickActionsDisabled(true);
     syncProductionSummary();
 
     if (prefill.shouldOpenModal && window.bootstrap && window.bootstrap.Modal) {

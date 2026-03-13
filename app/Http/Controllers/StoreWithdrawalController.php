@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Support\Concerns\PaginatesLegacySqlServer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 
 class StoreWithdrawalController extends Controller
 {
+    use PaginatesLegacySqlServer;
+
     /**
      * Display stores withdrawal list.
      */
@@ -33,6 +36,8 @@ class StoreWithdrawalController extends Controller
             ->all();
 
         $storeWithdrawalItems = $this->groupStoreWithdrawalItems($storeWithdrawalIds);
+        $lockedStoreWithdrawalIds = $this->lockedStoreWithdrawalIds($storeWithdrawalIds);
+        $lockedStoreWithdrawalLookup = array_fill_keys($lockedStoreWithdrawalIds, true);
 
         $departmentOptions = Department::query()
             ->select(['code', 'name'])
@@ -42,6 +47,7 @@ class StoreWithdrawalController extends Controller
         return view('pages.stores-withdrawals.index', [
             'storeWithdrawals' => $storeWithdrawals,
             'storeWithdrawalItems' => $storeWithdrawalItems,
+            'lockedStoreWithdrawalLookup' => $lockedStoreWithdrawalLookup,
             'departmentOptions' => $departmentOptions,
             'filters' => $filters,
         ]);
@@ -79,11 +85,10 @@ class StoreWithdrawalController extends Controller
             ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
                 $query->where('category_id', (int) $categoryId);
             })
-            ->orderBy('name');
+            ->orderBy('name')
+            ->orderBy('id');
 
-        $items = $itemsQuery
-            ->paginate(36)
-            ->withQueryString();
+        $items = $this->paginateEloquentForCurrentConnection($itemsQuery, 'name ASC, id ASC', 36);
 
         if ($request->expectsJson() || $request->ajax()) {
             $transformedItems = $items->getCollection()->map(function ($item) {
@@ -356,6 +361,12 @@ class StoreWithdrawalController extends Controller
             abort(404);
         }
 
+        if ($this->hasActiveTransferSlip($storeWithdrawalId)) {
+            return redirect()->back()->withErrors([
+                'items' => 'Stores withdrawal cannot be edited because a transfer slip has already been created.',
+            ]);
+        }
+
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer'],
@@ -451,6 +462,11 @@ class StoreWithdrawalController extends Controller
     public function destroy(string $storeWithdrawal)
     {
         $storeWithdrawalId = (int) $storeWithdrawal;
+
+        if ($this->hasActiveTransferSlip($storeWithdrawalId)) {
+            return redirect()->back()->with('error', 'Stores withdrawal cannot be deleted because a transfer slip has already been created.');
+        }
+
         $now = now();
         $authUserId = Auth::id();
 
@@ -595,7 +611,34 @@ class StoreWithdrawalController extends Controller
 
     private function isSqlServer(): bool
     {
-        return DB::connection()->getDriverName() === 'sqlsrv';
+        return $this->isSqlServerConnection();
+    }
+
+    /**
+     * @param  array<int, int>  $storeWithdrawalIds
+     * @return array<int, int>
+     */
+    private function lockedStoreWithdrawalIds(array $storeWithdrawalIds): array
+    {
+        if (empty($storeWithdrawalIds)) {
+            return [];
+        }
+
+        return DB::table('transfer_slips')
+            ->whereIn('store_withdrawal_id', $storeWithdrawalIds)
+            ->whereNull('deleted_at')
+            ->distinct()
+            ->pluck('store_withdrawal_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    private function hasActiveTransferSlip(int $storeWithdrawalId): bool
+    {
+        return DB::table('transfer_slips')
+            ->where('store_withdrawal_id', $storeWithdrawalId)
+            ->whereNull('deleted_at')
+            ->exists();
     }
 
     /**

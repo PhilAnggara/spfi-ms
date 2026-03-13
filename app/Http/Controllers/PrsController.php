@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Prs;
 use App\Models\PrsItem;
+use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Models\User;
 use App\Notifications\PrsSubmittedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -18,6 +19,8 @@ use Illuminate\Http\Request;
 
 class PrsController extends Controller
 {
+    use PaginatesLegacySqlServer;
+
     /**
      * Display a listing of the resource.
      */
@@ -89,11 +92,10 @@ class PrsController extends Controller
             ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
                 $query->where('category_id', (int) $categoryId);
             })
-            ->orderBy('name');
+            ->orderBy('name')
+            ->orderBy('id');
 
-        $items = $itemsQuery
-            ->paginate(36)
-            ->withQueryString();
+        $items = $this->paginateEloquentForCurrentConnection($itemsQuery, 'name ASC, id ASC', 36);
 
         if ($request->expectsJson() || $request->ajax()) {
             $transformedItems = $items->getCollection()->map(function ($item) {
@@ -471,4 +473,5 @@ class PrsController extends Controller
             ],
         );
     }
+
 }
