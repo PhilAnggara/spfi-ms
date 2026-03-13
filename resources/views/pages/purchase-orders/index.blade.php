@@ -121,6 +121,7 @@
                             <tbody>
                                 @foreach ($purchaseOrders as $po)
                                     @php
+                                        $poNumber = trim((string) ($po->po_number ?? ''));
                                         $statusClass = match($po->status) {
                                             'APPROVED' => 'bg-light-success text-success',
                                             'PENDING_APPROVAL' => 'bg-light-warning text-warning',
@@ -139,8 +140,14 @@
                                     @endphp
                                     <tr>
                                         <td>
-                                            <div class="fw-semibold">{{ $po->po_number ?: 'PO-' . str_pad((string) $po->id, 5, '0', STR_PAD_LEFT) }}</div>
-                                            <small class="text-muted">#{{ $po->id }}</small>
+                                            @if ($poNumber !== '')
+                                                <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $poNumber }}')">
+                                                    <i class="fa-solid fa-regular fa-clipboard"></i>
+                                                    {{ $poNumber }}
+                                                </button>
+                                            @else
+                                                <span class="badge bg-light-secondary">-</span>
+                                            @endif
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center gap-2">

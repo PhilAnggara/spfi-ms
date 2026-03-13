@@ -29,6 +29,7 @@ function initTransferSlipFilters() {
 
     const filterElements = {
         keyword: document.getElementById('filter-ts-keyword'),
+        department: document.getElementById('filter-ts-department'),
         production: document.getElementById('filter-ts-production'),
         tsStart: document.getElementById('filter-ts-date-start'),
         tsEnd: document.getElementById('filter-ts-date-end'),
@@ -49,6 +50,7 @@ function initTransferSlipFilters() {
         const url = new URL(window.location.href);
 
         setQueryParam(url.searchParams, 'keyword', filterElements.keyword?.value);
+        setQueryParam(url.searchParams, 'department', filterElements.department?.value);
         setQueryParam(url.searchParams, 'production', filterElements.production?.value);
         setQueryParam(url.searchParams, 'ts_start', filterElements.tsStart?.value);
         setQueryParam(url.searchParams, 'ts_end', filterElements.tsEnd?.value);
@@ -84,6 +86,10 @@ function initTransferSlipFilters() {
         filterElements.keyword.addEventListener('input', () => applyServerFilter(true));
     }
 
+    if (filterElements.department) {
+        filterElements.department.addEventListener('change', () => applyServerFilter(false));
+    }
+
     if (filterElements.production) {
         filterElements.production.addEventListener('change', () => applyServerFilter(false));
     }
@@ -99,6 +105,7 @@ function initTransferSlipFilters() {
     if (filterElements.reset) {
         filterElements.reset.addEventListener('click', function () {
             if (filterElements.keyword) filterElements.keyword.value = '';
+            if (filterElements.department) filterElements.department.value = '';
             if (filterElements.production) filterElements.production.value = '';
             if (filterElements.tsStart) filterElements.tsStart.value = '';
             if (filterElements.tsEnd) filterElements.tsEnd.value = '';
@@ -149,6 +156,11 @@ function initTransferSlipCreateModal(swsLookupUrl) {
     const createForProduction = document.getElementById('create_for_production');
     const createProductionHelp = document.getElementById('create-production-help');
     const createSaveButton = document.getElementById('create-ts-save-btn');
+
+    if (createSaveButton) {
+        createSaveButton.classList.remove('d-none');
+        createSaveButton.style.removeProperty('display');
+    }
 
     const detailFields = {
         number: document.getElementById('create-sws-detail-number'),
@@ -327,9 +339,6 @@ function initTransferSlipCreateModal(swsLookupUrl) {
 
         hideSwsError();
         createLoadSwsButton.disabled = true;
-        if (createSaveButton) {
-            createSaveButton.disabled = true;
-        }
 
         try {
             const url = new URL(swsLookupUrl, window.location.origin);
@@ -354,9 +363,6 @@ function initTransferSlipCreateModal(swsLookupUrl) {
             showSwsError(error.message || 'Failed to load SWS data.');
         } finally {
             createLoadSwsButton.disabled = false;
-            if (createSaveButton) {
-                createSaveButton.disabled = false;
-            }
         }
     };
 

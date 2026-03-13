@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,7 @@ class TransferSlipController extends Controller
     {
         $filters = [
             'keyword' => trim((string) $request->query('keyword', '')),
+            'department' => trim((string) $request->query('department', '')),
             'production' => trim((string) $request->query('production', '')),
             'ts_start' => trim((string) $request->query('ts_start', '')),
             'ts_end' => trim((string) $request->query('ts_end', '')),
@@ -26,9 +28,15 @@ class TransferSlipController extends Controller
 
         $transferSlipItems = $this->groupTransferSlipItems($transferSlipIds);
 
+        $departmentOptions = Department::query()
+            ->select(['code', 'name'])
+            ->orderBy('name')
+            ->get();
+
         return view('pages.transfer-slips.index', [
             'transferSlips' => $transferSlips,
             'transferSlipItems' => $transferSlipItems,
+            'departmentOptions' => $departmentOptions,
             'filters' => $filters,
         ]);
     }
@@ -303,6 +311,7 @@ class TransferSlipController extends Controller
         $currentPage = max(1, (int) $currentPage);
 
         $keyword = mb_strtolower(trim((string) ($filters['keyword'] ?? '')));
+        $department = mb_strtolower(trim((string) ($filters['department'] ?? '')));
         $production = trim((string) ($filters['production'] ?? ''));
         $tsStart = trim((string) ($filters['ts_start'] ?? ''));
         $tsEnd = trim((string) ($filters['ts_end'] ?? ''));
@@ -346,6 +355,9 @@ class TransferSlipController extends Controller
                         ->orWhereRaw('LOWER(COALESCE(ts.remarks, \'\')) LIKE ?', [$keywordLike])
                         ->orWhereRaw('LOWER(COALESCE(creator.name, \'\')) LIKE ?', [$keywordLike]);
                 });
+            })
+            ->when($department !== '', function ($subQuery) use ($department) {
+                $subQuery->whereRaw('LOWER(sw.department_code) = ?', [$department]);
             })
             ->when($production !== '', function ($subQuery) use ($production) {
                 $subQuery->where('ts.for_production', $production === '1');

@@ -46,9 +46,20 @@
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
                 <div class="row g-3 align-items-end" id="ts-filter-form">
-                    <div class="col-12 col-md-6 col-xl-5">
+                    <div class="col-12 col-md-6 col-xl-3">
                         <label for="filter-ts-keyword" class="form-label mb-1">Search Transfer Slip</label>
                         <input type="text" id="filter-ts-keyword" class="form-control" value="{{ $filters['keyword'] ?? '' }}" placeholder="TS number / SWS / dept / remarks / creator">
+                    </div>
+                    <div class="col-6 col-md-3 col-xl-2">
+                        <label for="filter-ts-department" class="form-label mb-1">Department</label>
+                        <select id="filter-ts-department" class="form-select">
+                            <option value="">All Department</option>
+                            @foreach ($departmentOptions as $department)
+                                <option value="{{ $department->code }}" @selected(($filters['department'] ?? '') === $department->code)>
+                                    {{ $department->code }} - {{ $department->name }}
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-ts-production" class="form-label mb-1">For Production</label>
@@ -110,18 +121,29 @@
                                     <th>Total Qty</th>
                                     <th>Remarks</th>
                                     <th>Created By</th>
-                                    <th class="text-center">Action</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach ($transferSlips as $transferSlip)
                                     <tr>
-                                        <td class="fw-semibold">{{ $transferSlip->ts_number }}</td>
-                                        <td>{{ format_date($transferSlip->ts_date) }}</td>
+                                        <td>
+                                            <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $transferSlip->ts_number }}')">
+                                                <i class="fa-solid fa-regular fa-clipboard"></i>
+                                                {{ $transferSlip->ts_number }}
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <i class="fa-duotone fa-solid fa-calendar-days text-danger"></i>
+                                            {{ \Carbon\Carbon::parse($transferSlip->ts_date)->format('d M Y') }}
+                                        </td>
                                         <td>{{ $transferSlip->sws_number ?? '-' }}</td>
                                         <td>
-                                            <div class="fw-semibold">{{ $transferSlip->department_code ?? '-' }}</div>
-                                            <small class="text-muted">{{ $transferSlip->department_name ?? '-' }}</small>
+                                            <span
+                                                class="badge bg-light-primary"
+                                                data-bstooltip-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="{{ $transferSlip->department_name ?? '-' }}">{{ $transferSlip->department_code ?? '-' }}</span>
                                         </td>
                                         <td>
                                             <span class="badge {{ (int) $transferSlip->for_production === 1 ? 'bg-light-success text-success' : 'bg-light-secondary text-secondary' }}">
@@ -132,16 +154,16 @@
                                         <td>{{ number_format((float) ($transferSlip->total_quantity ?? 0), 3) }}</td>
                                         <td class="text-wrap" style="max-width: 240px;">{{ $transferSlip->remarks ?: '-' }}</td>
                                         <td>{{ $transferSlip->created_by_name ?? '-' }}</td>
-                                        <td class="text-center">
-                                            <div class="d-inline-flex gap-1">
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#ts-detail-modal-{{ $transferSlip->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="View detail">
-                                                    <i class="fa-duotone fa-solid fa-eye"></i>
+                                                    <i class="fa-light fa-eye text-primary"></i>
                                                 </button>
                                                 @can('delete-transfer')
-                                                    <button type="button" class="btn icon text-danger" onclick="confirmDeleteTransferSlip({{ $transferSlip->id }}, '{{ $transferSlip->ts_number }}')" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete transfer slip">
-                                                        <i class="fa-duotone fa-solid fa-trash-can"></i>
+                                                    <button type="button" class="btn icon" onclick="confirmDeleteTransferSlip({{ $transferSlip->id }}, '{{ $transferSlip->ts_number }}')" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
+                                                        <i class="fa-light fa-trash text-secondary"></i>
                                                     </button>
-                                                    <form action="{{ route('transfer-slips.destroy', $transferSlip->id) }}" id="hapus-ts-{{ $transferSlip->id }}" method="POST" class="d-none">
+                                                    <form action="{{ route('transfer-slips.destroy', $transferSlip->id) }}" id="hapus-ts-{{ $transferSlip->id }}" method="POST">
                                                         @csrf
                                                         @method('DELETE')
                                                     </form>

@@ -125,20 +125,28 @@
                             <tbody>
                                 @foreach ($receivingReports as $rr)
                                     @php
+                                        $rrNumber = trim((string) ($rr->rr_number ?? ''));
                                         $qtyGood = (float) $rr->items->sum('qty_good');
                                         $qtyBad = (float) $rr->items->sum('qty_bad');
                                         $po = $rr->purchaseOrder;
+                                        $poNumber = trim((string) ($po?->po_number ?? ''));
                                     @endphp
                                     <tr>
                                         <td>
-                                            <div class="fw-semibold">{{ $rr->rr_number ?? ('#' . $rr->id) }}</div>
-                                            <small class="text-muted">#{{ $rr->id }}</small>
+                                            @if ($rrNumber !== '')
+                                                <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $rrNumber }}')">
+                                                    <i class="fa-solid fa-regular fa-clipboard"></i>
+                                                    {{ $rrNumber }}
+                                                </button>
+                                            @else
+                                                <span class="badge bg-light-secondary">-</span>
+                                            @endif
                                         </td>
                                         <td>
                                             @if ($po)
-                                                <button type="button" class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" data-bs-toggle="modal" data-bs-target="#po-detail-modal-{{ $po->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="View PO detail">
-                                                    <i class="fa-solid fa-file-lines"></i>
-                                                    {{ $po->po_number ?? ('PO#' . $po->id) }}
+                                                <button type="button" class="btn btn-sm btn-outline-primary icon icon-left" data-bs-toggle="modal" data-bs-target="#po-detail-modal-{{ $po->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="View PO detail">
+                                                    <i class="fa-light fa-eye"></i>
+                                                    {{ $poNumber !== '' ? $poNumber : '-' }}
                                                 </button>
                                             @else
                                                 <span class="badge bg-light-secondary">-</span>
@@ -170,7 +178,7 @@
                                                     <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-edit-modal-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                         <i class="fa-light fa-edit text-primary"></i>
                                                     </button>
-                                                    <button type="button" class="btn icon" onclick="confirmDeleteRr({{ $rr->id }}, '{{ $rr->rr_number ?? ('#' . $rr->id) }}')" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
+                                                    <button type="button" class="btn icon" onclick="confirmDeleteRr({{ $rr->id }}, '{{ $rrNumber !== '' ? $rrNumber : '-' }}')" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
                                                         <i class="fa-light fa-trash text-secondary"></i>
                                                     </button>
                                                     <form action="{{ route('receiving-reports.destroy', $rr) }}" id="hapus-rr-{{ $rr->id }}" method="POST">

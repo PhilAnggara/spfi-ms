@@ -100,7 +100,12 @@
                                         $canRemoveItem = $detailItems->count() > 1;
                                     @endphp
                                     <tr>
-                                        <td class="fw-semibold">{{ $sws->sws_number }}</td>
+                                        <td>
+                                            <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $sws->sws_number }}')">
+                                                <i class="fa-solid fa-regular fa-clipboard"></i>
+                                                {{ $sws->sws_number }}
+                                            </button>
+                                        </td>
                                         <td>
                                             <i class="fa-duotone fa-solid fa-calendar-days text-danger"></i>
                                             {{ \Carbon\Carbon::parse($sws->sws_date)->format('d M Y') }}
