@@ -14,6 +14,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $startedAt = microtime(true);
+
         // User::factory(10)->create();
 
         $this->call([
@@ -42,5 +44,15 @@ class DatabaseSeeder extends Seeder
             FishSizeSeeder::class,
             AccountingDataSeeder::class,
         ]);
+
+        $elapsedSeconds = (int) round(microtime(true) - $startedAt);
+        $hours = intdiv($elapsedSeconds, 3600);
+        $minutes = intdiv($elapsedSeconds % 3600, 60);
+        $seconds = $elapsedSeconds % 60;
+        $formattedDuration = sprintf('%02dh %02dm %02ds', $hours, $minutes, $seconds);
+
+        if ($this->command) {
+            $this->command->info('Total seeding time: '.$formattedDuration);
+        }
     }
 }
