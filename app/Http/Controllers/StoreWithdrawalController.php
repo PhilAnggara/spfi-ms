@@ -215,7 +215,7 @@ class StoreWithdrawalController extends Controller
         $now = now();
 
         $swsNumber = DB::transaction(function () use ($department, $departmentCode, $swsDate, $validated, $requestedItems, $itemRows, $authUserId, $now): string {
-            $swsNumber = $this->generateSwsNumber($departmentCode, $swsDate);
+            $swsNumber = $this->generateSwsNumber($departmentCode);
 
             $storeWithdrawalId = DB::table('store_withdrawals')->insertGetId([
                 'sws_number' => $swsNumber,
@@ -636,24 +636,29 @@ class StoreWithdrawalController extends Controller
         return $grouped;
     }
 
-    private function generateSwsNumber(string $departmentCode, Carbon $swsDate): string
+    // Sinkron dengan sistem lama: {DEPTCODE}{#######}, urutan naik per department.
+    private function generateSwsNumber(string $departmentCode): string
     {
         $normalizedDepartmentCode = strtoupper(trim($departmentCode));
-        $prefix = $normalizedDepartmentCode . '-' . $swsDate->format('dmy') . '-';
 
         $lastSwsNumber = DB::table('store_withdrawals')
             ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
-            ->where('sws_number', 'like', $prefix . '%')
             ->orderByDesc('id')
             ->value('sws_number');
 
         $lastNumber = 0;
-        if (is_string($lastSwsNumber) && preg_match('/(\d+)$/', $lastSwsNumber, $matches) === 1) {
-            $lastNumber = (int) $matches[1];
+        if (is_string($lastSwsNumber)) {
+            $upperLastSwsNumber = strtoupper($lastSwsNumber);
+            $exactPattern = '/^' . preg_quote($normalizedDepartmentCode, '/') . '(\d+)$/';
+
+            if (preg_match($exactPattern, $upperLastSwsNumber, $matches) === 1) {
+                $lastNumber = (int) $matches[1];
+            }
         }
 
-        $newNumber = str_pad((string) ($lastNumber + 1), 3, '0', STR_PAD_LEFT);
+        // Sequence selalu 7 digit agar konsisten: 0000001, 0000002, dst.
+        $newNumber = str_pad((string) ($lastNumber + 1), 7, '0', STR_PAD_LEFT);
 
-        return $prefix . $newNumber;
+        return $normalizedDepartmentCode . $newNumber;
     }
 }

@@ -336,24 +336,30 @@ class PrsController extends Controller
             ->stream($filename);
     }
 
-    // fungsi untuk genearate PRS Number
+    // Sinkron dengan sistem lama: {DEPTCODE}{#######}, urutan naik per department.
     private function generatePrsNumber($departmentID)
     {
-        $user = Auth::user(); // ambil user yang sedang terautentikasi
-        $departmentCode = Department::find($departmentID)->code; // ambil kode departemen dari relasi user->department
-        // $departmentID = $user->department->id; // ambil ID departemen dari relasi user->department
-        $year = date('y'); // ambil dua digit tahun saat ini (mis. "26")
-        $month = date('m'); // ambil bulan saat ini dengan dua digit (mis. "01".."12")
-        $day = date('d'); // ambil hari saat ini dengan dua digit (mis. "01".."31")
-        $lastPrs = Prs::withTrashed()->where('department_id', $departmentID) // mulai query untuk mencari PRS terakhir berdasarkan department
-            // ->whereMonth('created_at', date('m')) // (dinonaktifkan) filter berdasarkan bulan pembuatan jika diperlukan
-            ->whereYear('created_at', date('Y')) // batasi hasil pada tahun berjalan
-            ->orderBy('id', 'desc') // urutkan menurun berdasarkan id untuk mendapatkan entri terbaru
-            ->first(); // ambil satu hasil pertama (terbaru)
-        $lastNumber = $lastPrs ? (int) substr($lastPrs->prs_number, -3) : 0; // jika ada PRS terakhir, ambil 3 digit terakhir dari prs_number sebagai integer, jika tidak set 0
-        $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT); // tambahkan 1 dan pad dengan nol di kiri hingga panjang 3 (mis. "001")
+        $departmentCode = strtoupper(trim((string) Department::findOrFail($departmentID)->code));
 
-        return $departmentCode . '-' . $day . $month . $year . '-' . $newNumber; // bangun dan kembalikan format nomor PRS: DEPT-ddmmyy-###
+        $lastPrsNumber = Prs::withTrashed()
+            ->where('department_id', $departmentID)
+            ->orderByDesc('id')
+            ->value('prs_number');
+
+        $lastNumber = 0;
+        if (is_string($lastPrsNumber)) {
+            $upperLastPrsNumber = strtoupper($lastPrsNumber);
+            $exactPattern = '/^' . preg_quote($departmentCode, '/') . '(\d+)$/';
+
+            if (preg_match($exactPattern, $upperLastPrsNumber, $matches) === 1) {
+                $lastNumber = (int) $matches[1];
+            }
+        }
+
+        // Sequence selalu 7 digit agar konsisten: 0000001, 0000002, dst.
+        $nextNumber = str_pad((string) ($lastNumber + 1), 7, '0', STR_PAD_LEFT);
+
+        return $departmentCode . $nextNumber;
     }
 
     /**
