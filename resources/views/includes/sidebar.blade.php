@@ -311,6 +311,15 @@
                             </li>
                         @endrole
 
+                        @can('view-transfer')
+                            <li class="sidebar-item {{ Request::is('transfer-slips*') ? 'active' : '' }}">
+                                <a href="{{ route('transfer-slips.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-right-left {{ Request::is('transfer-slips*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Transfer Slips</span>
+                                </a>
+                            </li>
+                        @endcan
+
                     </ul>
                 </div>
             </div>

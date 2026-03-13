@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             StockInventorySeeder::class,
             StockBalanceSeeder::class,
             \Database\Seeders\StoreWithdrawalSeeder::class,
+            \Database\Seeders\TransferSlipSeeder::class,
             BuyerSeeder::class,
             FishSupplierSeeder::class,
             VesselSeeder::class,

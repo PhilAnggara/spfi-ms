@@ -26,6 +26,7 @@ use App\Http\Controllers\ReceivingReportController;
 use App\Http\Controllers\SupplierComparisonController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\StoreWithdrawalController;
+use App\Http\Controllers\TransferSlipController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VesselController;
 use Illuminate\Support\Facades\Route;
@@ -147,6 +148,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/{storeWithdrawal}/edit', [StoreWithdrawalController::class, 'edit'])->name('edit');
         Route::put('/{storeWithdrawal}', [StoreWithdrawalController::class, 'update'])->name('update');
         Route::delete('/{storeWithdrawal}', [StoreWithdrawalController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::middleware('permission:view-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {
+        Route::get('/', [TransferSlipController::class, 'index'])->name('index');
+    });
+
+    Route::middleware('permission:create-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {
+        Route::get('/sws-by-number', [TransferSlipController::class, 'swsByNumber'])->name('sws-by-number');
+        Route::post('/', [TransferSlipController::class, 'store'])->name('store');
+    });
+
+    Route::middleware('permission:delete-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {
+        Route::delete('/{transferSlip}', [TransferSlipController::class, 'destroy'])->name('destroy');
     });
 
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
