@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 480" role="img" aria-labelledby="employeeDefaultTitle employeeDefaultDesc">
+  <title id="employeeDefaultTitle">Default employee photo</title>
+  <desc id="employeeDefaultDesc">Simple modern placeholder card for an employee without a photo.</desc>
+  <defs>
+    <linearGradient id="employeeCardBg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="100%" stop-color="#dbeafe" />
+    </linearGradient>
+    <linearGradient id="employeeAccent" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#0f766e" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+  </defs>
+  <rect width="360" height="480" rx="36" fill="url(#employeeCardBg)" />
+  <rect x="28" y="28" width="304" height="20" rx="10" fill="url(#employeeAccent)" opacity="0.92" />
+  <circle cx="180" cy="170" r="78" fill="#ffffff" opacity="0.94" />
+  <circle cx="180" cy="158" r="44" fill="#94a3b8" />
+  <path d="M110 280c22-38 49-56 70-56s48 18 70 56v18H110z" fill="#94a3b8" />
+  <rect x="78" y="360" width="204" height="16" rx="8" fill="#cbd5e1" />
+  <rect x="104" y="390" width="152" height="12" rx="6" fill="#dbeafe" />
+  <text x="180" y="438" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle" fill="#334155">Employee Photo</text>
+</svg>

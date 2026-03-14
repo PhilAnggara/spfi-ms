@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             DepartmentSeeder::class,
+            EmployeeDepartmentSeeder::class,
+            EmployeeSeeder::class,
             RolePermissionSeeder::class,
             UserSeeder::class,
             UnitOfMeasureSeeder::class,
@@ -34,8 +36,8 @@ class DatabaseSeeder extends Seeder
             ReceivingReportSeeder::class,
             StockInventorySeeder::class,
             StockBalanceSeeder::class,
-            \Database\Seeders\StoreWithdrawalSeeder::class,
-            \Database\Seeders\TransferSlipSeeder::class,
+            StoreWithdrawalSeeder::class,
+            TransferSlipSeeder::class,
             BuyerSeeder::class,
             FishSupplierSeeder::class,
             VesselSeeder::class,

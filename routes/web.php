@@ -3,6 +3,7 @@
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\Accounting\AccountingCodeController;
 use App\Http\Controllers\Accounting\AccountingGroupCodeController;
 use App\Http\Controllers\Accounting\BsGroupingController;
@@ -45,6 +46,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role:administrator')->prefix('master')->group(function () {
         Route::resource('user', UserController::class);
+        Route::resource('employees', EmployeeController::class)->except(['create', 'show', 'edit']);
         // Endpoint khusus untuk DataTables (server-side)
         Route::get('product/datatables', [ProductController::class, 'datatable'])->name('product.datatables');
         Route::resource('product', ProductController::class);

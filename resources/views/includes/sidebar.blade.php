@@ -59,11 +59,14 @@
                                 </a>
                                 <ul class="submenu ">
 
-                                    <li class="submenu-item {{ is_active_menu(['master/user']) }} has-sub">
+                                    <li class="submenu-item {{ is_active_menu(['master/user', 'master/employees*']) }} has-sub">
                                         <a href="#" class="submenu-link">Management</a>
                                         <ul class="submenu submenu-level-2 ">
                                             <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
                                                 <a href="{{ route('user.index') }}" class="submenu-link">User</a>
+                                            </li>
+                                            <li class="submenu-item {{ Request::is('master/employees*') ? 'active' : '' }}">
+                                                <a href="{{ route('employees.index') }}" class="submenu-link">Employee</a>
                                             </li>
                                         </ul>
                                     </li>

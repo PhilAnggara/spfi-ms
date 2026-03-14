@@ -97,6 +97,16 @@ return [
             'connection' => env('LEGACY_DB_STOCK_BALANCE_CONNECTION'),
             'table' => env('LEGACY_DB_STOCK_BALANCE_TABLE', 'stock_balance'),
         ],
+        'employee_department' => [
+            'csv_path' => 'document/csv/tblDeptList.csv',
+            'connection' => env('LEGACY_DB_EMPLOYEE_DEPARTMENT_CONNECTION'),
+            'table' => env('LEGACY_DB_EMPLOYEE_DEPARTMENT_TABLE', 'tblDeptList'),
+        ],
+        'employee' => [
+            'csv_path' => 'document/csv/tblEmployeeMasterList.csv',
+            'connection' => env('LEGACY_DB_EMPLOYEE_CONNECTION'),
+            'table' => env('LEGACY_DB_EMPLOYEE_TABLE', 'tblEmployeeMasterList'),
+        ],
         'sws' => [
             'csv_path' => 'document/csv/sws.csv',
             'connection' => env('LEGACY_DB_SWS_CONNECTION'),
