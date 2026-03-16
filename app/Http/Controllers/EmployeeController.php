@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Employee;
 use App\Models\EmployeeDepartment;
 use App\Support\Concerns\PaginatesLegacySqlServer;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class EmployeeController extends Controller
 {
@@ -128,6 +130,44 @@ class EmployeeController extends Controller
         $employee->delete();
 
         return redirect()->back()->with('success', "Employee {$employeeName} has been deleted successfully.");
+    }
+
+    /**
+     * Print one or more employee ID cards.
+     */
+    public function printIdCards(Request $request)
+    {
+        $validated = $request->validate([
+            'employee_ids' => ['required', 'array', 'min:1'],
+            'employee_ids.*' => ['required', 'integer', 'exists:employees,id'],
+            'valid_until' => ['required', 'date'],
+        ]);
+
+        $employeeIds = collect($validated['employee_ids'])
+            ->map(static fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $employeesById = Employee::query()
+            ->with(['department:id,code,name'])
+            ->whereIn('id', $employeeIds)
+            ->get()
+            ->keyBy('id');
+
+        $employees = $employeeIds
+            ->map(static fn (int $id) => $employeesById->get($id))
+            ->filter()
+            ->values();
+
+        abort_if($employees->isEmpty(), 404, 'Selected employees were not found.');
+
+        $logoPath = public_path('assets/images/sinar.png');
+
+        return Pdf::loadView('pdf.employee-id-cards', [
+            'employees' => $employees,
+            'validUntil' => Carbon::parse($validated['valid_until']),
+            'logoPath' => $logoPath,
+        ])->setPaper('a4', 'portrait')->stream('employee-id-cards.pdf');
     }
 
     /**

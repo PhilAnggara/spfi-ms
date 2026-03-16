@@ -79,7 +79,16 @@
 
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <h5 class="card-title mb-0">Employee Data</h5>
-                    <span class="badge bg-light-primary" id="employee-filter-result">{{ $employees->total() }} records</span>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge bg-light-info text-info-emphasis" id="employee-selected-count">0 selected</span>
+                        <button type="button" class="btn btn-light-secondary btn-sm" id="employee-select-all-btn">Select All</button>
+                        <button type="button" class="btn btn-light-secondary btn-sm" id="employee-clear-selection-btn">Clear Selection</button>
+                        <button type="button" class="btn btn-primary btn-sm" id="employee-print-selected-btn" disabled>
+                            <i class="fa-light fa-id-card me-1"></i>
+                            Print Selected ID Cards
+                        </button>
+                        <span class="badge bg-light-primary" id="employee-filter-result">{{ $employees->total() }} records</span>
+                    </div>
                 </div>
 
                 @if ($employees->isEmpty())
@@ -93,6 +102,9 @@
                         <table class="table table-striped align-middle po-table text-nowrap" id="employees-table">
                             <thead>
                                 <tr>
+                                    <th style="width: 44px;">
+                                        <input type="checkbox" class="form-check-input employee-select-all-checkbox" id="employee-select-all-checkbox">
+                                    </th>
                                     <th>Employee ID</th>
                                     <th>Name</th>
                                     <th>Department</th>
@@ -111,6 +123,9 @@
                                         $statusBadgeClass = $statusLabel === 'Terminated' ? 'bg-light-danger text-danger' : 'bg-light-success text-success';
                                     @endphp
                                     <tr>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input employee-select-checkbox" value="{{ $employee->id }}" data-employee-name="{{ $employee->employee_name }}" data-employee-id="{{ $employee->employee_id }}">
+                                        </td>
                                         <td>
                                             <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $employee->employee_id }}')">
                                                 <i class="fa-solid fa-regular fa-clipboard"></i>
@@ -144,6 +159,9 @@
                                                 </button>
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#employee-edit-modal-{{ $employee->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                     <i class="fa-light fa-edit text-primary"></i>
+                                                </button>
+                                                <button type="button" class="btn icon" data-print-single-id="{{ $employee->id }}" data-print-single-name="{{ $employee->employee_name }}" data-print-single-code="{{ $employee->employee_id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print ID Card">
+                                                    <i class="fa-light fa-id-card text-primary"></i>
                                                 </button>
                                                 <button type="button" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete" onclick="hapusData({{ $employee->id }}, 'Delete Employee', 'Are you sure want to delete employee {{ $employee->employee_name }}?')">
                                                     <i class="fa-light fa-trash text-secondary"></i>
@@ -184,7 +202,13 @@
                             <h5 class="modal-title mb-1">Employee Detail</h5>
                             <small class="text-muted">{{ $employee->employee_name }}</small>
                         </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-print-single-id="{{ $employee->id }}" data-print-single-name="{{ $employee->employee_name }}" data-print-single-code="{{ $employee->employee_id }}">
+                                <i class="fa-light fa-id-card me-1"></i>
+                                Print ID Card
+                            </button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
                     </div>
                     <div class="modal-body">
                         <div class="employee-pill-row mb-3">
@@ -391,6 +415,37 @@
                         <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-success">Save Employee</button>
                     </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="employee-id-card-print-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="GET" action="{{ route('employees.id-cards.print') }}" target="_blank" id="employee-id-card-print-form">
+                <div class="modal-header employee-modal-header">
+                    <div>
+                        <h5 class="modal-title mb-1">Print Employee ID Card</h5>
+                        <small class="text-muted" id="employee-id-card-print-summary">Selected employees: 0</small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="employee-id-card-valid-until" class="form-label">Valid Until</label>
+                        <input type="date" class="form-control" id="employee-id-card-valid-until" name="valid_until" min="{{ now()->toDateString() }}" required>
+                        <div class="form-text">Pilih tanggal berlaku kartu sebelum melanjutkan proses cetak.</div>
+                    </div>
+                    <div id="employee-id-card-hidden-inputs"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-light fa-print me-1"></i>
+                        Print ID Card
+                    </button>
                 </div>
             </form>
         </div>
@@ -704,6 +759,18 @@
             background: #e2e8f0;
         }
 
+        .employee-select-checkbox,
+        .employee-select-all-checkbox {
+            width: 1.05rem;
+            height: 1.05rem;
+            cursor: pointer;
+        }
+
+        #employee-selected-count {
+            min-width: 94px;
+            text-align: center;
+        }
+
         @media (max-width: 767.98px) {
             .employee-photo-upload-card {
                 grid-template-columns: 1fr;
@@ -918,6 +985,121 @@
                 });
             }
 
+            function initIdCardPrint(scope = document) {
+                const rowCheckboxes = Array.from(scope.querySelectorAll('.employee-select-checkbox'));
+                const headerCheckbox = scope.querySelector('#employee-select-all-checkbox');
+                const selectAllButton = scope.querySelector('#employee-select-all-btn');
+                const clearButton = scope.querySelector('#employee-clear-selection-btn');
+                const printSelectedButton = scope.querySelector('#employee-print-selected-btn');
+                const selectedBadge = scope.querySelector('#employee-selected-count');
+                const printForm = document.getElementById('employee-id-card-print-form');
+                const hiddenInputs = document.getElementById('employee-id-card-hidden-inputs');
+                const summary = document.getElementById('employee-id-card-print-summary');
+                const validUntilInput = document.getElementById('employee-id-card-valid-until');
+                const printModalEl = document.getElementById('employee-id-card-print-modal');
+
+                if (!printForm || !hiddenInputs || !summary || !validUntilInput || !printModalEl) {
+                    return;
+                }
+
+                const printModal = window.bootstrap?.Modal
+                    ? window.bootstrap.Modal.getOrCreateInstance(printModalEl)
+                    : null;
+
+                const selectedIds = () => rowCheckboxes.filter((input) => input.checked).map((input) => Number(input.value));
+
+                const updateSelectionUi = () => {
+                    const selectedCount = selectedIds().length;
+                    const total = rowCheckboxes.length;
+
+                    if (selectedBadge) {
+                        selectedBadge.textContent = `${selectedCount} selected`;
+                    }
+
+                    if (printSelectedButton) {
+                        printSelectedButton.disabled = selectedCount === 0;
+                    }
+
+                    if (headerCheckbox) {
+                        headerCheckbox.checked = total > 0 && selectedCount === total;
+                        headerCheckbox.indeterminate = selectedCount > 0 && selectedCount < total;
+                    }
+                };
+
+                const setAll = (checked) => {
+                    rowCheckboxes.forEach((input) => {
+                        input.checked = checked;
+                    });
+                    updateSelectionUi();
+                };
+
+                const openPrintModal = (employeeIds, singleLabel = null) => {
+                    if (!employeeIds.length) {
+                        return;
+                    }
+
+                    hiddenInputs.innerHTML = '';
+                    employeeIds.forEach((employeeId) => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'employee_ids[]';
+                        input.value = String(employeeId);
+                        hiddenInputs.appendChild(input);
+                    });
+
+                    summary.textContent = singleLabel
+                        ? `Selected employee: ${singleLabel}`
+                        : `Selected employees: ${employeeIds.length}`;
+
+                    if (!validUntilInput.value) {
+                        const now = new Date();
+                        const localIsoDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                        validUntilInput.value = localIsoDate;
+                    }
+
+                    printModal?.show();
+                };
+
+                if (!scope.dataset.idCardSelectionInit) {
+                    scope.dataset.idCardSelectionInit = '1';
+
+                    rowCheckboxes.forEach((input) => {
+                        input.addEventListener('change', updateSelectionUi);
+                    });
+
+                    headerCheckbox?.addEventListener('change', function () {
+                        setAll(this.checked);
+                    });
+
+                    selectAllButton?.addEventListener('click', function () {
+                        setAll(true);
+                    });
+
+                    clearButton?.addEventListener('click', function () {
+                        setAll(false);
+                    });
+
+                    printSelectedButton?.addEventListener('click', function () {
+                        openPrintModal(selectedIds());
+                    });
+
+                    scope.querySelectorAll('[data-print-single-id]').forEach((button) => {
+                        button.addEventListener('click', function () {
+                            const employeeId = Number(this.dataset.printSingleId || 0);
+                            if (!employeeId) {
+                                return;
+                            }
+
+                            const employeeCode = this.dataset.printSingleCode || '-';
+                            const employeeName = this.dataset.printSingleName || 'Employee';
+                            openPrintModal([employeeId], `${employeeName} (${employeeCode})`);
+                        });
+                    });
+                }
+
+                updateSelectionUi();
+            }
+
             function openModalById(modalId) {
                 if (!modalId || !window.bootstrap || !window.bootstrap.Modal) {
                     return;
@@ -984,6 +1166,7 @@
 
                     initPageTooltips(newContainer);
                     initPhotoInputs(document);
+                    initIdCardPrint(newContainer);
 
                     if (window.feather && typeof window.feather.replace === 'function') {
                         window.feather.replace();
@@ -1014,6 +1197,7 @@
 
             initPageTooltips(document);
             initPhotoInputs(document);
+            initIdCardPrint(document.getElementById('employees-page-container') || document);
             openModalById(editModalId || createModalId);
         })();
     </script>

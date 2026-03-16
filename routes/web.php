@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role:administrator')->prefix('master')->group(function () {
         Route::resource('user', UserController::class);
+        Route::get('employees/id-cards/print', [EmployeeController::class, 'printIdCards'])->name('employees.id-cards.print');
         Route::resource('employees', EmployeeController::class)->except(['create', 'show', 'edit']);
         // Endpoint khusus untuk DataTables (server-side)
         Route::get('product/datatables', [ProductController::class, 'datatable'])->name('product.datatables');

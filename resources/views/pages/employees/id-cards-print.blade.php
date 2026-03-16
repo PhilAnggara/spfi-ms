@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee ID Cards</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --card-width: 54mm;
+            --card-height: 86mm;
+            --brand-blue: #0f4c81;
+            --brand-cyan: #0ea5e9;
+            --ink-dark: #0f172a;
+            --ink-muted: #475569;
+            --line-soft: #dbe4f0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            color: var(--ink-dark);
+            background:
+                radial-gradient(60% 45% at 8% 8%, rgba(14, 165, 233, 0.16), transparent 68%),
+                radial-gradient(46% 36% at 92% 88%, rgba(15, 76, 129, 0.12), transparent 72%),
+                repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.08) 0, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 14px),
+                #eef2f7;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(34rem 22rem at 22% -8%, rgba(56, 189, 248, 0.14), transparent 70%),
+                radial-gradient(36rem 26rem at 108% 108%, rgba(59, 130, 246, 0.14), transparent 72%);
+            z-index: -1;
+        }
+
+        .print-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: rgba(248, 250, 252, 0.92);
+            backdrop-filter: blur(4px);
+            border-bottom: 1px solid var(--line-soft);
+            padding: 0.8rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .print-toolbar h1 {
+            font-size: 1rem;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .print-toolbar small {
+            color: var(--ink-muted);
+        }
+
+        .print-button {
+            border: 0;
+            color: #fff;
+            background: linear-gradient(135deg, var(--brand-blue), var(--brand-cyan));
+            border-radius: 999px;
+            padding: 0.55rem 1rem;
+            font-size: 0.88rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .sheet {
+            max-width: 1180px;
+            margin: 1.2rem auto;
+            padding: 0 0.8rem 1.2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(calc(var(--card-width) + 8mm), 1fr));
+            gap: 0.9rem;
+            justify-items: center;
+        }
+
+        .id-card {
+            width: var(--card-width);
+            height: var(--card-height);
+            border-radius: 4mm;
+            background: #ffffff;
+            border: 0.35mm solid #b6d5f2;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* decorative geometric accents */
+        .id-card::before {
+            content: '';
+            position: absolute;
+            width: 36mm;
+            height: 36mm;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.12), transparent 70%);
+            bottom: -10mm;
+            right: -10mm;
+            pointer-events: none;
+        }
+
+        .id-card::after {
+            content: '';
+            position: absolute;
+            width: 22mm;
+            height: 22mm;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(15, 76, 129, 0.09), transparent 70%);
+            top: 18mm;
+            left: -8mm;
+            pointer-events: none;
+        }
+
+        .id-card-header {
+            padding: 2.8mm 3mm 2.4mm;
+            background: linear-gradient(128deg, #0a3b6b 0%, #0f4c81 45%, #0ea5e9 100%);
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .id-card-header::after {
+            content: '';
+            position: absolute;
+            right: -4mm;
+            top: -4mm;
+            width: 18mm;
+            height: 18mm;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            pointer-events: none;
+        }
+
+        .id-card-brand {
+            display: grid;
+            grid-template-columns: 8.2mm 1fr;
+            gap: 2mm;
+            align-items: center;
+        }
+
+        .id-card-logo {
+            width: 8.2mm;
+            height: 8.2mm;
+            border-radius: 1.3mm;
+            object-fit: cover;
+            background: #fff;
+            padding: 0.6mm;
+        }
+
+        .id-card-company {
+            line-height: 1.15;
+        }
+
+        .id-card-company strong {
+            display: block;
+            margin-top: 0.3mm;
+            font-size: 2.6mm;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+
+        .id-card-body {
+            padding: 2.6mm 3.2mm 3.2mm;
+            display: flex;
+            flex-direction: column;
+            gap: 2.4mm;
+            flex: 1;
+        }
+
+        .id-card-photo-wrap {
+            display: flex;
+            justify-content: center;
+        }
+
+        .id-card-photo {
+            width: 24mm;
+            height: 30mm;
+            border-radius: 2.5mm;
+            object-fit: cover;
+            background: #dbeafe;
+            border: 0.6mm solid #ffffff;
+            box-shadow: 0 0 0 0.4mm rgba(14, 165, 233, 0.35), 0 4px 10px rgba(15, 23, 42, 0.15);
+        }
+
+        .id-card-name {
+            text-align: center;
+        }
+
+        .id-card-name strong {
+            display: block;
+            font-size: 3.2mm;
+            line-height: 1.2;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .id-card-name .id-card-empid {
+            display: inline-block;
+            margin-top: 1.5mm;
+            padding: 0.5mm 2mm;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #0f4c81, #0ea5e9);
+            color: #fff;
+            font-size: 2.3mm;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+        }
+
+        .id-card-name .id-card-dept {
+            display: block;
+            margin-top: 1mm;
+            font-size: 2.35mm;
+            font-weight: 600;
+            color: var(--ink-muted);
+            letter-spacing: 0.02em;
+        }
+
+        .id-card-footer {
+            margin-top: auto;
+            text-align: center;
+            border-top: 0.3mm solid #dbeafe;
+            padding-top: 1.5mm;
+            padding-bottom: 0.5mm;
+        }
+
+        .id-card-footer-valid {
+            display: block;
+            color: var(--ink-muted);
+            font-size: 1.75mm;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+
+        @media print {
+            body {
+                background: #fff;
+            }
+
+            body::before {
+                display: none;
+            }
+
+            .print-toolbar {
+                display: none;
+            }
+
+            .sheet {
+                margin: 0;
+                padding: 0;
+                gap: 0;
+                max-width: none;
+                display: block;
+            }
+
+            .id-card {
+                margin: 0 auto;
+                box-shadow: none;
+                break-after: page;
+                page-break-after: always;
+            }
+
+            .id-card:last-child {
+                break-after: auto;
+                page-break-after: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-toolbar">
+        <div>
+            <h1>Employee ID Cards</h1>
+            <small>{{ $employees->count() }} card(s) • Valid until {{ $validUntil->format('d M Y') }}</small>
+        </div>
+        <button type="button" class="print-button" onclick="window.print()">Print Now</button>
+    </div>
+
+    <main class="sheet">
+        @foreach ($employees as $employee)
+            @php
+                $departmentName = $employee->department?->name
+                    ?? $employee->department?->code
+                    ?? $employee->legacy_department_code
+                    ?? '-';
+            @endphp
+            <article class="id-card">
+                <header class="id-card-header">
+                    <div class="id-card-brand">
+                        <img src="{{ asset('assets/images/sinar.png') }}" alt="PT SPFI logo" class="id-card-logo">
+                        <div class="id-card-company">
+                            <strong>PT. Sinar Pure Foods International</strong>
+                        </div>
+                    </div>
+                </header>
+                <div class="id-card-body">
+                    <div class="id-card-photo-wrap">
+                        <img src="{{ $employee->photo_url }}" alt="{{ $employee->employee_name }} photo" class="id-card-photo">
+                    </div>
+                    <div class="id-card-name">
+                        <strong>{{ $employee->employee_name }}</strong>
+                        <span class="id-card-empid">{{ $employee->employee_id }}</span>
+                        <span class="id-card-dept">{{ $departmentName }}</span>
+                    </div>
+                    <div class="id-card-footer">
+                        <span class="id-card-footer-valid">Valid Until: {{ $validUntil->format('d M Y') }}</span>
+                    </div>
+                </div>
+            </article>
+        @endforeach
+    </main>
+</body>
+</html>
