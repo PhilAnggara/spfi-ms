@@ -99,12 +99,12 @@ return [
         ],
         'employee_department' => [
             'csv_path' => 'document/csv/tblDeptList.csv',
-            'connection' => env('LEGACY_DB_EMPLOYEE_DEPARTMENT_CONNECTION'),
+            'connection' => env('LEGACY_DB_EMPLOYEE_DEPARTMENT_CONNECTION', 'legacy_sqlsrv_4'),
             'table' => env('LEGACY_DB_EMPLOYEE_DEPARTMENT_TABLE', 'tblDeptList'),
         ],
         'employee' => [
             'csv_path' => 'document/csv/tblEmployeeMasterList.csv',
-            'connection' => env('LEGACY_DB_EMPLOYEE_CONNECTION'),
+            'connection' => env('LEGACY_DB_EMPLOYEE_CONNECTION', 'legacy_sqlsrv_4'),
             'table' => env('LEGACY_DB_EMPLOYEE_TABLE', 'tblEmployeeMasterList'),
         ],
         'sws' => [

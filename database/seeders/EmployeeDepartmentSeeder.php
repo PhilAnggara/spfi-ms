@@ -24,39 +24,50 @@ class EmployeeDepartmentSeeder extends Seeder
 
         $inserted = 0;
         $skipped = 0;
+        $isSqlServer = DB::connection()->getDriverName() === 'sqlsrv';
 
-        foreach ($rows as $row) {
-            $id = $this->toInteger($row['Id'] ?? $row['id'] ?? null);
-            $code = $this->normalizeText($row['DeptCode'] ?? $row['dept_code'] ?? $row['code'] ?? null);
-            $name = $this->normalizeText($row['DeptName'] ?? $row['dept_name'] ?? $row['name'] ?? null);
+        if ($isSqlServer) {
+            DB::unprepared('SET IDENTITY_INSERT [employee_departments] ON');
+        }
 
-            if ($code === null || $name === null) {
-                $skipped++;
-                continue;
+        try {
+            foreach ($rows as $row) {
+                $id = $this->toInteger($row['Id'] ?? $row['id'] ?? null);
+                $code = $this->normalizeText($row['DeptCode'] ?? $row['dept_code'] ?? $row['code'] ?? null);
+                $name = $this->normalizeText($row['DeptName'] ?? $row['dept_name'] ?? $row['name'] ?? null);
+
+                if ($code === null || $name === null) {
+                    $skipped++;
+                    continue;
+                }
+
+                $payload = [
+                    'code' => $code,
+                    'old_code' => $this->normalizeText($row['OldDeptCode'] ?? $row['old_dept_code'] ?? $row['old_code'] ?? null),
+                    'name' => $name,
+                    'is_active' => true,
+                    'updated_at' => now(),
+                    'deleted_at' => null,
+                ];
+
+                if ($id !== null) {
+                    DB::table('employee_departments')->updateOrInsert(
+                        ['id' => $id],
+                        ['created_at' => now()] + $payload
+                    );
+                } else {
+                    DB::table('employee_departments')->updateOrInsert(
+                        ['code' => $code],
+                        ['created_at' => now()] + $payload
+                    );
+                }
+
+                $inserted++;
             }
-
-            $payload = [
-                'code' => $code,
-                'old_code' => $this->normalizeText($row['OldDeptCode'] ?? $row['old_dept_code'] ?? $row['old_code'] ?? null),
-                'name' => $name,
-                'is_active' => true,
-                'updated_at' => now(),
-                'deleted_at' => null,
-            ];
-
-            if ($id !== null) {
-                DB::table('employee_departments')->updateOrInsert(
-                    ['id' => $id],
-                    ['created_at' => now()] + $payload
-                );
-            } else {
-                DB::table('employee_departments')->updateOrInsert(
-                    ['code' => $code],
-                    ['created_at' => now()] + $payload
-                );
+        } finally {
+            if ($isSqlServer) {
+                DB::unprepared('SET IDENTITY_INSERT [employee_departments] OFF');
             }
-
-            $inserted++;
         }
 
         $this->command?->info("✓ [employee_department] Inserted/Updated: {$inserted}, Skipped: {$skipped}");

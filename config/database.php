@@ -166,6 +166,21 @@ return [
             'trust_server_certificate' => env('LEGACY_DB3_TRUST_SERVER_CERTIFICATE', true),
         ],
 
+        // Legacy DB koneksi 4 (casualtimekeeping — sumber data employee & employee_department).
+        'legacy_sqlsrv_4' => [
+            'driver' => 'sqlsrv',
+            'host' => env('LEGACY_DB4_HOST', '127.0.0.1'),
+            'port' => env('LEGACY_DB4_PORT', '1433'),
+            'database' => env('LEGACY_DB4_DATABASE', ''),
+            'username' => env('LEGACY_DB4_USERNAME', ''),
+            'password' => env('LEGACY_DB4_PASSWORD', ''),
+            'charset' => env('LEGACY_DB4_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('LEGACY_DB4_ENCRYPT', 'no'),
+            'trust_server_certificate' => env('LEGACY_DB4_TRUST_SERVER_CERTIFICATE', true),
+        ],
+
     ],
 
     /*

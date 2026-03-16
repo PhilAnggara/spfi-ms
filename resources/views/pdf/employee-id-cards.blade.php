@@ -42,7 +42,7 @@
             border: 0.4mm solid #b6d5f2;
             border-radius: 4mm;
             overflow: hidden;
-            background: #f8fbff;
+            background: #ffffff;
             page-break-inside: avoid;
         }
 
@@ -86,7 +86,7 @@
         }
 
         .brand-name {
-            font-size: 6.2pt;
+            font-size: 8pt;
             font-weight: bold;
             color: #ffffff;
             line-height: 1.25;
@@ -151,8 +151,8 @@
         }
 
         .id-card-name {
-            font-size: 7.5pt;
-            font-weight: bold;
+            font-size: 8.5pt;
+            /* font-weight: bold; */
             color: #0f172a;
             line-height: 1.2;
             margin-bottom: 1.8mm;
@@ -165,7 +165,7 @@
 
         .id-card-empid {
             display: inline-block;
-            font-size: 5.5pt;
+            font-size: 7pt;
             font-weight: bold;
             color: #ffffff;
             background-color: #1b5fa0;
@@ -177,7 +177,7 @@
         }
 
         .id-card-dept {
-            font-size: 6.2pt;
+            font-size: 7.6pt;
             color: #475569;
             font-weight: bold;
             margin-top: 1mm;

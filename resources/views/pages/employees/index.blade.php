@@ -2,7 +2,7 @@
 @section('title', ' | Employee List')
 
 @section('content')
-<div id="employees-page-container">
+<div id="employees-page-container" data-filtered-total="{{ $employees->total() }}">
 <div class="page-heading po-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
@@ -81,13 +81,13 @@
                     <h5 class="card-title mb-0">Employee Data</h5>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <span class="badge bg-light-info text-info-emphasis" id="employee-selected-count">0 selected</span>
-                        <button type="button" class="btn btn-light-secondary btn-sm" id="employee-select-all-btn">Select All</button>
+                        <button type="button" class="btn btn-light-secondary btn-sm" id="employee-select-all-btn">Select All Results</button>
                         <button type="button" class="btn btn-light-secondary btn-sm" id="employee-clear-selection-btn">Clear Selection</button>
                         <button type="button" class="btn btn-primary btn-sm" id="employee-print-selected-btn" disabled>
                             <i class="fa-light fa-id-card me-1"></i>
                             Print Selected ID Cards
                         </button>
-                        <span class="badge bg-light-primary" id="employee-filter-result">{{ $employees->total() }} records</span>
+                        <span class="badge bg-light-primary" id="employee-filter-result" data-total="{{ $employees->total() }}">{{ $employees->total() }} records</span>
                     </div>
                 </div>
 
@@ -123,8 +123,10 @@
                                         $statusBadgeClass = $statusLabel === 'Terminated' ? 'bg-light-danger text-danger' : 'bg-light-success text-success';
                                     @endphp
                                     <tr>
-                                        <td>
-                                            <input type="checkbox" class="form-check-input employee-select-checkbox" value="{{ $employee->id }}" data-employee-name="{{ $employee->employee_name }}" data-employee-id="{{ $employee->employee_id }}">
+                                        <td class="employee-select-cell">
+                                            <div class="employee-select-cell-inner">
+                                                <input id="employee-select-{{ $employee->id }}" type="checkbox" class="form-check-input employee-select-checkbox" value="{{ $employee->id }}" data-employee-name="{{ $employee->employee_name }}" data-employee-id="{{ $employee->employee_id }}">
+                                            </div>
                                         </td>
                                         <td>
                                             <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $employee->employee_id }}')">
@@ -133,13 +135,13 @@
                                             </button>
                                         </td>
                                         <td>
-                                            <div class="employee-list-person">
+                                            <button type="button" class="employee-list-person employee-list-person-button" data-bs-toggle="modal" data-bs-target="#employee-detail-modal-{{ $employee->id }}">
                                                 <img src="{{ $employee->photo_url }}" alt="{{ $employee->employee_name }} photo" class="employee-list-avatar">
                                                 <div>
                                                     <div class="fw-semibold text-dark">{{ $employee->employee_name }}</div>
                                                     <small class="text-muted">{{ $employee->display_code }}</small>
                                                 </div>
-                                            </div>
+                                            </button>
                                         </td>
                                         <td>
                                             <span class="badge bg-light-primary" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $department?->name ?? '-' }}">
@@ -435,8 +437,8 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="employee-id-card-valid-until" class="form-label">Valid Until</label>
-                        <input type="date" class="form-control" id="employee-id-card-valid-until" name="valid_until" min="{{ now()->toDateString() }}" required>
-                        <div class="form-text">Pilih tanggal berlaku kartu sebelum melanjutkan proses cetak.</div>
+                            <input type="date" class="form-control" id="employee-id-card-valid-until" name="valid_until" min="{{ now()->toDateString() }}" required>
+                            <div class="form-text">Choose a validity date for the ID cards before printing.</div>
                     </div>
                     <div id="employee-id-card-hidden-inputs"></div>
                 </div>
@@ -472,6 +474,25 @@
             align-items: center;
             gap: 0.75rem;
             min-width: 220px;
+        }
+
+        .employee-list-person-button {
+            width: 100%;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            text-align: left;
+        }
+
+        .employee-list-person-button:hover .fw-semibold,
+        .employee-list-person-button:focus-visible .fw-semibold {
+            color: #2563eb !important;
+        }
+
+        .employee-list-person-button:focus-visible {
+            outline: 2px solid #93c5fd;
+            outline-offset: 4px;
+            border-radius: 0.75rem;
         }
 
         .employee-list-avatar {
@@ -766,6 +787,21 @@
             cursor: pointer;
         }
 
+        .employee-select-cell {
+            padding: .5rem .75rem;
+            text-align: center;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+        .employee-select-cell .employee-select-cell-inner {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+
         #employee-selected-count {
             min-width: 94px;
             text-align: center;
@@ -812,6 +848,73 @@
                         new window.bootstrap.Tooltip(el);
                     }
                 });
+            }
+
+            function getEmployeeSelectionState() {
+                if (!window.__employeeSelectionState) {
+                    window.__employeeSelectionState = {
+                        filterKey: null,
+                        selectedIds: new Set(),
+                        selectingAll: false,
+                    };
+                }
+
+                return window.__employeeSelectionState;
+            }
+
+            function buildEmployeeFilterKey(url) {
+                const parsedUrl = new URL(url, window.location.origin);
+                parsedUrl.searchParams.delete('page');
+                parsedUrl.searchParams.delete('selection_scope');
+
+                const sortedParams = new URLSearchParams(
+                    Array.from(parsedUrl.searchParams.entries()).sort(([left], [right]) => left.localeCompare(right))
+                );
+
+                const queryString = sortedParams.toString();
+
+                return queryString === ''
+                    ? parsedUrl.pathname
+                    : `${parsedUrl.pathname}?${queryString}`;
+            }
+
+            function syncEmployeeSelectionScope(url) {
+                const selectionState = getEmployeeSelectionState();
+                const nextFilterKey = buildEmployeeFilterKey(url);
+
+                if (selectionState.filterKey !== null && selectionState.filterKey !== nextFilterKey) {
+                    selectionState.selectedIds.clear();
+                }
+
+                selectionState.filterKey = nextFilterKey;
+
+                return selectionState;
+            }
+
+            async function fetchAllFilteredEmployeeIds() {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('page');
+                url.searchParams.set('selection_scope', 'all_ids');
+
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load employee selections.');
+                }
+
+                const payload = await response.json();
+
+                return {
+                    ids: Array.isArray(payload.ids)
+                        ? payload.ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+                        : [],
+                    total: Number(payload.total || 0),
+                };
             }
 
             function updatePhotoUi(input, previewSrc = null) {
@@ -986,6 +1089,8 @@
             }
 
             function initIdCardPrint(scope = document) {
+                const selectionState = getEmployeeSelectionState();
+                const pageContainer = document.getElementById('employees-page-container');
                 const rowCheckboxes = Array.from(scope.querySelectorAll('.employee-select-checkbox'));
                 const headerCheckbox = scope.querySelector('#employee-select-all-checkbox');
                 const selectAllButton = scope.querySelector('#employee-select-all-btn');
@@ -1006,11 +1111,33 @@
                     ? window.bootstrap.Modal.getOrCreateInstance(printModalEl)
                     : null;
 
-                const selectedIds = () => rowCheckboxes.filter((input) => input.checked).map((input) => Number(input.value));
+                const selectedIds = () => Array.from(selectionState.selectedIds.values()).sort((left, right) => left - right);
+
+                const getFilteredTotal = () => {
+                    const total = Number(pageContainer?.dataset.filteredTotal || 0);
+
+                    return Number.isFinite(total) ? total : 0;
+                };
+
+                const syncCurrentPageCheckboxes = () => {
+                    rowCheckboxes.forEach((input) => {
+                        input.checked = selectionState.selectedIds.has(Number(input.value));
+                    });
+                };
+
+                const setSelectionBusy = (active) => {
+                    selectionState.selectingAll = active;
+
+                    headerCheckbox?.toggleAttribute('disabled', active);
+                    selectAllButton?.toggleAttribute('disabled', active);
+                    clearButton?.toggleAttribute('disabled', active && selectionState.selectedIds.size === 0);
+                };
 
                 const updateSelectionUi = () => {
-                    const selectedCount = selectedIds().length;
-                    const total = rowCheckboxes.length;
+                    syncCurrentPageCheckboxes();
+
+                    const selectedCount = selectionState.selectedIds.size;
+                    const total = getFilteredTotal();
 
                     if (selectedBadge) {
                         selectedBadge.textContent = `${selectedCount} selected`;
@@ -1026,11 +1153,32 @@
                     }
                 };
 
-                const setAll = (checked) => {
-                    rowCheckboxes.forEach((input) => {
-                        input.checked = checked;
-                    });
+                const clearSelection = () => {
+                    selectionState.selectedIds.clear();
                     updateSelectionUi();
+                };
+
+                const selectAllResults = async () => {
+                    if (selectionState.selectingAll) {
+                        return;
+                    }
+
+                    setSelectionBusy(true);
+
+                    try {
+                        const payload = await fetchAllFilteredEmployeeIds();
+                        selectionState.selectedIds = new Set(payload.ids);
+
+                        if (pageContainer) {
+                            pageContainer.dataset.filteredTotal = String(payload.total);
+                        }
+
+                        updateSelectionUi();
+                    } catch (_) {
+                        window.location.href = window.location.href;
+                    } finally {
+                        setSelectionBusy(false);
+                    }
                 };
 
                 const openPrintModal = (employeeIds, singleLabel = null) => {
@@ -1053,7 +1201,10 @@
 
                     if (!validUntilInput.value) {
                         const now = new Date();
-                        const localIsoDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                        const future = new Date(now);
+                        // add 3 months
+                        future.setMonth(future.getMonth() + 3);
+                        const localIsoDate = new Date(future.getTime() - (future.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
                         validUntilInput.value = localIsoDate;
                     }
 
@@ -1064,19 +1215,62 @@
                     scope.dataset.idCardSelectionInit = '1';
 
                     rowCheckboxes.forEach((input) => {
-                        input.addEventListener('change', updateSelectionUi);
+                        input.addEventListener('change', function () {
+                            const employeeId = Number(this.value);
+
+                            if (!Number.isInteger(employeeId) || employeeId <= 0) {
+                                return;
+                            }
+
+                            if (this.checked) {
+                                selectionState.selectedIds.add(employeeId);
+                            } else {
+                                selectionState.selectedIds.delete(employeeId);
+                            }
+
+                            updateSelectionUi();
+                        });
+                    });
+
+                    // Make entire first cell clickable to toggle checkbox (larger hit area)
+                    const selectCells = Array.from(scope.querySelectorAll('.employee-select-cell'));
+                    selectCells.forEach((cell) => {
+                        cell.addEventListener('click', function (e) {
+                            // ignore clicks on interactive elements inside the cell
+                            if (e.target.closest('input, button, a, label')) {
+                                return;
+                            }
+
+                            const checkbox = cell.querySelector('.employee-select-checkbox');
+                            if (!checkbox) {
+                                return;
+                            }
+
+                            const id = Number(checkbox.value);
+                            if (!Number.isInteger(id) || id <= 0) {
+                                return;
+                            }
+
+                            checkbox.checked = !checkbox.checked;
+                            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                        });
                     });
 
                     headerCheckbox?.addEventListener('change', function () {
-                        setAll(this.checked);
+                        if (this.checked) {
+                            selectAllResults();
+                            return;
+                        }
+
+                        clearSelection();
                     });
 
                     selectAllButton?.addEventListener('click', function () {
-                        setAll(true);
+                        selectAllResults();
                     });
 
                     clearButton?.addEventListener('click', function () {
-                        setAll(false);
+                        clearSelection();
                     });
 
                     printSelectedButton?.addEventListener('click', function () {
@@ -1097,6 +1291,7 @@
                     });
                 }
 
+                syncCurrentPageCheckboxes();
                 updateSelectionUi();
             }
 
@@ -1127,6 +1322,8 @@
                 if (isLoading) {
                     return;
                 }
+
+                syncEmployeeSelectionScope(url);
 
                 isLoading = true;
                 setLoading(true);
@@ -1192,9 +1389,11 @@
             });
 
             window.addEventListener('popstate', function () {
+                syncEmployeeSelectionScope(window.location.href);
                 replacePageContent(window.location.href, false);
             });
 
+            syncEmployeeSelectionScope(window.location.href);
             initPageTooltips(document);
             initPhotoInputs(document);
             initIdCardPrint(document.getElementById('employees-page-container') || document);

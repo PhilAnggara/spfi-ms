@@ -69,10 +69,11 @@ return new class extends Migration
 
     private function hasIndex(string $tableName, string $indexName): bool
     {
-        return DB::table('information_schema.statistics')
-            ->where('table_schema', DB::getDatabaseName())
-            ->where('table_name', $tableName)
-            ->where('index_name', $indexName)
-            ->exists();
+        $result = DB::selectOne(
+            'SELECT TOP 1 1 AS [found] FROM sys.indexes i JOIN sys.objects o ON i.object_id = o.object_id WHERE o.name = ? AND i.name = ?',
+            [$tableName, $indexName]
+        );
+
+        return $result !== null;
     }
 };

@@ -26,8 +26,14 @@ class EmployeeSeeder extends Seeder
         $departmentLookup = $this->buildDepartmentLookup();
         $inserted = 0;
         $skipped = 0;
+        $isSqlServer = DB::connection()->getDriverName() === 'sqlsrv';
 
-        foreach ($rows as $row) {
+        if ($isSqlServer) {
+            DB::unprepared('SET IDENTITY_INSERT [employees] ON');
+        }
+
+        try {
+            foreach ($rows as $row) {
             $legacyId = $this->toInteger($row['Id'] ?? $row['id'] ?? null);
             $employeeId = $this->normalizeText($row['EmployeeId'] ?? $row['employee_id'] ?? null);
             $employeeName = $this->normalizeText($row['EmployeeName'] ?? $row['employee_name'] ?? null);
@@ -108,6 +114,11 @@ class EmployeeSeeder extends Seeder
             }
 
             $inserted++;
+            }
+        } finally {
+            if ($isSqlServer) {
+                DB::unprepared('SET IDENTITY_INSERT [employees] OFF');
+            }
         }
 
         $this->command?->info("✓ [employee] Inserted/Updated: {$inserted}, Skipped: {$skipped}");

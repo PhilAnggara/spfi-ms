@@ -21,18 +21,62 @@ class EmployeeController extends Controller
      */
     public function index(Request $request)
     {
-        $filters = [
+        $filters = $this->employeeFilters($request);
+        $employeesQuery = $this->buildEmployeesQuery($filters);
+
+        if ($request->query('selection_scope') === 'all_ids') {
+            $employeeIds = (clone $employeesQuery)
+                ->reorder()
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(static fn ($id) => (int) $id)
+                ->values();
+
+            return response()->json([
+                'ids' => $employeeIds,
+                'total' => $employeeIds->count(),
+            ]);
+        }
+
+        $employeesQuery
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+
+        $employees = $this->paginateEloquentForCurrentConnection($employeesQuery, 'created_at DESC, id DESC', 10);
+
+        $departmentOptions = EmployeeDepartment::query()
+            ->select(['id', 'code', 'name'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        return view('pages.employees.index', [
+            'employees' => $employees,
+            'departmentOptions' => $departmentOptions,
+            'filters' => $filters,
+        ]);
+    }
+
+    /**
+     * @return array{keyword: string, department: string, gender: string, status: string}
+     */
+    private function employeeFilters(Request $request): array
+    {
+        return [
             'keyword' => trim((string) $request->query('keyword', '')),
             'department' => trim((string) $request->query('department', '')),
             'gender' => trim((string) $request->query('gender', '')),
             'status' => trim((string) $request->query('status', '')),
         ];
+    }
 
+    private function buildEmployeesQuery(array $filters)
+    {
         $searchTerms = collect(preg_split('/\s+/', mb_strtolower($filters['keyword']), -1, PREG_SPLIT_NO_EMPTY))
             ->filter()
             ->values();
 
-        $employeesQuery = Employee::query()
+        return Employee::query()
             ->with(['department:id,code,old_code,name'])
             ->when($searchTerms->isNotEmpty(), function ($query) use ($searchTerms) {
                 foreach ($searchTerms as $term) {
@@ -69,23 +113,7 @@ class EmployeeController extends Controller
             })
             ->when($filters['status'] === 'terminated', function ($query) {
                 $query->whereDate('date_terminated', '<=', now()->toDateString());
-            })
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
-
-        $employees = $this->paginateEloquentForCurrentConnection($employeesQuery, 'created_at DESC, id DESC', 10);
-
-        $departmentOptions = EmployeeDepartment::query()
-            ->select(['id', 'code', 'name'])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-
-        return view('pages.employees.index', [
-            'employees' => $employees,
-            'departmentOptions' => $departmentOptions,
-            'filters' => $filters,
-        ]);
+            });
     }
 
     /**
