@@ -184,9 +184,17 @@ function initPrsCatalog() {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 
+    const buildEmptyStateMarkup = () => `
+        <div class="prs-catalog-empty-state">
+            <i class="fa-duotone fa-solid fa-box-open prs-catalog-empty-icon"></i>
+            <p class="mb-0 mt-2 fw-semibold">No items found.</p>
+            <small>Try changing your keyword or category filter to see more results.</small>
+        </div>
+    `;
+
     const renderGrid = (items) => {
         if (!Array.isArray(items) || items.length === 0) {
-            grid.innerHTML = '<div class="text-muted">No items found.</div>';
+            grid.innerHTML = buildEmptyStateMarkup();
             return;
         }
 

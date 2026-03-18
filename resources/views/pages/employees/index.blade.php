@@ -68,127 +68,130 @@
             </div>
         </div>
 
-        <div class="card shadow-sm border-0">
-            <div class="card-body position-relative">
-                <div id="employees-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
-                    <div class="text-center">
-                        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
-                        <div class="mt-2 text-muted">Loading data...</div>
+        <div id="employees-page-results">
+            <div class="card shadow-sm border-0">
+                <div class="card-body position-relative">
+                    <div id="employees-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                            <div class="mt-2 text-muted">Loading data...</div>
+                        </div>
                     </div>
-                </div>
 
-                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h5 class="card-title mb-0">Employee Data</h5>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <span class="badge bg-light-info text-info-emphasis" id="employee-selected-count">0 selected</span>
-                        <button type="button" class="btn btn-light-secondary btn-sm" id="employee-select-all-btn">Select All Results</button>
-                        <button type="button" class="btn btn-light-secondary btn-sm" id="employee-clear-selection-btn">Clear Selection</button>
-                        <button type="button" class="btn btn-primary btn-sm" id="employee-print-selected-btn" disabled>
-                            <i class="fa-light fa-id-card me-1"></i>
-                            Print Selected ID Cards
-                        </button>
-                        <span class="badge bg-light-primary" id="employee-filter-result" data-total="{{ $employees->total() }}">{{ $employees->total() }} records</span>
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                        <h5 class="card-title mb-0">Employee Data</h5>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge bg-light-info text-info-emphasis" id="employee-selected-count">0 selected</span>
+                            <button type="button" class="btn btn-light-secondary btn-sm" id="employee-select-all-btn">Select All Results</button>
+                            <button type="button" class="btn btn-light-secondary btn-sm" id="employee-clear-selection-btn">Clear Selection</button>
+                            <button type="button" class="btn btn-primary btn-sm" id="employee-print-selected-btn" disabled>
+                                <i class="fa-light fa-id-card me-1"></i>
+                                Print Selected ID Cards
+                            </button>
+                            <span class="badge bg-light-primary" id="employee-filter-result" data-total="{{ $employees->total() }}">{{ $employees->total() }} records</span>
+                        </div>
                     </div>
-                </div>
 
-                @if ($employees->isEmpty())
-                    <div class="po-empty-state text-center text-muted py-5">
-                        <i class="fa-duotone fa-solid fa-user-slash po-empty-icon"></i>
-                        <p class="mb-0 mt-2 fw-semibold">No employee found.</p>
-                        <small>Try changing your keyword or filters to see more results.</small>
-                    </div>
-                @else
-                    <div class="table-responsive">
-                        <table class="table table-striped align-middle po-table text-nowrap" id="employees-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 44px;">
-                                        <input type="checkbox" class="form-check-input employee-select-all-checkbox" id="employee-select-all-checkbox">
-                                    </th>
-                                    <th>Employee ID</th>
-                                    <th>Name</th>
-                                    <th>Department</th>
-                                    <th>Gender</th>
-                                    <th>Position</th>
-                                    <th>Hired Date</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($employees as $employee)
-                                    @php
-                                        $department = $employee->department;
-                                        $statusLabel = $employee->employment_status;
-                                        $statusBadgeClass = $statusLabel === 'Terminated' ? 'bg-light-danger text-danger' : 'bg-light-success text-success';
-                                    @endphp
+                    @if ($employees->isEmpty())
+                        <div class="po-empty-state text-center text-muted py-5">
+                            <i class="fa-duotone fa-solid fa-user-slash po-empty-icon"></i>
+                            <p class="mb-0 mt-2 fw-semibold">No employee found.</p>
+                            <small>Try changing your keyword or filters to see more results.</small>
+                        </div>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle po-table text-nowrap" id="employees-table">
+                                <thead>
                                     <tr>
-                                        <td class="employee-select-cell">
-                                            <div class="employee-select-cell-inner">
-                                                <input id="employee-select-{{ $employee->id }}" type="checkbox" class="form-check-input employee-select-checkbox" value="{{ $employee->id }}" data-employee-name="{{ $employee->employee_name }}" data-employee-id="{{ $employee->employee_id }}">
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $employee->employee_id }}')">
-                                                <i class="fa-solid fa-regular fa-clipboard"></i>
-                                                {{ $employee->employee_id }}
-                                            </button>
-                                        </td>
-                                        <td>
-                                            <button type="button" class="employee-list-person employee-list-person-button" data-bs-toggle="modal" data-bs-target="#employee-detail-modal-{{ $employee->id }}">
-                                                <img src="{{ $employee->photo_url }}" alt="{{ $employee->employee_name }} photo" class="employee-list-avatar">
-                                                <div>
-                                                    <div class="fw-semibold text-dark">{{ $employee->employee_name }}</div>
-                                                    <small class="text-muted">{{ $employee->display_code }}</small>
-                                                </div>
-                                            </button>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-light-primary" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $department?->name ?? '-' }}">
-                                                {{ $department?->code ?? ($employee->legacy_department_code ?? '-') }}
-                                            </span>
-                                        </td>
-                                        <td>{{ $employee->gender === 'F' ? 'Female' : ($employee->gender === 'M' ? 'Male' : '-') }}</td>
-                                        <td>{{ $employee->position_name ?? '-' }}</td>
-                                        <td>{{ optional($employee->date_hired)->format('d M Y') ?? '-' }}</td>
-                                        <td>
-                                            <span class="badge {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
-                                        </td>
-                                        <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#employee-detail-modal-{{ $employee->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
-                                                    <i class="fa-light fa-eye text-primary"></i>
-                                                </button>
-                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#employee-edit-modal-{{ $employee->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
-                                                    <i class="fa-light fa-edit text-primary"></i>
-                                                </button>
-                                                <button type="button" class="btn icon" data-print-single-id="{{ $employee->id }}" data-print-single-name="{{ $employee->employee_name }}" data-print-single-code="{{ $employee->employee_id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print ID Card">
-                                                    <i class="fa-light fa-id-card text-primary"></i>
-                                                </button>
-                                                <button type="button" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete" onclick="hapusData({{ $employee->id }}, 'Delete Employee', 'Are you sure want to delete employee {{ $employee->employee_name }}?')">
-                                                    <i class="fa-light fa-trash text-secondary"></i>
-                                                </button>
-                                                <form action="{{ route('employees.destroy', $employee) }}" id="hapus-{{ $employee->id }}" method="POST">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                </form>
-                                            </div>
-                                        </td>
+                                        <th style="width: 44px;">
+                                            <input type="checkbox" class="form-check-input employee-select-all-checkbox" id="employee-select-all-checkbox">
+                                        </th>
+                                        <th>Employee ID</th>
+                                        <th>Name</th>
+                                        <th>Department</th>
+                                        <th>Gender</th>
+                                        <th>Position</th>
+                                        <th>Hired Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    @foreach ($employees as $employee)
+                                        @php
+                                            $department = $employee->department;
+                                            $statusLabel = $employee->employment_status;
+                                            $statusBadgeClass = $statusLabel === 'Terminated' ? 'bg-light-danger text-danger' : 'bg-light-success text-success';
+                                        @endphp
+                                        <tr>
+                                            <td class="employee-select-cell">
+                                                <div class="employee-select-cell-inner">
+                                                    <input id="employee-select-{{ $employee->id }}" type="checkbox" class="form-check-input employee-select-checkbox" value="{{ $employee->id }}" data-employee-name="{{ $employee->employee_name }}" data-employee-id="{{ $employee->employee_id }}">
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $employee->employee_id }}')">
+                                                    <i class="fa-solid fa-regular fa-clipboard"></i>
+                                                    {{ $employee->employee_id }}
+                                                </button>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="employee-list-person employee-list-person-button" data-bs-toggle="modal" data-bs-target="#employee-detail-modal-{{ $employee->id }}">
+                                                    <img src="{{ $employee->photo_url }}" alt="{{ $employee->employee_name }} photo" class="employee-list-avatar">
+                                                    <div>
+                                                        <div class="fw-semibold text-dark">{{ $employee->employee_name }}</div>
+                                                        <small class="text-muted">{{ $employee->display_code }}</small>
+                                                    </div>
+                                                </button>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-light-primary" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $department?->name ?? '-' }}">
+                                                    {{ $department?->code ?? ($employee->legacy_department_code ?? '-') }}
+                                                </span>
+                                            </td>
+                                            <td>{{ $employee->gender === 'F' ? 'Female' : ($employee->gender === 'M' ? 'Male' : '-') }}</td>
+                                            <td>{{ $employee->position_name ?? '-' }}</td>
+                                            <td>{{ optional($employee->date_hired)->format('d M Y') ?? '-' }}</td>
+                                            <td>
+                                                <span class="badge {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#employee-detail-modal-{{ $employee->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
+                                                        <i class="fa-light fa-eye text-primary"></i>
+                                                    </button>
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#employee-edit-modal-{{ $employee->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                                                        <i class="fa-light fa-edit text-primary"></i>
+                                                    </button>
+                                                    <button type="button" class="btn icon" data-print-single-id="{{ $employee->id }}" data-print-single-name="{{ $employee->employee_name }}" data-print-single-code="{{ $employee->employee_id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print ID Card">
+                                                        <i class="fa-light fa-id-card text-primary"></i>
+                                                    </button>
+                                                    <button type="button" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete" onclick="hapusData({{ $employee->id }}, 'Delete Employee', 'Are you sure want to delete employee {{ $employee->employee_name }}?')">
+                                                        <i class="fa-light fa-trash text-secondary"></i>
+                                                    </button>
+                                                    <form action="{{ route('employees.destroy', $employee) }}" id="hapus-{{ $employee->id }}" method="POST">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
 
-                    <div class="mt-3 d-flex justify-content-end">
-                        {{ $employees->onEachSide(1)->links('pagination::bootstrap-5') }}
-                    </div>
+                        <div class="mt-3 employee-pagination-wrap">
+                            {{ $employees->onEachSide(1)->links('pagination::bootstrap-5') }}
+                        </div>
 
-                @endif
+                    @endif
+                </div>
             </div>
         </div>
     </section>
 
+    <div id="employees-page-modals">
     @foreach ($employees as $employee)
         @php
             $department = $employee->department;
@@ -391,6 +394,7 @@
             </div>
         </div>
     @endforeach
+    </div>
 </div>
 
 <div class="modal fade employee-form-modal" id="employee-create-modal" tabindex="-1" aria-hidden="true">
@@ -807,6 +811,26 @@
             text-align: center;
         }
 
+        .employee-pagination-wrap nav {
+            width: 100%;
+        }
+
+        .employee-pagination-wrap .d-none.flex-sm-fill.d-sm-flex {
+            justify-content: space-between !important;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .employee-pagination-wrap .small.text-muted {
+            margin-bottom: 0;
+            text-align: left;
+        }
+
+        .employee-pagination-wrap .pagination {
+            margin-bottom: 0;
+        }
+
         @media (max-width: 767.98px) {
             .employee-photo-upload-card {
                 grid-template-columns: 1fr;
@@ -824,6 +848,17 @@
             .employee-photo-upload-toolbar {
                 align-items: flex-start;
             }
+
+            .employee-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none {
+                justify-content: flex-start !important;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .employee-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none .pagination {
+                width: 100%;
+                justify-content: flex-start;
+            }
         }
     </style>
 @endpush
@@ -833,6 +868,7 @@
     <script>
         (function () {
             let isLoading = false;
+            let pendingReplaceRequest = null;
             const createModalId = @json(session('employee_create_modal') && $errors->any() ? 'employee-create-modal' : null);
             const editModalId = @json(session('employee_edit_id') && $errors->any() ? 'employee-edit-modal-' . session('employee_edit_id') : null);
 
@@ -1319,24 +1355,30 @@
             }
 
             async function replacePageContent(url, pushState = true) {
+                const normalizedUrl = new URL(url, window.location.origin).toString();
+
                 if (isLoading) {
+                    pendingReplaceRequest = {
+                        url: normalizedUrl,
+                        pushState,
+                    };
                     return;
                 }
 
-                syncEmployeeSelectionScope(url);
+                syncEmployeeSelectionScope(normalizedUrl);
 
                 isLoading = true;
                 setLoading(true);
 
                 try {
-                    const response = await fetch(url, {
+                    const response = await fetch(normalizedUrl, {
                         headers: {
                             'X-Requested-With': 'XMLHttpRequest'
                         }
                     });
 
                     if (!response.ok) {
-                        window.location.href = url;
+                        window.location.href = normalizedUrl;
                         return;
                     }
 
@@ -1345,34 +1387,50 @@
                     const doc = parser.parseFromString(html, 'text/html');
                     const newContainer = doc.querySelector('#employees-page-container');
                     const currentContainer = document.querySelector('#employees-page-container');
+                    const newResults = doc.querySelector('#employees-page-results');
+                    const currentResults = document.querySelector('#employees-page-results');
+                    const newModals = doc.querySelector('#employees-page-modals');
+                    const currentModals = document.querySelector('#employees-page-modals');
 
-                    if (!newContainer || !currentContainer) {
-                        window.location.href = url;
+                    const hasNewerPendingRequest = pendingReplaceRequest && pendingReplaceRequest.url !== normalizedUrl;
+                    if (hasNewerPendingRequest) {
                         return;
                     }
 
-                    currentContainer.replaceWith(newContainer);
+                    if (!newContainer || !currentContainer || !newResults || !currentResults || !newModals || !currentModals) {
+                        window.location.href = normalizedUrl;
+                        return;
+                    }
+
+                    currentContainer.dataset.filteredTotal = String(newContainer.dataset.filteredTotal || 0);
+                    currentResults.replaceWith(newResults);
+                    currentModals.replaceWith(newModals);
 
                     if (pushState) {
-                        window.history.pushState({}, '', url);
+                        window.history.pushState({}, '', normalizedUrl);
                     }
 
-                    if (typeof initEmployeeFilters === 'function') {
-                        initEmployeeFilters();
-                    }
-
-                    initPageTooltips(newContainer);
+                    initPageTooltips(newResults);
+                    initPageTooltips(newModals);
                     initPhotoInputs(document);
-                    initIdCardPrint(newContainer);
+                    initIdCardPrint(newResults);
+                    initIdCardPrint(newModals);
 
                     if (window.feather && typeof window.feather.replace === 'function') {
                         window.feather.replace();
                     }
                 } catch (_) {
-                    window.location.href = url;
+                    window.location.href = normalizedUrl;
                 } finally {
                     isLoading = false;
                     setLoading(false);
+
+                    if (pendingReplaceRequest) {
+                        const nextRequest = pendingReplaceRequest;
+                        pendingReplaceRequest = null;
+
+                        replacePageContent(nextRequest.url, nextRequest.pushState);
+                    }
                 }
             }
 

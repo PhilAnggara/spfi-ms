@@ -33,22 +33,25 @@
                     <div class="card shadow-sm border-0">
                         <div class="card-body">
                             <div class="prs-catalog-toolbar" id="prs-catalog-filter-form" data-base-url="{{ route('prs.create') }}">
-                                <div class="prs-search">
-                                    <i class="fa-regular fa-magnifying-glass"></i>
-                                    <input type="text" class="form-control" id="prs-item-search" name="search" value="{{ $search ?? '' }}" placeholder="Search by item name or code">
+                                <div class="prs-catalog-field prs-catalog-search-field">
+                                    <label for="prs-item-search" class="form-label mb-1">Search Item</label>
+                                    <input type="text" class="form-control" id="prs-item-search" name="search" value="{{ $search ?? '' }}" placeholder="Item name or code">
                                 </div>
-                                <div class="prs-filter d-flex gap-2 align-items-center">
+                                <div class="prs-catalog-field">
+                                    <label for="prs-category-filter" class="form-label mb-1">Category</label>
                                     <select class="form-select" id="prs-category-filter" name="category">
                                         <option value="">All categories</option>
                                         @foreach ($categories as $category)
                                             <option value="{{ $category->id }}" @selected((string) ($selectedCategory ?? '') === (string) $category->id)>{{ $category->name }}</option>
                                         @endforeach
                                     </select>
-                                    <button type="button" class="btn btn-light-secondary" id="prs-reset-filter">Reset</button>
+                                </div>
+                                <div class="prs-catalog-reset-field">
+                                    <button type="button" class="btn btn-light-secondary w-100" id="prs-reset-filter">Reset</button>
                                 </div>
                             </div>
                             <div class="prs-item-grid" id="prs-item-grid">
-                                @foreach ($items as $item)
+                                @forelse ($items as $item)
                                     <div class="prs-item-card" data-name="{{ strtolower($item->name) }}" data-code="{{ strtolower($item->code) }}" data-category="{{ strtolower($item->category?->name ?? '') }}" data-item-id="{{ $item->id }}">
                                         {{-- <div class="prs-item-thumb" data-category="{{ category_data_attr($item->category?->name) }}">
                                             <div class="prs-item-thumb-icon">
@@ -77,7 +80,13 @@
                                             </div>
                                         </div>
                                     </div>
-                                @endforeach
+                                @empty
+                                    <div class="prs-catalog-empty-state">
+                                        <i class="fa-duotone fa-solid fa-box-open prs-catalog-empty-icon"></i>
+                                        <p class="mb-0 mt-2 fw-semibold">No items found.</p>
+                                        <small>Try changing your keyword or category filter to see more results.</small>
+                                    </div>
+                                @endforelse
                             </div>
                             <div class="mt-4 prs-pagination" id="prs-pagination" data-current-page="{{ $items->currentPage() }}" data-last-page="{{ $items->lastPage() }}"></div>
                         </div>
