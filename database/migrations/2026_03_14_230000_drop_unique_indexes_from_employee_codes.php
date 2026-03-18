@@ -69,11 +69,21 @@ return new class extends Migration
 
     private function hasIndex(string $tableName, string $indexName): bool
     {
-        $result = DB::selectOne(
-            'SELECT TOP 1 1 AS [found] FROM sys.indexes i JOIN sys.objects o ON i.object_id = o.object_id WHERE o.name = ? AND i.name = ?',
-            [$tableName, $indexName]
-        );
+        if (Schema::getConnection()->getDriverName() === 'sqlsrv') {
+            $result = DB::selectOne(
+                'SELECT TOP 1 1 AS [found]
+                 FROM sys.indexes i
+                 INNER JOIN sys.tables t ON i.object_id = t.object_id
+                 INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+                 WHERE t.name = ?
+                   AND i.name = ?
+                   AND s.name = SCHEMA_NAME()',
+                [$tableName, $indexName]
+            );
 
-        return $result !== null;
+            return $result !== null;
+        }
+
+        return Schema::hasIndex($tableName, $indexName);
     }
 };
