@@ -24,6 +24,24 @@ class EmployeeController extends Controller
         $filters = $this->employeeFilters($request);
         $employeesQuery = $this->buildEmployeesQuery($filters);
 
+        $sortDirection = $filters['sort_direction'] === 'asc' ? 'asc' : 'desc';
+        $sortDirectionSql = strtoupper($sortDirection);
+        $sortBy = $filters['sort_by'];
+
+        $orderableColumns = [
+            'employee_name' => 'employees.employee_name',
+            'employee_id' => 'employees.employee_id',
+            'position_name' => 'employees.position_name',
+            'date_hired' => 'employees.date_hired',
+            'date_of_birth' => 'employees.date_of_birth',
+            'date_terminated' => 'employees.date_terminated',
+            'created_at' => 'employees.created_at',
+        ];
+
+        $sortColumn = $orderableColumns[$sortBy] ?? $orderableColumns['created_at'];
+        $employeesQuery->orderBy($sortColumn, $sortDirection);
+        $orderClause = "{$sortColumn} {$sortDirectionSql}, employees.id {$sortDirectionSql}";
+
         if ($request->query('selection_scope') === 'all_ids') {
             $employeeIds = (clone $employeesQuery)
                 ->reorder()
@@ -38,11 +56,9 @@ class EmployeeController extends Controller
             ]);
         }
 
-        $employeesQuery
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
+        $employeesQuery->orderBy('employees.id', $sortDirection);
 
-        $employees = $this->paginateEloquentForCurrentConnection($employeesQuery, 'created_at DESC, id DESC', 10);
+        $employees = $this->paginateEloquentForCurrentConnection($employeesQuery, $orderClause, 10);
 
         $departmentOptions = EmployeeDepartment::query()
             ->select(['id', 'code', 'name'])
@@ -58,15 +74,30 @@ class EmployeeController extends Controller
     }
 
     /**
-     * @return array{keyword: string, department: string, gender: string, status: string}
+     * @return array{keyword: string, department: string, gender: string, status: string, sort_by: string, sort_direction: string}
      */
     private function employeeFilters(Request $request): array
     {
+        $sortBy = mb_strtolower(trim((string) $request->query('sort_by', 'created_at')));
+        $sortDirection = mb_strtolower(trim((string) $request->query('sort_direction', 'desc')));
+
+        $allowedSortBy = [
+            'employee_name',
+            'employee_id',
+            'position_name',
+            'date_hired',
+            'date_of_birth',
+            'date_terminated',
+            'created_at',
+        ];
+
         return [
             'keyword' => trim((string) $request->query('keyword', '')),
             'department' => trim((string) $request->query('department', '')),
             'gender' => trim((string) $request->query('gender', '')),
             'status' => trim((string) $request->query('status', '')),
+            'sort_by' => in_array($sortBy, $allowedSortBy, true) ? $sortBy : 'created_at',
+            'sort_direction' => in_array($sortDirection, ['asc', 'desc'], true) ? $sortDirection : 'desc',
         ];
     }
 

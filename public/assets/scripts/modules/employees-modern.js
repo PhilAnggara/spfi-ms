@@ -18,6 +18,8 @@ function initEmployeeFilters() {
         department: document.getElementById('filter-employee-department'),
         gender: document.getElementById('filter-employee-gender'),
         status: document.getElementById('filter-employee-status'),
+        sortBy: document.getElementById('filter-employee-sort-by'),
+        sortDirection: document.getElementById('filter-employee-sort-direction'),
         reset: document.getElementById('reset-employee-filter'),
     };
 
@@ -38,6 +40,8 @@ function initEmployeeFilters() {
         setQueryParam(url.searchParams, 'department', filterElements.department?.value);
         setQueryParam(url.searchParams, 'gender', filterElements.gender?.value);
         setQueryParam(url.searchParams, 'status', filterElements.status?.value);
+        setQueryParam(url.searchParams, 'sort_by', filterElements.sortBy?.value || 'created_at');
+        setQueryParam(url.searchParams, 'sort_direction', filterElements.sortDirection?.value || 'desc');
 
         url.searchParams.delete('page');
 
@@ -82,12 +86,22 @@ function initEmployeeFilters() {
         filterElements.status.addEventListener('change', () => applyServerFilter(false));
     }
 
+    if (filterElements.sortDirection) {
+        filterElements.sortDirection.addEventListener('change', () => applyServerFilter(false));
+    }
+
+    if (filterElements.sortBy) {
+        filterElements.sortBy.addEventListener('change', () => applyServerFilter(false));
+    }
+
     if (filterElements.reset) {
         filterElements.reset.addEventListener('click', function () {
             if (filterElements.keyword) filterElements.keyword.value = '';
             if (filterElements.department) filterElements.department.value = '';
             if (filterElements.gender) filterElements.gender.value = '';
             if (filterElements.status) filterElements.status.value = '';
+            if (filterElements.sortBy) filterElements.sortBy.value = 'created_at';
+            if (filterElements.sortDirection) filterElements.sortDirection.value = 'desc';
 
             applyServerFilter(false);
         });

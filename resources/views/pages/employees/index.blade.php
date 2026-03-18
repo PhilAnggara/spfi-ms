@@ -27,11 +27,11 @@
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
                 <div class="row g-3 align-items-end po-filter-grid" id="employee-filter-form">
-                    <div class="col-12 col-md-6 col-xl-4">
+                    <div class="col-12 col-md-6 col-xl-3">
                         <label for="filter-employee-keyword" class="form-label mb-1">Search Employee</label>
                         <input type="text" id="filter-employee-keyword" class="form-control" value="{{ $filters['keyword'] ?? '' }}" placeholder="Employee ID / code / name / position / phone">
                     </div>
-                    <div class="col-6 col-md-3 col-xl-3">
+                    <div class="col-6 col-md-4 col-xl-2">
                         <label for="filter-employee-department" class="form-label mb-1">Department</label>
                         <select id="filter-employee-department" class="form-select">
                             <option value="">All Department</option>
@@ -42,7 +42,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-3 col-xl-2">
+                    <div class="col-6 col-md-4 col-xl-1">
                         <label for="filter-employee-gender" class="form-label mb-1">Gender</label>
                         <select id="filter-employee-gender" class="form-select">
                             <option value="">All Gender</option>
@@ -50,7 +50,7 @@
                             <option value="F" @selected(($filters['gender'] ?? '') === 'F')>Female</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-3 col-xl-2">
+                    <div class="col-6 col-md-4 col-xl-1">
                         <label for="filter-employee-status" class="form-label mb-1">Status</label>
                         <select id="filter-employee-status" class="form-select">
                             <option value="">All Status</option>
@@ -58,7 +58,26 @@
                             <option value="terminated" @selected(($filters['status'] ?? '') === 'terminated')>Terminated</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-3 col-xl-1">
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <label for="filter-employee-sort-by" class="form-label mb-1">Sort By</label>
+                        <select id="filter-employee-sort-by" class="form-select">
+                            <option value="created_at" @selected(($filters['sort_by'] ?? 'created_at') === 'created_at')>Created Date</option>
+                            <option value="employee_name" @selected(($filters['sort_by'] ?? 'created_at') === 'employee_name')>Name</option>
+                            <option value="employee_id" @selected(($filters['sort_by'] ?? 'created_at') === 'employee_id')>Employee ID</option>
+                            <option value="position_name" @selected(($filters['sort_by'] ?? 'created_at') === 'position_name')>Position</option>
+                            <option value="date_hired" @selected(($filters['sort_by'] ?? 'created_at') === 'date_hired')>Date Hired</option>
+                            <option value="date_of_birth" @selected(($filters['sort_by'] ?? 'created_at') === 'date_of_birth')>Date of Birth</option>
+                            <option value="date_terminated" @selected(($filters['sort_by'] ?? 'created_at') === 'date_terminated')>Date Terminated</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-1">
+                        <label for="filter-employee-sort-direction" class="form-label mb-1">Order</label>
+                        <select id="filter-employee-sort-direction" class="form-select">
+                            <option value="asc" @selected(($filters['sort_direction'] ?? 'desc') === 'asc')>Ascending</option>
+                            <option value="desc" @selected(($filters['sort_direction'] ?? 'desc') === 'desc')>Descending</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-2">
                         <button type="button" id="reset-employee-filter" class="btn btn-light-secondary w-100">
                             <i class="fa-regular fa-rotate-left me-1"></i>
                             Reset
