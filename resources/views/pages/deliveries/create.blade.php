@@ -2,6 +2,18 @@
 @section('title', ' | Create Delivery')
 
 @section('content')
+@php
+    $selectedSupplierId = (string) old('supplier_id', '');
+    $selectedSupplier = collect($suppliers ?? [])->firstWhere('id', (int) $selectedSupplierId);
+    $selectedSupplierName = old('to_name_display', $selectedSupplier->name ?? '');
+    $supplierPickerData = collect($suppliers ?? [])->map(function ($supplier) {
+        return [
+            'id' => (int) $supplier->id,
+            'name' => $supplier->name,
+            'address' => $supplier->address,
+        ];
+    })->values();
+@endphp
 <div class="page-heading prs-create-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
@@ -144,8 +156,9 @@
                                 <input type="text" class="form-control" id="delivery-from-location" name="from_location" value="{{ old('from_location') }}" placeholder="From location">
                             </div>
                             <div class="col-12 col-md-6">
-                                <label for="delivery-to-name" class="form-label">To</label>
-                                <input type="text" class="form-control" id="delivery-to-name" name="to_name" value="{{ old('to_name') }}" placeholder="Destination name" required>
+                                <label for="delivery-to-name-display" class="form-label">To</label>
+                                <input type="hidden" id="delivery-supplier-id" name="supplier_id" value="{{ $selectedSupplierId }}" required>
+                                <input type="text" class="form-control" id="delivery-to-name-display" name="to_name_display" value="{{ $selectedSupplierName }}" placeholder="Choose supplier" readonly required>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label for="delivery-to-location" class="form-label">To Location</label>
@@ -185,6 +198,25 @@
             </aside>
         </form>
     </section>
+
+    <div class="modal fade" id="deliverySupplierPickerModal" tabindex="-1" aria-labelledby="deliverySupplierPickerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deliverySupplierPickerModalLabel">Choose Supplier</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="delivery-supplier-picker-search" placeholder="Search supplier...">
+                    </div>
+                    <div id="delivery-supplier-picker-list" class="list-group"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script id="delivery-supplier-data" type="application/json">@json($supplierPickerData)</script>
 </div>
 @endsection
 
@@ -200,6 +232,11 @@
 
         .delivery-cart-items {
             padding-top: 0.25rem;
+        }
+
+        #delivery-to-name-display {
+            cursor: pointer;
+            background-color: #fff;
         }
     </style>
 @endpush

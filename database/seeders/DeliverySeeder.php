@@ -32,7 +32,7 @@ class DeliverySeeder extends Seeder
 
         $defaultUserId = $this->resolveLegacyFallbackUserId(2);
         $itemIdByCode = $this->buildItemLookup();
-        $supplierNameByCode = $this->buildSupplierLookup();
+        $supplierInfoByCode = $this->buildSupplierLookup();
 
         $detailsByDrCode = [];
         foreach ($drDetailRows as $detailRow) {
@@ -65,17 +65,13 @@ class DeliverySeeder extends Seeder
             $isActive = ! $this->isNegative($drRow['is_active'] ?? 'Y');
 
             $supplierCode = $this->normalizeValue($drRow['supplier_code'] ?? null);
-            $toName = $this->resolveToName($supplierCode, $supplierNameByCode);
-
-            if ($toName === null) {
-                $toName = '-';
-            }
+            $supplierInfo = $this->resolveSupplier($supplierCode, $supplierInfoByCode);
 
             $headerPayload = [
                 'dr_date' => $drDate,
                 'from_name' => $this->normalizeValue($drRow['dr_from'] ?? null) ?? 'IM - PT. SPFI',
                 'from_location' => $this->normalizeValue($drRow['dr_fromloc'] ?? null),
-                'to_name' => $toName,
+                'supplier_id' => $supplierInfo['id'] ?? null,
                 'to_location' => $this->normalizeValue($drRow['dr_toloc'] ?? null),
                 'remarks' => $this->normalizeValue($drRow['dr_remarks'] ?? null),
                 'or_number' => $this->normalizeValue($drRow['or_code'] ?? null),
@@ -281,47 +277,55 @@ class DeliverySeeder extends Seeder
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, array{id:int,address:?string}>
      */
     private function buildSupplierLookup(): array
     {
         $lookup = [];
 
         $rows = DB::table('suppliers')
-            ->select(['code', 'name'])
+            ->select(['id', 'code', 'address'])
             ->whereNull('deleted_at')
             ->orderBy('id')
             ->get();
 
         foreach ($rows as $row) {
             $code = $this->normalizeValue($row->code ?? null);
-            $name = $this->normalizeValue($row->name ?? null);
 
-            if ($code === null || $name === null) {
+            if ($code === null) {
                 continue;
             }
 
-            $lookup[$this->normalizeLookupText($code)] = $name;
+            $lookup[$this->normalizeLookupText($code)] = [
+                'id' => (int) $row->id,
+                'address' => $this->normalizeValue($row->address ?? null),
+            ];
         }
 
         return $lookup;
     }
 
     /**
-     * @param  array<string, string>  $supplierNameByCode
+     * @param  array<string, array{id:int,address:?string}>  $supplierInfoByCode
+     * @return array{id:int,address:?string}|null
      */
-    private function resolveToName(?string $supplierCode, array $supplierNameByCode): ?string
+    private function resolveSupplier(?string $supplierCode, array $supplierInfoByCode): ?array
     {
         if ($supplierCode === null) {
             return null;
         }
 
         $normalized = $this->normalizeLookupText($supplierCode);
-        if (isset($supplierNameByCode[$normalized])) {
-            return $supplierNameByCode[$normalized];
+        if (isset($supplierInfoByCode[$normalized])) {
+            return $supplierInfoByCode[$normalized];
         }
 
-        return $supplierCode;
+        $trimmed = ltrim($normalized, '0');
+        if ($trimmed !== '' && isset($supplierInfoByCode[$trimmed])) {
+            return $supplierInfoByCode[$trimmed];
+        }
+
+        return null;
     }
 
     /**

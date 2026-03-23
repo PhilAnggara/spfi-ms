@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\Supplier;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -74,6 +75,11 @@ class DeliveryController extends Controller
 
         $items = $this->paginateEloquentForCurrentConnection($itemsQuery, 'name ASC, id ASC', 36);
 
+        $suppliers = Supplier::query()
+            ->whereNull('deleted_at')
+            ->orderBy('name')
+            ->get(['id', 'name', 'address']);
+
         if ($request->expectsJson() || $request->ajax()) {
             $transformedItems = $items->getCollection()->map(function ($item) {
                 return [
@@ -102,6 +108,7 @@ class DeliveryController extends Controller
             'items' => $items,
             'search' => $search,
             'selectedCategory' => $categoryId,
+            'suppliers' => $suppliers,
         ]);
     }
 
@@ -112,7 +119,7 @@ class DeliveryController extends Controller
             'dr_date' => ['required', 'date'],
             'from_name' => ['required', 'string', 'max:120'],
             'from_location' => ['nullable', 'string', 'max:120'],
-            'to_name' => ['required', 'string', 'max:160'],
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'to_location' => ['nullable', 'string', 'max:120'],
             'remarks' => ['nullable', 'string'],
             'or_number' => ['nullable', 'string', 'max:80'],
@@ -201,7 +208,7 @@ class DeliveryController extends Controller
                 'dr_date' => $validated['dr_date'],
                 'from_name' => trim((string) $validated['from_name']),
                 'from_location' => trim((string) ($validated['from_location'] ?? '')) ?: null,
-                'to_name' => trim((string) $validated['to_name']),
+                'supplier_id' => (int) $validated['supplier_id'],
                 'to_location' => trim((string) ($validated['to_location'] ?? '')) ?: null,
                 'remarks' => $validated['remarks'] ?? null,
                 'or_number' => trim((string) ($validated['or_number'] ?? '')) ?: null,
@@ -298,6 +305,7 @@ class DeliveryController extends Controller
 
         $query = DB::table('deliveries as d')
             ->leftJoin('users as creator', 'creator.id', '=', 'd.created_by')
+            ->leftJoin('suppliers as s', 's.id', '=', 'd.supplier_id')
             ->leftJoinSub($summaryQuery, 'di_summary', function ($join) {
                 $join->on('di_summary.delivery_id', '=', 'd.id');
             })
@@ -308,7 +316,8 @@ class DeliveryController extends Controller
                 'd.dr_date',
                 'd.from_name',
                 'd.from_location',
-                'd.to_name',
+                'd.supplier_id',
+                's.name as to_name',
                 'd.to_location',
                 'd.remarks',
                 'd.or_number',
@@ -323,7 +332,7 @@ class DeliveryController extends Controller
                         ->whereRaw('LOWER(d.dr_number) LIKE ?', [$keywordLike])
                         ->orWhereRaw("LOWER(COALESCE(d.from_name, '')) LIKE ?", [$keywordLike])
                         ->orWhereRaw("LOWER(COALESCE(d.from_location, '')) LIKE ?", [$keywordLike])
-                        ->orWhereRaw("LOWER(COALESCE(d.to_name, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(s.name, '')) LIKE ?", [$keywordLike])
                         ->orWhereRaw("LOWER(COALESCE(d.to_location, '')) LIKE ?", [$keywordLike])
                         ->orWhereRaw("LOWER(COALESCE(d.remarks, '')) LIKE ?", [$keywordLike])
                         ->orWhereRaw("LOWER(COALESCE(d.or_number, '')) LIKE ?", [$keywordLike])
@@ -372,6 +381,7 @@ class DeliveryController extends Controller
         if (! empty($ids)) {
             $itemsById = DB::table('deliveries as d')
                 ->leftJoin('users as creator', 'creator.id', '=', 'd.created_by')
+                ->leftJoin('suppliers as s', 's.id', '=', 'd.supplier_id')
                 ->leftJoinSub($summaryQuery, 'di_summary', function ($join) {
                     $join->on('di_summary.delivery_id', '=', 'd.id');
                 })
@@ -383,7 +393,8 @@ class DeliveryController extends Controller
                     'd.dr_date',
                     'd.from_name',
                     'd.from_location',
-                    'd.to_name',
+                    'd.supplier_id',
+                    's.name as to_name',
                     'd.to_location',
                     'd.remarks',
                     'd.or_number',

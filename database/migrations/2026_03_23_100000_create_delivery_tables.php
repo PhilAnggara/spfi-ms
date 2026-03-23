@@ -17,7 +17,7 @@ return new class extends Migration
             $table->date('dr_date'); // legacy: dr_date
             $table->string('from_name', 120)->default('IM - PT. SPFI'); // legacy: dr_from
             $table->string('from_location', 120)->nullable(); // legacy: dr_fromloc
-            $table->string('to_name', 160); // manual / legacy: supplier_code -> supplier name
+            $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->onDelete(fk_on_delete('set null')); // legacy: supplier_code -> suppliers.id
             $table->string('to_location', 120)->nullable(); // legacy: dr_toloc
             $table->text('remarks')->nullable(); // legacy: dr_remarks
             $table->string('or_number', 80)->nullable(); // legacy: or_code
@@ -30,6 +30,7 @@ return new class extends Migration
 
             $table->index('dr_date');
             $table->index('from_location');
+            $table->index('supplier_id');
             $table->index('to_location');
         });
 

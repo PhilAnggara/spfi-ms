@@ -1,7 +1,139 @@
 document.addEventListener('DOMContentLoaded', function () {
     initDeliveryCartPopup();
+    initDeliverySupplierPicker();
     initDeliveryCatalogAndCart();
 });
+
+function initDeliverySupplierPicker() {
+    const supplierDataScript = document.getElementById('delivery-supplier-data');
+
+    const supplierIdInput = document.getElementById('delivery-supplier-id');
+    const supplierNameInput = document.getElementById('delivery-to-name-display');
+    const toLocationInput = document.getElementById('delivery-to-location');
+    const pickSupplierButton = document.getElementById('delivery-pick-supplier');
+    const modalEl = document.getElementById('deliverySupplierPickerModal');
+    const pickerList = document.getElementById('delivery-supplier-picker-list');
+    const pickerSearchInput = document.getElementById('delivery-supplier-picker-search');
+
+    if (!supplierDataScript || !supplierIdInput || !supplierNameInput || !modalEl || !pickerList) {
+        return;
+    }
+
+    let suppliers = [];
+    try {
+        suppliers = JSON.parse(supplierDataScript.textContent || '[]');
+    } catch (_) {
+        suppliers = [];
+    }
+
+    const modal = window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
+
+    const assignSupplier = (supplier) => {
+        if (!supplier) {
+            return;
+        }
+
+        supplierIdInput.value = String(supplier.id);
+        supplierNameInput.value = String(supplier.name || '');
+        supplierNameInput.classList.remove('is-invalid');
+
+        if (toLocationInput) {
+            toLocationInput.value = String(supplier.address || '');
+        }
+    };
+
+    const renderSupplierList = (keyword = '') => {
+        const normalizedKeyword = String(keyword || '').trim().toLowerCase();
+
+        const rows = suppliers
+            .filter((supplier) => {
+                if (!normalizedKeyword) {
+                    return true;
+                }
+
+                return String(supplier.name || '').toLowerCase().includes(normalizedKeyword)
+                    || String(supplier.address || '').toLowerCase().includes(normalizedKeyword);
+            })
+            .sort((left, right) => String(left.name || '').localeCompare(String(right.name || '')));
+
+        if (rows.length === 0) {
+            pickerList.innerHTML = '<div class="text-muted small p-2">Supplier not found.</div>';
+            return;
+        }
+
+        pickerList.innerHTML = rows.map((supplier) => {
+            const activeClass = String(supplier.id) === String(supplierIdInput.value || '') ? 'active' : '';
+            return `
+                <button type="button" class="list-group-item list-group-item-action ${activeClass}" data-supplier-id="${supplier.id}">
+                    <div class="fw-semibold">${String(supplier.name || '')}</div>
+                    <div class="small text-muted">${String(supplier.address || '-')}</div>
+                </button>
+            `;
+        }).join('');
+    };
+
+    const showPicker = () => {
+        renderSupplierList('');
+        if (pickerSearchInput) {
+            pickerSearchInput.value = '';
+        }
+
+        if (modal) {
+            modal.show();
+        }
+    };
+
+    if (pickSupplierButton) {
+        pickSupplierButton.addEventListener('click', showPicker);
+    }
+
+    supplierNameInput.addEventListener('click', showPicker);
+
+    if (pickerSearchInput) {
+        pickerSearchInput.addEventListener('input', (event) => {
+            renderSupplierList(event.target.value || '');
+        });
+
+        pickerSearchInput.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') {
+                return;
+            }
+
+            event.preventDefault();
+            const firstSupplierButton = pickerList.querySelector('[data-supplier-id]');
+            if (!firstSupplierButton) {
+                return;
+            }
+
+            firstSupplierButton.click();
+        });
+    }
+
+    pickerList.addEventListener('click', (event) => {
+        const supplierButton = event.target.closest('[data-supplier-id]');
+        if (!supplierButton) {
+            return;
+        }
+
+        const supplierId = Number(supplierButton.dataset.supplierId || 0);
+        if (!supplierId) {
+            return;
+        }
+
+        const supplier = suppliers.find((item) => Number(item.id) === supplierId);
+        assignSupplier(supplier);
+
+        if (modal) {
+            modal.hide();
+        }
+    });
+
+    modalEl.addEventListener('shown.bs.modal', () => {
+        if (pickerSearchInput) {
+            pickerSearchInput.focus();
+        }
+    });
+}
 
 function initDeliveryCartPopup() {
     const cartPopup = document.getElementById('delivery-cart-popup');
@@ -66,6 +198,8 @@ function initDeliveryCatalogAndCart() {
     const topCartBtn = document.getElementById('toggle-delivery-cart');
     const stockRuleHint = document.getElementById('delivery-stock-rule-hint');
     const form = document.getElementById('delivery-create-form');
+    const supplierIdInput = document.getElementById('delivery-supplier-id');
+    const supplierNameInput = document.getElementById('delivery-to-name-display');
 
     const state = {
         page: parseInt(paginationContainer?.dataset.currentPage || '1', 10) || 1,
@@ -668,6 +802,15 @@ function initDeliveryCatalogAndCart() {
 
     if (form) {
         form.addEventListener('submit', (event) => {
+            if (!String(supplierIdInput?.value || '').trim()) {
+                event.preventDefault();
+                showStockRuleHint('Choose a supplier for destination first.');
+                supplierNameInput?.classList.add('is-invalid');
+                return;
+            }
+
+            supplierNameInput?.classList.remove('is-invalid');
+
             if (state.cart.size === 0) {
                 event.preventDefault();
                 showStockRuleHint('Add at least one item to the cart before submitting.');

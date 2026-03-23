@@ -114,7 +114,7 @@
                                             <small class="text-muted">{{ $delivery->from_location ?: '-' }}</small>
                                         </td>
                                         <td class="text-wrap" style="max-width: 200px;">
-                                            <div class="fw-semibold">{{ $delivery->to_name }}</div>
+                                            <div class="fw-semibold">{{ $delivery->to_name ?: '-' }}</div>
                                             <small class="text-muted">{{ $delivery->to_location ?: '-' }}</small>
                                         </td>
                                         <td>{{ $delivery->or_number ?: '-' }}</td>
@@ -186,7 +186,7 @@
                                             <div class="col-md-6">
                                                 <div class="delivery-info-card">
                                                     <small>To</small>
-                                                    <div>{{ $delivery->to_name }} ({{ $delivery->to_location ?: '-' }})</div>
+                                                    <div>{{ $delivery->to_name ?: '-' }} ({{ $delivery->to_location ?: '-' }})</div>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
