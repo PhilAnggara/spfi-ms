@@ -21,7 +21,7 @@ class CanvasingController extends Controller
 
         $prsItems = PrsItem::with([
             'prs',
-            'item',
+            'item.unit',
             'canvasingItems.supplier',
             'selectedCanvasingItem.supplier',
         ])

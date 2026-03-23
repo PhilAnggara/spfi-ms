@@ -27,24 +27,31 @@
                     </thead>
                     <tbody>
                         @forelse ($prsItems as $prsItem)
+                            @php
+                                $prs = $prsItem->prs;
+                                $item = $prsItem->item;
+                                $prsNumber = $prs?->prs_number ?? '-';
+                                $itemCode = $item?->code ?? 'N/A';
+                                $itemName = $item?->name ?? 'Item not found';
+                            @endphp
                             <tr>
                                 <td>
-                                    <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $prsItem->prs->prs_number }}')">
+                                    <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $prsNumber }}')">
                                         <i class="fa-solid fa-regular fa-clipboard"></i>
-                                        {{ $prsItem->prs->prs_number }}
+                                        {{ $prsNumber }}
                                     </button>
                                 </td>
                                 <td>
-                                    <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $prsItem->item->code }}')">{{ $prsItem->item->code }}</span>
+                                    <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $itemCode }}')">{{ $itemCode }}</span>
                                 </td>
-                                <td data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->item->name }}">{{ Str::limit($prsItem->item->name, 30) }}</td>
+                                <td data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $itemName }}">{{ Str::limit($itemName, 30) }}</td>
                                 <td>
                                     <span class="fw-semibold">{{ $prsItem->quantity }}</span>
-                                    <small class="text-muted">{{ $prsItem->item->unit?->name ?? 'PCS' }}</small>
+                                    <small class="text-muted">{{ $item?->unit?->name ?? 'PCS' }}</small>
                                 </td>
                                 <td>
                                     <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i>
-                                    {{ tgl($prsItem->prs->date_needed) }}
+                                    {{ $prs?->date_needed ? tgl($prs->date_needed) : '-' }}
                                 </td>
                                 <td>
                                     <div class="small text-muted">Quotes: {{ $prsItem->canvasingItems->count() }}</div>
