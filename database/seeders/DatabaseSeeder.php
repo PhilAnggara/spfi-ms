@@ -38,6 +38,7 @@ class DatabaseSeeder extends Seeder
             StockBalanceSeeder::class,
             StoreWithdrawalSeeder::class,
             TransferSlipSeeder::class,
+            DeliverySeeder::class,
             BuyerSeeder::class,
             FishSupplierSeeder::class,
             VesselSeeder::class,

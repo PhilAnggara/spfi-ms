@@ -323,6 +323,15 @@
                             </li>
                         @endcan
 
+                        @can('view-delivery')
+                            <li class="sidebar-item {{ Request::is('deliveries*') ? 'active' : '' }}">
+                                <a href="{{ route('deliveries.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-truck-ramp-box {{ Request::is('deliveries*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Delivery</span>
+                                </a>
+                            </li>
+                        @endcan
+
                     </ul>
                 </div>
             </div>

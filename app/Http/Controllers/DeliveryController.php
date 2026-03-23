@@ -1,0 +1,452 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Item;
+use App\Models\ItemCategory;
+use App\Support\Concerns\PaginatesLegacySqlServer;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+class DeliveryController extends Controller
+{
+    use PaginatesLegacySqlServer;
+
+    public function index(Request $request)
+    {
+        $filters = [
+            'keyword' => trim((string) $request->query('keyword', '')),
+            'from_location' => trim((string) $request->query('from_location', '')),
+            'to_location' => trim((string) $request->query('to_location', '')),
+            'dr_start' => trim((string) $request->query('dr_start', '')),
+            'dr_end' => trim((string) $request->query('dr_end', '')),
+        ];
+
+        $deliveries = $this->paginateDeliveries($filters, 10);
+        $deliveryIds = $deliveries->getCollection()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $deliveryItems = $this->groupDeliveryItems($deliveryIds);
+
+        return view('pages.deliveries.index', [
+            'deliveries' => $deliveries,
+            'deliveryItems' => $deliveryItems,
+            'filters' => $filters,
+        ]);
+    }
+
+    public function create(Request $request)
+    {
+        $categories = ItemCategory::query()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+
+        $search = trim((string) $request->query('search'));
+        $categoryId = trim((string) $request->query('category'));
+        $searchTerms = collect(preg_split('/\s+/', mb_strtolower($search), -1, PREG_SPLIT_NO_EMPTY))
+            ->filter()
+            ->values();
+
+        $itemsQuery = Item::with(['unit', 'category'])
+            ->select(['id', 'name', 'code', 'stock_on_hand', 'unit_of_measure_id', 'category_id'])
+            ->where('is_active', true)
+            ->when($searchTerms->isNotEmpty(), function ($query) use ($searchTerms) {
+                $query->where(function ($nested) use ($searchTerms) {
+                    foreach ($searchTerms as $term) {
+                        $termLike = "%{$term}%";
+                        $nested->where(function ($where) use ($termLike) {
+                            $where->whereRaw('LOWER(name) LIKE ?', [$termLike])
+                                ->orWhereRaw('LOWER(code) LIKE ?', [$termLike]);
+                        });
+                    }
+                });
+            })
+            ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
+                $query->where('category_id', (int) $categoryId);
+            })
+            ->orderBy('name')
+            ->orderBy('id');
+
+        $items = $this->paginateEloquentForCurrentConnection($itemsQuery, 'name ASC, id ASC', 36);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            $transformedItems = $items->getCollection()->map(function ($item) {
+                return [
+                    'id' => (int) $item->id,
+                    'name' => $item->name,
+                    'code' => $item->code,
+                    'stock_on_hand' => round((float) $item->stock_on_hand, 3),
+                    'unit' => $item->unit?->name ?? 'PCS',
+                    'category' => $item->category?->name,
+                ];
+            })->values();
+
+            return response()->json([
+                'data' => $transformedItems,
+                'meta' => [
+                    'current_page' => $items->currentPage(),
+                    'last_page' => $items->lastPage(),
+                    'per_page' => $items->perPage(),
+                    'total' => $items->total(),
+                ],
+            ]);
+        }
+
+        return view('pages.deliveries.create', [
+            'categories' => $categories,
+            'items' => $items,
+            'search' => $search,
+            'selectedCategory' => $categoryId,
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'dr_number' => ['required', 'string', 'max:50', 'unique:deliveries,dr_number'],
+            'dr_date' => ['required', 'date'],
+            'from_name' => ['required', 'string', 'max:120'],
+            'from_location' => ['nullable', 'string', 'max:120'],
+            'to_name' => ['required', 'string', 'max:160'],
+            'to_location' => ['nullable', 'string', 'max:120'],
+            'remarks' => ['nullable', 'string'],
+            'or_number' => ['nullable', 'string', 'max:80'],
+            'dm_number' => ['nullable', 'string', 'max:80'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.item_id' => ['required', 'exists:items,id'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
+        ]);
+
+        $requestedItems = collect($validated['items'])
+            ->map(function (array $row): array {
+                return [
+                    'item_id' => (int) ($row['item_id'] ?? 0),
+                    'quantity' => round((float) ($row['quantity'] ?? 0), 3),
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['item_id'] > 0 && $row['quantity'] > 0)
+            ->groupBy('item_id')
+            ->map(function ($rows, $itemId): array {
+                return [
+                    'item_id' => (int) $itemId,
+                    'quantity' => round((float) $rows->sum('quantity'), 3),
+                ];
+            })
+            ->values();
+
+        if ($requestedItems->isEmpty()) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Add at least one valid item before submitting.',
+            ]);
+        }
+
+        $itemRows = DB::table('items as i')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->whereIn('i.id', $requestedItems->pluck('item_id')->all())
+            ->whereNull('i.deleted_at')
+            ->select([
+                'i.id',
+                'i.code',
+                'i.stock_on_hand',
+                'u.name as uom_name',
+            ])
+            ->get()
+            ->keyBy('id');
+
+        if ($itemRows->count() !== $requestedItems->count()) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Some selected items are no longer available.',
+            ]);
+        }
+
+        $zeroStockIds = $requestedItems
+            ->filter(function (array $row) use ($itemRows): bool {
+                $stock = round((float) ($itemRows[$row['item_id']]->stock_on_hand ?? 0), 3);
+                return $stock <= 0;
+            })
+            ->pluck('item_id')
+            ->all();
+
+        if (! empty($zeroStockIds)) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Cannot submit delivery with zero-stock items.',
+            ]);
+        }
+
+        $overStockIds = $requestedItems
+            ->filter(function (array $row) use ($itemRows): bool {
+                $stock = round((float) ($itemRows[$row['item_id']]->stock_on_hand ?? 0), 3);
+                return $row['quantity'] > $stock;
+            })
+            ->pluck('item_id')
+            ->all();
+
+        if (! empty($overStockIds)) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Requested quantity exceeds stock on hand for one or more items.',
+            ]);
+        }
+
+        $authUserId = Auth::id();
+        $now = now();
+
+        DB::transaction(function () use ($validated, $requestedItems, $itemRows, $authUserId, $now): void {
+            $deliveryId = DB::table('deliveries')->insertGetId([
+                'dr_number' => $validated['dr_number'],
+                'dr_date' => $validated['dr_date'],
+                'from_name' => trim((string) $validated['from_name']),
+                'from_location' => trim((string) ($validated['from_location'] ?? '')) ?: null,
+                'to_name' => trim((string) $validated['to_name']),
+                'to_location' => trim((string) ($validated['to_location'] ?? '')) ?: null,
+                'remarks' => $validated['remarks'] ?? null,
+                'or_number' => trim((string) ($validated['or_number'] ?? '')) ?: null,
+                'dm_number' => trim((string) ($validated['dm_number'] ?? '')) ?: null,
+                'created_by' => $authUserId,
+                'updated_by' => $authUserId,
+                'meta' => json_encode([
+                    'source' => 'delivery-create-page',
+                    'item_count' => $requestedItems->count(),
+                ]),
+                'created_at' => $now,
+                'updated_at' => $now,
+                'deleted_at' => null,
+            ]);
+
+            $detailRows = $requestedItems->map(function (array $row) use ($deliveryId, $itemRows, $authUserId, $now): array {
+                $item = $itemRows[$row['item_id']];
+
+                return [
+                    'delivery_id' => (int) $deliveryId,
+                    'item_id' => $row['item_id'],
+                    'product_code' => $item->code,
+                    'uom' => $item->uom_name,
+                    'quantity' => $row['quantity'],
+                    'created_by' => $authUserId,
+                    'updated_by' => $authUserId,
+                    'meta' => json_encode([
+                        'stock_on_hand_snapshot' => round((float) ($item->stock_on_hand ?? 0), 3),
+                    ]),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                    'deleted_at' => null,
+                ];
+            })->values()->all();
+
+            DB::table('delivery_items')->insert($detailRows);
+        });
+
+        return redirect()
+            ->route('deliveries.index')
+            ->with('success', "Delivery {$validated['dr_number']} has been created successfully.");
+    }
+
+    public function destroy(string $delivery)
+    {
+        $deliveryId = (int) $delivery;
+        $now = now();
+        $authUserId = Auth::id();
+
+        $deleted = DB::transaction(function () use ($deliveryId, $now, $authUserId): int {
+            DB::table('delivery_items')
+                ->where('delivery_id', $deliveryId)
+                ->whereNull('deleted_at')
+                ->update([
+                    'updated_by' => $authUserId,
+                    'updated_at' => $now,
+                    'deleted_at' => $now,
+                ]);
+
+            return DB::table('deliveries')
+                ->where('id', $deliveryId)
+                ->whereNull('deleted_at')
+                ->update([
+                    'updated_by' => $authUserId,
+                    'updated_at' => $now,
+                    'deleted_at' => $now,
+                ]);
+        });
+
+        if ($deleted === 0) {
+            return redirect()->back()->with('error', 'Delivery not found or already deleted.');
+        }
+
+        return redirect()->back()->with('success', 'Delivery deleted successfully.');
+    }
+
+    private function paginateDeliveries(array $filters = [], int $perPage = 10): LengthAwarePaginator
+    {
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $currentPage = max(1, (int) $currentPage);
+
+        $keyword = mb_strtolower(trim((string) ($filters['keyword'] ?? '')));
+        $fromLocation = mb_strtolower(trim((string) ($filters['from_location'] ?? '')));
+        $toLocation = mb_strtolower(trim((string) ($filters['to_location'] ?? '')));
+        $drStart = trim((string) ($filters['dr_start'] ?? ''));
+        $drEnd = trim((string) ($filters['dr_end'] ?? ''));
+
+        $keywordLike = "%{$keyword}%";
+
+        $summaryQuery = DB::table('delivery_items')
+            ->whereNull('deleted_at')
+            ->selectRaw('delivery_id, COUNT(*) as item_count, SUM(quantity) as total_quantity')
+            ->groupBy('delivery_id');
+
+        $query = DB::table('deliveries as d')
+            ->leftJoin('users as creator', 'creator.id', '=', 'd.created_by')
+            ->leftJoinSub($summaryQuery, 'di_summary', function ($join) {
+                $join->on('di_summary.delivery_id', '=', 'd.id');
+            })
+            ->whereNull('d.deleted_at')
+            ->select([
+                'd.id',
+                'd.dr_number',
+                'd.dr_date',
+                'd.from_name',
+                'd.from_location',
+                'd.to_name',
+                'd.to_location',
+                'd.remarks',
+                'd.or_number',
+                'd.dm_number',
+                'creator.name as created_by_name',
+                DB::raw('COALESCE(di_summary.item_count, 0) as item_count'),
+                DB::raw('COALESCE(di_summary.total_quantity, 0) as total_quantity'),
+            ])
+            ->when($keyword !== '', function ($subQuery) use ($keywordLike) {
+                $subQuery->where(function ($whereQuery) use ($keywordLike) {
+                    $whereQuery
+                        ->whereRaw('LOWER(d.dr_number) LIKE ?', [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(d.from_name, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(d.from_location, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(d.to_name, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(d.to_location, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(d.remarks, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(d.or_number, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(d.dm_number, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(creator.name, '')) LIKE ?", [$keywordLike]);
+                });
+            })
+            ->when($fromLocation !== '', function ($subQuery) use ($fromLocation) {
+                $subQuery->whereRaw("LOWER(COALESCE(d.from_location, '')) = ?", [$fromLocation]);
+            })
+            ->when($toLocation !== '', function ($subQuery) use ($toLocation) {
+                $subQuery->whereRaw("LOWER(COALESCE(d.to_location, '')) = ?", [$toLocation]);
+            })
+            ->when($drStart !== '', function ($subQuery) use ($drStart) {
+                $subQuery->whereDate('d.dr_date', '>=', $drStart);
+            })
+            ->when($drEnd !== '', function ($subQuery) use ($drEnd) {
+                $subQuery->whereDate('d.dr_date', '<=', $drEnd);
+            })
+            ->orderByDesc('d.id');
+
+        if (! $this->isSqlServerConnection()) {
+            return $query
+                ->paginate($perPage)
+                ->withQueryString();
+        }
+
+        $total = (clone $query)->reorder()->count();
+        $startRow = (($currentPage - 1) * $perPage) + 1;
+        $endRow = $currentPage * $perPage;
+
+        $rankedIdsQuery = (clone $query)
+            ->reorder()
+            ->select('d.id')
+            ->selectRaw('ROW_NUMBER() OVER (ORDER BY d.id DESC) as row_num');
+
+        $ids = DB::query()
+            ->fromSub($rankedIdsQuery, 'ranked_deliveries')
+            ->whereBetween('row_num', [$startRow, $endRow])
+            ->orderBy('row_num')
+            ->pluck('id')
+            ->all();
+
+        $collection = collect();
+
+        if (! empty($ids)) {
+            $itemsById = DB::table('deliveries as d')
+                ->leftJoin('users as creator', 'creator.id', '=', 'd.created_by')
+                ->leftJoinSub($summaryQuery, 'di_summary', function ($join) {
+                    $join->on('di_summary.delivery_id', '=', 'd.id');
+                })
+                ->whereNull('d.deleted_at')
+                ->whereIn('d.id', $ids)
+                ->select([
+                    'd.id',
+                    'd.dr_number',
+                    'd.dr_date',
+                    'd.from_name',
+                    'd.from_location',
+                    'd.to_name',
+                    'd.to_location',
+                    'd.remarks',
+                    'd.or_number',
+                    'd.dm_number',
+                    'creator.name as created_by_name',
+                    DB::raw('COALESCE(di_summary.item_count, 0) as item_count'),
+                    DB::raw('COALESCE(di_summary.total_quantity, 0) as total_quantity'),
+                ])
+                ->get()
+                ->keyBy('id');
+
+            $collection = collect($ids)
+                ->map(fn ($id) => $itemsById->get($id))
+                ->filter()
+                ->values();
+        }
+
+        return new LengthAwarePaginator(
+            items: $collection,
+            total: $total,
+            perPage: $perPage,
+            currentPage: $currentPage,
+            options: [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ],
+        );
+    }
+
+    /**
+     * @param  array<int, int>  $deliveryIds
+     * @return array<int, array<int, object>>
+     */
+    private function groupDeliveryItems(array $deliveryIds): array
+    {
+        if (empty($deliveryIds)) {
+            return [];
+        }
+
+        $rows = DB::table('delivery_items as di')
+            ->leftJoin('items as i', 'i.id', '=', 'di.item_id')
+            ->whereIn('di.delivery_id', $deliveryIds)
+            ->whereNull('di.deleted_at')
+            ->orderBy('di.delivery_id')
+            ->orderBy('di.id')
+            ->select([
+                'di.id',
+                'di.delivery_id',
+                'di.item_id',
+                'di.product_code',
+                'di.uom',
+                'di.quantity',
+                'i.name as item_name',
+                'i.code as item_code',
+            ])
+            ->get();
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $deliveryId = (int) $row->delivery_id;
+            $grouped[$deliveryId][] = $row;
+        }
+
+        return $grouped;
+    }
+}

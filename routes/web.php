@@ -3,6 +3,7 @@
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\Accounting\AccountingCodeController;
 use App\Http\Controllers\Accounting\AccountingGroupCodeController;
@@ -164,6 +165,19 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:delete-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {
         Route::delete('/{transferSlip}', [TransferSlipController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::middleware('permission:view-delivery')->prefix('deliveries')->name('deliveries.')->group(function () {
+        Route::get('/', [DeliveryController::class, 'index'])->name('index');
+    });
+
+    Route::middleware('permission:create-delivery')->prefix('deliveries')->name('deliveries.')->group(function () {
+        Route::get('/create', [DeliveryController::class, 'create'])->name('create');
+        Route::post('/', [DeliveryController::class, 'store'])->name('store');
+    });
+
+    Route::middleware('permission:delete-delivery')->prefix('deliveries')->name('deliveries.')->group(function () {
+        Route::delete('/{delivery}', [DeliveryController::class, 'destroy'])->name('destroy');
     });
 
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');

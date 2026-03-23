@@ -127,5 +127,15 @@ return [
             'connection' => env('LEGACY_DB_TS_DETAIL_CONNECTION'),
             'table' => env('LEGACY_DB_TS_DETAIL_TABLE', 'ts_detail'),
         ],
+        'dr' => [
+            'csv_path' => 'document/csv/dr.csv',
+            'connection' => env('LEGACY_DB_DR_CONNECTION'),
+            'table' => env('LEGACY_DB_DR_TABLE', 'dr'),
+        ],
+        'dr_detail' => [
+            'csv_path' => 'document/csv/dr_detail.csv',
+            'connection' => env('LEGACY_DB_DR_DETAIL_CONNECTION'),
+            'table' => env('LEGACY_DB_DR_DETAIL_TABLE', 'dr_detail'),
+        ],
     ],
 ];
