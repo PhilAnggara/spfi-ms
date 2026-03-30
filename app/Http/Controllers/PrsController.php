@@ -447,9 +447,9 @@ class PrsController extends Controller
                 'department',
                 'user',
                 'items.item',
-                'items.canvaser',
-                'items.canvasingItems',
-                'items.selectedCanvasingItem',
+                'items.canvasser',
+                'items.canvassingItems',
+                'items.selectedCanvassingItem',
                 'items.purchaseOrderItem.receivingReportItems',
                 'logs' => function ($query) {
                     $query->latest();

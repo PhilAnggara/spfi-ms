@@ -24,11 +24,11 @@
                     <div class="accordion" id="poDraftAccordion">
                         @foreach ($itemsBySupplier as $supplierId => $items)
                             @php
-                                $supplier = $items->first()?->selectedCanvasingItem?->supplier;
+                                $supplier = $items->first()?->selectedCanvassingItem?->supplier;
                                 $accordionId = 'supplier-' . $supplierId;
                                 // Calculate supplier total
                                 $supplierTotal = $items->sum(function ($item) {
-                                    return $item->quantity * ($item->selectedCanvasingItem?->unit_price ?? 0);
+                                    return $item->quantity * ($item->selectedCanvassingItem?->unit_price ?? 0);
                                 });
                             @endphp
                             <div class="accordion-item">
@@ -75,15 +75,15 @@
                                                     <tbody>
                                                         @foreach ($items as $index => $prsItem)
                                                             @php
-                                                                $canvasing = $prsItem->selectedCanvasingItem;
+                                                                $canvassing = $prsItem->selectedCanvassingItem;
                                                             @endphp
                                                             <tr>
                                                                 <td>
                                                                     <input type="checkbox" class="form-check-input item-checkbox" data-item-index="{{ $index }}" checked>
                                                                     <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $prsItem->id }}">
                                                                     <input type="hidden" name="items[{{ $index }}][quantity]" value="{{ $prsItem->quantity }}">
-                                                                    <input type="hidden" name="items[{{ $index }}][unit_price]" value="{{ $canvasing?->unit_price ?? 0 }}">
-                                                                    <input type="hidden" name="items[{{ $index }}][notes]" value="{{ $canvasing?->notes }}">
+                                                                    <input type="hidden" name="items[{{ $index }}][unit_price]" value="{{ $canvassing?->unit_price ?? 0 }}">
+                                                                    <input type="hidden" name="items[{{ $index }}][notes]" value="{{ $canvassing?->notes }}">
                                                                     <input type="hidden" name="items[{{ $index }}][checked]" class="item-checked" value="1">
                                                                 </td>
                                                                 <td>{{ $prsItem->prs?->prs_number ?? '-' }}</td>
@@ -93,8 +93,8 @@
                                                                 </td>
                                                                 <td>{{ $prsItem->quantity }}</td>
                                                                 <td>{{ $prsItem->item->unit?->name ?? 'PCS' }}</td>
-                                                                <td>{{ number_format($canvasing?->unit_price ?? 0, 2) }}</td>
-                                                                <td>{{ $canvasing?->notes ?? '-' }}</td>
+                                                                <td>{{ number_format($canvassing?->unit_price ?? 0, 2) }}</td>
+                                                                <td>{{ $canvassing?->notes ?? '-' }}</td>
                                                             </tr>
                                                         @endforeach
                                                     </tbody>

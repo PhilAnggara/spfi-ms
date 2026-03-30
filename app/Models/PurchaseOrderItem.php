@@ -44,7 +44,7 @@ class PurchaseOrderItem extends Model
         'pph_rate' => 'decimal:2',
         'pph_amount' => 'decimal:2',
         'total' => 'decimal:2',
-        // Holds PR/canvasing snapshot (terms, lead time).
+        // Holds PR/canvassing snapshot (terms, lead time).
         'meta' => 'array',
     ];
 

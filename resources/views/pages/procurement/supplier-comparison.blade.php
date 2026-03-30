@@ -17,7 +17,7 @@
             <div class="card shadow-sm">
                 <div class="card-body text-center text-muted py-4">
                     <i class="fa-duotone fa-solid fa-inbox"></i>
-                    <p class="mb-0 mt-2">No canvasing items available for comparison.</p>
+                    <p class="mb-0 mt-2">No canvassing items available for comparison.</p>
                 </div>
             </div>
         @else
@@ -41,11 +41,11 @@
                                 </div>
                                 <div>
                                     <div class="text-muted small">Canvasser</div>
-                                    <div class="fw-semibold">{{ $prsItem->canvaser?->name ?? '-' }}</div>
+                                    <div class="fw-semibold">{{ $prsItem->canvasser?->name ?? '-' }}</div>
                                 </div>
                                 <div>
                                     <div class="text-muted small">Selected</div>
-                                    <div class="fw-semibold">{{ $prsItem->selectedCanvasingItem?->supplier?->name ?? 'Not selected' }}</div>
+                                    <div class="fw-semibold">{{ $prsItem->selectedCanvassingItem?->supplier?->name ?? 'Not selected' }}</div>
                                 </div>
                                 <div>
                                     <div class="text-muted small">Status</div>
@@ -70,22 +70,22 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @foreach ($prsItem->canvasingItems as $canvasing)
+                                            @foreach ($prsItem->canvassingItems as $canvassing)
                                                 <tr>
                                                     <td class="text-center">
-                                                        <input type="radio" name="canvasing_item_id" value="{{ $canvasing->id }}" @checked($prsItem->selected_canvasing_item_id === $canvasing->id) @if ($loop->first) required @endif @disabled($prsItem->purchase_order_id)>
+                                                        <input type="radio" name="canvassing_item_id" value="{{ $canvassing->id }}" @checked($prsItem->selected_canvassing_item_id === $canvassing->id) @if ($loop->first) required @endif @disabled($prsItem->purchase_order_id)>
                                                     </td>
-                                                    <td>{{ $canvasing->supplier?->name ?? '-' }}</td>
-                                                    <td class="text-end">{{ number_format($canvasing->unit_price, 2) }}</td>
-                                                    <td class="text-center">{{ $canvasing->lead_time_days ?? '-' }}</td>
+                                                    <td>{{ $canvassing->supplier?->name ?? '-' }}</td>
+                                                    <td class="text-end">{{ number_format($canvassing->unit_price, 2) }}</td>
+                                                    <td class="text-center">{{ $canvassing->lead_time_days ?? '-' }}</td>
                                                     <td>
                                                         @php
-                                                            $payment = trim(($canvasing->term_of_payment ? $canvasing->term_of_payment . ' ' : '') . ($canvasing->term_of_payment_type ?? ''));
+                                                            $payment = trim(($canvassing->term_of_payment ? $canvassing->term_of_payment . ' ' : '') . ($canvassing->term_of_payment_type ?? ''));
                                                         @endphp
                                                         {{ $payment !== '' ? $payment : '-' }}
                                                     </td>
-                                                    <td>{{ $canvasing->term_of_delivery ?? '-' }}</td>
-                                                    <td>{{ $canvasing->notes ?? '-' }}</td>
+                                                    <td>{{ $canvassing->term_of_delivery ?? '-' }}</td>
+                                                    <td>{{ $canvassing->notes ?? '-' }}</td>
                                                 </tr>
                                             @endforeach
                                         </tbody>
@@ -93,7 +93,7 @@
                                 </div>
 
                                 <div class="d-flex justify-content-end gap-2">
-                                    @if ($prsItem->selected_canvasing_item_id)
+                                    @if ($prsItem->selected_canvassing_item_id)
                                         <a href="{{ route('procurement.supplier-comparison.report', $prsItem->id) }}" target="_blank" rel="noopener" class="btn btn-outline-danger">
                                             <i class="fa-duotone fa-solid fa-file-pdf"></i>
                                             Export PDF

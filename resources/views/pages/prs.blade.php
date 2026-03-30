@@ -43,7 +43,7 @@
                             <option value="SUBMITTED" @selected(request('status') === 'SUBMITTED')>SUBMITTED</option>
                             <option value="ON_HOLD" @selected(request('status') === 'ON_HOLD')>ON_HOLD</option>
                             <option value="RESUBMITTED" @selected(request('status') === 'RESUBMITTED')>RESUBMITTED</option>
-                            <option value="CANVASING" @selected(request('status') === 'CANVASING')>CANVASING</option>
+                            <option value="CANVASSING" @selected(request('status') === 'CANVASSING')>CANVASSING</option>
                             <option value="DELIVERY_PENDING" @selected(request('status') === 'DELIVERY_PENDING')>DELIVERY_PENDING</option>
                             <option value="PARTIAL_DELIVERY" @selected(request('status') === 'PARTIAL_DELIVERY')>PARTIAL_DELIVERY</option>
                             <option value="DELIVERY_COMPLETE" @selected(request('status') === 'DELIVERY_COMPLETE')>DELIVERY_COMPLETE</option>

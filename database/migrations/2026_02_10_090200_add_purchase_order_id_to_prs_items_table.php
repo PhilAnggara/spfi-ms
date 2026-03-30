@@ -15,7 +15,7 @@ return new class extends Migration
             // Prevent reusing PR items once a PO is created.
             $table->foreignId('purchase_order_id')
                 ->nullable()
-                ->after('canvaser_id')
+                ->after('canvasser_id')
                 ->constrained('purchase_orders')
                 ->onDelete(fk_on_delete('set null'));
         });

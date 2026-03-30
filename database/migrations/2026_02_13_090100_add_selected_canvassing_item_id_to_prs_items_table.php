@@ -12,14 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('prs_items', function (Blueprint $table) {
-            $table->foreignId('selected_canvasing_item_id')
+            $table->foreignId('selected_canvassing_item_id')
                 ->nullable()
                 ->after('purchase_order_id')
-                ->constrained('prs_canvasing_items')
+                ->constrained('prs_canvassing_items')
                 ->onDelete(fk_on_delete('set null'));
             $table->text('selection_reason')
                 ->nullable()
-                ->after('selected_canvasing_item_id');
+                ->after('selected_canvassing_item_id');
         });
     }
 
@@ -30,7 +30,7 @@ return new class extends Migration
     {
         Schema::table('prs_items', function (Blueprint $table) {
             $table->dropColumn('selection_reason');
-            $table->dropConstrainedForeignId('selected_canvasing_item_id');
+            $table->dropConstrainedForeignId('selected_canvassing_item_id');
         });
     }
 };

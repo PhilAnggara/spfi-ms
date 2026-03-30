@@ -145,21 +145,21 @@ class PurchaseOrderController extends Controller
         $prsItems = PrsItem::with([
             'prs',
             'item.unit',
-            'selectedCanvasingItem.supplier',
+            'selectedCanvassingItem.supplier',
         ])
-            ->where('canvaser_id', $userId)
+            ->where('canvasser_id', $userId)
             ->whereNull('purchase_order_id')
             ->where('is_direct_purchase', false)
-            ->whereNotNull('selected_canvasing_item_id')
+            ->whereNotNull('selected_canvassing_item_id')
             ->orderByDesc('created_at')
             ->get();
 
         $itemsBySupplier = $prsItems
-            ->filter(fn ($item) => $item->selectedCanvasingItem?->supplier_id)
-            ->groupBy(fn ($item) => $item->selectedCanvasingItem->supplier_id);
+            ->filter(fn ($item) => $item->selectedCanvassingItem?->supplier_id)
+            ->groupBy(fn ($item) => $item->selectedCanvassingItem->supplier_id);
 
         $suppliers = $itemsBySupplier
-            ->map(fn ($items) => $items->first()?->selectedCanvasingItem?->supplier)
+            ->map(fn ($items) => $items->first()?->selectedCanvassingItem?->supplier)
             ->filter();
 
         return view('pages.purchase-orders.draft', [
@@ -194,11 +194,11 @@ class PurchaseOrderController extends Controller
         $userId = $request->user()->id;
         $checkedItemIds = array_column($checkedItems, 'prs_item_id');
 
-        $prsItems = PrsItem::with(['prs', 'item.unit', 'selectedCanvasingItem'])
+        $prsItems = PrsItem::with(['prs', 'item.unit', 'selectedCanvassingItem'])
             ->whereIn('id', $checkedItemIds)
-            ->where('canvaser_id', $userId)
+            ->where('canvasser_id', $userId)
             ->whereNull('purchase_order_id')
-            ->whereNotNull('selected_canvasing_item_id')
+            ->whereNotNull('selected_canvassing_item_id')
             ->get();
 
         if ($prsItems->count() !== count($checkedItemIds)) {
@@ -206,7 +206,7 @@ class PurchaseOrderController extends Controller
         }
 
         $invalidSupplierItems = $prsItems->filter(function ($item) use ($validated) {
-            return $item->selectedCanvasingItem?->supplier_id !== (int) $validated['supplier_id'];
+            return $item->selectedCanvassingItem?->supplier_id !== (int) $validated['supplier_id'];
         });
 
         if ($invalidSupplierItems->isNotEmpty()) {
@@ -214,7 +214,7 @@ class PurchaseOrderController extends Controller
         }
 
         $lineItems = $prsItems->map(function ($item) {
-            $unitPrice = $item->selectedCanvasingItem?->unit_price ?? 0;
+            $unitPrice = $item->selectedCanvassingItem?->unit_price ?? 0;
             $quantity = $item->quantity;
             $lineTotal = $quantity * $unitPrice;
 
@@ -225,7 +225,7 @@ class PurchaseOrderController extends Controller
                 'unit_name' => $item->item->unit?->name ?? 'PCS',
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
-                'notes' => $item->selectedCanvasingItem?->notes,
+                'notes' => $item->selectedCanvassingItem?->notes,
                 'line_total' => $lineTotal,
                 'prs_number' => $item->prs?->prs_number,
                 'discount_rate' => 0,
@@ -276,11 +276,11 @@ class PurchaseOrderController extends Controller
 
         $prsItemIds = collect($validated['items'])->pluck('prs_item_id');
 
-        $prsItems = PrsItem::with(['prs', 'item', 'selectedCanvasingItem'])
+        $prsItems = PrsItem::with(['prs', 'item', 'selectedCanvassingItem'])
             ->whereIn('id', $prsItemIds)
-            ->where('canvaser_id', $request->user()->id)
+            ->where('canvasser_id', $request->user()->id)
             ->whereNull('purchase_order_id')
-            ->whereNotNull('selected_canvasing_item_id')
+            ->whereNotNull('selected_canvassing_item_id')
             ->get();
 
         if ($prsItems->count() !== count($prsItemIds)) {
@@ -288,7 +288,7 @@ class PurchaseOrderController extends Controller
         }
 
         $invalidSupplierItems = $prsItems->filter(function ($item) use ($validated) {
-            return $item->selectedCanvasingItem?->supplier_id !== (int) $validated['supplier_id'];
+            return $item->selectedCanvassingItem?->supplier_id !== (int) $validated['supplier_id'];
         });
 
         if ($invalidSupplierItems->isNotEmpty()) {
@@ -338,7 +338,7 @@ class PurchaseOrderController extends Controller
                 $pphTotal += $pphAmount;
                 $itemsTotal += $lineTotal;
 
-                $canvasing = $prsItem->selectedCanvasingItem;
+                $canvassing = $prsItem->selectedCanvassingItem;
 
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $purchaseOrder->id,
@@ -358,10 +358,10 @@ class PurchaseOrderController extends Controller
                     'meta' => [
                         'prs_id' => $prsItem->prs_id,
                         'prs_number' => $prsItem->prs?->prs_number,
-                        'lead_time_days' => $canvasing?->lead_time_days,
-                        'term_of_payment_type' => $canvasing?->term_of_payment_type,
-                        'term_of_payment' => $canvasing?->term_of_payment,
-                        'term_of_delivery' => $canvasing?->term_of_delivery,
+                        'lead_time_days' => $canvassing?->lead_time_days,
+                        'term_of_payment_type' => $canvassing?->term_of_payment_type,
+                        'term_of_payment' => $canvassing?->term_of_payment,
+                        'term_of_delivery' => $canvassing?->term_of_delivery,
                     ],
                 ]);
             }

@@ -5,11 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class PrsCanvasingItem extends Model
+class PrsCanvassingItem extends Model
 {
     use HasFactory;
 
-    protected $table = 'prs_canvasing_items';
+    protected $table = 'prs_canvassing_items';
 
     protected $fillable = [
         'prs_id',

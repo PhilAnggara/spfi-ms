@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Supplier Canvasing Report</title>
+    <title>Supplier Canvassing Report</title>
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
@@ -115,12 +115,12 @@
     @php
         $item = $prsItem->item;
         $prs = $prsItem->prs;
-        $selectedId = $prsItem->selected_canvasing_item_id;
-        $lowestUnitPrice = (float) ($canvasingItems->min('unit_price') ?? 0);
-        $highestUnitPrice = (float) ($canvasingItems->max('unit_price') ?? 1);
+        $selectedId = $prsItem->selected_canvassing_item_id;
+        $lowestUnitPrice = (float) ($canvassingItems->min('unit_price') ?? 0);
+        $highestUnitPrice = (float) ($canvassingItems->max('unit_price') ?? 1);
     @endphp
 
-    <div class="title">Supplier Canvasing Report</div>
+    <div class="title">Supplier Canvassing Report</div>
     <div class="subtitle">Generated at {{ now()->format('d M Y H:i') }} by {{ $generatedBy->name ?? '-' }}</div>
 
     <div class="section">
@@ -165,30 +165,30 @@
             </tr>
         </thead>
         <tbody>
-            @foreach ($canvasingItems as $index => $canvasing)
+            @foreach ($canvassingItems as $index => $canvassing)
                 @php
-                    $isLowest = (float) $canvasing->unit_price === $lowestUnitPrice;
+                    $isLowest = (float) $canvassing->unit_price === $lowestUnitPrice;
                 @endphp
                 <tr class="{{ $isLowest ? 'lowest-row' : '' }}">
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>
-                        {{ $canvasing->supplier->name ?? '-' }}
-                        @if ($selectedId === $canvasing->id)
+                        {{ $canvassing->supplier->name ?? '-' }}
+                        @if ($selectedId === $canvassing->id)
                             {{-- <div style="font-size:9px; color:#111827;">(Selected)</div> --}}
                         @endif
                         @if ($isLowest)
                             <div class="lowest-label">LOWEST PRICE</div>
                         @endif
                     </td>
-                    <td class="text-right">{{ number_format((float) $canvasing->unit_price, 2, ',', '.') }}</td>
-                    <td class="text-center">{{ $canvasing->term_of_payment_type ? ucfirst($canvasing->term_of_payment_type) : '-' }}</td>
-                    <td class="text-wrap">{{ $canvasing->term_of_payment ?? '-' }}</td>
-                    <td class="text-center">{{ $canvasing->lead_time_days ?? '-' }} {{ $canvasing->lead_time_days ? 'days' : '' }}</td>
-                    <td class="text-wrap">{{ $canvasing->term_of_delivery ?? '-' }}</td>
+                    <td class="text-right">{{ number_format((float) $canvassing->unit_price, 2, ',', '.') }}</td>
+                    <td class="text-center">{{ $canvassing->term_of_payment_type ? ucfirst($canvassing->term_of_payment_type) : '-' }}</td>
+                    <td class="text-wrap">{{ $canvassing->term_of_payment ?? '-' }}</td>
+                    <td class="text-center">{{ $canvassing->lead_time_days ?? '-' }} {{ $canvassing->lead_time_days ? 'days' : '' }}</td>
+                    <td class="text-wrap">{{ $canvassing->term_of_delivery ?? '-' }}</td>
                 </tr>
                 <tr class="notes-row">
                     <td colspan="7" class="text-wrap">
-                        <strong>Notes:</strong> {{ $canvasing->notes ?: '-' }}
+                        <strong>Notes:</strong> {{ $canvassing->notes ?: '-' }}
                     </td>
                 </tr>
             @endforeach
@@ -197,16 +197,16 @@
 
     <div class="visual-section">
         <div class="visual-title">Supplier Price Visualization</div>
-        @foreach ($canvasingItems as $canvasing)
+        @foreach ($canvassingItems as $canvassing)
             @php
-                $isLowest = (float) $canvasing->unit_price === $lowestUnitPrice;
-                $ratio = $highestUnitPrice > 0 ? ((float) $canvasing->unit_price / $highestUnitPrice) * 100 : 0;
-                $differenceAmount = max($highestUnitPrice - (float) $canvasing->unit_price, 0);
+                $isLowest = (float) $canvassing->unit_price === $lowestUnitPrice;
+                $ratio = $highestUnitPrice > 0 ? ((float) $canvassing->unit_price / $highestUnitPrice) * 100 : 0;
+                $differenceAmount = max($highestUnitPrice - (float) $canvassing->unit_price, 0);
                 $cheaperPercent = $highestUnitPrice > 0 ? ($differenceAmount / $highestUnitPrice) * 100 : 0;
             @endphp
             <div class="visual-row">
                 <div class="visual-label">
-                    {{ $canvasing->supplier->name ?? '-' }} - {{ number_format((float) $canvasing->unit_price, 2, ',', '.') }}
+                    {{ $canvassing->supplier->name ?? '-' }} - {{ number_format((float) $canvassing->unit_price, 2, ',', '.') }}
                     @if ($differenceAmount > 0)
                         ({{ number_format($cheaperPercent, 2, ',', '.') }}% cheaper; difference {{ number_format($differenceAmount, 2, ',', '.') }} from highest)
                     @else

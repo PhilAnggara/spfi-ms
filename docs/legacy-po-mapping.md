@@ -6,7 +6,7 @@ Dokumen ini merangkum mapping dari sistem lama ke sistem baru untuk alur:
 ## Ringkasan Alur Bisnis Baru
 
 1. PRS dibuat oleh requester (`prs`, `prs_items`).
-2. Purchasing melakukan canvasing dan memilih supplier per `prs_item`.
+2. Purchasing melakukan canvassing dan memilih supplier per `prs_item`.
 3. PO dibuat dari item yang dipilih, bisa `DRAFT` atau `PENDING_APPROVAL`.
 4. Manager/GM melakukan approval -> status `APPROVED`.
 5. Inventory membuat RR dari PO approved, stok dan riwayat stok diperbarui.

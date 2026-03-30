@@ -4,7 +4,7 @@
 - PO Number
 
 ## 🚀 Improvement
-- Make supplier search in canvasing smarter
+- Make supplier search in canvassing smarter
 
 ## 🧹 Cleanup
 - Remove unused code in master product

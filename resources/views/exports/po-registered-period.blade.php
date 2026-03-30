@@ -99,7 +99,7 @@
                 <td class="right">{{ $fmtMoney($row['currency_buckets']['GBP']) }}</td>
                 <td class="right">{{ $fmtMoney($row['currency_buckets']['USD']) }}</td>
                 <td class="right">{{ $fmtMoney($row['currency_buckets']['YEN']) }}</td>
-                <td>{{ $row['canvaser'] }}</td>
+                <td>{{ $row['canvasser'] }}</td>
                 <td>{{ $row['remarks'] }}</td>
             </tr>
         @empty

@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('prs_canvasing_items', function (Blueprint $table) {
+        Schema::table('prs_canvassing_items', function (Blueprint $table) {
             $table->index('prs_item_id');
             $table->dropUnique(['prs_item_id']);
             $table->unique(['prs_item_id', 'supplier_id']);
@@ -23,7 +23,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('prs_canvasing_items', function (Blueprint $table) {
+        Schema::table('prs_canvassing_items', function (Blueprint $table) {
             $table->dropUnique(['prs_item_id', 'supplier_id']);
             $table->dropIndex(['prs_item_id']);
             $table->unique(['prs_item_id']);

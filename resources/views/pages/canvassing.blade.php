@@ -1,12 +1,12 @@
 @extends('layouts.app')
-@section('title', ' | Canvasing')
+@section('title', ' | Canvassing')
 
 @section('content')
 <div class="page-heading">
     <div class="page-title">
         <div class="row mb-4">
             <div class="col-12 col-md-6 order-md-1">
-                <h3>Canvasing</h3>
+                <h3>Canvassing</h3>
             </div>
         </div>
     </div>
@@ -54,19 +54,19 @@
                                     {{ $prs?->date_needed ? tgl($prs->date_needed) : '-' }}
                                 </td>
                                 <td>
-                                    <div class="small text-muted">Quotes: {{ $prsItem->canvasingItems->count() }}</div>
-                                    <div class="fw-semibold" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->selectedCanvasingItem?->supplier?->name ?? 'Not selected' }}">
-                                        <span class="{{ $prsItem->selectedCanvasingItem?->supplier?->name ? 'text-primary' : 'text-muted' }}">{{ Str::limit($prsItem->selectedCanvasingItem?->supplier?->name ?? 'Not selected', 15) }}</span>
+                                    <div class="small text-muted">Quotes: {{ $prsItem->canvassingItems->count() }}</div>
+                                    <div class="fw-semibold" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->selectedCanvassingItem?->supplier?->name ?? 'Not selected' }}">
+                                        <span class="{{ $prsItem->selectedCanvassingItem?->supplier?->name ? 'text-primary' : 'text-muted' }}">{{ Str::limit($prsItem->selectedCanvassingItem?->supplier?->name ?? 'Not selected', 15) }}</span>
                                     </div>
                                 </td>
                                 <td class="text-center">
                                     {{-- <div class="d-flex justify-content-center gap-1">
-                                        <a href="{{ route('canvasing.show', $prsItem->id) }}" class="btn btn-sm {{ $prsItem->canvasingItems->isNotEmpty() ? 'btn-primary' : 'btn-outline-primary' }}">
+                                        <a href="{{ route('canvassing.show', $prsItem->id) }}" class="btn btn-sm {{ $prsItem->canvassingItems->isNotEmpty() ? 'btn-primary' : 'btn-outline-primary' }}">
                                             <i class="fa-duotone fa-solid fa-pen-to-square"></i>
-                                            {{ $prsItem->canvasingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}
+                                            {{ $prsItem->canvassingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}
                                         </a>
                                         @if (!$prsItem->purchase_order_id)
-                                            <form action="{{ route('canvasing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
+                                            <form action="{{ route('canvassing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">
                                                 <button type="submit" class="btn btn-sm {{ $prsItem->is_direct_purchase ? 'btn-info' : 'btn-outline-info' }}" title="{{ $prsItem->is_direct_purchase ? 'Revert to Needs PO' : 'Mark as Direct Purchase' }}">
@@ -78,11 +78,11 @@
                                     </div> --}}
 
                                     <div class="btn-group btn-group-sm">
-                                        <a href="{{ route('canvasing.show', $prsItem->id) }}" class="btn icon {{ $prsItem->canvasingItems->isNotEmpty() ? 'btn-outline-primary' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->canvasingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}">
+                                        <a href="{{ route('canvassing.show', $prsItem->id) }}" class="btn icon {{ $prsItem->canvassingItems->isNotEmpty() ? 'btn-outline-primary' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->canvassingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}">
                                             <i class="fa-light fa-pen-to-square"></i>
                                         </a>
                                         @if (!$prsItem->purchase_order_id)
-                                            <form action="{{ route('canvasing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
+                                            <form action="{{ route('canvassing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">
                                                 <button type="submit" class="btn icon {{ $prsItem->is_direct_purchase ? 'btn-outline-info' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->is_direct_purchase ? 'Revert to Needs PO' : 'Mark as Direct Purchase' }}">
@@ -98,7 +98,7 @@
                             <tr>
                                 <td colspan="7" class="text-center text-muted py-4">
                                     <i class="fa-duotone fa-solid fa-inbox"></i>
-                                    <p class="mb-0 mt-2">No canvasing items assigned yet.</p>
+                                    <p class="mb-0 mt-2">No canvassing items assigned yet.</p>
                                 </td>
                             </tr>
                         @endforelse

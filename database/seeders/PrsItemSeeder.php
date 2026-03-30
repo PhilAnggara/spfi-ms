@@ -40,7 +40,7 @@ class PrsItemSeeder extends Seeder
         $itemIdByCode = DB::table('items')->pluck('id', 'code')->all();
 
         $this->prepareLegacyUserLookup();
-        $defaultCanvaserId = $this->resolveLegacyFallbackUserId(2);
+        $defaultCanvasserId = $this->resolveLegacyFallbackUserId(2);
 
         if (empty($prsIdByNumber)) {
             $this->warn("No PRS records found in new DB. Make sure PrsSeeder ran first.");
@@ -60,12 +60,12 @@ class PrsItemSeeder extends Seeder
         $poDetailRows = $this->resolveRows('po_detail', fn (string $message) => $this->command?->warn($message));
         $this->command?->info("ℹ [po_detail] rows loaded: " . count($poDetailRows));
 
-        $canvaserLookup = $this->buildPoDetailCanvaserLookup($poDetailRows);
+        $canvasserLookup = $this->buildPoDetailCanvasserLookup($poDetailRows);
 
         $inserted = 0;
         $skipped = 0;
-        $canvaserFromPoDetail = 0;
-        $canvaserFallback = 0;
+        $canvasserFromPoDetail = 0;
+        $canvasserFallback = 0;
 
         foreach ($legacyRows as $data) {
             $prsNumber = trim((string) ($data['prsnumber'] ?? ''));
@@ -96,19 +96,19 @@ class PrsItemSeeder extends Seeder
 
             $quantity = (int) ($data['qty'] ?? 0);
 
-            $legacyCanvaser = $this->consumePoDetailCanvaser(
-                $canvaserLookup,
+            $legacyCanvasser = $this->consumePoDetailCanvasser(
+                $canvasserLookup,
                 $prsNumber,
                 $productCode,
                 $departmentCode
             );
 
-            $canvaserId = $this->resolveLegacyUserId($legacyCanvaser, $defaultCanvaserId) ?? $defaultCanvaserId;
+            $canvasserId = $this->resolveLegacyUserId($legacyCanvasser, $defaultCanvasserId) ?? $defaultCanvasserId;
 
-            if ($legacyCanvaser === null) {
-                $canvaserFallback++;
+            if ($legacyCanvasser === null) {
+                $canvasserFallback++;
             } else {
-                $canvaserFromPoDetail++;
+                $canvasserFromPoDetail++;
             }
 
             // Upsert berdasarkan prs_id + item_id agar idempotent.
@@ -120,10 +120,10 @@ class PrsItemSeeder extends Seeder
                 [
                     'prs_id' => $prsId,
                     'item_id' => $itemId,
-                    'canvaser_id' => $canvaserId,
+                    'canvasser_id' => $canvasserId,
                     'quantity' => $quantity,
                     'purchase_order_id' => null,
-                    'selected_canvasing_item_id' => null,
+                    'selected_canvassing_item_id' => null,
                     'selection_reason' => null,
                     'is_direct_purchase' => false,
                     'created_at' => $createdDate ?? now(),
@@ -136,7 +136,7 @@ class PrsItemSeeder extends Seeder
         }
 
         $this->command?->info(
-            "✓ [prs_detail] Inserted/Updated: {$inserted}, Skipped: {$skipped}, Canvasser from po_detail: {$canvaserFromPoDetail}, Fallback: {$canvaserFallback} (user_id={$defaultCanvaserId})"
+            "✓ [prs_detail] Inserted/Updated: {$inserted}, Skipped: {$skipped}, Canvasser from po_detail: {$canvasserFromPoDetail}, Fallback: {$canvasserFallback} (user_id={$defaultCanvasserId})"
         );
     }
 
@@ -211,7 +211,7 @@ class PrsItemSeeder extends Seeder
      * @param  array<int, array<string, mixed>>  $poDetailRows
      * @return array{strict: array<string, array<int, int>>, loose: array<string, array<int, int>>, values: array<int, string|null>, used: array<int, bool>}
      */
-    protected function buildPoDetailCanvaserLookup(array $poDetailRows): array
+    protected function buildPoDetailCanvasserLookup(array $poDetailRows): array
     {
         $lookup = [
             'strict' => [],
@@ -250,7 +250,7 @@ class PrsItemSeeder extends Seeder
     /**
      * @param  array{strict: array<string, array<int, int>>, loose: array<string, array<int, int>>, values: array<int, string|null>, used: array<int, bool>}  $lookup
      */
-    protected function consumePoDetailCanvaser(array &$lookup, string $prsNumber, string $productCode, ?string $departmentCode): ?string
+    protected function consumePoDetailCanvasser(array &$lookup, string $prsNumber, string $productCode, ?string $departmentCode): ?string
     {
         $prsNumberKey = $this->normalizeLookupToken($prsNumber);
         $productCodeKey = $this->normalizeLookupToken($productCode);

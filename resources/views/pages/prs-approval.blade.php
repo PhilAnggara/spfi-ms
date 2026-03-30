@@ -115,10 +115,10 @@
                                             <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
                                             <td>
                                                 <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $itemInfo->id }}">
-                                                <select name="items[{{ $index }}][canvaser_id]" class="form-select" required>
-                                                    <option value="" disabled {{ $itemInfo->canvaser_id ? '' : 'selected' }}>-- Select Canvasser --</option>
-                                                    @foreach ($canvasers as $canvaser)
-                                                        <option value="{{ $canvaser->id }}" @selected($itemInfo->canvaser_id == $canvaser->id)>{{ $canvaser->name }}</option>
+                                                <select name="items[{{ $index }}][canvasser_id]" class="form-select" required>
+                                                    <option value="" disabled {{ $itemInfo->canvasser_id ? '' : 'selected' }}>-- Select Canvasser --</option>
+                                                    @foreach ($canvassers as $canvasser)
+                                                        <option value="{{ $canvasser->id }}" @selected($itemInfo->canvasser_id == $canvasser->id)>{{ $canvasser->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </td>
@@ -199,7 +199,7 @@
                                 'SUBMITTED' => 35,
                                 'ON_HOLD' => 35,
                                 'RESUBMITTED' => 50,
-                                'CANVASING' => 65,
+                                'CANVASSING' => 65,
                                 'APPROVED' => 80,
                                 'DELIVERY_COMPLETE' => 100,
                                 'REJECTED' => 100,
@@ -340,7 +340,7 @@
                                                 <i class="{{ $statusIcon }}"></i> {{ $status }}
                                             </span>
                                         </td>
-                                        <td>{{ $itemInfo->canvaser?->name ?? '-' }}</td>
+                                        <td>{{ $itemInfo->canvasser?->name ?? '-' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

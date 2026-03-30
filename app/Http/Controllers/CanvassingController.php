@@ -3,14 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\PrsItem;
-use App\Models\PrsCanvasingItem;
+use App\Models\PrsCanvassingItem;
 use App\Models\Supplier;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-class CanvasingController extends Controller
+class CanvassingController extends Controller
 {
     /**
      * List items assigned to the current canvasser.
@@ -22,24 +22,24 @@ class CanvasingController extends Controller
         $prsItems = PrsItem::with([
             'prs',
             'item.unit',
-            'canvasingItems.supplier',
-            'selectedCanvasingItem.supplier',
+            'canvassingItems.supplier',
+            'selectedCanvassingItem.supplier',
         ])
-            ->where('canvaser_id', $userId)
+            ->where('canvasser_id', $userId)
             ->orderByDesc('created_at')
             ->get();
 
-        return view('pages.canvasing', [
+        return view('pages.canvassing', [
             'prsItems' => $prsItems,
         ]);
     }
 
     /**
-     * Show PRS detail for canvasing input.
+     * Show PRS detail for canvassing input.
      */
     public function show(PrsItem $prsItem, Request $request)
     {
-        if ($prsItem->canvaser_id !== $request->user()->id) {
+        if ($prsItem->canvasser_id !== $request->user()->id) {
             abort(403);
         }
 
@@ -47,30 +47,30 @@ class CanvasingController extends Controller
             'prs.department',
             'prs.user',
             'item',
-            'canvasingItems.supplier',
-            'selectedCanvasingItem.supplier',
+            'canvassingItems.supplier',
+            'selectedCanvassingItem.supplier',
         ]);
 
         $suppliers = Supplier::orderBy('name')->get();
 
-        return view('pages.canvasing-detail', [
+        return view('pages.canvassing-detail', [
             'prsItem' => $prsItem,
             'suppliers' => $suppliers,
         ]);
     }
 
     /**
-     * Save canvasing results per item.
+     * Save canvassing results per item.
      */
     public function store(Request $request, PrsItem $prsItem)
     {
-        if ($prsItem->canvaser_id !== $request->user()->id) {
+        if ($prsItem->canvasser_id !== $request->user()->id) {
             abort(403);
         }
 
         $validated = $request->validate([
             'suppliers' => ['required', 'array', 'min:1'],
-            'suppliers.*.id' => ['nullable', 'integer', 'exists:prs_canvasing_items,id'],
+            'suppliers.*.id' => ['nullable', 'integer', 'exists:prs_canvassing_items,id'],
             'suppliers.*.supplier_id' => ['required', 'distinct', 'exists:suppliers,id'],
             'suppliers.*.unit_price' => ['required', 'numeric', 'min:0'],
             'suppliers.*.lead_time_days' => ['nullable', 'integer', 'min:0'],
@@ -98,16 +98,16 @@ class CanvasingController extends Controller
             foreach ($supplierTermsById as $supplierId => $terms) {
                 Supplier::whereKey($supplierId)->update($terms);
 
-                PrsCanvasingItem::where('supplier_id', $supplierId)->update($terms);
+                PrsCanvassingItem::where('supplier_id', $supplierId)->update($terms);
             }
 
             if ($keepIds->isEmpty()) {
-                $prsItem->canvasingItems()->delete();
-                if ($prsItem->selected_canvasing_item_id) {
-                    $prsItem->update(['selected_canvasing_item_id' => null]);
+                $prsItem->canvassingItems()->delete();
+                if ($prsItem->selected_canvassing_item_id) {
+                    $prsItem->update(['selected_canvassing_item_id' => null]);
                 }
             } else {
-                $prsItem->canvasingItems()->whereNotIn('id', $keepIds)->delete();
+                $prsItem->canvassingItems()->whereNotIn('id', $keepIds)->delete();
             }
 
             foreach ($rows as $row) {
@@ -130,21 +130,21 @@ class CanvasingController extends Controller
                 ];
 
                 if (! empty($row['id'])) {
-                    $existing = $prsItem->canvasingItems()->whereKey($row['id'])->first();
+                    $existing = $prsItem->canvassingItems()->whereKey($row['id'])->first();
                     if (! $existing) {
                         throw ValidationException::withMessages([
-                            'suppliers' => 'Invalid canvasing row for this PRS item.',
+                            'suppliers' => 'Invalid canvassing row for this PRS item.',
                         ]);
                     }
                     $existing->update($payload);
                 } else {
-                    $prsItem->canvasingItems()->create($payload);
+                    $prsItem->canvassingItems()->create($payload);
                 }
             }
 
-            if ($prsItem->selected_canvasing_item_id && $keepIds->isNotEmpty()) {
-                if (! $keepIds->contains($prsItem->selected_canvasing_item_id)) {
-                    $prsItem->update(['selected_canvasing_item_id' => null]);
+            if ($prsItem->selected_canvassing_item_id && $keepIds->isNotEmpty()) {
+                if (! $keepIds->contains($prsItem->selected_canvassing_item_id)) {
+                    $prsItem->update(['selected_canvassing_item_id' => null]);
                 }
             }
         });
@@ -152,23 +152,23 @@ class CanvasingController extends Controller
         $prsItem->prs?->logs()->create([
             'user_id' => $request->user()?->id,
             'action' => 'CANVASE',
-            'message' => 'Canvasing data saved per item.',
+            'message' => 'Canvassing data saved per item.',
             'meta' => [
                 'prs_item_id' => $prsItem->id,
                 'supplier_ids' => $rows->pluck('supplier_id')->values()->all(),
             ],
         ]);
 
-        // return redirect()->route('canvasing.index')->with('success', 'Canvasing data saved.');
-        return redirect()->back()->with('success', 'Canvasing data saved.');
+        // return redirect()->route('canvassing.index')->with('success', 'Canvassing data saved.');
+        return redirect()->back()->with('success', 'Canvassing data saved.');
     }
 
     /**
-     * Download canvasing report per PRS item.
+     * Download canvassing report per PRS item.
      */
     public function report(PrsItem $prsItem, Request $request)
     {
-        if ($prsItem->canvaser_id !== $request->user()->id) {
+        if ($prsItem->canvasser_id !== $request->user()->id) {
             abort(403);
         }
 
@@ -176,30 +176,30 @@ class CanvasingController extends Controller
             'prs.department',
             'prs.user',
             'item.unit',
-            'canvasingItems.supplier',
-            'selectedCanvasingItem.supplier',
+            'canvassingItems.supplier',
+            'selectedCanvassingItem.supplier',
         ]);
 
-        $canvasingItems = $prsItem->canvasingItems
+        $canvassingItems = $prsItem->canvassingItems
             ->sortBy('unit_price')
             ->values();
 
-        if ($canvasingItems->isEmpty()) {
+        if ($canvassingItems->isEmpty()) {
             return redirect()
-                ->route('canvasing.show', $prsItem)
-                ->withErrors(['message' => 'Canvasing report cannot be generated because no supplier data is available yet.']);
+                ->route('canvassing.show', $prsItem)
+                ->withErrors(['message' => 'Canvassing report cannot be generated because no supplier data is available yet.']);
         }
 
         $filename = sprintf(
-            'canvasing-report-%s-%s.pdf',
+            'canvassing-report-%s-%s.pdf',
             $prsItem->item?->code ?? ('item-' . $prsItem->item_id),
             now()->format('YmdHis')
         );
 
-        return Pdf::loadView('pdf.canvasing-report', [
+        return Pdf::loadView('pdf.canvassing-report', [
             'prsItem' => $prsItem,
-            'canvasingItems' => $canvasingItems,
-            'maxUnitPrice' => (float) max($canvasingItems->max('unit_price') ?? 0, 1),
+            'canvassingItems' => $canvassingItems,
+            'maxUnitPrice' => (float) max($canvassingItems->max('unit_price') ?? 0, 1),
             'generatedBy' => $request->user(),
         ])
             ->setPaper('a4', 'portrait')
@@ -211,7 +211,7 @@ class CanvasingController extends Controller
      */
     public function toggleDirectPurchase(Request $request, PrsItem $prsItem)
     {
-        if ($prsItem->canvaser_id !== $request->user()->id) {
+        if ($prsItem->canvasser_id !== $request->user()->id) {
             abort(403);
         }
 

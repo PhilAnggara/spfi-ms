@@ -20,7 +20,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\CanvasingController;
+use App\Http\Controllers\CanvassingController;
 use App\Http\Controllers\PurchasingReportController;
 use App\Http\Controllers\PurchaseOrderApprovalController;
 use App\Http\Controllers\PurchaseOrderController;
@@ -93,11 +93,11 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('role:administrator|purchasing-staff')->group(function () {
-        Route::get('/canvasing', [CanvasingController::class, 'index'])->name('canvasing.index');
-        Route::get('/canvasing/{prsItem}', [CanvasingController::class, 'show'])->name('canvasing.show');
-        Route::get('/canvasing/{prsItem}/report', [CanvasingController::class, 'report'])->name('canvasing.report');
-        Route::post('/canvasing/{prsItem}', [CanvasingController::class, 'store'])->name('canvasing.store');
-        Route::post('/canvasing/{prsItem}/toggle-direct-purchase', [CanvasingController::class, 'toggleDirectPurchase'])->name('canvasing.toggle-direct-purchase');
+        Route::get('/canvassing', [CanvassingController::class, 'index'])->name('canvassing.index');
+        Route::get('/canvassing/{prsItem}', [CanvassingController::class, 'show'])->name('canvassing.show');
+        Route::get('/canvassing/{prsItem}/report', [CanvassingController::class, 'report'])->name('canvassing.report');
+        Route::post('/canvassing/{prsItem}', [CanvassingController::class, 'store'])->name('canvassing.store');
+        Route::post('/canvassing/{prsItem}/toggle-direct-purchase', [CanvassingController::class, 'toggleDirectPurchase'])->name('canvassing.toggle-direct-purchase');
 
         Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
             Route::get('/draft', [PurchaseOrderController::class, 'draft'])->name('draft');

@@ -256,10 +256,10 @@
                         </li>
 
                         @role('administrator|purchasing-staff')
-                            <li class="sidebar-item {{ Request::is('canvasing*') ? 'active' : '' }}">
-                                <a href="{{ route('canvasing.index') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-diagram-lean-canvas {{ Request::is('canvasing') ? 'fa-fade' : '' }}"></i>
-                                    <span>Canvasing</span>
+                            <li class="sidebar-item {{ Request::is('canvassing*') ? 'active' : '' }}">
+                                <a href="{{ route('canvassing.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-diagram-lean-canvas {{ Request::is('canvassing') ? 'fa-fade' : '' }}"></i>
+                                    <span>Canvassing</span>
                                 </a>
                             </li>
 

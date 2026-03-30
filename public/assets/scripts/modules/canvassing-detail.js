@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const supplierTermMapNode = document.getElementById('canvasing-supplier-term-map');
-    const supplierListNode = document.getElementById('canvasing-supplier-list');
+    const supplierTermMapNode = document.getElementById('canvassing-supplier-term-map');
+    const supplierListNode = document.getElementById('canvassing-supplier-list');
 
     const supplierTermMap = supplierTermMapNode ? JSON.parse(supplierTermMapNode.textContent || '{}') : {};
     const suppliers = supplierListNode ? JSON.parse(supplierListNode.textContent || '[]') : [];
@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const rowsContainer = document.getElementById('supplier-rows');
     const template = document.getElementById('supplier-row-template');
     const addSupplierButton = document.getElementById('add-supplier');
-    const form = document.getElementById('canvasing-form');
+    const form = document.getElementById('canvassing-form');
     const supplierSummary = document.getElementById('supplier-summary');
     const formNotice = document.getElementById('form-notice');
 

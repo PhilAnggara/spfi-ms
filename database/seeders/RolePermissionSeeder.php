@@ -32,7 +32,7 @@ class RolePermissionSeeder extends Seeder
         ];
 
         $permissions_canvassing = [
-            'assign-canvaser',
+            'assign-canvasser',
             'view-canvassing',
             'update-canvassing',
         ];
@@ -131,7 +131,7 @@ class RolePermissionSeeder extends Seeder
             'purchasing-manager' => [
                 'approve-prs',
                 'view-prs',
-                'assign-canvaser',
+                'assign-canvasser',
                 'view-canvassing',
                 'approve-po',
                 'view-po',

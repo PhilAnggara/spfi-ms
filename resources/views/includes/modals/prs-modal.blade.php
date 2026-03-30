@@ -24,7 +24,7 @@
                             'SUBMITTED' => 35,
                             'ON_HOLD' => 35,
                             'RESUBMITTED' => 50,
-                            'CANVASING' => 65,
+                            'CANVASSING' => 65,
                             'APPROVED' => 80,
                             'DELIVERY_COMPLETE' => 100,
                             'REJECTED' => 100,
@@ -176,7 +176,7 @@
                                             <i class="{{ $statusIcon }}"></i> {{ $status }}
                                         </span>
                                     </td>
-                                    <td>{{ $itemInfo->canvaser?->name ?? '-' }}</td>
+                                    <td>{{ $itemInfo->canvasser?->name ?? '-' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

@@ -15,7 +15,7 @@ class PurchasingReportController extends Controller
 {
     public function index()
     {
-        $canvasers = User::role('purchasing-staff')
+        $canvassers = User::role('purchasing-staff')
             ->whereHas('department', function ($query) {
                 $query->whereRaw('LOWER(name) = ?', ['purchasing']);
             })
@@ -23,7 +23,7 @@ class PurchasingReportController extends Controller
             ->get();
 
         return view('pages.procurement-reports', [
-            'canvasers' => $canvasers,
+            'canvassers' => $canvassers,
         ]);
     }
 
@@ -31,7 +31,7 @@ class PurchasingReportController extends Controller
     {
         $validated = $request->validate([
             'date_to' => ['required', 'date'],
-            'canvaser_id' => ['nullable', 'exists:users,id'],
+            'canvasser_id' => ['nullable', 'exists:users,id'],
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
@@ -40,7 +40,7 @@ class PurchasingReportController extends Controller
         $itemsQuery = PrsItem::with([
             'prs.department',
             'item.unit',
-            'canvaser',
+            'canvasser',
         ])
             ->whereNull('purchase_order_id')
             ->where('is_direct_purchase', false)
@@ -49,8 +49,8 @@ class PurchasingReportController extends Controller
                     ->whereDate('prs_date', '<=', $validated['date_to']);
             });
 
-        if (! empty($validated['canvaser_id'])) {
-            $itemsQuery->where('canvaser_id', $validated['canvaser_id']);
+        if (! empty($validated['canvasser_id'])) {
+            $itemsQuery->where('canvasser_id', $validated['canvasser_id']);
         }
 
         $rows = $itemsQuery
@@ -80,7 +80,7 @@ class PurchasingReportController extends Controller
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
             'title' => 'Purchase Requisition Slip (PRS) Not Yet Purchase Order (PO)',
             'as_of' => $validated['date_to'],
-            'canvaser' => $this->canvaserName($validated['canvaser_id'] ?? null),
+            'canvasser' => $this->canvasserName($validated['canvasser_id'] ?? null),
             'rows' => $rows,
         ];
 
@@ -96,7 +96,7 @@ class PurchasingReportController extends Controller
     {
         $validated = $request->validate([
             'date_to' => ['required', 'date'],
-            'canvaser_id' => ['nullable', 'exists:users,id'],
+            'canvasser_id' => ['nullable', 'exists:users,id'],
             'po_type' => ['required', 'in:cash,credit'],
             'format' => ['required', 'in:pdf,excel'],
         ]);
@@ -115,9 +115,9 @@ class PurchasingReportController extends Controller
             })
             ->where('meta->term_of_payment_type', $validated['po_type']);
 
-        if (! empty($validated['canvaser_id'])) {
+        if (! empty($validated['canvasser_id'])) {
             $itemsQuery->whereHas('purchaseOrder', function ($query) use ($validated) {
-                $query->where('created_by', $validated['canvaser_id']);
+                $query->where('created_by', $validated['canvasser_id']);
             });
         }
 
@@ -144,7 +144,7 @@ class PurchasingReportController extends Controller
                 'ppn' => $this->calculateLinePpn($item, $po),
                 'amount' => $amount,
                 'currency_buckets' => $currencyBuckets,
-                'canvaser' => $po?->createdBy?->name,
+                'canvasser' => $po?->createdBy?->name,
                 'remarks' => $item->notes ?? $po?->remark_text,
             ];
         });
@@ -153,7 +153,7 @@ class PurchasingReportController extends Controller
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
             'title' => 'Purchase Order (PO) Not Yet Delivered',
             'as_of' => $validated['date_to'],
-            'canvaser' => $this->canvaserName($validated['canvaser_id'] ?? null),
+            'canvasser' => $this->canvasserName($validated['canvasser_id'] ?? null),
             'po_type' => $validated['po_type'],
             'rows' => $rows,
         ];
@@ -220,7 +220,7 @@ class PurchasingReportController extends Controller
                 'ppn' => $this->calculateLinePpn($item, $po),
                 'amount' => $amount,
                 'currency_buckets' => $currencyBuckets,
-                'canvaser' => $po?->createdBy?->name,
+                'canvasser' => $po?->createdBy?->name,
                 'remarks' => $item->notes ?? $po?->remark_text,
             ];
         });
@@ -295,7 +295,7 @@ class PurchasingReportController extends Controller
                     'ppn' => $this->calculateLinePpn($item, $po),
                     'amount' => $amount,
                     'currency_buckets' => $currencyBuckets,
-                    'canvaser' => $po?->createdBy?->name,
+                    'canvasser' => $po?->createdBy?->name,
                     'remarks' => $item->notes ?? $po?->remark_text,
                 ];
             });
@@ -486,13 +486,13 @@ class PurchasingReportController extends Controller
         ]);
     }
 
-    private function canvaserName(?int $canvaserId): string
+    private function canvasserName(?int $canvasserId): string
     {
-        if (! $canvaserId) {
+        if (! $canvasserId) {
             return 'All';
         }
 
-        return User::query()->find($canvaserId)?->name ?? 'All';
+        return User::query()->find($canvasserId)?->name ?? 'All';
     }
 
     private function calculateLineDiscount(PurchaseOrderItem $item, ?PurchaseOrder $po): float

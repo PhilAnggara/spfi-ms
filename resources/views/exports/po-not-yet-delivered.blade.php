@@ -31,7 +31,7 @@
             <td colspan="23">As Of {{ $fmtDate($as_of) }}</td>
         </tr>
         <tr class="no-border">
-            <td colspan="23">Canvasser Name: {{ $canvaser }}</td>
+            <td colspan="23">Canvasser Name: {{ $canvasser }}</td>
         </tr>
         <tr class="no-border">
             <td colspan="23">PO Type: {{ strtoupper($po_type) }}</td>
@@ -98,7 +98,7 @@
                 <td class="right">{{ $fmtMoney($row['currency_buckets']['GBP']) }}</td>
                 <td class="right">{{ $fmtMoney($row['currency_buckets']['USD']) }}</td>
                 <td class="right">{{ $fmtMoney($row['currency_buckets']['YEN']) }}</td>
-                <td>{{ $row['canvaser'] }}</td>
+                <td>{{ $row['canvasser'] }}</td>
                 <td>{{ $row['remarks'] }}</td>
             </tr>
         @empty

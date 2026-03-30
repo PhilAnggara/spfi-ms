@@ -28,11 +28,11 @@
                                 <input type="date" id="prs-not-po-date" name="date_to" class="form-control" value="{{ $today }}" required>
                             </div>
                             <div class="col-12 col-md-6">
-                                <label class="form-label" for="prs-not-po-canvaser">Canvasser</label>
-                                <select id="prs-not-po-canvaser" name="canvaser_id" class="form-select">
+                                <label class="form-label" for="prs-not-po-canvasser">Canvasser</label>
+                                <select id="prs-not-po-canvasser" name="canvasser_id" class="form-select">
                                     <option value="">All</option>
-                                    @foreach ($canvasers as $canvaser)
-                                        <option value="{{ $canvaser->id }}">{{ $canvaser->name }}</option>
+                                    @foreach ($canvassers as $canvasser)
+                                        <option value="{{ $canvasser->id }}">{{ $canvasser->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -62,11 +62,11 @@
                                 <input type="date" id="po-not-delivered-date" name="date_to" class="form-control" value="{{ $today }}" required>
                             </div>
                             <div class="col-12 col-md-4">
-                                <label class="form-label" for="po-not-delivered-canvaser">Canvasser</label>
-                                <select id="po-not-delivered-canvaser" name="canvaser_id" class="form-select">
+                                <label class="form-label" for="po-not-delivered-canvasser">Canvasser</label>
+                                <select id="po-not-delivered-canvasser" name="canvasser_id" class="form-select">
                                     <option value="">All</option>
-                                    @foreach ($canvasers as $canvaser)
-                                        <option value="{{ $canvaser->id }}">{{ $canvaser->name }}</option>
+                                    @foreach ($canvassers as $canvasser)
+                                        <option value="{{ $canvasser->id }}">{{ $canvasser->name }}</option>
                                     @endforeach
                                 </select>
                             </div>

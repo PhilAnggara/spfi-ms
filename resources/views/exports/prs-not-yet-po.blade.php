@@ -32,7 +32,7 @@
         </tr>
         <tr class="no-border"><td colspan="10">&nbsp;</td></tr>
         <tr class="no-border">
-            <td colspan="10">Canvasser Name: {{ $canvaser }}</td>
+            <td colspan="10">Canvasser Name: {{ $canvasser }}</td>
         </tr>
         <tr class="no-border"><td colspan="10">&nbsp;</td></tr>
         <tr>

@@ -16,13 +16,13 @@ class SupplierComparisonController extends Controller
         $prsItems = PrsItem::with([
             'prs.department',
             'item.unit',
-            'canvaser',
-            'canvasingItems.supplier',
-            'selectedCanvasingItem.supplier',
+            'canvasser',
+            'canvassingItems.supplier',
+            'selectedCanvassingItem.supplier',
         ])
             ->whereNull('purchase_order_id')
             ->where('is_direct_purchase', false)
-            ->whereHas('canvasingItems')
+            ->whereHas('canvassingItems')
             ->orderByDesc('id')
             ->get();
 
@@ -37,21 +37,21 @@ class SupplierComparisonController extends Controller
     public function select(Request $request, PrsItem $prsItem)
     {
         if ($prsItem->purchase_order_id) {
-            return redirect()->back()->withErrors(['canvasing_item_id' => 'Supplier selection is locked because a PO has been created.']);
+            return redirect()->back()->withErrors(['canvassing_item_id' => 'Supplier selection is locked because a PO has been created.']);
         }
 
         $validated = $request->validate([
-            'canvasing_item_id' => ['required', 'exists:prs_canvasing_items,id'],
+            'canvassing_item_id' => ['required', 'exists:prs_canvassing_items,id'],
             'selection_reason' => ['nullable', 'string'],
         ]);
 
-        $canvasing = $prsItem->canvasingItems()->whereKey($validated['canvasing_item_id'])->first();
-        if (! $canvasing) {
-            return redirect()->back()->withErrors(['canvasing_item_id' => 'Invalid supplier for this item.']);
+        $canvassing = $prsItem->canvassingItems()->whereKey($validated['canvassing_item_id'])->first();
+        if (! $canvassing) {
+            return redirect()->back()->withErrors(['canvassing_item_id' => 'Invalid supplier for this item.']);
         }
 
         $prsItem->update([
-            'selected_canvasing_item_id' => $canvasing->id,
+            'selected_canvassing_item_id' => $canvassing->id,
             'selection_reason' => $validated['selection_reason'] ?? null,
         ]);
 
@@ -61,8 +61,8 @@ class SupplierComparisonController extends Controller
             'message' => 'Supplier selected for PRS item.',
             'meta' => [
                 'prs_item_id' => $prsItem->id,
-                'supplier_id' => $canvasing->supplier_id,
-                'canvasing_item_id' => $canvasing->id,
+                'supplier_id' => $canvassing->supplier_id,
+                'canvassing_item_id' => $canvassing->id,
             ],
         ]);
 
@@ -78,21 +78,21 @@ class SupplierComparisonController extends Controller
             'prs.department',
             'prs.user',
             'item.unit',
-            'canvasingItems.supplier',
-            'selectedCanvasingItem.supplier',
+            'canvassingItems.supplier',
+            'selectedCanvassingItem.supplier',
         ]);
 
-        $canvasingItems = $prsItem->canvasingItems
+        $canvassingItems = $prsItem->canvassingItems
             ->sortBy('unit_price')
             ->values();
 
-        if ($canvasingItems->isEmpty()) {
+        if ($canvassingItems->isEmpty()) {
             return redirect()
                 ->back()
                 ->withErrors(['message' => 'Selection report cannot be generated because no supplier data is available.']);
         }
 
-        if (!$prsItem->selected_canvasing_item_id) {
+        if (!$prsItem->selected_canvassing_item_id) {
             return redirect()
                 ->back()
                 ->withErrors(['message' => 'Selection report cannot be generated because no supplier has been selected yet.']);
@@ -106,7 +106,7 @@ class SupplierComparisonController extends Controller
 
         return Pdf::loadView('pdf.selection-report', [
             'prsItem' => $prsItem,
-            'canvasingItems' => $canvasingItems,
+            'canvassingItems' => $canvassingItems,
             'generatedBy' => $request->user(),
         ])
             ->setPaper('a4', 'portrait')

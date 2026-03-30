@@ -20,8 +20,8 @@ class PrsItem extends Model
         'id' => 'integer',
         'item_id' => 'integer',
         'prs_id' => 'integer',
-        'selected_canvasing_item_id' => 'integer',
-        'canvaser_id' => 'integer',
+        'selected_canvassing_item_id' => 'integer',
+        'canvasser_id' => 'integer',
         'purchase_order_id' => 'integer',
         'is_direct_purchase' => 'boolean',
     ];
@@ -39,19 +39,19 @@ class PrsItem extends Model
         return $this->belongsTo(Prs::class, 'prs_id', 'id');
     }
 
-    public function canvasingItems()
+    public function canvassingItems()
     {
-        return $this->hasMany(PrsCanvasingItem::class, 'prs_item_id', 'id');
+        return $this->hasMany(PrsCanvassingItem::class, 'prs_item_id', 'id');
     }
 
-    public function selectedCanvasingItem()
+    public function selectedCanvassingItem()
     {
-        return $this->belongsTo(PrsCanvasingItem::class, 'selected_canvasing_item_id');
+        return $this->belongsTo(PrsCanvassingItem::class, 'selected_canvassing_item_id');
     }
 
-    public function canvaser()
+    public function canvasser()
     {
-        return $this->belongsTo(User::class, 'canvaser_id', 'id');
+        return $this->belongsTo(User::class, 'canvasser_id', 'id');
     }
 
     public function purchaseOrder()

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('prs_id')->constrained()->onDelete(fk_on_delete('cascade'));
             $table->foreignId('item_id')->constrained()->onDelete(fk_on_delete('restrict'));
-            $table->foreignId('canvaser_id')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
+            $table->foreignId('canvasser_id')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->integer('quantity');
             $table->timestamps();
             $table->softDeletes();

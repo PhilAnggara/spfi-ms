@@ -16,10 +16,10 @@ class PrsApprovalController extends Controller
     public function index()
     {
         $items = $this->paginatePrsForSqlServer(perPage: 20);
-        $canvasers = User::role('purchasing-staff')->orderBy('name')->get();
+        $canvassers = User::role('purchasing-staff')->orderBy('name')->get();
         return view('pages.prs-approval', [
             'items' => $items,
-            'canvasers' => $canvasers,
+            'canvassers' => $canvassers,
         ]);
     }
 
@@ -63,7 +63,7 @@ class PrsApprovalController extends Controller
         $data = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
-            'items.*.canvaser_id' => ['required', 'exists:users,id'],
+            'items.*.canvasser_id' => ['required', 'exists:users,id'],
         ]);
 
         $assignments = collect($data['items'])->keyBy('prs_item_id');
@@ -73,10 +73,10 @@ class PrsApprovalController extends Controller
             return redirect()->back()->withErrors(['items' => 'One or more PRS items are invalid for this PRS.']);
         }
 
-        $canvaserIds = $assignments->pluck('canvaser_id')->unique()->values();
-        $validCanvaserIds = User::role('purchasing-staff')->whereIn('id', $canvaserIds)->pluck('id');
-        $invalidCanvasers = $canvaserIds->diff($validCanvaserIds);
-        if ($invalidCanvasers->isNotEmpty()) {
+        $canvasserIds = $assignments->pluck('canvasser_id')->unique()->values();
+        $validCanvasserIds = User::role('purchasing-staff')->whereIn('id', $canvasserIds)->pluck('id');
+        $invalidCanvassers = $canvasserIds->diff($validCanvasserIds);
+        if ($invalidCanvassers->isNotEmpty()) {
             return redirect()->back()->withErrors(['items' => 'One or more selected users are not canvassers.']);
         }
 
@@ -85,16 +85,16 @@ class PrsApprovalController extends Controller
         DB::transaction(function () use ($prs, $assignments, $previousStatus, $request) {
             foreach ($assignments as $prsItemId => $row) {
                 $prs->items()->whereKey($prsItemId)->update([
-                    'canvaser_id' => $row['canvaser_id'],
+                    'canvasser_id' => $row['canvasser_id'],
                 ]);
             }
 
-            $prs->status = 'CANVASING';
+            $prs->status = 'CANVASSING';
             $prs->save();
 
             $prs->logs()->create([
                 'user_id' => $request->user()?->id,
-                'action' => 'CANVASING',
+                'action' => 'CANVASSING',
                 'message' => 'Approved and assigned canvassers per item.',
                 'meta' => [
                     'previous_status' => $previousStatus,
@@ -137,9 +137,9 @@ class PrsApprovalController extends Controller
                 'department',
                 'user',
                 'items.item',
-                'items.canvaser',
-                'items.canvasingItems',
-                'items.selectedCanvasingItem',
+                'items.canvasser',
+                'items.canvassingItems',
+                'items.selectedCanvassingItem',
                 'items.purchaseOrderItem.receivingReportItems',
                 'logs' => function ($query) {
                     $query->latest();
