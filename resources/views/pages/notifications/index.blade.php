@@ -131,48 +131,5 @@
 @endsection
 
 @push('addon-script')
-<script>
-// Handle notification click
-function handleNotificationClick(notificationId, actionUrl) {
-    // Mark as read
-    fetch(`/notifications/${notificationId}/read`, {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-            'Accept': 'application/json',
-        }
-    }).then(() => {
-        // Redirect to action URL
-        if (actionUrl && actionUrl !== '#') {
-            window.location.href = actionUrl;
-        } else {
-            location.reload();
-        }
-    });
-}
-
-// Mark single notification as read
-function markAsRead(notificationId) {
-    fetch(`/notifications/${notificationId}/read`, {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-            'Accept': 'application/json',
-        }
-    }).then(() => location.reload());
-}
-
-// Delete notification
-function deleteNotification(notificationId) {
-    if (confirm('Delete this notification?')) {
-        fetch(`/notifications/${notificationId}`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json',
-            }
-        }).then(() => location.reload());
-    }
-}
-</script>
+    <script src="{{ url('assets/scripts/modules/notifications-index.js') }}"></script>
 @endpush

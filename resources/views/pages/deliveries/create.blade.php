@@ -222,23 +222,7 @@
 
 @push('addon-style')
     <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
-    <style>
-        .delivery-cart-header-fields {
-            padding: 0.75rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 0.75rem;
-            background: #f8fafc;
-        }
-
-        .delivery-cart-items {
-            padding-top: 0.25rem;
-        }
-
-        #delivery-to-name-display {
-            cursor: pointer;
-            background-color: #fff;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url('assets/css/modules/deliveries-create.css') }}">
 @endpush
 
 @push('addon-script')

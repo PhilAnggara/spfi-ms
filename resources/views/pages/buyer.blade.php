@@ -2,7 +2,12 @@
 @section('title', ' | Buyer')
 
 @section('content')
-<div class="page-heading">
+<div
+    class="page-heading"
+    data-modal-restore="true"
+    data-open-create-modal="{{ $errors->any() ? '1' : '0' }}"
+    data-edit-modal-id="{{ session('editing_buyer_id') ? 'edit-modal-' . session('editing_buyer_id') : '' }}"
+    data-create-modal-id="create-modal">
     <div class="page-title">
         <div class="row mb-4">
             <div class="col-12 col-md-6 order-md-1">
@@ -74,17 +79,5 @@
 @endpush
 
 @push('addon-script')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        @if ($errors->any())
-            @if (session('editing_buyer_id'))
-                const editModal = new bootstrap.Modal(document.getElementById('edit-modal-{{ session("editing_buyer_id") }}'));
-                editModal.show();
-            @else
-                const createModal = new bootstrap.Modal(document.getElementById('create-modal'));
-                createModal.show();
-            @endif
-        @endif
-    });
-</script>
+    <script src="{{ url('assets/scripts/modules/master-modal-restore.js') }}"></script>
 @endpush

@@ -130,12 +130,6 @@
 </div>
 
 @push('addon-script')
-<script>
-function submitWithReason(prsItemId) {
-    const reasonText = document.getElementById('reasonText-' + prsItemId).value;
-    document.getElementById('reason-' + prsItemId).value = reasonText;
-    document.getElementById('form-' + prsItemId).submit();
-}
-</script>
+    <script src="{{ url('assets/scripts/modules/supplier-comparison-index.js') }}"></script>
 @endpush
 @endsection

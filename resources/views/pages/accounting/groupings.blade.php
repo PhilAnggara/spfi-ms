@@ -2,7 +2,10 @@
 @section('title', ' | Groupings')
 
 @section('content')
-<div class="page-heading">
+<div class="page-heading"
+    data-modal-restore="true"
+    data-open-create-modal="{{ $errors->any() ? '1' : '' }}"
+    data-edit-modal-id="{{ $errors->any() && session('editing_grouping_id') ? 'edit-modal-' . session('editing_grouping_id') : '' }}">
     <div class="page-title">
         <div class="row mb-4">
             <div class="col-12 col-md-6 order-md-1">
@@ -268,17 +271,5 @@
 @endpush
 
 @push('addon-script')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        @if ($errors->any())
-            @if (session('editing_grouping_id'))
-                const editModal = new bootstrap.Modal(document.getElementById('edit-modal-{{ session("editing_grouping_id") }}'));
-                editModal.show();
-            @else
-                const createModal = new bootstrap.Modal(document.getElementById('create-modal'));
-                createModal.show();
-            @endif
-        @endif
-    });
-</script>
+    <script src="{{ url('assets/scripts/modules/master-modal-restore.js') }}"></script>
 @endpush

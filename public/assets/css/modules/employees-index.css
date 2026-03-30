@@ -1,0 +1,398 @@
+.employee-modal-header {
+    background: linear-gradient(135deg, #f8fafc, #eef2ff);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.employee-pill-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.employee-list-person {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 220px;
+}
+
+.employee-list-person-button {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+}
+
+.employee-list-person-button:hover .fw-semibold,
+.employee-list-person-button:focus-visible .fw-semibold {
+    color: #2563eb !important;
+}
+
+.employee-list-person-button:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 4px;
+    border-radius: 0.75rem;
+}
+
+.employee-list-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    object-fit: cover;
+    border: 2px solid #dbeafe;
+    background: #e2e8f0;
+    flex-shrink: 0;
+}
+
+.employee-info-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 0.65rem 0.8rem;
+    min-height: 72px;
+}
+
+.employee-info-card small {
+    color: #64748b;
+    display: block;
+    margin-bottom: 0.2rem;
+}
+
+.employee-info-card div {
+    color: #0f172a;
+    font-weight: 600;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.employee-edit-alert {
+    background: #eff6ff;
+    color: #1e3a8a;
+}
+
+.employee-photo-upload-card {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 1rem;
+    padding: 1.1rem;
+    border: 1px solid #dbe4f0;
+    border-radius: 1.25rem;
+    background:
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 26%),
+        linear-gradient(135deg, #f8fafc, #ffffff);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.employee-photo-upload-preview-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.employee-photo-upload-preview {
+    width: 100%;
+    max-width: 160px;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: 1.1rem;
+    border: 3px solid #fff;
+    background: #e2e8f0;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+}
+
+.employee-photo-upload-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.9rem;
+}
+
+.employee-photo-upload-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.employee-photo-upload-subtitle {
+    color: #64748b;
+    font-size: 0.92rem;
+}
+
+.employee-photo-dropzone {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    border: 1.5px dashed #93c5fd;
+    border-radius: 1rem;
+    background: rgba(239, 246, 255, 0.8);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.employee-photo-dropzone.is-dragover {
+    border-color: #2563eb;
+    background: rgba(219, 234, 254, 0.95);
+    transform: translateY(-1px);
+}
+
+.employee-photo-dropzone-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.12);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.employee-photo-dropzone-copy {
+    flex: 1;
+}
+
+.employee-photo-dropzone-title {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.employee-photo-dropzone-text,
+.employee-photo-dropzone-meta {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.employee-photo-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+}
+
+.employee-photo-upload-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.employee-photo-upload-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.employee-photo-file-name {
+    color: #475569;
+    font-size: 0.9rem;
+    word-break: break-word;
+}
+
+.employee-detail-profile-card {
+    position: sticky;
+    top: 0;
+    border: 1px solid #dbe4f0;
+    border-radius: 1.25rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+}
+
+.employee-detail-profile-copy {
+    padding: 1rem 1rem 1.1rem;
+}
+
+.employee-detail-profile-name {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.employee-detail-profile-role {
+    margin-top: 0.2rem;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.employee-detail-profile-meta {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 0.85rem;
+    color: #475569;
+    font-size: 0.92rem;
+}
+
+.employee-detail-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.85rem;
+}
+
+.employee-detail-panel {
+    padding: 1.15rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 1.15rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.employee-detail-modal .modal-dialog {
+    max-width: min(1180px, calc(100vw - 1.5rem));
+}
+
+.employee-detail-modal .modal-body {
+    padding: 1.35rem;
+}
+
+.employee-detail-section-title {
+    margin-bottom: 0.9rem;
+    color: #0f172a;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.employee-remarks-card {
+    min-height: 110px;
+}
+
+.employee-photo-card {
+    width: 100%;
+    border: 1px solid #dbe4f0;
+    border-radius: 1rem;
+    overflow: hidden;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.employee-photo-card-button {
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+}
+
+.employee-photo-card-image {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    background: #e2e8f0;
+}
+
+.employee-photo-card-copy {
+    padding: 1rem;
+}
+
+.employee-photo-card-copy small {
+    color: #64748b;
+    display: block;
+    margin-bottom: 0.35rem;
+}
+
+.employee-photo-card-copy div {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.employee-photo-card-copy span {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #2563eb;
+}
+
+.employee-photo-zoom-image {
+    max-width: 100%;
+    max-height: 75vh;
+    border-radius: 1rem;
+    object-fit: contain;
+    background: #e2e8f0;
+}
+
+.employee-select-checkbox,
+.employee-select-all-checkbox {
+    width: 1.05rem;
+    height: 1.05rem;
+    cursor: pointer;
+}
+
+.employee-select-cell {
+    padding: .5rem .75rem;
+    text-align: center;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.employee-select-cell .employee-select-cell-inner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+#employee-selected-count {
+    min-width: 94px;
+    text-align: center;
+}
+
+.employee-pagination-wrap nav {
+    width: 100%;
+}
+
+.employee-pagination-wrap .d-none.flex-sm-fill.d-sm-flex {
+    justify-content: space-between !important;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.employee-pagination-wrap .small.text-muted {
+    margin-bottom: 0;
+    text-align: left;
+}
+
+.employee-pagination-wrap .pagination {
+    margin-bottom: 0;
+}
+
+@media (max-width: 767.98px) {
+    .employee-photo-upload-card {
+        grid-template-columns: 1fr;
+    }
+
+    .employee-photo-upload-preview {
+        max-width: 180px;
+    }
+
+    .employee-photo-dropzone {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .employee-photo-upload-toolbar {
+        align-items: flex-start;
+    }
+
+    .employee-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none {
+        justify-content: flex-start !important;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .employee-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none .pagination {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
