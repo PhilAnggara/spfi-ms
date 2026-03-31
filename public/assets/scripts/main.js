@@ -113,4 +113,117 @@ function copyToClipboard(text) {
     document.body.removeChild(textarea);
   }
 }
+
+// Sidebar Desktop Toggle State Persistence
+const SIDEBAR_STORAGE_KEY = 'desktop-sidebar-state';
+const SIDEBAR_BREAKPOINT = '(min-width: 1200px)';
+
+// Apply stored sidebar state early - with inline style to force correct layout
+const applySidebarStateEarly = () => {
+  if (!window.matchMedia(SIDEBAR_BREAKPOINT).matches) {
+    return;
+  }
+
+  const sidebar = document.getElementById('sidebar');
+  const wrapper = document.querySelector('.sidebar-wrapper');
+  const main = document.getElementById('main');
+
+  if (!sidebar || !wrapper) {
+    return;
+  }
+
+  const storedState = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+  const shouldShow = storedState !== 'hidden';
+
+  // Set class
+  sidebar.classList.remove('active', 'inactive');
+  sidebar.classList.add(shouldShow ? 'active' : 'inactive');
+
+  // Force with inline styles to override any component defaults
+  if (shouldShow) {
+    wrapper.style.left = '0';
+    if (main) main.style.marginLeft = '300px';
+  } else {
+    wrapper.style.left = '-300px';
+    if (main) main.style.marginLeft = '0';
+  }
+};
+
+// Run early before component sidebar initializes
+applySidebarStateEarly();
+
+// Full initialization with event handlers - runs after DOM is ready
+(() => {
+  const initSidebarToggle = () => {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) {
+      return;
+    }
+
+    const desktopBreakpoint = window.matchMedia(SIDEBAR_BREAKPOINT);
+    const wrapper = document.querySelector('.sidebar-wrapper');
+    const main = document.getElementById('main');
+
+    const isDesktop = () => desktopBreakpoint.matches;
+
+    const setDesktopSidebarState = (isVisible) => {
+      sidebar.classList.toggle('active', isVisible);
+      sidebar.classList.toggle('inactive', !isVisible);
+
+      // Force inline styles
+      if (isVisible) {
+        wrapper.style.left = '0';
+        if (main) main.style.marginLeft = '300px';
+      } else {
+        wrapper.style.left = '-300px';
+        if (main) main.style.marginLeft = '0';
+      }
+
+      document.querySelector('.sidebar-backdrop')?.remove();
+      document.body.style.overflowY = 'auto';
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, isVisible ? 'shown' : 'hidden');
+    };
+
+    const syncDesktopSidebarState = () => {
+      if (!isDesktop()) {
+        return;
+      }
+
+      const storedState = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+      setDesktopSidebarState(storedState !== 'hidden');
+    };
+
+    document.querySelectorAll('.burger-btn, .sidebar-hide').forEach((trigger) => {
+      trigger.addEventListener('click', (event) => {
+        if (!isDesktop()) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const isVisible = !sidebar.classList.contains('inactive');
+        setDesktopSidebarState(!isVisible);
+      }, true);
+    });
+
+    // Intercept window resize to maintain localStorage state for desktop
+    const originalResize = window.onresize;
+    window.addEventListener('resize', (event) => {
+      syncDesktopSidebarState();
+      if (typeof originalResize === 'function') {
+        originalResize.call(window, event);
+      }
+    });
+
+    desktopBreakpoint.addEventListener('change', syncDesktopSidebarState);
+    syncDesktopSidebarState();
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSidebarToggle);
+  } else {
+    initSidebarToggle();
+  }
+})();
 // ...existing code...
