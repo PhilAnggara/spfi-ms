@@ -441,7 +441,14 @@
 @endpush
 
 @push('addon-script')
-    <script type="application/json" id="transfer-slip-prefill-data">@json(['shouldOpenModal' => $errors->any(), 'swsNumber' => old('sws_number', ''), 'items' => old('items', [])])</script>
+    @php
+        $transferSlipPrefillData = [
+            'shouldOpenModal' => $errors->any(),
+            'swsNumber' => old('sws_number', ''),
+            'items' => old('items', []),
+        ];
+    @endphp
+    <script type="application/json" id="transfer-slip-prefill-data">@json($transferSlipPrefillData)</script>
     <script src="{{ url('assets/scripts/modules/transfer-slips-prefill.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/transfer-slips-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/transfer-slips-index.js') }}"></script>
