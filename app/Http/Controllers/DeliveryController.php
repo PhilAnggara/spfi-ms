@@ -6,6 +6,7 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Supplier;
 use App\Support\Concerns\PaginatesLegacySqlServer;
+use App\Support\Concerns\UsesSmartCatalogSearch;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 class DeliveryController extends Controller
 {
     use PaginatesLegacySqlServer;
+    use UsesSmartCatalogSearch;
 
     public function index(Request $request)
     {
@@ -49,31 +51,14 @@ class DeliveryController extends Controller
 
         $search = trim((string) $request->query('search'));
         $categoryId = trim((string) $request->query('category'));
-        $searchTerms = collect(preg_split('/\s+/', mb_strtolower($search), -1, PREG_SPLIT_NO_EMPTY))
-            ->filter()
-            ->values();
-
-        $itemsQuery = Item::with(['unit', 'category'])
+        $itemsBaseQuery = Item::query()
             ->select(['id', 'name', 'code', 'stock_on_hand', 'unit_of_measure_id', 'category_id'])
             ->where('is_active', true)
-            ->when($searchTerms->isNotEmpty(), function ($query) use ($searchTerms) {
-                $query->where(function ($nested) use ($searchTerms) {
-                    foreach ($searchTerms as $term) {
-                        $termLike = "%{$term}%";
-                        $nested->where(function ($where) use ($termLike) {
-                            $where->whereRaw('LOWER(name) LIKE ?', [$termLike])
-                                ->orWhereRaw('LOWER(code) LIKE ?', [$termLike]);
-                        });
-                    }
-                });
-            })
             ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
                 $query->where('category_id', (int) $categoryId);
-            })
-            ->orderBy('name')
-            ->orderBy('id');
+            });
 
-        $items = $this->paginateEloquentForCurrentConnection($itemsQuery, 'name ASC, id ASC', 36);
+        $items = $this->smartCatalogPaginator($itemsBaseQuery, $search, 36);
 
         $suppliers = Supplier::query()
             ->whereNull('deleted_at')

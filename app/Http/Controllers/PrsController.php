@@ -8,6 +8,7 @@ use App\Models\ItemCategory;
 use App\Models\Prs;
 use App\Models\PrsItem;
 use App\Support\Concerns\PaginatesLegacySqlServer;
+use App\Support\Concerns\UsesSmartCatalogSearch;
 use App\Models\User;
 use App\Notifications\PrsSubmittedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -20,6 +21,7 @@ use Illuminate\Http\Request;
 class PrsController extends Controller
 {
     use PaginatesLegacySqlServer;
+    use UsesSmartCatalogSearch;
 
     /**
      * Display a listing of the resource.
@@ -73,29 +75,14 @@ class PrsController extends Controller
 
         $search = trim((string) $request->query('search'));
         $categoryId = trim((string) $request->query('category'));
-        $searchTerms = collect(preg_split('/\s+/', mb_strtolower($search), -1, PREG_SPLIT_NO_EMPTY))
-            ->filter()
-            ->values();
-
-        $itemsQuery = Item::with(['unit', 'category'])
+        $itemsBaseQuery = Item::query()
             ->select(['id', 'name', 'code', 'stock_on_hand', 'unit_of_measure_id', 'category_id'])
             ->where('is_active', true)
-            ->when($searchTerms->isNotEmpty(), function ($query) use ($searchTerms) {
-                foreach ($searchTerms as $term) {
-                    $query->where(function ($subQuery) use ($term) {
-                        $subQuery
-                            ->whereRaw('LOWER(name) LIKE ?', ['%' . $term . '%'])
-                            ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $term . '%']);
-                    });
-                }
-            })
             ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
                 $query->where('category_id', (int) $categoryId);
-            })
-            ->orderBy('name')
-            ->orderBy('id');
+            });
 
-        $items = $this->paginateEloquentForCurrentConnection($itemsQuery, 'name ASC, id ASC', 36);
+        $items = $this->smartCatalogPaginator($itemsBaseQuery, $search, 36);
 
         if ($request->expectsJson() || $request->ajax()) {
             $transformedItems = $items->getCollection()->map(function ($item) {
