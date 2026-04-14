@@ -5,12 +5,11 @@ namespace App\Notifications;
 use App\Models\Prs;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-// Hapus "implements ShouldQueue" untuk development agar notifikasi langsung terkirim
-// Untuk production, aktifkan kembali dan gunakan queue worker
-class PrsSubmittedNotification extends Notification // implements ShouldQueue
+class PrsSubmittedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -30,7 +29,7 @@ class PrsSubmittedNotification extends Notification // implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database']; // Bisa ditambah 'mail' jika ingin kirim email juga
+        return ['database', 'broadcast'];
     }
 
     /**
@@ -72,5 +71,10 @@ class PrsSubmittedNotification extends Notification // implements ShouldQueue
             'icon' => 'bi-file-earmark-plus',
             'icon_color' => 'bg-primary',
         ];
+    }
+
+    public function toBroadcast(object $notifiable): BroadcastMessage
+    {
+        return new BroadcastMessage($this->toArray($notifiable));
     }
 }

@@ -4,9 +4,11 @@ namespace App\Notifications;
 
 use App\Models\PurchaseOrder;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Notification;
 
-class PoSubmittedNotification extends Notification
+class PoSubmittedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -16,7 +18,7 @@ class PoSubmittedNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', 'broadcast'];
     }
 
     public function toArray(object $notifiable): array
@@ -33,5 +35,10 @@ class PoSubmittedNotification extends Notification
             'icon' => 'bi-bag-check',
             'icon_color' => 'bg-success',
         ];
+    }
+
+    public function toBroadcast(object $notifiable): BroadcastMessage
+    {
+        return new BroadcastMessage($this->toArray($notifiable));
     }
 }

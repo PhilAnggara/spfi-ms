@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseOrder;
 use App\Models\User;
+use App\Services\NotificationRecipientService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -180,6 +181,19 @@ class PurchaseOrderApprovalController extends Controller
             ]);
         }
 
+        $recipients = app(NotificationRecipientService::class)->relatedPurchaseOrderUsers($purchaseOrder);
+        app(NotificationRecipientService::class)->notify($recipients, [
+            'type' => 'po_approved',
+            'title' => 'Purchase Order Approved',
+            'message' => 'PO #'.($purchaseOrder->po_number ?: $purchaseOrder->id).' has been approved.',
+            'action_url' => '/purchase-orders/'.$purchaseOrder->id,
+            'icon' => 'fa-light fa-file-circle-check',
+            'icon_color' => 'bg-success',
+            'meta' => [
+                'purchase_order_id' => $purchaseOrder->id,
+            ],
+        ]);
+
         return redirect()->back()->with('success', 'Purchase order approved.');
     }
 
@@ -195,6 +209,20 @@ class PurchaseOrderApprovalController extends Controller
         $purchaseOrder->update([
             'status' => 'CHANGES_REQUESTED',
             'approval_notes' => $validated['message'],
+        ]);
+
+        $recipients = app(NotificationRecipientService::class)->relatedPurchaseOrderUsers($purchaseOrder);
+        app(NotificationRecipientService::class)->notify($recipients, [
+            'type' => 'po_changes_requested',
+            'title' => 'PO Needs Changes',
+            'message' => 'PO #'.($purchaseOrder->po_number ?: $purchaseOrder->id).' needs changes from approver.',
+            'action_url' => '/purchase-orders/'.$purchaseOrder->id,
+            'icon' => 'fa-light fa-file-pen',
+            'icon_color' => 'bg-warning',
+            'meta' => [
+                'purchase_order_id' => $purchaseOrder->id,
+                'approval_notes' => $validated['message'],
+            ],
         ]);
 
         return redirect()->back()->with('success', 'Changes requested for purchase order.');

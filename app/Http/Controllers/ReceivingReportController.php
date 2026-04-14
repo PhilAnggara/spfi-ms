@@ -6,6 +6,7 @@ use App\Models\CustomsDocumentType;
 use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
+use App\Services\NotificationRecipientService;
 use App\Services\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -179,7 +180,7 @@ class ReceivingReportController extends Controller
             }
         }
 
-        DB::transaction(function () use ($validated, $selectedRows, $request, $currentStockLines, $requiresCustomsDocument) {
+        $receivingReport = DB::transaction(function () use ($validated, $selectedRows, $request, $currentStockLines, $requiresCustomsDocument) {
             $receivingReport = ReceivingReport::create([
                 'rr_number' => $validated['rr_number'],
                 'purchase_order_id' => $validated['purchase_order_id'],
@@ -210,7 +211,27 @@ class ReceivingReportController extends Controller
 
             // Trigger PRS status check for all affected items
             $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
+
+            return $receivingReport;
         });
+
+        $recipients = app(NotificationRecipientService::class)->uniqueUsers(
+            app(NotificationRecipientService::class)->inventoryTeam(),
+            app(NotificationRecipientService::class)->relatedPurchaseOrderUsers($purchaseOrder)
+        );
+
+        app(NotificationRecipientService::class)->notify($recipients, [
+            'type' => 'receiving_report_created',
+            'title' => 'Receiving Report Created',
+            'message' => 'RR #'.$receivingReport->rr_number.' has been created.',
+            'action_url' => '/receiving-reports',
+            'icon' => 'fa-light fa-truck-ramp-box',
+            'icon_color' => 'bg-success',
+            'meta' => [
+                'receiving_report_id' => $receivingReport->id,
+                'purchase_order_id' => $receivingReport->purchase_order_id,
+            ],
+        ]);
 
         return redirect()
             ->route('receiving-reports.index')
@@ -330,6 +351,25 @@ class ReceivingReportController extends Controller
             $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
         });
 
+        $receivingReport->loadMissing('purchaseOrder.items.prsItem.prs.user');
+        $recipients = app(NotificationRecipientService::class)->uniqueUsers(
+            app(NotificationRecipientService::class)->inventoryTeam(),
+            app(NotificationRecipientService::class)->relatedPurchaseOrderUsers($receivingReport->purchaseOrder)
+        );
+
+        app(NotificationRecipientService::class)->notify($recipients, [
+            'type' => 'receiving_report_updated',
+            'title' => 'Receiving Report Updated',
+            'message' => 'RR #'.$receivingReport->rr_number.' has been updated.',
+            'action_url' => '/receiving-reports',
+            'icon' => 'fa-light fa-pen-to-square',
+            'icon_color' => 'bg-info',
+            'meta' => [
+                'receiving_report_id' => $receivingReport->id,
+                'purchase_order_id' => $receivingReport->purchase_order_id,
+            ],
+        ]);
+
         return redirect()
             ->route('receiving-reports.index')
             ->with('success', 'Receiving report has been updated.');
@@ -355,6 +395,25 @@ class ReceivingReportController extends Controller
 
             $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
         });
+
+        $receivingReport->loadMissing('purchaseOrder.items.prsItem.prs.user');
+        $recipients = app(NotificationRecipientService::class)->uniqueUsers(
+            app(NotificationRecipientService::class)->inventoryTeam(),
+            app(NotificationRecipientService::class)->relatedPurchaseOrderUsers($receivingReport->purchaseOrder)
+        );
+
+        app(NotificationRecipientService::class)->notify($recipients, [
+            'type' => 'receiving_report_deleted',
+            'title' => 'Receiving Report Deleted',
+            'message' => 'RR #'.$receivingReport->rr_number.' has been deleted.',
+            'action_url' => '/receiving-reports',
+            'icon' => 'fa-light fa-trash-can',
+            'icon_color' => 'bg-danger',
+            'meta' => [
+                'receiving_report_id' => $receivingReport->id,
+                'purchase_order_id' => $receivingReport->purchase_order_id,
+            ],
+        ]);
 
         return redirect()
             ->route('receiving-reports.index')

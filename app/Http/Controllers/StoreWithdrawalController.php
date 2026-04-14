@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\User;
+use App\Services\NotificationRecipientService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\UsesSmartCatalogSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -206,7 +208,7 @@ class StoreWithdrawalController extends Controller
         $authUserId = Auth::id();
         $now = now();
 
-        $swsNumber = DB::transaction(function () use ($department, $departmentCode, $swsDate, $validated, $requestedItems, $itemRows, $authUserId, $now): string {
+        $createdStoreWithdrawal = DB::transaction(function () use ($department, $departmentCode, $swsDate, $validated, $requestedItems, $itemRows, $authUserId, $now): array {
             $swsNumber = $this->generateSwsNumber($departmentCode);
 
             $storeWithdrawalId = DB::table('store_withdrawals')->insertGetId([
@@ -252,12 +254,35 @@ class StoreWithdrawalController extends Controller
 
             DB::table('store_withdrawal_items')->insert($detailRows);
 
-            return $swsNumber;
+            return [
+                'id' => (int) $storeWithdrawalId,
+                'sws_number' => $swsNumber,
+            ];
         });
+
+        $recipientService = app(NotificationRecipientService::class);
+        $documentUsers = User::whereIn('id', array_filter([$authUserId]))->get();
+        $recipients = $recipientService->uniqueUsers(
+            $recipientService->inventoryTeam(),
+            $documentUsers
+        );
+
+        $recipientService->notify($recipients, [
+            'type' => 'store_withdrawal_created',
+            'title' => 'Store Withdrawal Created',
+            'message' => 'SWS '.$createdStoreWithdrawal['sws_number'].' has been created.',
+            'action_url' => '/stores-withdrawals',
+            'icon' => 'fa-light fa-box-open-full',
+            'icon_color' => 'bg-success',
+            'meta' => [
+                'store_withdrawal_id' => $createdStoreWithdrawal['id'],
+                'sws_number' => $createdStoreWithdrawal['sws_number'],
+            ],
+        ]);
 
         return redirect()
             ->route('stores-withdrawals.index')
-            ->with('success', "Stores Withdrawal {$swsNumber} has been created successfully.");
+            ->with('success', "Stores Withdrawal {$createdStoreWithdrawal['sws_number']} has been created successfully.");
     }
 
     public function show(string $storeWithdrawal)
@@ -408,6 +433,10 @@ class StoreWithdrawalController extends Controller
         $now = now();
         $authUserId = Auth::id();
         $removeItemIds = array_keys($removeIds);
+        $storeWithdrawal = DB::table('store_withdrawals')
+            ->where('id', $storeWithdrawalId)
+            ->whereNull('deleted_at')
+            ->first(['id', 'sws_number', 'created_by']);
 
         DB::transaction(function () use ($storeWithdrawalId, $updatePayloads, $removeItemIds, $now, $authUserId): void {
             foreach ($updatePayloads as $itemId => $quantity) {
@@ -443,6 +472,26 @@ class StoreWithdrawalController extends Controller
                 ]);
         });
 
+        $recipientService = app(NotificationRecipientService::class);
+        $documentUsers = User::whereIn('id', array_filter([(int) ($storeWithdrawal->created_by ?? 0), (int) $authUserId]))->get();
+        $recipients = $recipientService->uniqueUsers(
+            $recipientService->inventoryTeam(),
+            $documentUsers
+        );
+
+        $recipientService->notify($recipients, [
+            'type' => 'store_withdrawal_updated',
+            'title' => 'Store Withdrawal Updated',
+            'message' => 'SWS '.($storeWithdrawal->sws_number ?? $storeWithdrawalId).' has been updated.',
+            'action_url' => '/stores-withdrawals',
+            'icon' => 'fa-light fa-pen-to-square',
+            'icon_color' => 'bg-info',
+            'meta' => [
+                'store_withdrawal_id' => $storeWithdrawalId,
+                'sws_number' => $storeWithdrawal->sws_number ?? null,
+            ],
+        ]);
+
         return redirect()->back()->with('success', 'Stores withdrawal updated successfully.');
     }
 
@@ -456,6 +505,10 @@ class StoreWithdrawalController extends Controller
 
         $now = now();
         $authUserId = Auth::id();
+        $storeWithdrawal = DB::table('store_withdrawals')
+            ->where('id', $storeWithdrawalId)
+            ->whereNull('deleted_at')
+            ->first(['id', 'sws_number', 'created_by']);
 
         $deleted = DB::transaction(function () use ($storeWithdrawalId, $now, $authUserId): int {
             DB::table('store_withdrawal_items')
@@ -480,6 +533,26 @@ class StoreWithdrawalController extends Controller
         if ($deleted === 0) {
             return redirect()->back()->with('error', 'Stores withdrawal not found or already deleted.');
         }
+
+        $recipientService = app(NotificationRecipientService::class);
+        $documentUsers = User::whereIn('id', array_filter([(int) ($storeWithdrawal->created_by ?? 0), (int) $authUserId]))->get();
+        $recipients = $recipientService->uniqueUsers(
+            $recipientService->inventoryTeam(),
+            $documentUsers
+        );
+
+        $recipientService->notify($recipients, [
+            'type' => 'store_withdrawal_deleted',
+            'title' => 'Store Withdrawal Deleted',
+            'message' => 'SWS '.($storeWithdrawal->sws_number ?? $storeWithdrawalId).' has been deleted.',
+            'action_url' => '/stores-withdrawals',
+            'icon' => 'fa-light fa-trash-can',
+            'icon_color' => 'bg-danger',
+            'meta' => [
+                'store_withdrawal_id' => $storeWithdrawalId,
+                'sws_number' => $storeWithdrawal->sws_number ?? null,
+            ],
+        ]);
 
         return redirect()->back()->with('success', 'Stores withdrawal deleted successfully.');
     }

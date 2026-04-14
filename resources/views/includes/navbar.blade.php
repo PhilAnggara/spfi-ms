@@ -13,16 +13,17 @@
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
                 <ul class="navbar-nav ms-auto mb-lg-0">
                     <li class="nav-item dropdown me-3">
-                        <a class="nav-link active dropdown-toggle text-gray-600" href="#"
+                        <a class="nav-link active dropdown-toggle text-gray-600" href="#" id="notificationBell"
+                            data-auth-user-id="{{ auth()->id() }}"
                             data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
                             <i class="fa-light fa-bell fa-shake fa-xl"></i>
 
-                            <!-- Badge untuk unread notifications count -->
-                            @if(Auth::user()->unreadNotifications->count() > 0)
-                                <span class="badge badge-notification bg-danger">
-                                    {{ Auth::user()->unreadNotifications->count() }}
-                                </span>
-                            @endif
+                            <span
+                                id="notificationBadge"
+                                class="badge badge-notification bg-danger {{ Auth::user()->unreadNotifications->count() > 0 ? '' : 'd-none' }}"
+                            >
+                                {{ Auth::user()->unreadNotifications->count() }}
+                            </span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end notification-dropdown shadow"
                             aria-labelledby="dropdownMenuButton" style="min-width: 350px; max-height: 500px; overflow-y: auto;">
@@ -30,21 +31,25 @@
                             <!-- Header -->
                             <li class="dropdown-header d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0">Notifications</h6>
-                                @if(Auth::user()->unreadNotifications->count() > 0)
-                                    <button class="btn btn-sm btn-link p-0" id="markAllReadBtn" style="font-size: 0.75rem;">
-                                        Mark all as read
-                                    </button>
-                                @endif
+                                <button
+                                    class="btn btn-sm btn-link p-0 {{ Auth::user()->unreadNotifications->count() > 0 ? '' : 'd-none' }}"
+                                    id="markAllReadBtn"
+                                    style="font-size: 0.75rem;"
+                                >
+                                    Mark all as read
+                                </button>
                             </li>
 
                             <li><hr class="dropdown-divider"></li>
 
-                            <!-- Notifications List -->
+                            <li class="p-0 border-0">
+                            <ul id="notificationList" class="list-unstyled mb-0">
                             @forelse(Auth::user()->notifications->take(5) as $notification)
                                 <li class="dropdown-item notification-item {{ $notification->read_at ? '' : 'bg-light' }}"
                                     style="white-space: normal; cursor: pointer;"
                                     data-notification-id="{{ $notification->id }}"
-                                    data-action-url="{{ $notification->data['action_url'] ?? '#' }}">
+                                    data-action-url="{{ $notification->data['action_url'] ?? '#' }}"
+                                    data-is-read="{{ $notification->read_at ? '1' : '0' }}">
 
                                     <a class="d-flex align-items-start text-decoration-none" href="#">
                                         <!-- Icon -->
@@ -70,18 +75,20 @@
                                     </a>
                                 </li>
                             @empty
-                                <li class="dropdown-item text-center py-4">
+                                <li id="notificationEmptyState" class="dropdown-item text-center py-4">
                                     <div class="text-muted">
                                         <i class="bi bi-inbox fa-2x ms-1 d-block"></i>
                                         <p class="ms-1">No notifications</p>
                                     </div>
                                 </li>
                             @endforelse
+                            </ul>
+                            </li>
 
                             <!-- Footer -->
                             @if(Auth::user()->notifications->count() > 0)
                                 <li><hr class="dropdown-divider"></li>
-                                <li>
+                                <li id="notificationFooter">
                                     <a href="{{ route('notifications.index') }}" class="dropdown-item text-center text-primary">
                                         <i class="bi bi-arrow-right-circle"></i> View All Notifications
                                     </a>
@@ -132,54 +139,3 @@
 </header>
 
 @include('includes.modals.change-password-modal')
-
-<!-- Script untuk handle notifications -->
-<script>
-// Mark notification as read ketika di-click
-document.querySelectorAll('.notification-item').forEach(item => {
-    item.addEventListener('click', function(e) {
-        e.preventDefault();
-
-        const notificationId = this.dataset.notificationId;
-        const actionUrl = this.dataset.actionUrl;
-
-        // Mark as read via AJAX
-        if (notificationId) {
-            fetch(`/notifications/${notificationId}/read`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json',
-                }
-            }).then(response => response.json())
-              .then(data => {
-                  // Redirect ke action URL jika ada
-                  if (actionUrl && actionUrl !== '#') {
-                      window.location.href = actionUrl;
-                  } else {
-                      // Refresh page untuk update badge count
-                      location.reload();
-                  }
-              });
-        }
-    });
-});
-
-// Mark all as read button
-document.getElementById('markAllReadBtn')?.addEventListener('click', function(e) {
-    e.preventDefault();
-
-    if (confirm('Mark all notifications as read?')) {
-        fetch('/notifications/mark-all-read', {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json',
-            }
-        }).then(response => response.json())
-          .then(data => {
-              location.reload();
-          });
-    }
-});
-</script>

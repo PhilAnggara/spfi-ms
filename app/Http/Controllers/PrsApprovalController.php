@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Prs;
 use App\Models\User;
+use App\Services\NotificationRecipientService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +49,24 @@ class PrsApprovalController extends Controller
             'action' => 'HOLD',
             'message' => $data['message'],
             'meta' => [
+                'previous_status' => $previousStatus,
+            ],
+        ]);
+
+        $recipients = app(NotificationRecipientService::class)->uniqueUsers(
+            collect([$prs->user])->filter(),
+            app(NotificationRecipientService::class)->purchasingManagers()
+        );
+
+        app(NotificationRecipientService::class)->notify($recipients, [
+            'type' => 'prs_on_hold',
+            'title' => 'PRS On Hold',
+            'message' => 'PRS #'.$prs->prs_number.' is on hold.',
+            'action_url' => '/procurement/approval/'.$prs->id,
+            'icon' => 'fa-light fa-circle-pause',
+            'icon_color' => 'bg-warning',
+            'meta' => [
+                'prs_id' => $prs->id,
                 'previous_status' => $previousStatus,
             ],
         ]);
@@ -102,6 +121,25 @@ class PrsApprovalController extends Controller
                 ],
             ]);
         });
+
+        $assignedCanvassers = User::whereIn('id', $assignments->pluck('canvasser_id')->unique()->all())->get();
+        $recipients = app(NotificationRecipientService::class)->uniqueUsers(
+            collect([$prs->user])->filter(),
+            $assignedCanvassers
+        );
+
+        app(NotificationRecipientService::class)->notify($recipients, [
+            'type' => 'prs_approved_canvassing',
+            'title' => 'PRS Approved',
+            'message' => 'PRS #'.$prs->prs_number.' has been approved and moved to canvassing.',
+            'action_url' => '/procurement/approval/'.$prs->id,
+            'icon' => 'fa-light fa-badge-check',
+            'icon_color' => 'bg-success',
+            'meta' => [
+                'prs_id' => $prs->id,
+                'previous_status' => $previousStatus,
+            ],
+        ]);
 
         return redirect()->back()->with('success', 'PRS has been approved and assigned.');
     }
