@@ -35,6 +35,24 @@
                     $canEdit = $user
                         && in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED'], true)
                         && ($user->hasRole('administrator') || $purchaseOrder->created_by === $user->id);
+                    $feeItemsForForm = old('fee_items', $purchaseOrder->fees_breakdown ?? []);
+
+                    if (empty($feeItemsForForm)) {
+                        $feeItemsForForm = [
+                            ['type' => '', 'amount' => ''],
+                        ];
+                    }
+
+                    $feeItemsReadOnly = collect($purchaseOrder->fees_breakdown ?? [])
+                        ->filter(fn ($row) => is_array($row))
+                        ->map(function (array $row) {
+                            return [
+                                'type' => trim((string) ($row['type'] ?? '')),
+                                'amount' => (float) ($row['amount'] ?? 0),
+                            ];
+                        })
+                        ->filter(fn (array $row) => $row['type'] !== '' || $row['amount'] > 0)
+                        ->values();
                 @endphp
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-4">
@@ -103,8 +121,8 @@
                                         <th>Unit</th>
                                         <th class="text-end">Unit/Price</th>
                                         <th class="text-end">Disc %</th>
-                                        <th class="text-end">PPN %</th>
-                                        <th class="text-end">PPh %</th>
+                                        <th class="text-end">VAT (PPN) %</th>
+                                        <th class="text-end">Withholding Tax (PPh) %</th>
                                         <th class="text-end">Amount</th>
                                         <th>Notes</th>
                                     </tr>
@@ -156,19 +174,63 @@
                                         <span class="fw-semibold">- {{ $currencyCode }} {{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</span>
                                     </div>
                                     <div class="d-flex justify-content-between mb-2">
-                                        <span>PPN</span>
+                                        <span>VAT (PPN)</span>
                                         <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</span>
                                     </div>
                                     <div class="d-flex justify-content-between mb-2">
-                                        <span>PPh</span>
+                                        <span>Withholding Tax (PPh)</span>
                                         <span class="fw-semibold">- {{ $currencyCode }} {{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</span>
                                     </div>
-                                    <div class="d-flex justify-content-between mb-2 align-items-center">
-                                        <span>Fees</span>
-                                        <input type="number" name="fees" class="form-control form-control-sm text-end" min="0" step="0.01" value="{{ $purchaseOrder->fees }}" style="max-width: 140px;">
+                                    <div class="border rounded-3 p-3 my-3 bg-light-subtle">
+                                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                            <div>
+                                                <div class="fw-semibold">Additional Charges</div>
+                                                <div class="text-muted small">Add or remove extra charges for this PO.</div>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="add-po-fee-btn">
+                                                <i class="fa-duotone fa-solid fa-plus"></i>
+                                                Add Charge
+                                            </button>
+                                        </div>
+
+                                        <div id="po-fee-items-container" class="d-flex flex-column gap-2">
+                                            @foreach ($feeItemsForForm as $index => $feeItem)
+                                                <div class="po-fee-item-row border rounded-2 p-2 bg-white" data-fee-index="{{ $index }}">
+                                                    <div class="row g-2 align-items-center">
+                                                        <div class="col-12 col-md-6">
+                                                            <label class="form-label form-label-sm mb-1">Charge Type</label>
+                                                            <input
+                                                                type="text"
+                                                                name="fee_items[{{ $index }}][type]"
+                                                                class="form-control form-control-sm"
+                                                                value="{{ $feeItem['type'] ?? '' }}"
+                                                                placeholder="e.g. Freight, Insurance, Handling"
+                                                            >
+                                                        </div>
+                                                        <div class="col-10 col-md-4">
+                                                            <label class="form-label form-label-sm mb-1">Amount</label>
+                                                            <input
+                                                                type="number"
+                                                                name="fee_items[{{ $index }}][amount]"
+                                                                class="form-control form-control-sm text-end"
+                                                                min="0"
+                                                                step="0.01"
+                                                                value="{{ $feeItem['amount'] ?? '' }}"
+                                                                placeholder="0"
+                                                            >
+                                                        </div>
+                                                        <div class="col-2 col-md-2 d-flex align-items-end">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger w-100 remove-po-fee-btn" aria-label="Remove charge">
+                                                                <i class="fa-duotone fa-solid fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     </div>
                                     <div class="d-flex justify-content-between">
-                                        <span class="fw-bold">Total</span>
+                                        <span class="fw-bold">Grand Total</span>
                                         <span class="fw-bold">{{ $currencyCode }} {{ number_format($purchaseOrder->total, 2, ',', '.') }}</span>
                                     </div>
                                 </div>
@@ -214,8 +276,8 @@
                                     <th>Unit</th>
                                     <th class="text-end">Unit/Price</th>
                                     <th class="text-end">Disc %</th>
-                                    <th class="text-end">PPN %</th>
-                                    <th class="text-end">PPh %</th>
+                                    <th class="text-end">VAT (PPN) %</th>
+                                    <th class="text-end">Withholding Tax (PPh) %</th>
                                     <th class="text-end">Amount</th>
                                     <th>Notes</th>
                                 </tr>
@@ -256,19 +318,36 @@
                                     <span class="fw-semibold">- {{ $currencyCode }} {{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span>PPN</span>
+                                    <span>VAT (PPN)</span>
                                     <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span>PPh</span>
+                                    <span>Withholding Tax (PPh)</span>
                                     <span class="fw-semibold">- {{ $currencyCode }} {{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</span>
                                 </div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span>Fees</span>
-                                    <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->fees, 2, ',', '.') }}</span>
-                                </div>
+                                @if ($feeItemsReadOnly->isNotEmpty())
+                                    <div class="border rounded-3 p-3 my-3 bg-light-subtle">
+                                        <div class="fw-semibold mb-2">Additional Charges</div>
+                                        @foreach ($feeItemsReadOnly as $feeItem)
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span class="text-muted">{{ $feeItem['type'] !== '' ? $feeItem['type'] : 'Additional charge' }}</span>
+                                                <span>{{ $currencyCode }} {{ number_format($feeItem['amount'], 2, ',', '.') }}</span>
+                                            </div>
+                                        @endforeach
+                                        <hr class="my-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="text-muted">Total Additional Charges</span>
+                                            <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->fees, 2, ',', '.') }}</span>
+                                        </div>
+                                    </div>
+                                @elseif ((float) $purchaseOrder->fees > 0)
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Additional Charges</span>
+                                        <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->fees, 2, ',', '.') }}</span>
+                                    </div>
+                                @endif
                                 <div class="d-flex justify-content-between">
-                                    <span class="fw-bold">Total</span>
+                                    <span class="fw-bold">Grand Total</span>
                                     <span class="fw-bold">{{ $currencyCode }} {{ number_format($purchaseOrder->total, 2, ',', '.') }}</span>
                                 </div>
                             </div>
@@ -315,3 +394,113 @@
     </section>
 </div>
 @endsection
+
+@push('addon-script')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const container = document.getElementById('po-fee-items-container');
+            const addBtn = document.getElementById('add-po-fee-btn');
+
+            if (!container || !addBtn) {
+                return;
+            }
+
+            const reindexRows = () => {
+                container.querySelectorAll('.po-fee-item-row').forEach((row, index) => {
+                    row.setAttribute('data-fee-index', String(index));
+
+                    const typeInput = row.querySelector('input[type="text"]');
+                    const amountInput = row.querySelector('input[type="number"]');
+
+                    if (typeInput) {
+                        typeInput.setAttribute('name', `fee_items[${index}][type]`);
+                    }
+
+                    if (amountInput) {
+                        amountInput.setAttribute('name', `fee_items[${index}][amount]`);
+                    }
+                });
+            };
+
+            const createRow = (index) => {
+                const row = document.createElement('div');
+                row.className = 'po-fee-item-row border rounded-2 p-2 bg-white';
+                row.setAttribute('data-fee-index', String(index));
+
+                row.innerHTML = `
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label form-label-sm mb-1">Charge Type</label>
+                            <input
+                                type="text"
+                                name="fee_items[${index}][type]"
+                                class="form-control form-control-sm"
+                                placeholder="e.g. Freight, Insurance, Handling"
+                            >
+                        </div>
+                        <div class="col-10 col-md-4">
+                            <label class="form-label form-label-sm mb-1">Amount</label>
+                            <input
+                                type="number"
+                                name="fee_items[${index}][amount]"
+                                class="form-control form-control-sm text-end"
+                                min="0"
+                                step="0.01"
+                                placeholder="0"
+                            >
+                        </div>
+                        <div class="col-2 col-md-2 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger w-100 remove-po-fee-btn" aria-label="Remove charge">
+                                <i class="fa-duotone fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                return row;
+            };
+
+            addBtn.addEventListener('click', function () {
+                const nextIndex = container.querySelectorAll('.po-fee-item-row').length;
+                container.appendChild(createRow(nextIndex));
+                reindexRows();
+            });
+
+            container.addEventListener('click', function (event) {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+
+                const removeBtn = target.closest('.remove-po-fee-btn');
+                if (!removeBtn) {
+                    return;
+                }
+
+                const row = removeBtn.closest('.po-fee-item-row');
+                if (!row) {
+                    return;
+                }
+
+                const rows = container.querySelectorAll('.po-fee-item-row');
+                if (rows.length <= 1) {
+                    const textInput = row.querySelector('input[type="text"]');
+                    const numberInput = row.querySelector('input[type="number"]');
+
+                    if (textInput) {
+                        textInput.value = '';
+                    }
+
+                    if (numberInput) {
+                        numberInput.value = '';
+                    }
+
+                    return;
+                }
+
+                row.remove();
+                reindexRows();
+            });
+        });
+    </script>
+@endpush

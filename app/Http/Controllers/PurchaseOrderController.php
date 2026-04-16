@@ -17,6 +17,34 @@ use Illuminate\Support\Facades\DB;
 class PurchaseOrderController extends Controller
 {
     /**
+     * Normalize fee item payload and calculate fee total.
+     */
+    private function buildFeeBreakdown(array $feeItems): array
+    {
+        $normalized = collect($feeItems)
+            ->filter(fn ($row) => is_array($row))
+            ->map(function (array $row) {
+                $type = trim((string) ($row['type'] ?? ''));
+                $amount = (float) ($row['amount'] ?? 0);
+
+                return [
+                    'type' => $type,
+                    'amount' => max(0, $amount),
+                ];
+            })
+            ->filter(fn (array $row) => $row['type'] !== '' || $row['amount'] > 0)
+            ->values()
+            ->all();
+
+        $fees = collect($normalized)->sum('amount');
+
+        return [
+            'fees' => (float) $fees,
+            'fee_breakdown' => $normalized,
+        ];
+    }
+
+    /**
      * List PO for canvasser/admin.
      */
     public function index(Request $request)
@@ -246,7 +274,7 @@ class PurchaseOrderController extends Controller
             'currencyId' => $currencyId,
             'remarkType' => 'Normal',
             'remarkText' => '',
-            'fees' => 0,
+            'feeItems' => [],
         ]);
     }
 
@@ -259,7 +287,9 @@ class PurchaseOrderController extends Controller
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'currency_id' => ['required', 'exists:currencies,id'],
             'action' => ['required', 'in:draft,submit'],
-            'fees' => ['nullable', 'numeric', 'min:0'],
+            'fee_items' => ['nullable', 'array'],
+            'fee_items.*.type' => ['nullable', 'string', 'max:100'],
+            'fee_items.*.amount' => ['nullable', 'numeric', 'min:0'],
             'remark_type' => ['required', 'in:Normal,Confirmatory'],
             'remark_text' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
@@ -272,7 +302,9 @@ class PurchaseOrderController extends Controller
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
-        $fees = (float) ($validated['fees'] ?? 0);
+        $feePayload = $this->buildFeeBreakdown($validated['fee_items'] ?? []);
+        $fees = $feePayload['fees'];
+        $feesBreakdown = $feePayload['fee_breakdown'];
 
         $prsItemIds = collect($validated['items'])->pluck('prs_item_id');
 
@@ -298,7 +330,7 @@ class PurchaseOrderController extends Controller
         $itemsById = $prsItems->keyBy('id');
 
         // Atomic create: PO header, items, and PR item marking.
-        $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $fees, $request) {
+        $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $fees, $feesBreakdown, $request) {
             $purchaseOrder = PurchaseOrder::create([
                 'supplier_id' => $validated['supplier_id'],
                 'currency_id' => $validated['currency_id'],
@@ -306,6 +338,7 @@ class PurchaseOrderController extends Controller
                 'status' => $validated['action'] === 'submit' ? 'PENDING_APPROVAL' : 'DRAFT',
                 'tax_rate' => 0,
                 'fees' => $fees,
+                'fees_breakdown' => $feesBreakdown,
                 'discount_rate' => 0,
                 'ppn_rate' => 0,
                 'pph_rate' => 0,
@@ -464,7 +497,9 @@ class PurchaseOrderController extends Controller
 
         $validated = $request->validate([
             'currency_id' => ['required', 'exists:currencies,id'],
-            'fees' => ['nullable', 'numeric', 'min:0'],
+            'fee_items' => ['nullable', 'array'],
+            'fee_items.*.type' => ['nullable', 'string', 'max:100'],
+            'fee_items.*.amount' => ['nullable', 'numeric', 'min:0'],
             'remark_type' => ['required', 'in:Normal,Confirmatory'],
             'remark_text' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
@@ -485,9 +520,11 @@ class PurchaseOrderController extends Controller
         }
 
         $itemsById = $poItems->keyBy('id');
-        $fees = (float) ($validated['fees'] ?? 0);
+        $feePayload = $this->buildFeeBreakdown($validated['fee_items'] ?? []);
+        $fees = $feePayload['fees'];
+        $feesBreakdown = $feePayload['fee_breakdown'];
 
-        DB::transaction(function () use ($validated, $purchaseOrder, $itemsById, $fees) {
+        DB::transaction(function () use ($validated, $purchaseOrder, $itemsById, $fees, $feesBreakdown) {
             $subtotal = 0;
             $discountTotal = 0;
             $ppnTotal = 0;
@@ -530,6 +567,7 @@ class PurchaseOrderController extends Controller
             $purchaseOrder->update([
                 'currency_id' => $validated['currency_id'],
                 'fees' => $fees,
+                'fees_breakdown' => $feesBreakdown,
                 'remark_type' => $validated['remark_type'],
                 'remark_text' => $validated['remark_text'],
                 'subtotal' => $subtotal,

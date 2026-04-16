@@ -32,6 +32,13 @@
                 @php
                     $selectedCurrency = $currencies->firstWhere('id', $currencyId) ?? $currencies->first();
                     $currencySymbol = $selectedCurrency?->symbol ?: ($selectedCurrency?->code ?: 'Rp');
+                    $feeItemsForForm = old('fee_items', $feeItems ?? []);
+
+                    if (empty($feeItemsForForm)) {
+                        $feeItemsForForm = [
+                            ['type' => '', 'amount' => ''],
+                        ];
+                    }
                 @endphp
 
                 <div class="row g-3 mb-4">
@@ -68,8 +75,8 @@
                                 <th style="width: 150px;">Quantity</th>
                                 <th style="width: 150px;">Unit Price</th>
                                 <th style="width: 120px;">Discount (%)</th>
-                                <th style="width: 120px;">PPN (%)</th>
-                                <th style="width: 120px;">PPh (%)</th>
+                                <th style="width: 120px;">VAT (PPN) (%)</th>
+                                <th style="width: 120px;">Withholding Tax (PPh) (%)</th>
                                 <th>Notes</th>
                                 <th style="width: 150px;" class="text-end">Line Total</th>
                             </tr>
@@ -129,10 +136,59 @@
                     </table>
                 </div>
 
-                <div class="row g-3 mt-4">
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="fees">Additional Fees</label>
-                        <input type="number" name="fees" id="fees" class="form-control" min="0" step="0.01" value="{{ $fees }}">
+                <div class="row mt-4">
+                    <div class="col-12 col-xl-8">
+                        <div class="border rounded-3 p-3 p-md-4 bg-light-subtle">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                <div>
+                                    <h6 class="mb-1">Additional Charges</h6>
+                                    <p class="text-muted small mb-0">Add optional charges that should be included in this purchase order total.</p>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="add-fee-btn">
+                                    <i class="fa-duotone fa-solid fa-plus"></i>
+                                    Add Charge
+                                </button>
+                            </div>
+
+                            <div id="fee-items-container" class="d-flex flex-column gap-2">
+                                @foreach ($feeItemsForForm as $index => $feeItem)
+                                    <div class="fee-item-row border rounded-2 p-2 bg-white" data-fee-index="{{ $index }}">
+                                        <div class="row g-2 align-items-center">
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label form-label-sm mb-1">Charge Type</label>
+                                                <input
+                                                    type="text"
+                                                    name="fee_items[{{ $index }}][type]"
+                                                    class="form-control form-control-sm"
+                                                    value="{{ $feeItem['type'] ?? '' }}"
+                                                    placeholder="e.g. Freight, Insurance, Handling"
+                                                >
+                                            </div>
+                                            <div class="col-10 col-md-4">
+                                                <label class="form-label form-label-sm mb-1">Amount</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text currency-symbol">{{ $currencySymbol }}</span>
+                                                    <input
+                                                        type="number"
+                                                        name="fee_items[{{ $index }}][amount]"
+                                                        class="form-control text-end fee-amount-input"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value="{{ $feeItem['amount'] ?? '' }}"
+                                                        placeholder="0"
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div class="col-2 col-md-2 d-flex align-items-end">
+                                                <button type="button" class="btn btn-sm btn-outline-danger w-100 remove-fee-btn" aria-label="Remove charge">
+                                                    <i class="fa-duotone fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -149,20 +205,20 @@
                                 <span class="fw-semibold" id="discount-amount">Rp 0</span>
                             </div>
                             <div class="d-flex justify-content-between mb-3">
-                                <span class="text-muted">PPN</span>
+                                <span class="text-muted">VAT (PPN)</span>
                                 <span class="fw-semibold" id="ppn-amount">Rp 0</span>
                             </div>
                             <div class="d-flex justify-content-between mb-3">
-                                <span class="text-muted">PPh</span>
+                                <span class="text-muted">Withholding Tax (PPh)</span>
                                 <span class="fw-semibold" id="pph-amount">Rp 0</span>
                             </div>
                             <div class="d-flex justify-content-between mb-3">
-                                <span class="text-muted">Additional Fees</span>
+                                <span class="text-muted">Additional Charges</span>
                                 <span class="fw-semibold" id="fees-amount">Rp 0</span>
                             </div>
                             <hr class="my-2">
                             <div class="d-flex justify-content-between">
-                                <span class="fw-bold">Total Amount</span>
+                                <span class="fw-bold">Grand Total</span>
                                 <span class="fw-bold" id="total" style="font-size: 1.2em;">Rp 0</span>
                             </div>
                         </div>

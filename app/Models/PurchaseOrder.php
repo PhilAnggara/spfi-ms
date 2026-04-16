@@ -30,6 +30,7 @@ class PurchaseOrder extends Model
         'pph_rate',
         'pph_amount',
         'fees',
+        'fees_breakdown',
         'total',
         'remark_type',
         'remark_text',
@@ -50,6 +51,7 @@ class PurchaseOrder extends Model
         'approved_by_user_id' => 'integer',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
+        'fees_breakdown' => 'array',
         // Snapshot of signature names/titles for print.
         'signature_meta' => 'array',
     ];

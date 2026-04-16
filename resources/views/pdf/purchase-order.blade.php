@@ -203,17 +203,42 @@
                         <span>{{ $currencyCode }} {{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</span>
                     </div>
                     <div class="summary-row">
-                        <span>PPH</span>
+                        <span>Withholding Tax (PPh)</span>
                         <span>{{ $currencyCode }} {{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</span>
                     </div>
                     <div class="summary-row">
-                        <span>PPN/VAT</span>
+                        <span>VAT (PPN)</span>
                         <span>{{ $currencyCode }} {{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</span>
                     </div>
-                    <div class="summary-row">
-                        <span>Fees</span>
-                        <span>{{ $currencyCode }} {{ number_format($purchaseOrder->fees ?? 0, 2, ',', '.') }}</span>
-                    </div>
+                    @php
+                        $feeItems = collect($purchaseOrder->fees_breakdown ?? [])
+                            ->filter(fn ($row) => is_array($row))
+                            ->map(function (array $row) {
+                                return [
+                                    'type' => trim((string) ($row['type'] ?? '')),
+                                    'amount' => (float) ($row['amount'] ?? 0),
+                                ];
+                            })
+                            ->filter(fn (array $row) => $row['type'] !== '' || $row['amount'] > 0)
+                            ->values();
+                    @endphp
+                    @if ($feeItems->isNotEmpty())
+                        @foreach ($feeItems as $feeItem)
+                            <div class="summary-row">
+                                <span>{{ $feeItem['type'] !== '' ? $feeItem['type'] : 'Additional charge' }}</span>
+                                <span>{{ $currencyCode }} {{ number_format($feeItem['amount'], 2, ',', '.') }}</span>
+                            </div>
+                        @endforeach
+                        <div class="summary-row">
+                            <span>Total Additional Charges</span>
+                            <span>{{ $currencyCode }} {{ number_format($purchaseOrder->fees ?? 0, 2, ',', '.') }}</span>
+                        </div>
+                    @elseif ((float) $purchaseOrder->fees > 0)
+                        <div class="summary-row">
+                            <span>Additional Charges</span>
+                            <span>{{ $currencyCode }} {{ number_format($purchaseOrder->fees ?? 0, 2, ',', '.') }}</span>
+                        </div>
+                    @endif
                     <div class="summary-row summary-total">
                         <span>TOTAL</span>
                         <span>{{ $currencyCode }} {{ number_format($purchaseOrder->total, 2, ',', '.') }}</span>
