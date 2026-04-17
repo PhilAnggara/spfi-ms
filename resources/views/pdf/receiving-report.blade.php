@@ -4,243 +4,134 @@
     <meta charset="UTF-8">
     <title>Receiving Report</title>
     <style>
+        @page {
+            size: A4 landscape;
+            margin: 0;
+        }
+
         body {
+            margin: 0;
             font-family: DejaVu Sans, sans-serif;
-            font-size: 10px;
             color: #111827;
         }
-        .header {
-            display: block;
-            margin-bottom: 8px;
+
+        .rr-form-page {
+            position: relative;
+            width: 297mm;
+            height: 210mm;
+            page-break-after: auto;
+            overflow: hidden;
         }
-        .title {
-            font-size: 16px;
+
+        .rr-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 297mm;
+            height: 210mm;
+        }
+
+        .field {
+            position: absolute;
+            font-size: 12px;
+            line-height: 1.25;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .po-number {
+            font-size: 13px;
             font-weight: bold;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.2px;
         }
-        .line {
-            border-top: 1px solid #111827;
-            margin: 6px 0 8px;
+
+        .cell {
+            position: absolute;
+            font-size: 11px;
+            line-height: 1.2;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
-        .muted {
-            color: #6b7280;
+
+        .item-cell {
+            white-space: normal;
+            text-overflow: clip;
+            line-height: 1.15;
+            max-height: 8.8mm;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
-        .text-right {
+
+        .right {
             text-align: right;
         }
-        .text-center {
+
+        .center {
             text-align: center;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            border: 1px solid #111827;
-            padding: 3px 4px;
-            text-align: left;
-            vertical-align: top;
-        }
-        th {
-            background: #f3f4f6;
-            font-weight: bold;
-            font-size: 9px;
-        }
-        .rr-items {
-            font-size: 9px;
-        }
-        .table-clean th,
-        .table-clean td {
-            border: none;
-            padding: 2px 0;
-        }
-        .label {
-            width: 120px;
-            white-space: nowrap;
-            font-weight: bold;
-        }
-        .signatures {
-            margin-top: 24px;
-        }
-        .signature-table td {
-            border: none;
-            padding: 4px 0;
-        }
-        .signature-line {
-            margin-top: 24px;
-            font-weight: bold;
-        }
-        .note {
-            font-size: 9px;
-            line-height: 1.4;
-        }
-        .summary-box {
-            border: 1px solid #111827;
-            padding: 6px;
-            margin-top: 8px;
-        }
-        .summary-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 2px 0;
-        }
+
     </style>
 </head>
 <body>
     @php
         $po = $receivingReport->purchaseOrder;
-        $supplier = $po?->supplier;
-        $totalGood = (float) $receivingReport->items->sum('qty_good');
-        $totalBad = (float) $receivingReport->items->sum('qty_bad');
-        $totalReceived = $totalGood + $totalBad;
+        $rowStartTopMm = 73;
+        $rowHeightMm = 9.2;
+        $maxRows = 11;
+        $rows = $receivingReport->items->take($maxRows)->values();
+        $rowCount = $rows->count();
+        $totalAmount = $rows->sum(function ($rrItem) {
+            $poItem = $rrItem->purchaseOrderItem;
+            $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
+            $unitCost = (float) ($poItem?->unit_price ?? 0);
+
+            return $qtyTotal * $unitCost;
+        });
+        $amountLineTop = $rowStartTopMm + (($rowCount - 1) * $rowHeightMm) + 7.2;
+        $amountTotalTop = $amountLineTop + 1.2;
+        $poDateText = $po?->created_at ? $po->created_at->locale('id')->translatedFormat('d M Y') : '-';
+        $rrDateText = $receivingReport->created_at ? $receivingReport->created_at->locale('id')->translatedFormat('d M Y') : '-';
     @endphp
 
-    <div class="header">
-        <div class="title">RECEIVING REPORT</div>
-    </div>
-
-    <table class="table-clean">
-        <tr>
-            <td class="label">RR Number</td>
-            <td>: {{ $receivingReport->rr_number ?? '-' }}</td>
-            <td class="label text-right">Received Date</td>
-            <td class="text-right">: {{ format_date($receivingReport->received_date) }}</td>
-        </tr>
-        <tr>
-            <td class="label">PO Number</td>
-            <td colspan="3">: {{ $po?->po_number ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td class="label">Supplier Name</td>
-            <td colspan="3">: {{ $supplier?->name ?? '-' }}{{ $supplier?->code ? ' | ' . $supplier->code : '' }}</td>
-        </tr>
-        <tr>
-            <td class="label">Address</td>
-            <td colspan="3">: {{ $supplier?->address ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td class="label">Customs Document</td>
-            <td colspan="3">: {{ $receivingReport->requires_customs_document ? 'Yes' : 'No' }}</td>
-        </tr>
-        @if($receivingReport->requires_customs_document)
-        <tr>
-            <td class="label">Customs Number</td>
-            <td>: {{ $receivingReport->customs_document_number ?? '-' }}</td>
-            <td class="label text-right">Customs Date</td>
-            <td class="text-right">: {{ format_date($receivingReport->customs_document_date) }}</td>
-        </tr>
-        <tr>
-            <td class="label">Customs Type</td>
-            <td colspan="3">: {{ $receivingReport->customsDocumentType ? ($receivingReport->customsDocumentType->code . ' - ' . $receivingReport->customsDocumentType->name) : '-' }}</td>
-        </tr>
+    <div class="rr-form-page">
+        @if($isPreview && !empty($backgroundImageDataUri))
+            <img src="{{ $backgroundImageDataUri }}" alt="" class="rr-bg">
         @endif
-        @if($receivingReport->notes)
-        <tr>
-            <td class="label">Notes</td>
-            <td colspan="3">: {{ $receivingReport->notes }}</td>
-        </tr>
+
+        <div class="field" style="left: 43mm; top: 41mm; width: 88mm;">{{ $po?->supplier?->name ?? '-' }}</div>
+        <div class="field po-number" style="left: 170mm; top: 41mm; width: 48mm;">{{ $po?->po_number ?? '-' }}</div>
+        <div class="field" style="left: 170mm; top: 49mm; width: 48mm;">{{ $poDateText }}</div>
+
+        @foreach($rows as $index => $rrItem)
+            @php
+                $poItem = $rrItem->purchaseOrderItem;
+                $item = $poItem?->item;
+                $departmentCode = $poItem?->prsItem?->prs?->department?->code ?? '-';
+                $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
+                $unitCost = (float) ($poItem?->unit_price ?? 0);
+                $amount = $qtyTotal * $unitCost;
+                $top = $rowStartTopMm + ($index * $rowHeightMm);
+            @endphp
+
+            <div class="cell item-cell" style="left: 18mm; top: {{ $top }}mm; width: 70mm;">{{ $item?->name ?? '-' }}</div>
+            <div class="cell" style="left: 94mm; top: {{ $top }}mm; width: 19mm;">{{ $item?->code ?? '-' }}</div>
+            <div class="cell center" style="left: 114mm; top: {{ $top }}mm; width: 24mm;">{{ $departmentCode }}</div>
+            <div class="cell right" style="left: 140mm; top: {{ $top }}mm; width: 20mm;">{{ number_format($qtyTotal, 2, '.', ',') }}</div>
+            <div class="cell center" style="left: 167mm; top: {{ $top }}mm; width: 20mm;">{{ $item?->unit?->name ?? 'PCS' }}</div>
+            <div class="cell right" style="left: 188mm; top: {{ $top }}mm; width: 30mm;">{{ number_format($unitCost, 2, '.', ',') }}</div>
+            <div class="cell right" style="left: 228mm; top: {{ $top }}mm; width: 38mm;">{{ number_format($amount, 2, '.', ',') }}</div>
+        @endforeach
+
+        @if($rowCount > 1)
+            <div style="position: absolute; left: 235mm; top: {{ $amountLineTop }}mm; width: 38mm; border-top: 1px solid #111827;"></div>
+            <div class="cell right" style="left: 228mm; top: {{ $amountTotalTop }}mm; width: 38mm; font-weight: bold;">{{ number_format($totalAmount, 2, '.', ',') }}</div>
         @endif
-    </table>
 
-    <div class="line"></div>
-
-    <table class="rr-items">
-        <thead>
-            <tr>
-                <th style="width: 30px;" class="text-center">No</th>
-                <th>Item Name</th>
-                <th style="width: 70px;">Item Code</th>
-                <th style="width: 50px;">PRS Number</th>
-                <th style="width: 50px;">Department</th>
-                <th style="width: 40px;" class="text-center">Unit</th>
-                <th style="width: 60px;" class="text-right">Qty Ordered</th>
-                <th style="width: 60px;" class="text-right">Qty Good</th>
-                <th style="width: 60px;" class="text-right">Qty Bad</th>
-                <th style="width: 60px;" class="text-right">Total Received</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($receivingReport->items as $idx => $rrItem)
-                @php
-                    $poItem = $rrItem->purchaseOrderItem;
-                    $item = $poItem?->item;
-                    $prsItem = $poItem?->prsItem;
-                    $prs = $prsItem?->prs;
-                    $qtyGood = (float) $rrItem->qty_good;
-                    $qtyBad = (float) $rrItem->qty_bad;
-                    $qtyTotal = $qtyGood + $qtyBad;
-                @endphp
-                <tr>
-                    <td class="text-center">{{ $idx + 1 }}</td>
-                    <td>{{ $item?->name ?? '-' }}</td>
-                    <td>{{ $item?->code ?? '-' }}</td>
-                    <td>{{ $prs?->prs_number ?? '-' }}</td>
-                    <td>{{ $prs?->department?->name ?? '-' }}</td>
-                    <td class="text-center">{{ $item?->unit?->name ?? 'PCS' }}</td>
-                    <td class="text-right">{{ number_format($poItem?->quantity ?? 0, 2, ',', '.') }}</td>
-                    <td class="text-right">{{ number_format($qtyGood, 2, ',', '.') }}</td>
-                    <td class="text-right">{{ number_format($qtyBad, 2, ',', '.') }}</td>
-                    <td class="text-right">{{ number_format($qtyTotal, 2, ',', '.') }}</td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
-
-    <table class="table-clean" style="margin-top: 10px;">
-        <tr>
-            <td style="width: 60%;">
-                <div class="note">
-                    This receiving report confirms the receipt of goods as per the purchase order.
-                </div>
-                <div class="note" style="margin-top: 4px;">
-                    PT Sinar Pure Foods International
-                </div>
-            </td>
-            <td style="width: 40%;">
-                <div class="summary-box">
-                    <div class="summary-row">
-                        <span>Total Items</span>
-                        <span>{{ $receivingReport->items->count() }}</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Qty Good</span>
-                        <span>{{ number_format($totalGood, 2, ',', '.') }}</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Qty Bad</span>
-                        <span>{{ number_format($totalBad, 2, ',', '.') }}</span>
-                    </div>
-                    <div class="summary-row" style="border-top: 1px solid #111827; margin-top: 4px; padding-top: 4px; font-weight: bold;">
-                        <span>Total Received</span>
-                        <span>{{ number_format($totalReceived, 2, ',', '.') }}</span>
-                    </div>
-                </div>
-            </td>
-        </tr>
-    </table>
-
-    <div class="signatures">
-        <table class="signature-table" style="width: 100%;">
-            <tr>
-                <td style="width: 33%;">Received by</td>
-                <td style="width: 33%;">Checked by</td>
-                <td style="width: 34%;">Approved by</td>
-            </tr>
-            <tr>
-                <td class="signature-line">{{ $receivingReport->createdBy?->name ?? '-' }}</td>
-                <td class="signature-line">____________________</td>
-                <td class="signature-line">____________________</td>
-            </tr>
-            <tr>
-                <td>Date: {{ format_date($receivingReport->created_at) }}</td>
-                <td>Date: ____________________</td>
-                <td>Date: ____________________</td>
-            </tr>
-            <tr>
-                <td colspan="3" style="padding-top: 18px;">Supplier's Signature : ____________________________</td>
-            </tr>
-        </table>
+        <div class="field center" style="left: 158mm; top: 170mm; width: 47mm;">{{ $receivingReport->createdBy?->name ?? '-' }}</div>
+        <div class="field center" style="left: 225mm; top: 170mm; width: 45mm;">{{ $approvedByName ?? '-' }}</div>
+        <div class="field center" style="left: 235mm; top: 193mm; width: 45mm;">{{ $rrDateText }}</div>
     </div>
 </body>
 </html>

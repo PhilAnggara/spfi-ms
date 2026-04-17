@@ -171,7 +171,7 @@
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-view-modal-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
                                                     <i class="fa-light fa-eye text-primary"></i>
                                                 </button>
-                                                <a href="{{ route('receiving-reports.print', $rr) }}" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print PDF">
+                                                <a href="{{ route('receiving-reports.print', ['receivingReport' => $rr, 'mode' => 'print']) }}" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print Isi Saja">
                                                     <i class="fa-light fa-print text-primary"></i>
                                                 </a>
                                                 @role('administrator|im-manager|im-supervisor|im-staff')
@@ -396,9 +396,9 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <a href="{{ route('receiving-reports.print', $rr) }}" target="_blank" rel="noopener" class="btn btn-outline-danger">
+                        <a href="{{ route('receiving-reports.print', ['receivingReport' => $rr, 'mode' => 'preview']) }}" target="_blank" rel="noopener" class="btn btn-outline-primary">
                             <i class="fa-duotone fa-solid fa-file-pdf"></i>
-                            Print PDF
+                            Preview Form
                         </a>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>

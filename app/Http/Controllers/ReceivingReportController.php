@@ -6,6 +6,7 @@ use App\Models\CustomsDocumentType;
 use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
+use App\Models\User;
 use App\Services\NotificationRecipientService;
 use App\Services\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -420,8 +421,11 @@ class ReceivingReportController extends Controller
             ->with('success', 'Receiving report has been deleted.');
     }
 
-    public function print(ReceivingReport $receivingReport)
+    public function print(Request $request, ReceivingReport $receivingReport)
     {
+        $mode = $request->query('mode', 'print');
+        $isPreview = $mode !== 'print';
+
         $receivingReport->load([
             'purchaseOrder.supplier',
             'items.purchaseOrderItem.item.unit',
@@ -429,6 +433,20 @@ class ReceivingReportController extends Controller
             'customsDocumentType',
             'createdBy',
         ]);
+
+        $imManager = User::query()
+            ->whereHas('department', function ($query) {
+                $query->where('name', 'Inventory Management');
+            })
+            ->where('role', 'Manager')
+            ->orderBy('name')
+            ->first();
+
+        $backgroundImagePath = public_path('assets/images/Blank RR.jpg');
+        $backgroundImageDataUri = null;
+        if ($isPreview && is_readable($backgroundImagePath)) {
+            $backgroundImageDataUri = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($backgroundImagePath));
+        }
 
         $filename = sprintf(
             'RR-%s-%s.pdf',
@@ -438,8 +456,11 @@ class ReceivingReportController extends Controller
 
         return Pdf::loadView('pdf.receiving-report', [
             'receivingReport' => $receivingReport,
+            'isPreview' => $isPreview,
+            'approvedByName' => $imManager?->name,
+            'backgroundImageDataUri' => $backgroundImageDataUri,
         ])
-            ->setPaper('a4', 'portrait')
+            ->setPaper('a4', 'landscape')
             ->stream($filename);
     }
 
