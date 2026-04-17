@@ -429,6 +429,7 @@ class ReceivingReportController extends Controller
         $receivingReport->load([
             'purchaseOrder.supplier',
             'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
             'items.purchaseOrderItem.prsItem.prs.department',
             'customsDocumentType',
             'createdBy',
