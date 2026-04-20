@@ -22,6 +22,7 @@ class PrsItem extends Model
         'prs_id' => 'integer',
         'selected_canvassing_item_id' => 'integer',
         'canvasser_id' => 'integer',
+        'assigned_canvasser_at' => 'datetime',
         'purchase_order_id' => 'integer',
         'is_direct_purchase' => 'boolean',
     ];

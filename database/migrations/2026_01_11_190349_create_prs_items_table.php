@@ -16,9 +16,12 @@ return new class extends Migration
             $table->foreignId('prs_id')->constrained()->onDelete(fk_on_delete('cascade'));
             $table->foreignId('item_id')->constrained()->onDelete(fk_on_delete('restrict'));
             $table->foreignId('canvasser_id')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
+            $table->dateTime('assigned_canvasser_at')->nullable();
             $table->integer('quantity');
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index('assigned_canvasser_at');
         });
     }
 

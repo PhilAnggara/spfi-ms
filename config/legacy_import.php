@@ -67,6 +67,14 @@ return [
             'connection' => env('LEGACY_DB_PRS_DETAIL_CONNECTION'),
             'table' => env('LEGACY_DB_PRS_DETAIL_TABLE', 'prs_detail'),
         ],
+        'assign_canv' => [
+            'connection' => env('LEGACY_DB_ASSIGN_CANV_CONNECTION'),
+            'table' => env('LEGACY_DB_ASSIGN_CANV_TABLE', 'assign_canv'),
+        ],
+        'assign_canv_dtl' => [
+            'connection' => env('LEGACY_DB_ASSIGN_CANV_DTL_CONNECTION'),
+            'table' => env('LEGACY_DB_ASSIGN_CANV_DTL_TABLE', 'assign_canv_dtl'),
+        ],
         'po' => [
             'csv_path' => 'document/csv/po.csv',
             'connection' => env('LEGACY_DB_PO_CONNECTION'),

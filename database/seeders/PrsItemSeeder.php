@@ -57,14 +57,18 @@ class PrsItemSeeder extends Seeder
 
         $this->command?->info("ℹ [prs_detail] rows loaded: " . count($legacyRows));
 
-        $poDetailRows = $this->resolveRows('po_detail', fn (string $message) => $this->command?->warn($message));
-        $this->command?->info("ℹ [po_detail] rows loaded: " . count($poDetailRows));
+        $assignCanvRows = $this->resolveRows('assign_canv', fn (string $message) => $this->command?->warn($message));
+        $assignCanvDtlRows = $this->resolveRows('assign_canv_dtl', fn (string $message) => $this->command?->warn($message));
 
-        $canvasserLookup = $this->buildPoDetailCanvasserLookup($poDetailRows);
+        $this->command?->info("ℹ [assign_canv] rows loaded: " . count($assignCanvRows));
+        $this->command?->info("ℹ [assign_canv_dtl] rows loaded: " . count($assignCanvDtlRows));
+
+        $assignmentLookup = $this->buildAssignCanvLookup($assignCanvRows, $assignCanvDtlRows);
 
         $inserted = 0;
         $skipped = 0;
-        $canvasserFromPoDetail = 0;
+        $assignmentMatched = 0;
+        $assignmentMissingTimestamp = 0;
         $canvasserFallback = 0;
 
         foreach ($legacyRows as $data) {
@@ -96,19 +100,28 @@ class PrsItemSeeder extends Seeder
 
             $quantity = (int) ($data['qty'] ?? 0);
 
-            $legacyCanvasser = $this->consumePoDetailCanvasser(
-                $canvasserLookup,
+            $assignment = $this->resolveAssignCanvForPrsItem(
+                $assignmentLookup,
                 $prsNumber,
                 $productCode,
                 $departmentCode
             );
 
+            $legacyCanvasser = $assignment['canvasser'] ?? null;
+            $assignedCanvasserAt = $assignment['assigned_at'] ?? null;
+
+            if ($assignment !== null) {
+                $assignmentMatched++;
+
+                if ($assignedCanvasserAt === null) {
+                    $assignmentMissingTimestamp++;
+                }
+            }
+
             $canvasserId = $this->resolveLegacyUserId($legacyCanvasser, $defaultCanvasserId) ?? $defaultCanvasserId;
 
             if ($legacyCanvasser === null) {
                 $canvasserFallback++;
-            } else {
-                $canvasserFromPoDetail++;
             }
 
             // Upsert berdasarkan prs_id + item_id agar idempotent.
@@ -121,6 +134,7 @@ class PrsItemSeeder extends Seeder
                     'prs_id' => $prsId,
                     'item_id' => $itemId,
                     'canvasser_id' => $canvasserId,
+                    'assigned_canvasser_at' => $assignedCanvasserAt?->toDateTimeString(),
                     'quantity' => $quantity,
                     'purchase_order_id' => null,
                     'selected_canvassing_item_id' => null,
@@ -136,7 +150,7 @@ class PrsItemSeeder extends Seeder
         }
 
         $this->command?->info(
-            "✓ [prs_detail] Inserted/Updated: {$inserted}, Skipped: {$skipped}, Canvasser from po_detail: {$canvasserFromPoDetail}, Fallback: {$canvasserFallback} (user_id={$defaultCanvasserId})"
+            "✓ [prs_detail] Inserted/Updated: {$inserted}, Skipped: {$skipped}, Assignment matched: {$assignmentMatched}, Missing assign timestamp: {$assignmentMissingTimestamp}, Canvasser fallback: {$canvasserFallback} (user_id={$defaultCanvasserId})"
         );
     }
 
@@ -208,49 +222,78 @@ class PrsItemSeeder extends Seeder
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $poDetailRows
-     * @return array{strict: array<string, array<int, int>>, loose: array<string, array<int, int>>, values: array<int, string|null>, used: array<int, bool>}
+     * @param  array<int, array<string, mixed>>  $assignCanvRows
+     * @param  array<int, array<string, mixed>>  $assignCanvDtlRows
+     * @return array{strict: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>, loose: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>}
      */
-    protected function buildPoDetailCanvasserLookup(array $poDetailRows): array
+    protected function buildAssignCanvLookup(array $assignCanvRows, array $assignCanvDtlRows): array
     {
         $lookup = [
             'strict' => [],
             'loose' => [],
-            'values' => [],
-            'used' => [],
         ];
 
-        foreach ($poDetailRows as $index => $row) {
+        $assignTimestampByHeaderId = [];
+
+        foreach ($assignCanvRows as $row) {
             if ($this->isInactiveFlag($row['is_active'] ?? 'Y')) {
                 continue;
             }
 
-            $prsNumber = $this->normalizeLookupToken($row['prsnumber'] ?? null);
+            $headerId = $this->resolveAssignCanvHeaderId($row);
+            if ($headerId === null) {
+                continue;
+            }
+
+            $assignedAt = $this->resolveAssignedCanvasserAt($row);
+
+            if (!isset($assignTimestampByHeaderId[$headerId]) || $this->shouldReplaceAssignment($assignTimestampByHeaderId[$headerId], $assignedAt, null, null)) {
+                $assignTimestampByHeaderId[$headerId] = $assignedAt;
+            }
+        }
+
+        foreach ($assignCanvDtlRows as $row) {
+            if ($this->isInactiveFlag($row['is_active'] ?? 'Y')) {
+                continue;
+            }
+
+            $prsNumber = $this->normalizeLookupToken($row['prsnumber'] ?? ($row['prs_number'] ?? null));
             $productCode = $this->normalizeLookupToken($row['product_code'] ?? ($row['productcode'] ?? null));
 
             if ($prsNumber === null || $productCode === null) {
                 continue;
             }
 
-            $departmentCode = $this->normalizeLookupToken($row['department_code'] ?? null);
+            $departmentCode = $this->normalizeLookupToken($row['department_code'] ?? ($row['departmentcode'] ?? null));
             $strictKey = $this->buildPrsItemLookupKey($prsNumber, $productCode, $departmentCode);
             $looseKey = $this->buildPrsItemLookupKey($prsNumber, $productCode, null);
 
-            $candidateId = (int) $index;
+            $legacyCanvasser = $this->normalizeLookupToken(
+                $row['created_by']
+                ?? ($row['canvasser']
+                ?? ($row['canvasser_id']
+                ?? ($row['assigned_to']
+                ?? ($row['assign_to'] ?? null))))
+            );
 
-            $lookup['strict'][$strictKey][] = $candidateId;
-            $lookup['loose'][$looseKey][] = $candidateId;
-            $lookup['values'][$candidateId] = $this->normalizeLookupToken($row['created_by'] ?? null);
-            $lookup['used'][$candidateId] = false;
+            $headerRefId = $this->resolveAssignCanvHeaderRefId($row);
+            $assignedAt = $headerRefId !== null ? ($assignTimestampByHeaderId[$headerRefId] ?? null) : null;
+
+            if ($assignedAt === null) {
+                $assignedAt = $this->resolveAssignedCanvasserAt($row);
+            }
+
+            $this->upsertBestAssignment($lookup['strict'], $strictKey, $legacyCanvasser, $assignedAt);
+            $this->upsertBestAssignment($lookup['loose'], $looseKey, $legacyCanvasser, $assignedAt);
         }
 
         return $lookup;
     }
 
     /**
-     * @param  array{strict: array<string, array<int, int>>, loose: array<string, array<int, int>>, values: array<int, string|null>, used: array<int, bool>}  $lookup
+     * @param  array{strict: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>, loose: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>}  $lookup
      */
-    protected function consumePoDetailCanvasser(array &$lookup, string $prsNumber, string $productCode, ?string $departmentCode): ?string
+    protected function resolveAssignCanvForPrsItem(array $lookup, string $prsNumber, string $productCode, ?string $departmentCode): ?array
     {
         $prsNumberKey = $this->normalizeLookupToken($prsNumber);
         $productCodeKey = $this->normalizeLookupToken($productCode);
@@ -262,40 +305,91 @@ class PrsItemSeeder extends Seeder
         $strictKey = $this->buildPrsItemLookupKey($prsNumberKey, $productCodeKey, $departmentCode);
         $looseKey = $this->buildPrsItemLookupKey($prsNumberKey, $productCodeKey, null);
 
-        $strictCandidate = $this->consumeLookupCandidate($lookup, 'strict', $strictKey);
-        if ($strictCandidate !== null) {
-            return $strictCandidate;
+        if (isset($lookup['strict'][$strictKey])) {
+            return $lookup['strict'][$strictKey];
         }
 
-        return $this->consumeLookupCandidate($lookup, 'loose', $looseKey);
+        return $lookup['loose'][$looseKey] ?? null;
     }
 
     /**
-     * @param  array{strict: array<string, array<int, int>>, loose: array<string, array<int, int>>, values: array<int, string|null>, used: array<int, bool>}  $lookup
+     * @param  array<string, array{canvasser: string|null, assigned_at: Carbon|null}>  $bucket
      */
-    protected function consumeLookupCandidate(array &$lookup, string $bucket, string $key): ?string
+    protected function upsertBestAssignment(array &$bucket, string $key, ?string $legacyCanvasser, ?Carbon $assignedAt): void
     {
-        if (! isset($lookup[$bucket][$key])) {
-            return null;
+        if (!isset($bucket[$key])) {
+            $bucket[$key] = [
+                'canvasser' => $legacyCanvasser,
+                'assigned_at' => $assignedAt,
+            ];
+            return;
         }
 
-        while (! empty($lookup[$bucket][$key])) {
-            $candidateId = array_shift($lookup[$bucket][$key]);
+        $current = $bucket[$key];
 
-            if ($candidateId === null) {
-                continue;
-            }
+        if ($this->shouldReplaceAssignment($current['assigned_at'] ?? null, $assignedAt, $current['canvasser'] ?? null, $legacyCanvasser)) {
+            $bucket[$key] = [
+                'canvasser' => $legacyCanvasser,
+                'assigned_at' => $assignedAt,
+            ];
+        }
+    }
 
-            if (($lookup['used'][$candidateId] ?? true) === true) {
-                continue;
-            }
-
-            $lookup['used'][$candidateId] = true;
-
-            return $lookup['values'][$candidateId] ?? null;
+    protected function shouldReplaceAssignment(?Carbon $currentAssignedAt, ?Carbon $candidateAssignedAt, ?string $currentCanvasser, ?string $candidateCanvasser): bool
+    {
+        if ($currentAssignedAt === null && $candidateAssignedAt !== null) {
+            return true;
         }
 
-        return null;
+        if ($currentAssignedAt !== null && $candidateAssignedAt !== null) {
+            return $candidateAssignedAt->greaterThanOrEqualTo($currentAssignedAt);
+        }
+
+        if ($currentAssignedAt === null && $candidateAssignedAt === null) {
+            return $currentCanvasser === null && $candidateCanvasser !== null;
+        }
+
+        return false;
+    }
+
+    protected function resolveAssignCanvHeaderId(array $row): ?string
+    {
+        return $this->normalizeLookupToken(
+            $row['id']
+            ?? ($row['assign_canv_id']
+            ?? ($row['assign_id'] ?? null))
+        );
+    }
+
+    protected function resolveAssignCanvHeaderRefId(array $row): ?string
+    {
+        return $this->normalizeLookupToken(
+            $row['assign_canv_id']
+            ?? ($row['assigncanv_id']
+            ?? ($row['assign_id']
+            ?? ($row['header_id'] ?? null)))
+        );
+    }
+
+    protected function resolveAssignedCanvasserAt(array $row): ?Carbon
+    {
+        return $this->parseDate(
+            $row['created_date']
+            ?? ($row['assign_date']
+            ?? ($row['assigned_date']
+            ?? ($row['updated_date'] ?? null)))
+        );
+    }
+
+    protected function isInactiveFlag(mixed $value): bool
+    {
+        if ($value === null) {
+            return false;
+        }
+
+        $normalized = strtoupper(trim((string) $value));
+
+        return in_array($normalized, ['N', '0', 'FALSE', 'F', 'NO'], true);
     }
 
     protected function buildPrsItemLookupKey(string $prsNumber, string $productCode, ?string $departmentCode): string
@@ -319,14 +413,4 @@ class PrsItemSeeder extends Seeder
         return strtolower(trim(preg_replace('/\s+/', ' ', $normalized) ?? $normalized));
     }
 
-    protected function isInactiveFlag(mixed $value): bool
-    {
-        if ($value === null) {
-            return false;
-        }
-
-        $normalized = strtoupper(trim((string) $value));
-
-        return in_array($normalized, ['N', '0', 'FALSE', 'F', 'NO'], true);
-    }
 }
