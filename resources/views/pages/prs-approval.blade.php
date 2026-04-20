@@ -3,87 +3,135 @@
 
 @section('content')
 <div id="prs-approval-page-container">
-<div class="page-heading">
-    <div class="page-title">
-        <div class="row mb-4">
-            <div class="col-12 col-md-6 order-md-1">
-                <h3>Canvasser Assignment</h3>
-            </div>
-        </div>
-    </div>
-    <section class="section">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <table class="table table-striped text-center text-nowrap" id="table1">
-                    <thead>
-                        <tr>
-                            <th class="text-center">PRS Number</th>
-                            <th class="text-center">Charged to Department</th>
-                            <th class="text-center">PRS Date</th>
-                            <th class="text-center">Remarks</th>
-                            <th class="text-center">Details</th>
-                            <th class="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($items as $item)
-                            <tr>
-                                <td>
-                                    <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $item->prs_number }}')">
-                                        <i class="fa-solid fa-regular fa-clipboard"></i>
-                                        {{ $item->prs_number }}
-                                    </button>
-                                </td>
-                                <td>{{ $item->department->name }}</td>
-                                <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
-                                <td>{{ Str::limit($item->remarks, 20, '...') ?? '-' }}</td>
-                                <td>
-                                    <button type="button" class="btn btn-sm icon icon-left" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}">
-                                        <i class="fa-light fa-eye text-primary"></i>
-                                        View Details
-                                    </button>
-                                </td>
-                                <td>
-                                    @if ($item->status === 'SUBMITTED' || $item->status === 'RESUBMITTED')
-                                        <div class="btn-group btn-group-sm">
-
-                                            <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process" @disabled($item->status === 'DRAFT')>
-                                                <i class="fa-duotone fa-solid fa-circle-check text-success"></i>
-                                            </button>
-                                            <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#hold-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Hold" @disabled($item->status === 'DRAFT' || $item->status === 'APPROVED')>
-                                                <i class="fa-duotone fa-solid fa-circle-pause text-warning"></i>
-                                            </button>
-
-                                            {{-- <button type="button" class="btn icon icon-left btn-outline-success" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process" @disabled($item->status === 'DRAFT')>
-                                                <i class="fa-duotone fa-solid fa-circle-check"></i>
-                                                Process
-                                            </button>
-                                            <button type="button" class="btn icon icon-left btn-outline-warning" data-bs-toggle="modal" data-bs-target="#hold-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Hold" @disabled($item->status === 'DRAFT' || $item->status === 'APPROVED')>
-                                                <i class="fa-duotone fa-solid fa-circle-pause"></i>
-                                                Hold
-                                            </button> --}}
-                                        </div>
-                                    @else
-                                        <span class="badge {{ status_badge_color($item->status) }}">
-                                            <i class="{{ status_badge_icon($item->status) }}"></i>
-                                            {{ $item->status }}
-                                        </span>
-                                    @endif
-                                </td>
-                            </tr>
-
-                        @endforeach
-                    </tbody>
-                </table>
-
-                <div class="mt-3 d-flex justify-content-end">
-                    {{ $items->onEachSide(1)->links('pagination::bootstrap-5') }}
+<div class="page-heading po-page">
+    <div class="page-title mb-4">
+        <div class="row g-3 align-items-center">
+            <div class="col-12 col-lg-7">
+                <div class="po-hero">
+                    <h3 class="mb-1">Canvasser Assignment</h3>
+                    <p class="text-muted mb-0">Assign canvassers faster with instant search, status filters, and dynamic pagination.</p>
                 </div>
             </div>
         </div>
+    </div>
 
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end po-filter-grid" id="prs-approval-filter-form">
+                <div class="col-12 col-md-6 col-xl-5">
+                    <label for="filter-prs-approval-keyword" class="form-label mb-1">Search PRS</label>
+                    <input type="text" id="filter-prs-approval-keyword" class="form-control" placeholder="PRS number / department / requester / remarks" value="{{ $filters['keyword'] ?? '' }}">
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label for="filter-prs-approval-status" class="form-label mb-1">Status</label>
+                    <select id="filter-prs-approval-status" class="form-select">
+                        <option value="">All Status</option>
+                        @foreach ($statusOptions as $statusValue => $statusLabel)
+                            <option value="{{ $statusValue }}" @selected(($filters['status'] ?? '') === $statusValue)>{{ $statusLabel }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label for="filter-prs-approval-date-start" class="form-label mb-1">PRS Date (from)</label>
+                    <input type="date" id="filter-prs-approval-date-start" class="form-control" value="{{ $filters['date_from'] ?? '' }}">
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label for="filter-prs-approval-date-end" class="form-label mb-1">PRS Date (to)</label>
+                    <input type="date" id="filter-prs-approval-date-end" class="form-control" value="{{ $filters['date_to'] ?? '' }}">
+                </div>
+                <div class="col-6 col-md-3 col-xl-1">
+                    <button type="button" id="reset-prs-approval-filter" class="btn btn-light-secondary w-100">
+                        <i class="fa-regular fa-rotate-left me-1"></i>
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="prs-approval-page-results">
+    <section class="section">
+        <div class="card shadow-sm border-0">
+            <div class="card-body position-relative">
+                <div id="prs-approval-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                        <div class="mt-2 text-muted">Loading data...</div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h5 class="card-title mb-0">Canvasser Assignment Data</h5>
+                    <span class="badge bg-light-primary" id="prs-approval-filter-result">{{ number_format($items->total()) }} records</span>
+                </div>
+
+                @if ($items->isEmpty())
+                    <div class="po-empty-state text-center text-muted py-5">
+                        <i class="fa-duotone fa-solid fa-file-circle-question po-empty-icon"></i>
+                        <p class="mb-0 mt-2 fw-semibold">No PRS found.</p>
+                        <small>Try changing your keyword, status, or date filters to see more results.</small>
+                    </div>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-striped text-center text-nowrap" id="prs-approval-table">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">PRS Number</th>
+                                    <th class="text-center">Charged to Department</th>
+                                    <th class="text-center">PRS Date</th>
+                                    <th class="text-center">Remarks</th>
+                                    <th class="text-center">Details</th>
+                                    <th class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($items as $item)
+                                    <tr>
+                                        <td>
+                                            <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $item->prs_number }}')">
+                                                <i class="fa-solid fa-regular fa-clipboard"></i>
+                                                {{ $item->prs_number }}
+                                            </button>
+                                        </td>
+                                        <td>{{ $item->department->name }}</td>
+                                        <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
+                                        <td>{{ Str::limit($item->remarks, 20, '...') ?? '-' }}</td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm icon icon-left" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}">
+                                                <i class="fa-light fa-eye text-primary"></i>
+                                                View Details
+                                            </button>
+                                        </td>
+                                        <td>
+                                            @if ($item->status === 'SUBMITTED' || $item->status === 'RESUBMITTED')
+                                                <div class="btn-group btn-group-sm">
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process" @disabled($item->status === 'DRAFT')>
+                                                        <i class="fa-duotone fa-solid fa-circle-check text-success"></i>
+                                                    </button>
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#hold-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Hold" @disabled($item->status === 'DRAFT' || $item->status === 'APPROVED')>
+                                                        <i class="fa-duotone fa-solid fa-circle-pause text-warning"></i>
+                                                    </button>
+                                                </div>
+                                            @else
+                                                <span class="badge {{ status_badge_color($item->status) }}">
+                                                    <i class="{{ status_badge_icon($item->status) }}"></i>
+                                                    {{ $item->status }}
+                                                </span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-3 d-flex justify-content-end">
+                        {{ $items->onEachSide(1)->links('pagination::bootstrap-5') }}
+                    </div>
+                @endif
+            </div>
+        </div>
     </section>
-</div>
 
 @foreach ($items as $item)
     <div class="modal fade text-left modal-borderless" id="approve-modal-{{ $item->id }}" tabindex="-1"
@@ -363,10 +411,16 @@
     </div>
 @endforeach
 </div>
+</div>
+</div>
 @endsection
 
 @push('prepend-style')
     <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
+@endpush
+@push('addon-style')
+    <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
 @endpush
 @push('addon-script')
     <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>

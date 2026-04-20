@@ -14,13 +14,34 @@ class PrsApprovalController extends Controller
     /**
      * Display list of PRS pending approval
      */
-    public function index()
+    public function index(Request $request)
     {
-        $items = $this->paginatePrsForSqlServer(perPage: 20);
+        $filters = [
+            'keyword' => trim((string) $request->query('keyword', '')),
+            'status' => trim((string) $request->query('status', '')),
+            'date_from' => trim((string) $request->query('date_from', '')),
+            'date_to' => trim((string) $request->query('date_to', '')),
+        ];
+
+        $items = $this->paginatePrsForApproval($filters, perPage: 20);
         $canvassers = User::role('purchasing-staff')->orderBy('name')->get();
+
+        $statusOptions = [
+            'SUBMITTED' => 'SUBMITTED',
+            'RESUBMITTED' => 'RESUBMITTED',
+            'ON_HOLD' => 'ON_HOLD',
+            'CANVASSING' => 'CANVASSING',
+            'APPROVED' => 'APPROVED',
+            'DELIVERY_COMPLETE' => 'DELIVERY_COMPLETE',
+            'REJECTED' => 'REJECTED',
+            'DRAFT' => 'DRAFT',
+        ];
+
         return view('pages.prs-approval', [
             'items' => $items,
             'canvassers' => $canvassers,
+            'filters' => $filters,
+            'statusOptions' => $statusOptions,
         ]);
     }
 
@@ -145,28 +166,68 @@ class PrsApprovalController extends Controller
     }
 
     /**
-     * SQL Server-compatible pagination without OFFSET/FETCH.
+     * SQL Server-safe pagination with filters for canvasser assignment.
      */
-    private function paginatePrsForSqlServer(int $perPage = 20): LengthAwarePaginator
+    private function paginatePrsForApproval(array $filters = [], int $perPage = 20): LengthAwarePaginator
     {
-        $currentPage = LengthAwarePaginator::resolveCurrentPage();
-        $currentPage = max(1, (int) $currentPage);
+        $currentPage = max(1, (int) LengthAwarePaginator::resolveCurrentPage());
 
-        $baseQuery = Prs::query();
-        $total = (clone $baseQuery)->count();
+        $keyword = mb_strtolower(trim((string) ($filters['keyword'] ?? '')));
+        $status = trim((string) ($filters['status'] ?? ''));
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        $keywordLike = "%{$keyword}%";
 
-        $startRow = (($currentPage - 1) * $perPage) + 1;
-        $endRow = $currentPage * $perPage;
+        $query = Prs::query()
+            ->when($keyword !== '', function ($subQuery) use ($keywordLike) {
+                $subQuery->where(function ($whereQuery) use ($keywordLike) {
+                    $whereQuery->whereRaw("LOWER(COALESCE(prs_number, '')) LIKE ?", [$keywordLike])
+                        ->orWhereRaw("LOWER(COALESCE(remarks, '')) LIKE ?", [$keywordLike])
+                        ->orWhereHas('department', function ($departmentQuery) use ($keywordLike) {
+                            $departmentQuery->whereRaw("LOWER(COALESCE(name, '')) LIKE ?", [$keywordLike]);
+                        })
+                        ->orWhereHas('user', function ($userQuery) use ($keywordLike) {
+                            $userQuery->whereRaw("LOWER(COALESCE(name, '')) LIKE ?", [$keywordLike]);
+                        });
+                });
+            })
+            ->when($status !== '', function ($subQuery) use ($status) {
+                $subQuery->where('status', $status);
+            })
+            ->when($dateFrom !== '', function ($subQuery) use ($dateFrom) {
+                $subQuery->whereDate('prs_date', '>=', $dateFrom);
+            })
+            ->when($dateTo !== '', function ($subQuery) use ($dateTo) {
+                $subQuery->whereDate('prs_date', '<=', $dateTo);
+            })
+            ->orderByDesc('prs_date')
+            ->orderByDesc('id');
 
-        $rankedIdsQuery = (clone $baseQuery)
-            ->selectRaw('id, ROW_NUMBER() OVER (ORDER BY id DESC) as row_num');
+        $total = (clone $query)->reorder()->count();
+        $ids = [];
 
-        $ids = DB::query()
-            ->fromSub($rankedIdsQuery, 'ranked_prs')
-            ->whereBetween('row_num', [$startRow, $endRow])
-            ->orderBy('row_num')
-            ->pluck('id')
-            ->all();
+        if ($this->isSqlServer()) {
+            $startRow = (($currentPage - 1) * $perPage) + 1;
+            $endRow = $currentPage * $perPage;
+
+            $rankedIdsQuery = (clone $query)
+                ->reorder()
+                ->selectRaw('id, ROW_NUMBER() OVER (ORDER BY prs_date DESC, id DESC) as row_num');
+
+            $ids = DB::query()
+                ->fromSub($rankedIdsQuery, 'ranked_prs')
+                ->whereBetween('row_num', [$startRow, $endRow])
+                ->orderBy('row_num')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        } else {
+            $ids = (clone $query)
+                ->forPage($currentPage, $perPage)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
 
         $collection = collect();
 
@@ -200,5 +261,10 @@ class PrsApprovalController extends Controller
                 'query' => request()->query(),
             ],
         );
+    }
+
+    private function isSqlServer(): bool
+    {
+        return DB::connection()->getDriverName() === 'sqlsrv';
     }
 }

@@ -60,34 +60,35 @@
         </div>
     </div>
 
-    <section class="section">
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-body">
-                <div class="row g-3 align-items-end po-filter-grid" id="rr-filter-form">
-                    <div class="col-12 col-md-6 col-xl-7">
-                        <label for="filter-rr-keyword" class="form-label mb-1">Search RR</label>
-                        <input type="text" id="filter-rr-keyword" class="form-control" placeholder="RR number / PO number / supplier / creator" value="{{ $filters['keyword'] ?? '' }}">
-                    </div>
-                    <div class="col-6 col-md-3 col-xl-2">
-                        <label for="filter-rr-date-start" class="form-label mb-1">Received (from)</label>
-                        <input type="date" id="filter-rr-date-start" class="form-control" value="{{ $filters['date_from'] ?? '' }}">
-                    </div>
-                    <div class="col-6 col-md-3 col-xl-2">
-                        <label for="filter-rr-date-end" class="form-label mb-1">Received (to)</label>
-                        <input type="date" id="filter-rr-date-end" class="form-control" value="{{ $filters['date_to'] ?? '' }}">
-                    </div>
-                    <div class="col-6 col-md-3 col-xl-1">
-                        <button type="button" id="reset-rr-filter" class="btn btn-light-secondary w-100">
-                            <i class="fa-regular fa-rotate-left me-1"></i>
-                            Reset
-                        </button>
-                    </div>
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end po-filter-grid" id="rr-filter-form">
+                <div class="col-12 col-md-6 col-xl-7">
+                    <label for="filter-rr-keyword" class="form-label mb-1">Search RR</label>
+                    <input type="text" id="filter-rr-keyword" class="form-control" placeholder="RR number / PO number / supplier / creator" value="{{ $filters['keyword'] ?? '' }}">
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label for="filter-rr-date-start" class="form-label mb-1">Received (from)</label>
+                    <input type="date" id="filter-rr-date-start" class="form-control" value="{{ $filters['date_from'] ?? '' }}">
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label for="filter-rr-date-end" class="form-label mb-1">Received (to)</label>
+                    <input type="date" id="filter-rr-date-end" class="form-control" value="{{ $filters['date_to'] ?? '' }}">
+                </div>
+                <div class="col-6 col-md-3 col-xl-1">
+                    <button type="button" id="reset-rr-filter" class="btn btn-light-secondary w-100">
+                        <i class="fa-regular fa-rotate-left me-1"></i>
+                        Reset
+                    </button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="card shadow-sm border-0">
-            <div class="card-body position-relative">
+    <section class="section">
+        <div id="rr-page-results">
+            <div class="card shadow-sm border-0">
+                <div class="card-body position-relative">
                 <div id="rr-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
                     <div class="text-center">
                         <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
@@ -198,6 +199,7 @@
                         {{ $receivingReports->onEachSide(1)->links('pagination::bootstrap-5') }}
                     </div>
                 @endif
+                </div>
             </div>
         </div>
     </section>
