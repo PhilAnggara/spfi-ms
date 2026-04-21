@@ -123,12 +123,13 @@ if (! function_exists('status_badge_color')) {
     {
         return match ($status) {
             'DRAFT' => 'bg-light-secondary',
-            'SUBMITTED' => 'bg-light-info',
-            'RESUBMITTED' => 'bg-light-info',
+            'REQUESTED', 'SUBMITTED' => 'bg-light-secondary text-secondary',
+            'REVISED', 'RESUBMITTED' => 'bg-light-secondary text-secondary',
             'ON_HOLD' => 'bg-light-warning',
-            'CANVASSING' => 'bg-light-primary',
-            'APPROVED' => 'bg-light-success',
-            'DELIVERY_COMPLETE' => 'bg-light-success',
+            'CANVASSING' => 'bg-light-info text-primary',
+            'PO_CREATED', 'APPROVED' => 'bg-light-primary text-primary',
+            'RECEIVED', 'DELIVERY_COMPLETE' => 'bg-light-success text-success',
+            'PARTIALLY_RECEIVED' => 'bg-light-success text-success',
             'REJECTED' => 'bg-light-danger',
             default => 'bg-light-secondary',
         };
@@ -139,12 +140,13 @@ if (! function_exists('status_badge_icon')) {
     {
         return match ($status) {
             'DRAFT' => 'fa-duotone fa-solid fa-circle-dot text-secondary',
-            'SUBMITTED' => 'fa-duotone fa-solid fa-circle-up text-info',
-            'RESUBMITTED' => 'fa-duotone fa-solid fa-circle-up text-info',
+            'REQUESTED', 'SUBMITTED' => 'fa-duotone fa-solid fa-circle-up',
+            'REVISED', 'RESUBMITTED' => 'fa-duotone fa-solid fa-circle-up text-info',
             'ON_HOLD' => 'fa-duotone fa-solid fa-circle-pause text-warning',
-            'CANVASSING' => 'fa-duotone fa-solid fa-circle-check text-primary',
-            'APPROVED' => 'fa-duotone fa-solid fa-circle-check text-success',
-            'DELIVERY_COMPLETE' => 'fa-duotone fa-solid fa-boxes-packing text-success',
+            'CANVASSING' => 'fa-duotone fa-solid fa-circle-check text-info',
+            'PO_CREATED', 'APPROVED' => 'fa-duotone fa-solid fa-file-circle-plus text-primary',
+            'RECEIVED', 'DELIVERY_COMPLETE' => 'fa-duotone fa-solid fa-boxes-packing text-success',
+            'PARTIALLY_RECEIVED' => 'fa-duotone fa-solid fa-truck-ramp-box text-warning',
             'REJECTED' => 'fa-duotone fa-solid fa-circle-xmark text-danger',
             default => 'fa-duotone fa-solid fa-circle-dot text-secondary',
         };

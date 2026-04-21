@@ -19,7 +19,7 @@ return new class extends Migration
             $table->date('prs_date');
             $table->date('date_needed');
             $table->text('remarks')->nullable();
-            $table->string('status')->default('DRAFT'); // DRAFT, SUBMITTED, RESUBMITTED, CANVASSING, ON_HOLD, APPROVED
+            $table->string('status')->default('REQUESTED'); // REQUESTED, CANVASSING, ON_HOLD, REVISED, PO_CREATED
             $table->timestamps();
             $table->softDeletes();
         });

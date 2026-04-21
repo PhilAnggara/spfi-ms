@@ -414,6 +414,22 @@ class PurchaseOrderController extends Controller
             PrsItem::whereIn('id', $itemsById->keys()->all())
                 ->update(['purchase_order_id' => $purchaseOrder->id]);
 
+            $affectedPrsIds = $itemsById
+                ->pluck('prs_id')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            if (! empty($affectedPrsIds)) {
+                DB::table('prs')
+                    ->whereIn('id', $affectedPrsIds)
+                    ->update([
+                        'status' => 'PO_CREATED',
+                        'updated_at' => now(),
+                    ]);
+            }
+
             return $purchaseOrder;
         });
 

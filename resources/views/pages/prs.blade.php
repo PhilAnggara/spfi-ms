@@ -39,14 +39,11 @@
                         <label for="filter-status" class="form-label mb-1">Status</label>
                         <select id="filter-status" class="form-select">
                             <option value="" @selected(request('status') === null || request('status') === '')>All</option>
-                            <option value="DRAFT" @selected(request('status') === 'DRAFT')>DRAFT</option>
-                            <option value="SUBMITTED" @selected(request('status') === 'SUBMITTED')>SUBMITTED</option>
+                            <option value="REQUESTED" @selected(request('status') === 'REQUESTED')>REQUESTED</option>
                             <option value="ON_HOLD" @selected(request('status') === 'ON_HOLD')>ON_HOLD</option>
-                            <option value="RESUBMITTED" @selected(request('status') === 'RESUBMITTED')>RESUBMITTED</option>
+                            <option value="REVISED" @selected(request('status') === 'REVISED')>REVISED</option>
                             <option value="CANVASSING" @selected(request('status') === 'CANVASSING')>CANVASSING</option>
-                            <option value="DELIVERY_PENDING" @selected(request('status') === 'DELIVERY_PENDING')>DELIVERY_PENDING</option>
-                            <option value="PARTIAL_DELIVERY" @selected(request('status') === 'PARTIAL_DELIVERY')>PARTIAL_DELIVERY</option>
-                            <option value="DELIVERY_COMPLETE" @selected(request('status') === 'DELIVERY_COMPLETE')>DELIVERY_COMPLETE</option>
+                            <option value="PO_CREATED" @selected(request('status') === 'PO_CREATED')>PO_CREATED</option>
                             <option value="REJECTED" @selected(request('status') === 'REJECTED')>REJECTED</option>
                         </select>
                     </div>
@@ -119,23 +116,23 @@
                                     $departmentName = $item->department?->name ?? '-';
                                 @endphp
                                 @php
-                                    $isDeliveryPhase = in_array($item->status, ['APPROVED', 'DELIVERY_COMPLETE'], true);
+                                    $isDeliveryPhase = in_array($item->status, ['PO_CREATED', 'APPROVED', 'DELIVERY_COMPLETE'], true);
                                     if ($isDeliveryPhase) {
                                         $deliveryStatus = $item->overall_delivery_status;
                                         $primaryStatusText = match($deliveryStatus) {
-                                            'RECEIVED' => 'DELIVERY_COMPLETE',
-                                            'PARTIAL' => 'PARTIAL_DELIVERY',
-                                            default => 'DELIVERY_PENDING',
+                                            'RECEIVED' => 'RECEIVED',
+                                            'PARTIAL' => 'PARTIALLY_RECEIVED',
+                                            default => 'PO_CREATED',
                                         };
                                         $primaryStatusColor = match($deliveryStatus) {
                                             'RECEIVED' => 'bg-light-success text-success',
-                                            'PARTIAL' => 'bg-light-warning text-warning',
-                                            default => 'bg-light-danger text-danger',
+                                            'PARTIAL' => 'bg-light-success text-success',
+                                            default => 'bg-light-primary text-primary',
                                         };
                                         $primaryStatusIcon = match($deliveryStatus) {
-                                            'RECEIVED' => 'fa-solid fa-boxes-packing',
-                                            'PARTIAL' => 'fa-solid fa-truck-ramp-box',
-                                            default => 'fa-solid fa-inbox',
+                                            'RECEIVED' => 'fa-solid fa-boxes-packing text-success',
+                                            'PARTIAL' => 'fa-solid fa-truck-ramp-box text-warning',
+                                            default => 'fa-solid fa-inbox text-primary',
                                         };
                                     } else {
                                         $primaryStatusText = $item->status;
@@ -170,7 +167,7 @@
                                             <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
                                                 <i class="fa-light fa-eye text-primary"></i>
                                             </button>
-                                            @if ($item->status === 'DRAFT' || $item->status === 'ON_HOLD' || $item->status === 'SUBMITTED' || $item->status === 'RESUBMITTED')
+                                            @if ($item->status === 'REQUESTED' || $item->status === 'ON_HOLD' || $item->status === 'REVISED' || $item->status === 'DRAFT')
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                     <i class="fa-light fa-edit text-primary"></i>
                                                 </button>

@@ -103,12 +103,12 @@
                                             </button>
                                         </td>
                                         <td>
-                                            @if ($item->status === 'SUBMITTED' || $item->status === 'RESUBMITTED')
+                                            @if ($item->status === 'REQUESTED' || $item->status === 'REVISED')
                                                 <div class="btn-group btn-group-sm">
-                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process" @disabled($item->status === 'DRAFT')>
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#approve-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Process">
                                                         <i class="fa-duotone fa-solid fa-circle-check text-success"></i>
                                                     </button>
-                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#hold-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Hold" @disabled($item->status === 'DRAFT' || $item->status === 'APPROVED')>
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#hold-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Hold" @disabled($item->status === 'PO_CREATED')>
                                                         <i class="fa-duotone fa-solid fa-circle-pause text-warning"></i>
                                                     </button>
                                                 </div>
@@ -239,46 +239,58 @@
 
                     @php
                         $holdLog = $item->logs?->firstWhere('action', 'HOLD');
-                        $isDeliveryPhase = in_array($item->status, ['APPROVED', 'DELIVERY_COMPLETE'], true);
-                        $headerProgress = $isDeliveryPhase
-                            ? (int) $item->overall_delivery_progress
-                            : match ($item->status) {
-                                'DRAFT' => 0,
-                                'SUBMITTED' => 35,
-                                'ON_HOLD' => 35,
-                                'RESUBMITTED' => 50,
-                                'CANVASSING' => 65,
-                                'APPROVED' => 80,
-                                'DELIVERY_COMPLETE' => 100,
-                                'REJECTED' => 100,
-                                default => 0,
-                            };
+                        $isDeliveryPhase = in_array($item->status, ['PO_CREATED', 'APPROVED', 'DELIVERY_COMPLETE'], true);
+                        $deliveryProgressRaw = max(0, min(100, (int) $item->overall_delivery_progress));
 
                         if ($isDeliveryPhase) {
                             $headerStatusText = match ($item->overall_delivery_status) {
-                                'RECEIVED' => 'DELIVERY_COMPLETE',
-                                'PARTIAL' => 'PARTIAL_DELIVERY',
-                                default => 'DELIVERY_PENDING',
+                                'RECEIVED' => 'RECEIVED',
+                                'PARTIAL' => 'PARTIALLY_RECEIVED',
+                                default => 'PO_CREATED',
                             };
                             $headerStatusClass = match ($item->overall_delivery_status) {
                                 'RECEIVED' => 'bg-light-success text-success',
-                                'PARTIAL' => 'bg-light-warning text-warning',
-                                default => 'bg-light-danger text-danger',
+                                'PARTIAL' => 'bg-light-success text-success',
+                                default => 'bg-light-primary text-primary',
                             };
                             $headerStatusIcon = match ($item->overall_delivery_status) {
-                                'RECEIVED' => 'fa-solid fa-boxes-packing',
-                                'PARTIAL' => 'fa-solid fa-truck-ramp-box',
-                                default => 'fa-solid fa-inbox',
+                                'RECEIVED' => 'fa-solid fa-boxes-packing text-success',
+                                'PARTIAL' => 'fa-solid fa-truck-ramp-box text-warning',
+                                default => 'fa-solid fa-inbox text-primary',
+                            };
+
+                            $headerProgress = match ($item->overall_delivery_status) {
+                                'RECEIVED' => 100,
+                                'PARTIAL' => min(99, 70 + (int) round(($deliveryProgressRaw / 100) * 29)),
+                                default => 70,
                             };
                         } else {
                             $headerStatusText = $item->status;
                             $headerStatusClass = status_badge_color($item->status);
                             $headerStatusIcon = status_badge_icon($item->status);
+
+                            $headerProgress = match ($item->status) {
+                                'DRAFT' => 0,
+                                'REQUESTED' => 15,
+                                'ON_HOLD' => 15,
+                                'REVISED' => 30,
+                                'CANVASSING' => 50,
+                                'PO_CREATED' => 70,
+                                'DELIVERY_COMPLETE' => 100,
+                                'REJECTED' => 100,
+                                default => 0,
+                            };
                         }
 
-                        $headerProgressClass = $headerProgress >= 100
-                            ? 'bg-success'
-                            : ($headerProgress > 0 ? 'bg-warning' : 'bg-secondary');
+                        $headerProgressClass = match (true) {
+                            $headerStatusText === 'REQUESTED',
+                            $headerStatusText === 'REVISED' => 'bg-secondary',
+                            $headerStatusText === 'CANVASSING' => 'bg-info',
+                            $headerStatusText === 'PO_CREATED' => 'bg-primary',
+                            $headerStatusText === 'RECEIVED',
+                            $headerStatusText === 'PARTIALLY_RECEIVED' => 'bg-success',
+                            default => 'bg-secondary',
+                        };
                     @endphp
 
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -296,7 +308,7 @@
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-6 col-lg-4">
                             <div class="border rounded-3 p-3 h-100 bg-light-subtle">
-                                <small class="text-muted d-block mb-1">Submitted by</small>
+                                <small class="text-muted d-block mb-1">Requested by</small>
                                 <div class="fw-semibold"><i class="fa-duotone fa-solid fa-circle-user text-secondary"></i> {{ $item->user->name }}</div>
                             </div>
                         </div>

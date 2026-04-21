@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use Carbon\Carbon;
 use Database\Seeders\Concerns\ResolvesLegacyImport;
-use Database\Seeders\Concerns\ResolvesLegacyUserLookup;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +11,6 @@ use Illuminate\Support\Facades\Log;
 class PrsItemSeeder extends Seeder
 {
     use ResolvesLegacyImport;
-    use ResolvesLegacyUserLookup;
 
     /**
      * Run the database seeds.
@@ -39,8 +37,8 @@ class PrsItemSeeder extends Seeder
         $prsIdByNumber = DB::table('prs')->pluck('id', 'prs_number')->all();
         $itemIdByCode = DB::table('items')->pluck('id', 'code')->all();
 
-        $this->prepareLegacyUserLookup();
-        $defaultCanvasserId = $this->resolveLegacyFallbackUserId(2);
+        $legacyCanvasserMap = $this->getLegacyCanvasserCodeToUsernameMap();
+        $mappedCanvasserIdByLegacyCode = $this->resolveMappedCanvasserIds($legacyCanvasserMap);
 
         if (empty($prsIdByNumber)) {
             $this->warn("No PRS records found in new DB. Make sure PrsSeeder ran first.");
@@ -69,7 +67,10 @@ class PrsItemSeeder extends Seeder
         $skipped = 0;
         $assignmentMatched = 0;
         $assignmentMissingTimestamp = 0;
-        $canvasserFallback = 0;
+        $assignmentMappedCanvasser = 0;
+        $assignmentUnmappedCanvasser = 0;
+        $assignmentMissingCanvasserCode = 0;
+        $unmappedLegacyCanvasserCodes = [];
 
         foreach ($legacyRows as $data) {
             $prsNumber = trim((string) ($data['prsnumber'] ?? ''));
@@ -107,7 +108,7 @@ class PrsItemSeeder extends Seeder
                 $departmentCode
             );
 
-            $legacyCanvasser = $assignment['canvasser'] ?? null;
+            $legacyCanvasserCode = $assignment['canvasser'] ?? null;
             $assignedCanvasserAt = $assignment['assigned_at'] ?? null;
 
             if ($assignment !== null) {
@@ -118,10 +119,20 @@ class PrsItemSeeder extends Seeder
                 }
             }
 
-            $canvasserId = $this->resolveLegacyUserId($legacyCanvasser, $defaultCanvasserId) ?? $defaultCanvasserId;
+            $canvasserId = null;
 
-            if ($legacyCanvasser === null) {
-                $canvasserFallback++;
+            if ($legacyCanvasserCode === null) {
+                $assignmentMissingCanvasserCode++;
+            } else {
+                $canvasserId = $mappedCanvasserIdByLegacyCode[$legacyCanvasserCode] ?? null;
+
+                if ($canvasserId !== null) {
+                    $assignmentMappedCanvasser++;
+                } else {
+                    $assignmentUnmappedCanvasser++;
+                    $unmappedLegacyCanvasserCodes[$legacyCanvasserCode] = true;
+                    $this->warn("Unmapped legacy canvasser code '{$legacyCanvasserCode}' for prsnumber '{$prsNumber}', productcode '{$productCode}', department '{$departmentCode}'");
+                }
             }
 
             // Upsert berdasarkan prs_id + item_id agar idempotent.
@@ -149,8 +160,11 @@ class PrsItemSeeder extends Seeder
             $inserted++;
         }
 
+        $unmappedCodes = implode(', ', array_keys($unmappedLegacyCanvasserCodes));
+        $unmappedCodesText = $unmappedCodes !== '' ? $unmappedCodes : '-';
+
         $this->command?->info(
-            "✓ [prs_detail] Inserted/Updated: {$inserted}, Skipped: {$skipped}, Assignment matched: {$assignmentMatched}, Missing assign timestamp: {$assignmentMissingTimestamp}, Canvasser fallback: {$canvasserFallback} (user_id={$defaultCanvasserId})"
+            "✓ [prs_detail] Inserted/Updated: {$inserted}, Skipped: {$skipped}, Assignment matched: {$assignmentMatched}, Missing assign timestamp: {$assignmentMissingTimestamp}, Canvasser mapped: {$assignmentMappedCanvasser}, Canvasser unmapped: {$assignmentUnmappedCanvasser}, Missing canvasser code: {$assignmentMissingCanvasserCode}, Unmapped legacy codes: {$unmappedCodesText}"
         );
     }
 
@@ -224,7 +238,7 @@ class PrsItemSeeder extends Seeder
     /**
      * @param  array<int, array<string, mixed>>  $assignCanvRows
      * @param  array<int, array<string, mixed>>  $assignCanvDtlRows
-     * @return array{strict: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>, loose: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>}
+    * @return array{strict: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>, loose: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>}
      */
     protected function buildAssignCanvLookup(array $assignCanvRows, array $assignCanvDtlRows): array
     {
@@ -268,12 +282,11 @@ class PrsItemSeeder extends Seeder
             $strictKey = $this->buildPrsItemLookupKey($prsNumber, $productCode, $departmentCode);
             $looseKey = $this->buildPrsItemLookupKey($prsNumber, $productCode, null);
 
-            $legacyCanvasser = $this->normalizeLookupToken(
-                $row['created_by']
-                ?? ($row['canvasser']
-                ?? ($row['canvasser_id']
-                ?? ($row['assigned_to']
-                ?? ($row['assign_to'] ?? null))))
+            // Gunakan hanya kode user assignment dari legacy untuk hindari mismatch karena heuristik nama.
+            $legacyCanvasser = $this->normalizeLegacyCanvasserCode(
+                $row['user_id']
+                ?? ($row['userid']
+                ?? ($row['user_code'] ?? null))
             );
 
             $headerRefId = $this->resolveAssignCanvHeaderRefId($row);
@@ -411,6 +424,70 @@ class PrsItemSeeder extends Seeder
         }
 
         return strtolower(trim(preg_replace('/\s+/', ' ', $normalized) ?? $normalized));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function getLegacyCanvasserCodeToUsernameMap(): array
+    {
+        return [
+            'USER0005' => 'sta.prc',
+            'USER0007' => 'jeffry.lantang',
+            'USER0008' => 'erni.ending',
+            'USER0009' => 'spfi_ua',
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $legacyCanvasserMap
+     * @return array<string, int>
+     */
+    protected function resolveMappedCanvasserIds(array $legacyCanvasserMap): array
+    {
+        $usernameToLegacyCode = [];
+
+        foreach ($legacyCanvasserMap as $legacyCode => $username) {
+            $usernameToLegacyCode[strtolower($username)] = strtoupper($legacyCode);
+        }
+
+        $usersByUsername = DB::table('users')
+            ->whereIn('username', array_values($legacyCanvasserMap))
+            ->pluck('id', 'username')
+            ->all();
+
+        $mapped = [];
+
+        foreach ($usersByUsername as $username => $id) {
+            $legacyCode = $usernameToLegacyCode[strtolower((string) $username)] ?? null;
+            if ($legacyCode === null) {
+                continue;
+            }
+
+            $mapped[$legacyCode] = (int) $id;
+        }
+
+        foreach ($legacyCanvasserMap as $legacyCode => $username) {
+            if (!isset($mapped[strtoupper($legacyCode)])) {
+                $this->warn("Mapped canvasser username '{$username}' for legacy code '{$legacyCode}' not found in users table");
+            }
+        }
+
+        return $mapped;
+    }
+
+    protected function normalizeLegacyCanvasserCode(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = strtoupper(trim((string) $value));
+        if ($normalized === '' || $normalized === 'NULL') {
+            return null;
+        }
+
+        return $normalized;
     }
 
 }

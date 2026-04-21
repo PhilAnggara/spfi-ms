@@ -6,7 +6,6 @@ use App\Models\Prs;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class PrsSubmittedNotification extends Notification implements ShouldQueue
@@ -14,7 +13,7 @@ class PrsSubmittedNotification extends Notification implements ShouldQueue
     use Queueable;
 
     /**
-     * Instance PRS yang baru dibuat
+     * Instance PRS yang baru dibuat/requested.
      */
     public function __construct(public Prs $prs)
     {
@@ -39,9 +38,9 @@ class PrsSubmittedNotification extends Notification implements ShouldQueue
     // public function toMail(object $notifiable): MailMessage
     // {
     //     return (new MailMessage)
-    //         ->subject('New PRS Submitted - ' . $this->prs->prs_number)
+    //         ->subject('New PRS Requested - ' . $this->prs->prs_number)
     //         ->greeting('Hello ' . $notifiable->name)
-    //         ->line('A new Purchase Requisition Slip has been submitted for your review.')
+    //         ->line('A new Purchase Requisition Slip has been requested for your review.')
     //         ->line('PRS Number: ' . $this->prs->prs_number)
     //         ->line('Department: ' . $this->prs->department->name)
     //         ->line('Requested By: ' . $this->prs->user->name)
@@ -62,8 +61,8 @@ class PrsSubmittedNotification extends Notification implements ShouldQueue
             'type' => 'prs_submitted',
             'prs_id' => $this->prs->id,
             'prs_number' => $this->prs->prs_number,
-            'title' => 'New PRS Submitted',
-            'message' => 'PRS #' . $this->prs->prs_number . ' has been submitted by ' . $this->prs->user->name,
+            'title' => 'New PRS Requested',
+            'message' => 'PRS #' . $this->prs->prs_number . ' has been requested by ' . $this->prs->user->name,
             'department' => $this->prs->department->name,
             'requester' => $this->prs->user->name,
             'items_count' => $this->prs->items->count(),

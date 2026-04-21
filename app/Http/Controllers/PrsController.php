@@ -128,6 +128,7 @@ class PrsController extends Controller
         $data['prs_number'] = $this->generatePrsNumber($data['department_id']);
         $data['user_id'] = Auth::id();
         $data['prs_date'] = date('Y-m-d');
+        $data['status'] = 'REQUESTED';
 
         // dd($data);
         $newPrs = Prs::create($data);
@@ -201,7 +202,7 @@ class PrsController extends Controller
 
         $previousStatus = $prs->status;
         if ($prs->status === 'ON_HOLD') {
-            $prs->status = 'RESUBMITTED';
+            $prs->status = 'REVISED';
         }
 
         $prs->save();
@@ -252,17 +253,17 @@ class PrsController extends Controller
         // Ambil data PRS beserta relasi yang diperlukan
         $prs = Prs::with(['user', 'department', 'items.item'])->findOrFail($id);
 
-        // ubah status jadi SUBMITTED
+        // Ubah status kembali ke tahap pengajuan setelah perbaikan dari hold.
         if ($prs->status === 'DRAFT' || $prs->status === 'ON_HOLD') {
             $previousStatus = $prs->status;
-            $prs->status = 'SUBMITTED';
+            $prs->status = 'REQUESTED';
             $prs->save();
 
             // Log perubahan status jika sebelumnya DRAFT atau ON_HOLD
             $prs->logs()->create([
                 'user_id' => Auth::id(),
-                'action' => 'SUBMIT',
-                'message' => 'PRS submitted for GM approval.',
+                'action' => 'REQUEST',
+                'message' => 'PRS requested for purchasing approval.',
                 'meta' => [
                     'previous_status' => $previousStatus,
                 ],
@@ -383,14 +384,12 @@ class PrsController extends Controller
         }
 
         if ($status !== '') {
-            // Untuk status delivery turunan, fallback ke status dasar agar tetap kompatibel query DB.
-            $statusMap = [
-                'DELIVERY_PENDING' => 'APPROVED',
-                'PARTIAL_DELIVERY' => 'APPROVED',
-                'DELIVERY_COMPLETE' => 'DELIVERY_COMPLETE',
-            ];
-            $statusToUse = $statusMap[$status] ?? $status;
-            $baseQuery->where('status', $statusToUse);
+            if ($status === 'PO_CREATED') {
+                // Backward compatible with pre-refactor records.
+                $baseQuery->whereIn('status', ['PO_CREATED', 'APPROVED', 'DELIVERY_COMPLETE']);
+            } else {
+                $baseQuery->where('status', $status);
+            }
         }
 
         if ($department !== '') {

@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             PrsItemSeeder::class,
             CurrencySeeder::class,
             PurchaseOrderSeeder::class,
+            PrsStatusSyncSeeder::class,
             ReceivingReportSeeder::class,
             StockInventorySeeder::class,
             StockBalanceSeeder::class,

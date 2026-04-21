@@ -97,14 +97,11 @@ class Prs extends Model
     }
 
     /**
-     * Auto-update PRS status to DELIVERY_COMPLETE if all items received
+     * Delivery completion checker for UI/derived state.
+     * Main PRS workflow status is managed separately (REQUESTED -> PO_CREATED).
      */
     public function checkAndUpdateDeliveryStatus()
     {
-        if ($this->isDeliveryComplete() && $this->status !== 'DELIVERY_COMPLETE') {
-            $this->update(['status' => 'DELIVERY_COMPLETE']);
-            return true;
-        }
-        return false;
+        return $this->isDeliveryComplete();
     }
 }

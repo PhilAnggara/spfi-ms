@@ -27,12 +27,11 @@ class PrsApprovalController extends Controller
         $canvassers = User::role('purchasing-staff')->orderBy('name')->get();
 
         $statusOptions = [
-            'SUBMITTED' => 'SUBMITTED',
-            'RESUBMITTED' => 'RESUBMITTED',
+            'REQUESTED' => 'REQUESTED',
+            'REVISED' => 'REVISED',
             'ON_HOLD' => 'ON_HOLD',
             'CANVASSING' => 'CANVASSING',
-            'APPROVED' => 'APPROVED',
-            'DELIVERY_COMPLETE' => 'DELIVERY_COMPLETE',
+            'PO_CREATED' => 'PO_CREATED',
             'REJECTED' => 'REJECTED',
             'DRAFT' => 'DRAFT',
         ];
@@ -53,8 +52,8 @@ class PrsApprovalController extends Controller
         if ($prs->status === 'ON_HOLD') {
             return redirect()->back()->withErrors(['message' => 'PRS is already on hold.']);
         }
-        if ($prs->status === 'APPROVED') {
-            return redirect()->back()->withErrors(['message' => 'Approved PRS cannot be held.']);
+        if ($prs->status === 'PO_CREATED') {
+            return redirect()->back()->withErrors(['message' => 'PRS with created PO cannot be held.']);
         }
 
         $data = $request->validate([
@@ -123,10 +122,32 @@ class PrsApprovalController extends Controller
         $previousStatus = $prs->status;
 
         DB::transaction(function () use ($prs, $assignments, $previousStatus, $request) {
+            $existingAssignments = $prs->items()
+                ->whereIn('id', $assignments->keys()->all())
+                ->get(['id', 'canvasser_id'])
+                ->keyBy('id');
+
+            $assignmentChangedCount = 0;
+            $assignmentUnchangedCount = 0;
+
             foreach ($assignments as $prsItemId => $row) {
-                $prs->items()->whereKey($prsItemId)->update([
-                    'canvasser_id' => $row['canvasser_id'],
-                ]);
+                $newCanvasserId = (int) $row['canvasser_id'];
+                $currentCanvasserId = isset($existingAssignments[$prsItemId])
+                    ? (int) $existingAssignments[$prsItemId]->canvasser_id
+                    : null;
+
+                $updatePayload = [
+                    'canvasser_id' => $newCanvasserId,
+                ];
+
+                if ($currentCanvasserId !== $newCanvasserId) {
+                    $updatePayload['assigned_canvasser_at'] = now();
+                    $assignmentChangedCount++;
+                } else {
+                    $assignmentUnchangedCount++;
+                }
+
+                $prs->items()->whereKey($prsItemId)->update($updatePayload);
             }
 
             $prs->status = 'CANVASSING';
@@ -135,10 +156,12 @@ class PrsApprovalController extends Controller
             $prs->logs()->create([
                 'user_id' => $request->user()?->id,
                 'action' => 'CANVASSING',
-                'message' => 'Approved and assigned canvassers per item.',
+                'message' => 'Assigned canvassers per item and moved PRS to canvassing.',
                 'meta' => [
                     'previous_status' => $previousStatus,
                     'assignments' => $assignments->values()->all(),
+                    'assignment_changed_count' => $assignmentChangedCount,
+                    'assignment_unchanged_count' => $assignmentUnchangedCount,
                 ],
             ]);
         });
@@ -151,8 +174,8 @@ class PrsApprovalController extends Controller
 
         app(NotificationRecipientService::class)->notify($recipients, [
             'type' => 'prs_approved_canvassing',
-            'title' => 'PRS Approved',
-            'message' => 'PRS #'.$prs->prs_number.' has been approved and moved to canvassing.',
+            'title' => 'PRS Assigned',
+            'message' => 'PRS #'.$prs->prs_number.' has been assigned and moved to canvassing.',
             'action_url' => '/procurement/approval/'.$prs->id,
             'icon' => 'fa-light fa-badge-check',
             'icon_color' => 'bg-success',
@@ -162,7 +185,7 @@ class PrsApprovalController extends Controller
             ],
         ]);
 
-        return redirect()->back()->with('success', 'PRS has been approved and assigned.');
+        return redirect()->back()->with('success', 'PRS has been assigned and moved to canvassing.');
     }
 
     /**
