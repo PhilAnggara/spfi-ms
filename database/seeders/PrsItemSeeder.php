@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Database\Seeders\Concerns\ResolvesLegacyImport;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
 class PrsItemSeeder extends Seeder
@@ -17,21 +18,35 @@ class PrsItemSeeder extends Seeder
      */
     public function run(): void
     {
-        if ($this->isLegacySource()) {
-            $this->seedFromLegacy();
+        $legacyRows = $this->resolveRows('prs_detail', fn (string $message) => $this->command?->warn($message));
+
+        if ($this->isLegacySource() && !empty($legacyRows)) {
+            $assignCanvRows = $this->resolveRows('assign_canv', fn (string $message) => $this->command?->warn($message));
+            $assignCanvDtlRows = $this->resolveRows('assign_canv_dtl', fn (string $message) => $this->command?->warn($message));
+
+            $this->seedRows($legacyRows, $assignCanvRows, $assignCanvDtlRows, 'legacy');
             return;
         }
 
-        // Fallback ke local seeder (data manual yang sudah ada).
-        $this->seedLocal();
+        $prsDetailRows = $this->readCsvRows('prs_detail');
+
+        if (empty($prsDetailRows)) {
+            $this->warn('No CSV prs_detail rows loaded.');
+            return;
+        }
+
+        $assignCanvRows = $this->readCsvRows('assign_canv');
+        $assignCanvDtlRows = $this->readCsvRows('assign_canv_dtl');
+
+        $this->seedRows($prsDetailRows, $assignCanvRows, $assignCanvDtlRows, 'csv');
     }
 
     /**
-     * Seed PRS Items dari legacy database (prs_detail).
+     * Seed PRS Items dari baris impor ter-normalisasi.
      */
-    protected function seedFromLegacy(): void
+    protected function seedRows(array $rows, array $assignCanvRows, array $assignCanvDtlRows, string $source): void
     {
-        $this->logImportSource('prs_detail', 'legacy');
+        $this->logImportSource('prs_detail', $source);
 
         // Build lookup maps
         $prsIdByNumber = DB::table('prs')->pluck('id', 'prs_number')->all();
@@ -45,18 +60,7 @@ class PrsItemSeeder extends Seeder
             return;
         }
 
-        // Ambil semua baris legacy sekaligus (chunk tidak kompatibel dgn SQL Server lama).
-        $legacyRows = $this->resolveRows('prs_detail', fn (string $message) => $this->command?->warn($message));
-
-        if (empty($legacyRows)) {
-            $this->warn("No legacy prs_detail rows loaded.");
-            return;
-        }
-
-        $this->command?->info("ℹ [prs_detail] rows loaded: " . count($legacyRows));
-
-        $assignCanvRows = $this->resolveRows('assign_canv', fn (string $message) => $this->command?->warn($message));
-        $assignCanvDtlRows = $this->resolveRows('assign_canv_dtl', fn (string $message) => $this->command?->warn($message));
+        $this->command?->info("ℹ [prs_detail] rows loaded: " . count($rows));
 
         $this->command?->info("ℹ [assign_canv] rows loaded: " . count($assignCanvRows));
         $this->command?->info("ℹ [assign_canv_dtl] rows loaded: " . count($assignCanvDtlRows));
@@ -72,10 +76,16 @@ class PrsItemSeeder extends Seeder
         $assignmentMissingCanvasserCode = 0;
         $unmappedLegacyCanvasserCodes = [];
 
-        foreach ($legacyRows as $data) {
+        foreach ($rows as $data) {
             $prsNumber = trim((string) ($data['prsnumber'] ?? ''));
             $productCode = trim((string) ($data['productcode'] ?? ''));
             $departmentCode = $this->normalizeLookupToken($data['department_code'] ?? null);
+
+            if ($prsNumber === '' || $productCode === '') {
+                $this->warn("PRS Item skipped: missing prsnumber or productcode");
+                $skipped++;
+                continue;
+            }
 
             // Lookup prs_id
             $prsId = $prsIdByNumber[$prsNumber] ?? null;
@@ -169,49 +179,55 @@ class PrsItemSeeder extends Seeder
     }
 
     /**
-     * Seed PRS Items dari local seeder (data manual yang sudah ada sebelumnya).
+     * Read semicolon-delimited rows from configured CSV dataset.
      */
-    protected function seedLocal(): void
+    protected function readCsvRows(string $dataset): array
     {
-        $this->logImportSource('prs_detail', 'local');
+        $csvPath = $this->csvPathFor($dataset);
 
-        DB::table('prs_items')->insert([
-            [
-                'prs_id' => 1,
-                'item_id' => 1,
-                'quantity' => 5,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'prs_id' => 1,
-                'item_id' => 2,
-                'quantity' => 3,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'prs_id' => 2,
-                'item_id' => 3,
-                'quantity' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'prs_id' => 2,
-                'item_id' => 4,
-                'quantity' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'prs_id' => 3,
-                'item_id' => 1,
-                'quantity' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
+        if (!File::exists($csvPath)) {
+            $this->warn("{$dataset}.csv not found at: {$csvPath}");
+            return [];
+        }
+
+        $handle = fopen($csvPath, 'r');
+        if ($handle === false) {
+            $this->warn("Failed to open {$dataset}.csv at: {$csvPath}");
+            return [];
+        }
+
+        $header = fgetcsv($handle, 0, ';');
+        if ($header === false) {
+            fclose($handle);
+            $this->warn("{$dataset}.csv is empty: {$csvPath}");
+            return [];
+        }
+
+        $rows = [];
+        $skippedInvalidColumns = 0;
+
+        while (($row = fgetcsv($handle, 0, ';')) !== false) {
+            if (count($row) !== count($header)) {
+                $skippedInvalidColumns++;
+                continue;
+            }
+
+            $data = array_combine($header, $row);
+            if ($data === false) {
+                $skippedInvalidColumns++;
+                continue;
+            }
+
+            $rows[] = $data;
+        }
+
+        fclose($handle);
+
+        if ($skippedInvalidColumns > 0) {
+            $this->warn("{$dataset}.csv skipped rows with invalid columns: {$skippedInvalidColumns}");
+        }
+
+        return $rows;
     }
 
     // ─── helpers ────────────────────────────────────────────────────────

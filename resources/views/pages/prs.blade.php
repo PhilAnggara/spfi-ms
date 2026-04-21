@@ -103,7 +103,7 @@
                         <thead>
                             <tr>
                                 <th class="text-center">PRS Number</th>
-                                <th class="text-center">Charged to Department</th>
+                                <th class="text-center">Dept.</th>
                                 <th class="text-center">PRS Date</th>
                                 <th class="text-center">Status</th>
                                 <th class="text-center">Remarks</th>
@@ -114,6 +114,7 @@
                             @foreach ($items as $item)
                                 @php
                                     $departmentName = $item->department?->name ?? '-';
+                                    $departmentCode = $item->department?->code ?? '-';
                                 @endphp
                                 @php
                                     $isDeliveryPhase = in_array($item->status, ['PO_CREATED', 'APPROVED', 'DELIVERY_COMPLETE'], true);
@@ -153,7 +154,13 @@
                                             {{ $item->prs_number }}
                                         </button>
                                     </td>
-                                    <td>{{ $departmentName }}</td>
+                                    <td>
+                                        <span
+                                            class="badge bg-light-primary"
+                                            data-bstooltip-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="{{ $departmentName }}">{{ $departmentCode }}</span>
+                                    </td>
                                     <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
                                     <td>
                                         <span class="badge {{ $primaryStatusColor }}">

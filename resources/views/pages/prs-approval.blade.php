@@ -77,7 +77,7 @@
                             <thead>
                                 <tr>
                                     <th class="text-center">PRS Number</th>
-                                    <th class="text-center">Charged to Department</th>
+                                    <th class="text-center">Dept.</th>
                                     <th class="text-center">PRS Date</th>
                                     <th class="text-center">Remarks</th>
                                     <th class="text-center">Details</th>
@@ -93,7 +93,13 @@
                                                 {{ $item->prs_number }}
                                             </button>
                                         </td>
-                                        <td>{{ $item->department->name }}</td>
+                                        <td>
+                                            <span
+                                                class="badge bg-light-primary"
+                                                data-bstooltip-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="{{ $item->department?->name ?? '-' }}">{{ $item->department?->code ?? '-' }}</span>
+                                        </td>
                                         <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
                                         <td>{{ Str::limit($item->remarks, 20, '...') ?? '-' }}</td>
                                         <td>
@@ -351,36 +357,90 @@
                         </div>
                     @endif
 
+                    @php
+                        $totalItems = $item->items->count();
+                        $assignedItemsCount = $item->items->whereNotNull('canvasser_id')->count();
+                        $pendingAssignmentCount = max(0, $totalItems - $assignedItemsCount);
+                        $receivedItemsCount = $item->items->filter(fn ($prsItem) => $prsItem->delivery_status === 'RECEIVED')->count();
+                    @endphp
+
+                    <div class="prs-detail-summary mb-4">
+                        <div class="prs-detail-summary-card">
+                            <span class="prs-detail-summary-label">Total Items</span>
+                            <span class="prs-detail-summary-value">{{ $totalItems }}</span>
+                        </div>
+                        <div class="prs-detail-summary-card">
+                            <span class="prs-detail-summary-label">Assigned</span>
+                            <span class="prs-detail-summary-value">{{ $assignedItemsCount }}</span>
+                        </div>
+                        <div class="prs-detail-summary-card">
+                            <span class="prs-detail-summary-label">Pending Assignment</span>
+                            <span class="prs-detail-summary-value">{{ $pendingAssignmentCount }}</span>
+                        </div>
+                        <div class="prs-detail-summary-card">
+                            <span class="prs-detail-summary-label">Received</span>
+                            <span class="prs-detail-summary-value">{{ $receivedItemsCount }}</span>
+                        </div>
+                    </div>
+
                     <div class="divider">
                         <div class="divider-text fw-bold">Items</div>
                     </div>
 
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover align-middle mb-0 text-center">
+                    <div class="table-responsive prs-detail-table-wrap">
+                        <table class="table align-middle mb-0 prs-detail-items-table">
                             <thead>
                                 <tr>
-                                    <th class="text-uppercase small">Item Code</th>
-                                    <th class="text-uppercase small">Item Name</th>
-                                    <th class="text-uppercase small">Stock on Hand</th>
-                                    <th class="text-uppercase small">Qty Ordered</th>
-                                    <th class="text-uppercase small">Qty Delivered</th>
-                                    <th class="text-uppercase small">Delivery Status</th>
-                                    <th class="text-uppercase small">Canvasser</th>
+                                    <th class="text-uppercase small text-start">Item</th>
+                                    <th class="text-uppercase small text-center">Stock</th>
+                                    <th class="text-uppercase small text-center">Quantity</th>
+                                    <th class="text-uppercase small text-center">Delivery</th>
+                                    <th class="text-uppercase small text-start">Assignment</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach ($item->items as $itemInfo)
+                                    @php
+                                        $catalogItem = $itemInfo->item;
+                                        $itemCode = $catalogItem?->code;
+                                        $itemName = $catalogItem?->name;
+                                        $itemStockOnHand = $catalogItem?->stock_on_hand;
+                                        $itemUnitName = $catalogItem?->unit?->name ?? 'PCS';
+                                        $assignedAt = $itemInfo->assigned_canvasser_at?->format('d M Y H:i');
+                                    @endphp
                                     <tr>
-                                        <td>
-                                            <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $itemInfo->item->code }}')">
-                                                {{ $itemInfo->item->code }}
-                                            </button>
+                                        <td class="text-start">
+                                            <div class="prs-detail-item-main">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                                    @if ($itemCode)
+                                                        <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $itemCode }}')">
+                                                            {{ $itemCode }}
+                                                        </button>
+                                                    @else
+                                                        <span class="badge bg-light-secondary">No code</span>
+                                                    @endif
+                                                    <span class="prs-detail-inline-unit">{{ $itemUnitName }}</span>
+                                                </div>
+                                                <div class="prs-detail-item-name">{{ $itemName ?? '(item unavailable)' }}</div>
+                                            </div>
                                         </td>
-                                        <td>{{ $itemInfo->item->name }}</td>
-                                        <td>{{ $itemInfo->item->stock_on_hand }}</td>
-                                        <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
-                                        <td>{{ $itemInfo->delivered_quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
-                                        <td>
+                                        <td class="text-center">
+                                            <div class="prs-detail-metric-value">{{ $itemStockOnHand ?? '-' }}</div>
+                                            <div class="prs-detail-metric-label">Available {{ $itemUnitName }}</div>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="prs-detail-metric-stack">
+                                                <div>
+                                                    <span class="prs-detail-metric-value">{{ $itemInfo->quantity }}</span>
+                                                    <span class="prs-detail-metric-label">Ordered</span>
+                                                </div>
+                                                <div>
+                                                    <span class="prs-detail-metric-value">{{ $itemInfo->delivered_quantity }}</span>
+                                                    <span class="prs-detail-metric-label">Delivered</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
                                             @php
                                                 $status = $itemInfo->delivery_status;
                                                 $statusColor = match($status) {
@@ -396,11 +456,18 @@
                                                     default => 'fa-solid fa-circle-question'
                                                 };
                                             @endphp
-                                            <span class="badge {{ $statusColor }}">
-                                                <i class="{{ $statusIcon }}"></i> {{ $status }}
-                                            </span>
+                                            <div class="prs-detail-delivery-cell">
+                                                <span class="badge {{ $statusColor }}">
+                                                    <i class="{{ $statusIcon }}"></i> {{ $status }}
+                                                </span>
+                                            </div>
                                         </td>
-                                        <td>{{ $itemInfo->canvasser?->name ?? '-' }}</td>
+                                        <td class="text-start">
+                                            <div class="prs-detail-assignment {{ $itemInfo->canvasser?->name ? 'is-assigned' : 'is-pending' }}">
+                                                <div class="prs-detail-assignment-name">{{ $itemInfo->canvasser?->name ?? 'Not assigned yet' }}</div>
+                                                <div class="prs-detail-assignment-time">{{ $assignedAt ? 'Assigned on '.$assignedAt : 'Waiting for canvasser assignment' }}</div>
+                                            </div>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
