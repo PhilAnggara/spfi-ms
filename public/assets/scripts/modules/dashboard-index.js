@@ -1,4 +1,22 @@
 document.addEventListener('DOMContentLoaded', function () {
+    const dashboardData = window.dashboardData || {};
+    const monthlyPrs = dashboardData.monthly_prs || {};
+    const prsStatus = dashboardData.prs_status || {};
+    const topSuppliers = dashboardData.top_suppliers || {};
+    const poStatus = dashboardData.po_status || {};
+
+    const monthlyPrsLabels = Array.isArray(monthlyPrs.labels) ? monthlyPrs.labels : [];
+    const monthlyPrsSeries = Array.isArray(monthlyPrs.series) ? monthlyPrs.series : [];
+
+    const prsStatusLabels = Array.isArray(prsStatus.labels) ? prsStatus.labels : [];
+    const prsStatusSeries = Array.isArray(prsStatus.series) ? prsStatus.series : [];
+
+    const topSuppliersLabels = Array.isArray(topSuppliers.labels) ? topSuppliers.labels : [];
+    const topSuppliersSeries = Array.isArray(topSuppliers.series) ? topSuppliers.series : [];
+
+    const poStatusLabels = Array.isArray(poStatus.labels) ? poStatus.labels : [];
+    const poStatusSeries = Array.isArray(poStatus.series) ? poStatus.series : [];
+
     const optionsProfileVisit = {
         annotations: {
             position: 'back',
@@ -16,32 +34,19 @@ document.addEventListener('DOMContentLoaded', function () {
         plotOptions: {},
         series: [
             {
-                name: 'sales',
-                data: [9, 20, 30, 20, 10, 20, 30, 20, 10, 20, 30, 20],
+                name: 'PRS',
+                data: monthlyPrsSeries,
             },
         ],
         colors: '#435ebe',
         xaxis: {
-            categories: [
-                'Jan',
-                'Feb',
-                'Mar',
-                'Apr',
-                'May',
-                'Jun',
-                'Jul',
-                'Aug',
-                'Sep',
-                'Oct',
-                'Nov',
-                'Dec',
-            ],
+            categories: monthlyPrsLabels,
         },
     };
 
     const optionsVisitorsProfile = {
-        series: [70, 30],
-        labels: ['Export', 'Domestic'],
+        series: prsStatusSeries,
+        labels: prsStatusLabels,
         colors: ['#435ebe', '#55c6e8'],
         chart: {
             type: 'donut',
@@ -60,18 +65,88 @@ document.addEventListener('DOMContentLoaded', function () {
         },
     };
 
+    const optionsTopSuppliers = {
+        series: [
+            {
+                name: 'PO Value',
+                data: topSuppliersSeries,
+            },
+        ],
+        chart: {
+            type: 'bar',
+            height: 360,
+        },
+        colors: ['#1f9d8f'],
+        plotOptions: {
+            bar: {
+                borderRadius: 6,
+                horizontal: true,
+            },
+        },
+        dataLabels: {
+            enabled: false,
+        },
+        xaxis: {
+            categories: topSuppliersLabels,
+            labels: {
+                formatter: function (value) {
+                    return new Intl.NumberFormat('id-ID').format(value);
+                },
+            },
+        },
+    };
+
+    const optionsPoStatus = {
+        series: poStatusSeries,
+        labels: poStatusLabels,
+        chart: {
+            type: 'donut',
+            width: '100%',
+            height: 320,
+        },
+        legend: {
+            position: 'bottom',
+        },
+        dataLabels: {
+            enabled: true,
+        },
+    };
+
     if (window.ApexCharts) {
-        const chartProfileVisit = new window.ApexCharts(
-            document.querySelector('#chart-profile-visit'),
-            optionsProfileVisit
-        );
+        const chartProfileVisitEl = document.querySelector('#chart-profile-visit');
+        if (chartProfileVisitEl) {
+            const chartProfileVisit = new window.ApexCharts(
+                chartProfileVisitEl,
+                optionsProfileVisit
+            );
+            chartProfileVisit.render();
+        }
 
-        const chartVisitorsProfile = new window.ApexCharts(
-            document.getElementById('chart-visitors-profile'),
-            optionsVisitorsProfile
-        );
+        const chartVisitorsProfileEl = document.getElementById('chart-visitors-profile');
+        if (chartVisitorsProfileEl) {
+            const chartVisitorsProfile = new window.ApexCharts(
+                chartVisitorsProfileEl,
+                optionsVisitorsProfile
+            );
+            chartVisitorsProfile.render();
+        }
 
-        chartProfileVisit.render();
-        chartVisitorsProfile.render();
+        const chartTopSuppliersEl = document.querySelector('#chart-top-suppliers');
+        if (chartTopSuppliersEl) {
+            const chartTopSuppliers = new window.ApexCharts(
+                chartTopSuppliersEl,
+                optionsTopSuppliers
+            );
+            chartTopSuppliers.render();
+        }
+
+        const chartPoStatusEl = document.querySelector('#chart-po-status');
+        if (chartPoStatusEl) {
+            const chartPoStatus = new window.ApexCharts(
+                chartPoStatusEl,
+                optionsPoStatus
+            );
+            chartPoStatus.render();
+        }
     }
 });

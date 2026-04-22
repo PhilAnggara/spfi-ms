@@ -26,7 +26,7 @@
                                 </div>
                                 <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
                                     <h6 class="text-muted font-semibold">User Accounts</h6>
-                                    <h6 class="font-extrabold mb-0">35</h6>
+                                    <h6 class="font-extrabold mb-0">{{ number_format($metrics['user_accounts']) }}</h6>
                                 </div>
                             </div>
                         </div>
@@ -42,8 +42,8 @@
                                     </div>
                                 </div>
                                 <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
-                                    <h6 class="text-muted font-semibold">PRS This Month</h6>
-                                    <h6 class="font-extrabold mb-0">21</h6>
+                                    <h6 class="text-muted font-semibold">PRS ({{ $dashboardMonthLabel }})</h6>
+                                    <h6 class="font-extrabold mb-0">{{ number_format($metrics['prs_this_month']) }}</h6>
                                 </div>
                             </div>
                         </div>
@@ -59,8 +59,8 @@
                                     </div>
                                 </div>
                                 <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
-                                    <h6 class="text-muted font-semibold">Production</h6>
-                                    <h6 class="font-extrabold mb-0">80.000</h6>
+                                    <h6 class="text-muted font-semibold">Approved PO Value</h6>
+                                    <h6 class="font-extrabold mb-0">Rp {{ number_format($metrics['po_approved_value_this_month'], 0, ',', '.') }}</h6>
                                 </div>
                             </div>
                         </div>
@@ -76,8 +76,8 @@
                                     </div>
                                 </div>
                                 <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
-                                    <h6 class="text-muted font-semibold">Exports</h6>
-                                    <h6 class="font-extrabold mb-0">60.000</h6>
+                                    <h6 class="text-muted font-semibold">Receiving Reports ({{ $dashboardMonthLabel }})</h6>
+                                    <h6 class="font-extrabold mb-0">{{ number_format($metrics['rr_this_month']) }}</h6>
                                 </div>
                             </div>
                         </div>
@@ -88,7 +88,7 @@
                 <div class="col-12">
                     <div class="card shadow-sm" data-aos="zoom-in" data-aos-delay="500">
                         <div class="card-header">
-                            <h4>Monthly Production</h4>
+                            <h4>Monthly PRS Trend (Last 12 Months)</h4>
                         </div>
                         <div class="card-body">
                             <div id="chart-profile-visit"></div>
@@ -100,10 +100,33 @@
         <div class="col-12 col-lg-3">
             <div class="card shadow-sm" data-aos="fade-left" data-aos-delay="700">
                 <div class="card-header">
-                    <h4>Shipments this Month</h4>
+                    <h4>PRS Status Distribution</h4>
                 </div>
                 <div class="card-body">
                     <div id="chart-visitors-profile"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="row mt-2">
+        <div class="col-12 col-lg-8">
+            <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="300">
+                <div class="card-header">
+                    <h4>Top Suppliers by PO Value</h4>
+                </div>
+                <div class="card-body">
+                    <div id="chart-top-suppliers"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card shadow-sm" data-aos="fade-up" data-aos-delay="400">
+                <div class="card-header">
+                    <h4>PO Status Distribution</h4>
+                </div>
+                <div class="card-body">
+                    <div id="chart-po-status"></div>
                 </div>
             </div>
         </div>
@@ -117,6 +140,9 @@
     <link rel="stylesheet" href="{{ url('assets/compiled/css/iconly.css') }}">
 @endpush
 @push('addon-script')
+    <script>
+        window.dashboardData = @json($dashboardData);
+    </script>
         <script src="{{ url('assets/extensions/apexcharts/apexcharts.min.js') }}"></script>
         <script src="{{ url('assets/scripts/modules/dashboard-index.js') }}"></script>
 @endpush
