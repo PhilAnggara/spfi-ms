@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PrsItem;
 use App\Models\PrsCanvassingItem;
+use App\Models\Department;
 use App\Models\Supplier;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -19,18 +20,61 @@ class CanvassingController extends Controller
     {
         $userId = $request->user()->id;
 
+        $filters = [
+            'keyword' => trim((string) $request->query('keyword', '')),
+            'date_needed_start' => trim((string) $request->query('date_needed_start', '')),
+            'date_needed_end' => trim((string) $request->query('date_needed_end', '')),
+            'department' => trim((string) $request->query('department', '')),
+        ];
+
         $prsItems = PrsItem::with([
             'prs',
+            'prs.department',
             'item.unit',
             'canvassingItems.supplier',
             'selectedCanvassingItem.supplier',
         ])
             ->where('canvasser_id', $userId)
+            ->when($filters['keyword'] !== '', function ($query) use ($filters) {
+                $keyword = $filters['keyword'];
+
+                $query->where(function ($innerQuery) use ($keyword) {
+                    $innerQuery->whereHas('prs', function ($prsQuery) use ($keyword) {
+                        $prsQuery->where('prs_number', 'like', "%{$keyword}%");
+                    })->orWhereHas('item', function ($itemQuery) use ($keyword) {
+                        $itemQuery->where('code', 'like', "%{$keyword}%")
+                            ->orWhere('name', 'like', "%{$keyword}%");
+                    });
+                });
+            })
+            ->when($filters['date_needed_start'] !== '', function ($query) use ($filters) {
+                $query->whereHas('prs', function ($prsQuery) use ($filters) {
+                    $prsQuery->whereDate('date_needed', '>=', $filters['date_needed_start']);
+                });
+            })
+            ->when($filters['date_needed_end'] !== '', function ($query) use ($filters) {
+                $query->whereHas('prs', function ($prsQuery) use ($filters) {
+                    $prsQuery->whereDate('date_needed', '<=', $filters['date_needed_end']);
+                });
+            })
+            ->when($filters['department'] !== '', function ($query) use ($filters) {
+                $query->whereHas('prs.department', function ($departmentQuery) use ($filters) {
+                    $departmentQuery->where('code', $filters['department']);
+                });
+            })
             ->orderByDesc('created_at')
+            ->paginate(10)
+            ->withQueryString();
+
+        $departmentOptions = Department::query()
+            ->select(['code', 'name'])
+            ->orderBy('name')
             ->get();
 
         return view('pages.canvassing', [
             'prsItems' => $prsItems,
+            'departmentOptions' => $departmentOptions,
+            'filters' => $filters,
         ]);
     }
 

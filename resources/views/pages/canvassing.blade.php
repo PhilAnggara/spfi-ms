@@ -2,119 +2,185 @@
 @section('title', ' | Canvassing')
 
 @section('content')
-<div class="page-heading">
-    <div class="page-title">
-        <div class="row mb-4">
-            <div class="col-12 col-md-6 order-md-1">
-                <h3>Canvassing</h3>
+    <div id="canvassing-page-container">
+        <div class="page-heading po-page">
+            <div class="page-title mb-4">
+                <div class="row g-3 align-items-center">
+                <div class="col-12 col-lg-7">
+                    <div class="po-hero">
+                        <h3 class="mb-1">Canvassing</h3>
+                        <p class="text-muted mb-0">Manage supplier quotes quickly with unified filters, clean table view, and dynamic pagination.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-5">
+                    <div class="po-top-actions">
+                        <a href="{{ route('canvassing.index') }}" class="btn btn-light-secondary icon icon-left" id="reset-canvassing-top">
+                            <i class="fa-light fa-rotate-left"></i>
+                            Reset View
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
+
+        <section class="section">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end po-filter-grid" id="canvassing-filter-form">
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <label for="filter-canvassing-keyword" class="form-label mb-1">Search Canvassing</label>
+                            <input
+                                type="text"
+                                id="filter-canvassing-keyword"
+                                class="form-control"
+                                value="{{ $filters['keyword'] ?? '' }}"
+                                placeholder="PRS number / item code / item name">
+                        </div>
+                        <div class="col-6 col-md-3 col-xl-3">
+                            <label for="filter-canvassing-department" class="form-label mb-1">Department</label>
+                            <select id="filter-canvassing-department" class="form-select">
+                                <option value="">All Department</option>
+                                @foreach ($departmentOptions as $department)
+                                    <option value="{{ $department->code }}" @selected(($filters['department'] ?? '') === $department->code)>
+                                        {{ $department->code }} - {{ $department->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3 col-xl-2">
+                            <label for="filter-canvassing-date-start" class="form-label mb-1">Date Needed (from)</label>
+                            <input type="date" id="filter-canvassing-date-start" class="form-control" value="{{ $filters['date_needed_start'] ?? '' }}">
+                        </div>
+                        <div class="col-6 col-md-3 col-xl-2">
+                            <label for="filter-canvassing-date-end" class="form-label mb-1">Date Needed (to)</label>
+                            <input type="date" id="filter-canvassing-date-end" class="form-control" value="{{ $filters['date_needed_end'] ?? '' }}">
+                        </div>
+                        <div class="col-6 col-md-3 col-xl-1">
+                            <button type="button" id="reset-canvassing-filter" class="btn btn-light-secondary w-100">
+                                <i class="fa-regular fa-rotate-left me-1"></i>
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="canvassing-page-results">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body position-relative">
+                        <div id="canvassing-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                                <div class="mt-2 text-muted">Loading data...</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                            <h5 class="card-title mb-0">Canvassing Data</h5>
+                            <span class="badge bg-light-primary" id="canvassing-filter-result">{{ $prsItems->total() }} records</span>
+                        </div>
+
+                        @if ($prsItems->isEmpty())
+                            <div class="po-empty-state text-center text-muted py-5">
+                                <i class="fa-duotone fa-solid fa-file-circle-question po-empty-icon"></i>
+                                <p class="mb-0 mt-2 fw-semibold">No canvassing items found.</p>
+                                <small>Try changing your keyword or filters to see more results.</small>
+                            </div>
+                        @else
+                            <div class="table-responsive">
+                                <table class="table table-striped align-middle po-table text-nowrap" id="canvassing-table">
+                                    <thead>
+                                        <tr>
+                                            <th>PRS Number</th>
+                                            <th>Department</th>
+                                            <th>Item Code</th>
+                                            <th>Item Name</th>
+                                            <th>Quantity</th>
+                                            <th>Date Needed</th>
+                                            <th>Suppliers</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($prsItems as $prsItem)
+                                            @php
+                                                $prs = $prsItem->prs;
+                                                $department = $prs?->department;
+                                                $item = $prsItem->item;
+                                                $prsNumber = $prs?->prs_number ?? '-';
+                                                $departmentCode = $department?->code ?? '-';
+                                                $departmentName = $department?->name ?? 'Department not available';
+                                                $itemCode = $item?->code ?? 'N/A';
+                                                $itemName = $item?->name ?? 'Item not found';
+                                            @endphp
+                                            <tr>
+                                                <td>
+                                                    <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $prsNumber }}')">
+                                                        <i class="fa-solid fa-regular fa-clipboard"></i>
+                                                        {{ $prsNumber }}
+                                                    </button>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-light-primary" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $departmentName }}">{{ $departmentCode }}</span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $itemCode }}')">{{ $itemCode }}</span>
+                                                </td>
+                                                <td data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $itemName }}">{{ Str::limit($itemName, 40) }}</td>
+                                                <td>
+                                                    <span class="fw-semibold">{{ $prsItem->quantity }}</span>
+                                                    <small class="text-muted">{{ $item?->unit?->name ?? 'PCS' }}</small>
+                                                </td>
+                                                <td>
+                                                    <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i>
+                                                    {{ $prs?->date_needed ? tgl($prs->date_needed) : '-' }}
+                                                </td>
+                                                <td>
+                                                    <div class="small text-muted">Quotes: {{ $prsItem->canvassingItems->count() }}</div>
+                                                    <div class="fw-semibold" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->selectedCanvassingItem?->supplier?->name ?? 'Not selected' }}">
+                                                        <span class="{{ $prsItem->selectedCanvassingItem?->supplier?->name ? 'text-primary' : 'text-muted' }}">{{ Str::limit($prsItem->selectedCanvassingItem?->supplier?->name ?? 'Not selected', 18) }}</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <a href="{{ route('canvassing.show', $prsItem->id) }}" class="btn icon {{ $prsItem->canvassingItems->isNotEmpty() ? 'btn-outline-primary' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->canvassingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}">
+                                                            <i class="fa-light fa-pen-to-square"></i>
+                                                        </a>
+                                                        @if (!$prsItem->purchase_order_id)
+                                                            <form action="{{ route('canvassing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
+                                                                @csrf
+                                                                <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">
+                                                                <button type="submit" class="btn icon {{ $prsItem->is_direct_purchase ? 'btn-outline-info' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->is_direct_purchase ? 'Revert to Needs PO' : 'Mark as Direct Purchase' }}">
+                                                                    <i class="fa-light fa-basket-shopping"></i>
+                                                                </button>
+                                                            </form>
+                                                        @endif
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="mt-3 canvassing-pagination-wrap">
+                                {{ $prsItems->onEachSide(1)->links('pagination::bootstrap-5') }}
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
-    <section class="section">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <table class="table table-striped align-middle text-nowrap" id="table1">
-                    <thead>
-                        <tr>
-                            <th>PRS Number</th>
-                            <th>Item Code</th>
-                            <th>Item Name</th>
-                            <th>Quantity</th>
-                            <th>Date Needed</th>
-                            <th>Suppliers</th>
-                            <th class="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($prsItems as $prsItem)
-                            @php
-                                $prs = $prsItem->prs;
-                                $item = $prsItem->item;
-                                $prsNumber = $prs?->prs_number ?? '-';
-                                $itemCode = $item?->code ?? 'N/A';
-                                $itemName = $item?->name ?? 'Item not found';
-                            @endphp
-                            <tr>
-                                <td>
-                                    <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $prsNumber }}')">
-                                        <i class="fa-solid fa-regular fa-clipboard"></i>
-                                        {{ $prsNumber }}
-                                    </button>
-                                </td>
-                                <td>
-                                    <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $itemCode }}')">{{ $itemCode }}</span>
-                                </td>
-                                <td data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $itemName }}">{{ Str::limit($itemName, 30) }}</td>
-                                <td>
-                                    <span class="fw-semibold">{{ $prsItem->quantity }}</span>
-                                    <small class="text-muted">{{ $item?->unit?->name ?? 'PCS' }}</small>
-                                </td>
-                                <td>
-                                    <i class="fa-duotone fa-solid fa-calendar-star text-primary"></i>
-                                    {{ $prs?->date_needed ? tgl($prs->date_needed) : '-' }}
-                                </td>
-                                <td>
-                                    <div class="small text-muted">Quotes: {{ $prsItem->canvassingItems->count() }}</div>
-                                    <div class="fw-semibold" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->selectedCanvassingItem?->supplier?->name ?? 'Not selected' }}">
-                                        <span class="{{ $prsItem->selectedCanvassingItem?->supplier?->name ? 'text-primary' : 'text-muted' }}">{{ Str::limit($prsItem->selectedCanvassingItem?->supplier?->name ?? 'Not selected', 15) }}</span>
-                                    </div>
-                                </td>
-                                <td class="text-center">
-                                    {{-- <div class="d-flex justify-content-center gap-1">
-                                        <a href="{{ route('canvassing.show', $prsItem->id) }}" class="btn btn-sm {{ $prsItem->canvassingItems->isNotEmpty() ? 'btn-primary' : 'btn-outline-primary' }}">
-                                            <i class="fa-duotone fa-solid fa-pen-to-square"></i>
-                                            {{ $prsItem->canvassingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}
-                                        </a>
-                                        @if (!$prsItem->purchase_order_id)
-                                            <form action="{{ route('canvassing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">
-                                                <button type="submit" class="btn btn-sm {{ $prsItem->is_direct_purchase ? 'btn-info' : 'btn-outline-info' }}" title="{{ $prsItem->is_direct_purchase ? 'Revert to Needs PO' : 'Mark as Direct Purchase' }}">
-                                                    <i class="fa-duotone fa-solid fa-basket-shopping"></i>
-                                                    {{ $prsItem->is_direct_purchase ? 'Unmark DP' : 'Direct Purchase' }}
-                                                </button>
-                                            </form>
-                                        @endif
-                                    </div> --}}
-
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{{ route('canvassing.show', $prsItem->id) }}" class="btn icon {{ $prsItem->canvassingItems->isNotEmpty() ? 'btn-outline-primary' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->canvassingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}">
-                                            <i class="fa-light fa-pen-to-square"></i>
-                                        </a>
-                                        @if (!$prsItem->purchase_order_id)
-                                            <form action="{{ route('canvassing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">
-                                                <button type="submit" class="btn icon {{ $prsItem->is_direct_purchase ? 'btn-outline-info' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->is_direct_purchase ? 'Revert to Needs PO' : 'Mark as Direct Purchase' }}">
-                                                    <i class="fa-light fa-basket-shopping"></i>
-                                                </button>
-                                            </form>
-                                        @endif
-                                    </div>
-
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
-                                    <i class="fa-duotone fa-solid fa-inbox"></i>
-                                    <p class="mb-0 mt-2">No canvassing items assigned yet.</p>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
 </div>
 @endsection
 
 @push('addon-style')
-    <link rel="stylesheet" href="{{ url('assets/extensions/simple-datatables/style.css') }}">
-    <link rel="stylesheet" href="{{ url('assets/compiled/css/table-datatable.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/modules/canvassing-index.css') }}">
 @endpush
+
 @push('addon-script')
-    <script src="{{ url('assets/extensions/simple-datatables/umd/simple-datatables.js') }}"></script>
-    <script src="{{ url('assets/static/js/pages/simple-datatables.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/canvassing-modern.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/canvassing-index.js') }}"></script>
 @endpush
