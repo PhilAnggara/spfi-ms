@@ -311,6 +311,10 @@
                         <div class="progress-bar {{ $headerProgressClass }}" role="progressbar" style="width: {{ $headerProgress }}%" aria-valuenow="{{ $headerProgress }}" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
 
+                    @if ($isDeliveryPhase)
+                        <small class="text-muted d-block mb-3"><i class="fa-solid fa-box-open text-secondary"></i> Delivered: {{ $deliveryProgressRaw }}%</small>
+                    @endif
+
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-6 col-lg-4">
                             <div class="border rounded-3 p-3 h-100 bg-light-subtle">
@@ -362,6 +366,33 @@
                         $assignedItemsCount = $item->items->whereNotNull('canvasser_id')->count();
                         $pendingAssignmentCount = max(0, $totalItems - $assignedItemsCount);
                         $receivedItemsCount = $item->items->filter(fn ($prsItem) => $prsItem->delivery_status === 'RECEIVED')->count();
+                        $poNumbers = $item->items
+                            ->map(function ($prsItem) {
+                                return trim((string) ($prsItem->purchaseOrder?->po_number
+                                    ?? $prsItem->purchaseOrderItem?->purchaseOrder?->po_number
+                                    ?? ''));
+                            })
+                            ->filter()
+                            ->unique()
+                            ->sort()
+                            ->values();
+                        $poNumbersText = $poNumbers->isNotEmpty() ? $poNumbers->implode(', ') : 'Pending';
+                        $rrNumbers = $item->items
+                            ->flatMap(function ($prsItem) {
+                                $reportItems = $prsItem->purchaseOrderItem?->receivingReportItems;
+                                if (! $reportItems) {
+                                    return [];
+                                }
+
+                                return $reportItems->map(function ($reportItem) {
+                                    return trim((string) ($reportItem->receivingReport?->rr_number ?? ''));
+                                });
+                            })
+                            ->filter()
+                            ->unique()
+                            ->sort()
+                            ->values();
+                        $rrNumbersText = $rrNumbers->isNotEmpty() ? $rrNumbers->implode(', ') : 'Pending';
                     @endphp
 
                     <div class="prs-detail-summary mb-4">
@@ -381,6 +412,14 @@
                             <span class="prs-detail-summary-label">Received</span>
                             <span class="prs-detail-summary-value">{{ $receivedItemsCount }}</span>
                         </div>
+                        <div class="prs-detail-summary-card">
+                            <span class="prs-detail-summary-label">PO Number(s)</span>
+                            <span class="prs-detail-summary-value" title="{{ $poNumbersText }}">{{ $poNumbersText }}</span>
+                        </div>
+                        <div class="prs-detail-summary-card">
+                            <span class="prs-detail-summary-label">RR Number(s)</span>
+                            <span class="prs-detail-summary-value" title="{{ $rrNumbersText }}">{{ $rrNumbersText }}</span>
+                        </div>
                     </div>
 
                     <div class="divider">
@@ -395,6 +434,7 @@
                                     <th class="text-uppercase small text-center">Stock</th>
                                     <th class="text-uppercase small text-center">Quantity</th>
                                     <th class="text-uppercase small text-center">Delivery</th>
+                                    <th class="text-uppercase small text-start">Documents</th>
                                     <th class="text-uppercase small text-start">Assignment</th>
                                 </tr>
                             </thead>
@@ -407,6 +447,18 @@
                                         $itemStockOnHand = $catalogItem?->stock_on_hand;
                                         $itemUnitName = $catalogItem?->unit?->name ?? 'PCS';
                                         $assignedAt = $itemInfo->assigned_canvasser_at?->format('d M Y H:i');
+                                        $itemPoNumber = trim((string) ($itemInfo->purchaseOrder?->po_number
+                                            ?? $itemInfo->purchaseOrderItem?->purchaseOrder?->po_number
+                                            ?? ''));
+                                        $itemRrNumbers = $itemInfo->purchaseOrderItem?->receivingReportItems
+                                            ?->map(fn ($reportItem) => trim((string) ($reportItem->receivingReport?->rr_number ?? '')))
+                                            ->filter()
+                                            ->unique()
+                                            ->sort()
+                                            ->values();
+                                        $itemRrNumbersText = ($itemRrNumbers && $itemRrNumbers->isNotEmpty())
+                                            ? $itemRrNumbers->implode(', ')
+                                            : 'Pending';
                                     @endphp
                                     <tr>
                                         <td class="text-start">
@@ -460,6 +512,26 @@
                                                 <span class="badge {{ $statusColor }}">
                                                     <i class="{{ $statusIcon }}"></i> {{ $status }}
                                                 </span>
+                                            </div>
+                                        </td>
+                                        <td class="text-start">
+                                            <div class="d-flex flex-column gap-1">
+                                                <div>
+                                                    <small class="text-muted me-1">PO</small>
+                                                    @if ($itemPoNumber !== '')
+                                                        <span class="badge bg-light-primary text-primary">{{ $itemPoNumber }}</span>
+                                                    @else
+                                                        <span class="text-muted small fst-italic">Pending</span>
+                                                    @endif
+                                                </div>
+                                                <div>
+                                                    <small class="text-muted me-1">RR</small>
+                                                    @if ($itemRrNumbersText !== 'Pending')
+                                                        <span class="badge bg-light-success text-success">{{ $itemRrNumbersText }}</span>
+                                                    @else
+                                                        <span class="text-muted small fst-italic">Pending</span>
+                                                    @endif
+                                                </div>
                                             </div>
                                         </td>
                                         <td class="text-start">

@@ -262,7 +262,10 @@ class PrsApprovalController extends Controller
                 'items.canvasser',
                 'items.canvassingItems',
                 'items.selectedCanvassingItem',
+                'items.purchaseOrder',
                 'items.purchaseOrderItem.receivingReportItems',
+                'items.purchaseOrderItem.receivingReportItems.receivingReport',
+                'items.purchaseOrderItem.purchaseOrder',
                 'logs' => function ($query) {
                     $query->latest();
                 },
