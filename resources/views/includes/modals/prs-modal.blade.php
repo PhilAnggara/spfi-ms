@@ -369,7 +369,7 @@
                                     <select class="form-select" id="edit-department-{{ $item->id }}" name="department_id" required>
                                         <option value="" disabled>-- Select Department --</option>
                                         @foreach ($departments as $department)
-                                            <option value="{{ $department->id }}" {{ $item->department_id == $department->id ? 'selected' : '' }}>{{ $department->name }}</option>
+                                            <option value="{{ $department->id }}" {{ $item->department_id == $department->id ? 'selected' : '' }}>{{ $department->code }} - {{ $department->name }}</option>
                                         @endforeach
                                     </select>
                                 </fieldset>

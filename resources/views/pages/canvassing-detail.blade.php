@@ -21,6 +21,7 @@
         $supplierList = $suppliers
             ->map(fn ($supplier) => [
                 'id' => $supplier->id,
+                'code' => $supplier->code,
                 'name' => $supplier->name,
             ])
             ->values();
@@ -31,7 +32,7 @@
             <div class="row g-3 align-items-center">
                 <div class="col-12 col-lg-7">
                     <h3 class="mb-1">Supplier Canvassing</h3>
-                    <p class="text-muted mb-0">Input penawaran supplier dengan tampilan yang lebih cepat, rapi, dan mudah dipilih.</p>
+                    <p class="text-muted mb-0">Record supplier quotations — fast, organized, and easy to compare.</p>
                 </div>
                 <div class="col-12 col-lg-5">
                     <div class="d-flex flex-wrap justify-content-lg-end gap-2">
@@ -113,8 +114,8 @@
 
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                             <div>
-                                <h5 class="mb-1">Penawaran Supplier</h5>
-                                <p class="text-muted mb-0 small">Setiap supplier hanya boleh dipilih satu kali.</p>
+                                <h5 class="mb-1">Supplier Quotations</h5>
+                                <p class="text-muted mb-0 small">Each supplier can only be selected once.</p>
                             </div>
                             <span class="badge bg-light-primary" id="supplier-summary">0/0 supplier dipilih</span>
                         </div>
@@ -129,8 +130,8 @@
                                             <span class="badge bg-light-secondary supplier-number">Supplier #{{ $index + 1 }}</span>
                                             <button type="button" class="btn btn-sm btn-outline-danger remove-supplier" @disabled($canvassingRows->count() === 1)>Remove</button>
                                         </div>
-                                        <div class="supplier-name px-3 py-2 rounded border bg-light-primary w-100 cursor-pointer d-flex justify-content-between align-items-center mb-3" data-placeholder="Belum dipilih" role="button" tabindex="0">
-                                            <span class="supplier-name-text flex-grow-1">{{ $canvassing?->supplier?->name ?? 'Belum dipilih' }}</span>
+                                        <div class="supplier-name px-3 py-2 rounded border bg-light-primary w-100 cursor-pointer d-flex justify-content-between align-items-center mb-3" data-placeholder="Not selected" role="button" tabindex="0">
+                                            <span class="supplier-name-text flex-grow-1">{{ $canvassing?->supplier ? ($canvassing->supplier->code . ' · ' . $canvassing->supplier->name) : 'Not selected' }}</span>
                                             <button type="button" class="btn btn-sm p-0 ms-2 clear-supplier" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; display: none;" title="Clear supplier">
                                                 <i class="fa-duotone fa-solid fa-xmark"></i>
                                             </button>
@@ -193,8 +194,8 @@
                                     <span class="badge bg-light-secondary supplier-number">Supplier #__NUMBER__</span>
                                     <button type="button" class="btn btn-sm btn-outline-danger remove-supplier">Remove</button>
                                 </div>
-                                <div class="supplier-name px-3 py-2 rounded border bg-light-primary w-100 cursor-pointer d-flex justify-content-between align-items-center mb-3" data-placeholder="Belum dipilih" role="button" tabindex="0">
-                                    <span class="supplier-name-text flex-grow-1">Belum dipilih</span>
+                                <div class="supplier-name px-3 py-2 rounded border bg-light-primary w-100 cursor-pointer d-flex justify-content-between align-items-center mb-3" data-placeholder="Not selected" role="button" tabindex="0">
+                                    <span class="supplier-name-text flex-grow-1">Not selected</span>
                                     <button type="button" class="btn btn-sm p-0 ms-2 clear-supplier" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; display: none;" title="Clear supplier">
                                         <i class="fa-duotone fa-solid fa-xmark"></i>
                                     </button>
@@ -245,12 +246,12 @@
         <div class="modal-dialog modal-dialog-scrollable modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="supplierPickerModalLabel">Pilih Supplier</h5>
+                    <h5 class="modal-title" id="supplierPickerModalLabel">Select Supplier</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <input type="text" class="form-control" id="supplier-picker-search" placeholder="Cari supplier...">
+                        <input type="text" class="form-control" id="supplier-picker-search" placeholder="Search by name or code...">
                     </div>
                     <div id="supplier-picker-list" class="list-group"></div>
                 </div>

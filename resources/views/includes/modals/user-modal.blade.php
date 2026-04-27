@@ -65,7 +65,7 @@
                                 <select class="choices form-select {{ ($errors->any() && !session('editing_user_id')) ? ($errors->has('department_id') ? 'is-invalid' : '') : '' }}" id="department" name="department_id" required>
                                     <option value="" {{ ($errors->any() && !session('editing_user_id') && old('department_id')) ? '' : 'selected' }} disabled>-- Select Department --</option>
                                     @foreach ($departments as $department)
-                                        <option value="{{ $department->id }}" {{ ($errors->any() && !session('editing_user_id') && old('department_id') == $department->id) ? 'selected' : '' }}>{{ $department->name }}</option>
+                                        <option value="{{ $department->id }}" {{ ($errors->any() && !session('editing_user_id') && old('department_id') == $department->id) ? 'selected' : '' }}>{{ $department->code }} - {{ $department->name }}</option>
                                     @endforeach
                                 </select>
                                 @if ($errors->any() && !session('editing_user_id'))
@@ -211,7 +211,7 @@
                                 <select class="choices form-select {{ ($errors->any() && session('editing_user_id') == $user->id) ? ($errors->has('department_id') ? 'is-invalid' : '') : '' }}" id="edit-department-{{ $user->id }}" name="department_id" required>
                                     <option value="" disabled>-- Select Department --</option>
                                     @foreach ($departments as $department)
-                                        <option value="{{ $department->id }}" {{ (($errors->any() && session('editing_user_id') == $user->id) ? old('department_id') : $user->department_id) == $department->id ? 'selected' : '' }}>{{ $department->name }}</option>
+                                        <option value="{{ $department->id }}" {{ (($errors->any() && session('editing_user_id') == $user->id) ? old('department_id') : $user->department_id) == $department->id ? 'selected' : '' }}>{{ $department->code }} - {{ $department->name }}</option>
                                     @endforeach
                                 </select>
                                 @if ($errors->any() && session('editing_user_id') == $user->id)

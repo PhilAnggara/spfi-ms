@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const supplierTermMap = supplierTermMapNode ? JSON.parse(supplierTermMapNode.textContent || '{}') : {};
     const suppliers = supplierListNode ? JSON.parse(supplierListNode.textContent || '[]') : [];
 
+    const escapeHtml = (str) => String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
     const rowsContainer = document.getElementById('supplier-rows');
     const template = document.getElementById('supplier-row-template');
     const addSupplierButton = document.getElementById('add-supplier');
@@ -25,9 +27,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let activeRow = null;
 
-    const getSupplierNameById = (supplierId) => {
-        const found = suppliers.find((supplier) => String(supplier.id) === String(supplierId));
-        return found ? found.name : '';
+    const getSupplierById = (supplierId) => {
+        return suppliers.find((supplier) => String(supplier.id) === String(supplierId)) || null;
     };
 
     const getRows = () => Array.from(rowsContainer.querySelectorAll('.supplier-row'));
@@ -105,13 +106,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const placeholder = supplierNameEl.dataset.placeholder || 'Belum dipilih';
-        const supplierName = supplierId ? getSupplierNameById(supplierId) : '';
+        const placeholder = supplierNameEl.dataset.placeholder || 'Not selected';
+        const supplier = supplierId ? getSupplierById(supplierId) : null;
 
         supplierNameEl.classList.remove('bg-light-primary', 'bg-body', 'text-dark', 'text-muted', 'fw-semibold');
 
-        if (supplierName) {
-            supplierNameText.textContent = supplierName;
+        if (supplier) {
+            supplierNameText.innerHTML = supplier.code
+                ? `<span class="badge bg-light-secondary font-monospace me-2">${escapeHtml(supplier.code)}</span>${escapeHtml(supplier.name)}`
+                : escapeHtml(supplier.name);
             supplierNameEl.classList.add('bg-body', 'text-dark', 'fw-semibold');
             if (clearButton) {
                 clearButton.style.display = 'flex';
@@ -132,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const rows = getRows();
         const selectedCount = rows.filter((row) => row.querySelector('.supplier-id-input')?.value).length;
-        supplierSummary.textContent = `${selectedCount}/${rows.length} supplier dipilih`;
+        supplierSummary.textContent = `${selectedCount}/${rows.length} supplier${rows.length !== 1 ? 's' : ''} selected`;
     };
 
     const updateRemoveButtons = () => {
@@ -176,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return true;
             }
 
-            return supplier.name.toLowerCase().includes(keyword);
+            return supplier.name.toLowerCase().includes(keyword) || (supplier.code || '').toLowerCase().includes(keyword);
         })
             .sort((a, b) => {
                 if (!keyword) {
@@ -202,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
         if (!filteredSuppliers.length) {
-            pickerList.innerHTML = '<div class="text-muted small p-2">Supplier tidak ditemukan.</div>';
+            pickerList.innerHTML = '<div class="text-center py-4 text-muted"><i class="fa-duotone fa-solid fa-building-circle-xmark fs-2 mb-2 d-block"></i><div class="fw-semibold small">No suppliers found</div><div class="small opacity-75">Try a different name or code</div></div>';
             return;
         }
 
@@ -214,12 +217,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 return `
                     <button
                         type="button"
-                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isSelected ? 'active' : ''}"
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-2 ${isSelected ? 'active' : ''}"
                         data-supplier-id="${supplier.id}"
                         ${isTaken ? 'disabled' : ''}
                     >
-                        <span>${supplier.name}</span>
-                        ${isTaken ? '<span class="badge bg-light-secondary">Sudah dipilih</span>' : ''}
+                        <span class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
+                            ${supplier.code ? `<span class="badge bg-light-secondary font-monospace flex-shrink-0">${escapeHtml(supplier.code)}</span>` : ''}
+                            <span class="text-truncate">${escapeHtml(supplier.name)}</span>
+                        </span>
+                        ${isTaken ? '<span class="badge bg-light-warning flex-shrink-0">Already selected</span>' : ''}
                     </button>
                 `;
             })
@@ -392,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (unselectedRows.length) {
                 unselectedRows.forEach((row) => setRowInvalidState(row, true));
                 event.preventDefault();
-                showFormNotice('Mohon pilih supplier untuk setiap baris terlebih dahulu.');
+                showFormNotice('Please select a supplier for each row before saving.');
                 return;
             }
 
@@ -417,7 +423,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (!form.checkValidity()) {
                 event.preventDefault();
-                showFormNotice('Mohon lengkapi field wajib seperti Unit Price pada setiap baris.');
+                showFormNotice('Please fill in all required fields such as Unit Price for each row.');
                 form.reportValidity();
                 return;
             }

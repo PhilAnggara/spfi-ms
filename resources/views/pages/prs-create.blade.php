@@ -120,7 +120,7 @@
                                         <option value="" disabled>-- Select Department --</option>
                                         @foreach ($departments as $department)
                                             <option value="{{ $department->id }}" {{ auth()->user()->department_id == $department->id ? 'selected' : '' }}>
-                                                {{ $department->name }}
+                                                {{ $department->code }} - {{ $department->name }}
                                             </option>
                                         @endforeach
                                     </select>

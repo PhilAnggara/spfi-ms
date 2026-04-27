@@ -53,7 +53,7 @@
                             <select id="filter-department" class="form-select">
                                 <option value="" @selected(request('department') === null || request('department') === '')>All</option>
                                 @foreach ($filterDepartments as $department)
-                                    <option value="{{ $department->name }}" @selected(request('department') === $department->name)>{{ $department->name }}</option>
+                                    <option value="{{ $department->name }}" @selected(request('department') === $department->name)>{{ $department->code }} - {{ $department->name }}</option>
                                 @endforeach
                             </select>
                         </div>

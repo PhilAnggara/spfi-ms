@@ -36,7 +36,7 @@
                     <select id="user-filter-department" class="form-select">
                         <option value="">All Departments</option>
                         @foreach ($departments as $department)
-                            <option value="{{ $department->id }}">{{ $department->name }} ({{ $department->code }})</option>
+                            <option value="{{ $department->id }}">{{ $department->code }} - {{ $department->name }}</option>
                         @endforeach
                     </select>
                 </div>
