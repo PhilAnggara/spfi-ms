@@ -79,6 +79,11 @@ return [
             'connection' => env('LEGACY_DB_ASSIGN_CANV_DTL_CONNECTION'),
             'table' => env('LEGACY_DB_ASSIGN_CANV_DTL_TABLE', 'assign_canv_dtl'),
         ],
+        'assign_canv_prc' => [
+            'csv_path' => 'csv/[b12d4a36]/[assign_canv_prc].csv',
+            'connection' => env('LEGACY_DB_ASSIGN_CANV_PRC_CONNECTION'),
+            'table' => env('LEGACY_DB_ASSIGN_CANV_PRC_TABLE', 'assign_canv_prc'),
+        ],
         'po' => [
             'csv_path' => 'csv/[b12d4a36]/[po].csv',
             'connection' => env('LEGACY_DB_PO_CONNECTION'),

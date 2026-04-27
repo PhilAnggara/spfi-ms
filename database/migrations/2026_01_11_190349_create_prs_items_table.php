@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignId('canvasser_id')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->dateTime('assigned_canvasser_at')->nullable();
             $table->integer('quantity');
+            $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

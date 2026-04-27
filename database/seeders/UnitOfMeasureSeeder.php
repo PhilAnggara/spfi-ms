@@ -45,6 +45,7 @@ class UnitOfMeasureSeeder extends Seeder
                     'name' => $data['uom_name'] ?? null,
                     'code' => $data['uom_code'] ?? null,
                     'remarks' => $remarks,
+                    'meta' => json_encode($data),
                     'created_at' => $createdAt,
                     'updated_at' => $updatedAt,
                 ]);
@@ -101,6 +102,7 @@ class UnitOfMeasureSeeder extends Seeder
                 'name' => $data['uom_name'] ?? null,
                 'code' => $data['uom_code'] ?? null,
                 'remarks' => $remarks,
+                'meta' => json_encode($data),
                 'created_at' => $createdAt,
                 'updated_at' => $updatedAt,
             ]);

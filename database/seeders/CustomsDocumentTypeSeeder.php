@@ -87,6 +87,7 @@ class CustomsDocumentTypeSeeder extends Seeder
                     'name' => $name,
                 ],
                 [
+                    'meta' => json_encode($row),
                     'updated_at' => now(),
                     'created_at' => now(),
                 ]

@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('name')->index();
             $table->string('code')->unique();
             $table->text('remarks')->nullable();
+            $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

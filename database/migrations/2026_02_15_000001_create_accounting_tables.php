@@ -18,6 +18,7 @@ return new class extends Migration
             $table->integer('tab')->default(0);
             $table->boolean('other')->default(false);
             $table->boolean('selection')->default(false);
+            $table->json('meta')->nullable();
             $table->timestamps();
         });
 
@@ -26,6 +27,7 @@ return new class extends Migration
             $table->id();
             $table->string('group_code', 10)->unique();
             $table->string('group_desc');
+            $table->json('meta')->nullable();
             $table->timestamps();
         });
 
@@ -34,6 +36,7 @@ return new class extends Migration
             $table->id();
             $table->string('code', 10)->unique();
             $table->string('desc');
+            $table->json('meta')->nullable();
             $table->timestamps();
         });
 
@@ -44,6 +47,7 @@ return new class extends Migration
             $table->foreignId('accounting_code_id')->constrained('accounting_codes')->onDelete(fk_on_delete('cascade'));
             $table->foreignId('grouping_id')->nullable()->constrained('groupings')->onDelete(fk_on_delete('set null'));
             $table->string('major', 2)->nullable();
+            $table->json('meta')->nullable();
             $table->timestamps();
 
             $table->unique(['group_code_id', 'accounting_code_id'], 'unique_mapping');

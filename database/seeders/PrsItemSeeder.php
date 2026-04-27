@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Carbon\Carbon;
 use Database\Seeders\Concerns\ResolvesLegacyImport;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -145,27 +146,31 @@ class PrsItemSeeder extends Seeder
                 }
             }
 
-            // Upsert berdasarkan prs_id + item_id agar idempotent.
-            DB::table('prs_items')->updateOrInsert(
-                [
-                    'prs_id' => $prsId,
-                    'item_id' => $itemId,
-                ],
-                [
-                    'prs_id' => $prsId,
-                    'item_id' => $itemId,
-                    'canvasser_id' => $canvasserId,
-                    'assigned_canvasser_at' => $assignedCanvasserAt?->toDateTimeString(),
-                    'quantity' => $quantity,
-                    'purchase_order_id' => null,
-                    'selected_canvassing_item_id' => null,
-                    'selection_reason' => null,
-                    'is_direct_purchase' => false,
-                    'created_at' => $createdDate ?? now(),
-                    'updated_at' => $updatedDate ?? now(),
-                    'deleted_at' => $deletedAt,
-                ]
-            );
+            $attributes = [
+                'prs_id' => $prsId,
+                'item_id' => $itemId,
+            ];
+
+            $values = [
+                'prs_id' => $prsId,
+                'item_id' => $itemId,
+                'canvasser_id' => $canvasserId,
+                'assigned_canvasser_at' => $assignedCanvasserAt?->toDateTimeString(),
+                'quantity' => $quantity,
+                'purchase_order_id' => null,
+                'selected_canvassing_item_id' => null,
+                'selection_reason' => null,
+                'is_direct_purchase' => false,
+                'meta' => json_encode($data),
+                'created_at' => $createdDate ?? now(),
+                'updated_at' => $updatedDate ?? now(),
+                'deleted_at' => $deletedAt,
+            ];
+
+            if (! $this->upsertPrsItemWithRetry($attributes, $values, $prsNumber, $productCode)) {
+                $skipped++;
+                continue;
+            }
 
             $inserted++;
         }
@@ -504,6 +509,50 @@ class PrsItemSeeder extends Seeder
         }
 
         return $normalized;
+    }
+
+    /**
+     * Retry one row upsert when SQL Server returns deadlock/connection-drop errors.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $values
+     */
+    protected function upsertPrsItemWithRetry(array $attributes, array $values, string $prsNumber, string $productCode): bool
+    {
+        $maxAttempts = 3;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                DB::table('prs_items')->updateOrInsert($attributes, $values);
+
+                return true;
+            } catch (QueryException $e) {
+                $message = strtolower((string) $e->getMessage());
+                $isDeadlock = str_contains($message, 'deadlock') || str_contains($message, 'sqlstate[40001]');
+                $isConnectionDrop = str_contains($message, 'sqlstate[08s01]') || str_contains($message, 'communication link failure');
+                $isRetryable = $this->isSqlServer() && ($isDeadlock || $isConnectionDrop);
+
+                if (! $isRetryable || $attempt === $maxAttempts) {
+                    $this->warn("PRS Item failed after {$attempt} attempt(s): prsnumber '{$prsNumber}', productcode '{$productCode}'. {$e->getMessage()}");
+
+                    return false;
+                }
+
+                $this->warn("Retrying PRS Item upsert attempt {$attempt} for prsnumber '{$prsNumber}', productcode '{$productCode}' due to SQL Server lock/connection issue.");
+
+                if ($isConnectionDrop) {
+                    DB::disconnect();
+                    DB::reconnect();
+                }
+            }
+        }
+
+        return false;
+    }
+
+    protected function isSqlServer(): bool
+    {
+        return DB::connection()->getDriverName() === 'sqlsrv';
     }
 
 }

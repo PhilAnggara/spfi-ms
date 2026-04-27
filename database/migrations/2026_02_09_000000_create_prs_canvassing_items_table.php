@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('prs_id')->constrained('prs')->onDelete(fk_on_delete('cascade'));
             $table->foreignId('prs_item_id')->constrained('prs_items')->onDelete(fk_on_delete('cascade'));
             $table->foreignId('supplier_id')->constrained('suppliers')->onDelete(fk_on_delete('restrict'));
+            $table->boolean('is_selected')->default(false);
             $table->decimal('unit_price', 15, 2);
             $table->unsignedInteger('lead_time_days')->nullable();
             $table->string('term_of_payment_type')->nullable();
@@ -23,7 +24,9 @@ return new class extends Migration
             $table->string('term_of_delivery')->nullable();
             $table->text('notes')->nullable();
             $table->foreignId('canvased_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
+            $table->json('meta')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique('prs_item_id');
         });

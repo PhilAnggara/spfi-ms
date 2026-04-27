@@ -29,6 +29,7 @@ return new class extends Migration
             $table->text('approval_notes')->nullable();
             // Persist signature names/titles for printing.
             $table->json('signature_meta')->nullable();
+            $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

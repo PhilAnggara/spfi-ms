@@ -12,10 +12,12 @@ class AccountingCode extends Model
     protected $fillable = [
         'code',
         'desc',
+        'meta',
     ];
 
     protected $casts = [
         'id' => 'integer',
+        'meta' => 'array',
     ];
 
     public function bsGroupings()

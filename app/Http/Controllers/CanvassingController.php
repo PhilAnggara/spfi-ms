@@ -6,6 +6,7 @@ use App\Models\PrsItem;
 use App\Models\PrsCanvassingItem;
 use App\Models\Department;
 use App\Models\Supplier;
+use App\Support\Concerns\PaginatesLegacySqlServer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class CanvassingController extends Controller
 {
+    use PaginatesLegacySqlServer;
+
     /**
      * List items assigned to the current canvasser.
      */
@@ -27,7 +30,7 @@ class CanvassingController extends Controller
             'department' => trim((string) $request->query('department', '')),
         ];
 
-        $prsItems = PrsItem::with([
+        $prsItemsQuery = PrsItem::with([
             'prs',
             'prs.department',
             'item.unit',
@@ -62,9 +65,15 @@ class CanvassingController extends Controller
                     $departmentQuery->where('code', $filters['department']);
                 });
             })
+            ->orderByDesc('assigned_canvasser_at')
             ->orderByDesc('created_at')
-            ->paginate(10)
-            ->withQueryString();
+            ->orderByDesc('id');
+
+        $prsItems = $this->paginateEloquentForCurrentConnection(
+            $prsItemsQuery,
+            'assigned_canvasser_at DESC, created_at DESC, id DESC',
+            10
+        );
 
         $departmentOptions = Department::query()
             ->select(['code', 'name'])

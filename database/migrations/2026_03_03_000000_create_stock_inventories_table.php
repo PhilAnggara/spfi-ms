@@ -23,6 +23,7 @@ return new class extends Migration
             $table->boolean('is_delete')->default(false);
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
+            $table->json('meta')->nullable();
             $table->timestamps();
 
             $table->unique(['item_id', 'wh_code'], 'stock_inventories_item_wh_unique');

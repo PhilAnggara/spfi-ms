@@ -33,6 +33,7 @@ return new class extends Migration
             $table->unsignedBigInteger('reference_id')->nullable();
             $table->unsignedBigInteger('reference_line_id')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
+            $table->json('meta')->nullable();
             $table->timestamps();
 
             $table->index(['date', 'item_id'], 'stock_balances_date_item_index');

@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             CustomsDocumentTypeSeeder::class,
             PrsSeeder::class,
             PrsItemSeeder::class,
+            PrsCanvassingItemSeeder::class,
             CurrencySeeder::class,
             PurchaseOrderSeeder::class,
             PrsStatusSyncSeeder::class,

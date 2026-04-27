@@ -17,12 +17,14 @@ class Grouping extends Model
         'tab',
         'other',
         'selection',
+        'meta',
     ];
 
     protected $casts = [
         'id' => 'integer',
         'other' => 'boolean',
         'selection' => 'boolean',
+        'meta' => 'array',
     ];
 
     public function bsGroupings()

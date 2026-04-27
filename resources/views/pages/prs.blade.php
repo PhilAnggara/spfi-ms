@@ -168,7 +168,14 @@
                                             {{ $primaryStatusText }}
                                         </span>
                                     </td>
-                                    <td>{{ $item->remarks ? Str::limit($item->remarks, 40, '...') : '-' }}</td>
+                                    {{-- <td>{{ $item->remarks ? Str::limit($item->remarks, 40, '...') : '-' }}</td> --}}
+                                    <td>
+                                        <span
+                                            data-bstooltip-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="{{ $item->remarks }}">{{ $item->remarks ? Str::limit($item->remarks, 40, '...') : '-' }}
+                                        </span>
+                                    </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">

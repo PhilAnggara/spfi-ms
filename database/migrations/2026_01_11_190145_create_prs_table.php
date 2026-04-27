@@ -20,6 +20,7 @@ return new class extends Migration
             $table->date('date_needed');
             $table->text('remarks')->nullable();
             $table->string('status')->default('REQUESTED'); // REQUESTED, CANVASSING, ON_HOLD, REVISED, PO_CREATED
+            $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

@@ -101,7 +101,14 @@
                                                 title="{{ $item->department?->name ?? '-' }}">{{ $item->department?->code ?? '-' }}</span>
                                         </td>
                                         <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
-                                        <td>{{ Str::limit($item->remarks, 20, '...') ?? '-' }}</td>
+                                        {{-- <td>{{ $item->remarks ? Str::limit($item->remarks, 40, '...') : '-' }}</td> --}}
+                                        <td>
+                                            <span
+                                                data-bstooltip-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="{{ $item->remarks }}">{{ $item->remarks ? Str::limit($item->remarks, 40, '...') : '-' }}
+                                            </span>
+                                        </td>
                                         <td>
                                             <button type="button" class="btn btn-sm icon icon-left" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}">
                                                 <i class="fa-light fa-eye text-primary"></i>

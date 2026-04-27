@@ -91,6 +91,7 @@ class PrsSeeder extends Seeder
                     'date_needed' => $requestDate,
                     'remarks' => $data['remarks'] ?? null,
                     'status' => 'REQUESTED',
+                    'meta' => json_encode($data),
                     'created_at' => $createdDate ?? now(),
                     'updated_at' => $updatedDate ?? now(),
                     'deleted_at' => $deletedAt,

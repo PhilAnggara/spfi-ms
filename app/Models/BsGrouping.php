@@ -14,6 +14,7 @@ class BsGrouping extends Model
         'accounting_code_id',
         'grouping_id',
         'major',
+        'meta',
     ];
 
     protected $casts = [
@@ -21,6 +22,7 @@ class BsGrouping extends Model
         'group_code_id' => 'integer',
         'accounting_code_id' => 'integer',
         'grouping_id' => 'integer',
+        'meta' => 'array',
     ];
 
     public function groupCode()

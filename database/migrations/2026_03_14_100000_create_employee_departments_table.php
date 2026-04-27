@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('old_code')->nullable()->index();
             $table->string('name')->index();
             $table->boolean('is_active')->default(true);
+            $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

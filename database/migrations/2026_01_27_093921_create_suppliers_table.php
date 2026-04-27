@@ -23,6 +23,7 @@ return new class extends Migration
             $table->text('remarks')->nullable();
             $table->foreignId('created_by')->constrained('users')->onDelete(fk_on_delete('restrict'));
             $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
+            $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

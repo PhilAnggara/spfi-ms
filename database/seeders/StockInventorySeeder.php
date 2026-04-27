@@ -76,6 +76,7 @@ class StockInventorySeeder extends Seeder
                     'average_price' => round($averagePrice, 2),
                     'is_active' => $isActive,
                     'is_delete' => $isDelete,
+                    'meta' => json_encode($row),
                     'created_by' => $createdBy,
                     'updated_by' => $updatedBy,
                     'created_at' => $createdAt,

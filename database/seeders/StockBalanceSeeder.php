@@ -102,6 +102,7 @@ class StockBalanceSeeder extends Seeder
                 'reference_type' => $referenceType,
                 'reference_id' => $referenceId,
                 'reference_line_id' => $referenceLineId,
+                'meta' => json_encode($row),
                 'created_by' => $createdBy,
                 'created_at' => $createdAt,
                 'updated_at' => $updatedAt,

@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name')->index();
             $table->string('code')->nullable()->index();
+            $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

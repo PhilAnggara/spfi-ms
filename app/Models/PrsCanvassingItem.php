@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PrsCanvassingItem extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'prs_canvassing_items';
 
@@ -15,6 +16,7 @@ class PrsCanvassingItem extends Model
         'prs_id',
         'prs_item_id',
         'supplier_id',
+        'is_selected',
         'unit_price',
         'lead_time_days',
         'term_of_payment_type',
@@ -22,6 +24,7 @@ class PrsCanvassingItem extends Model
         'term_of_delivery',
         'notes',
         'canvased_by',
+        'meta',
     ];
 
     protected $casts = [
@@ -29,8 +32,10 @@ class PrsCanvassingItem extends Model
         'prs_id' => 'integer',
         'prs_item_id' => 'integer',
         'supplier_id' => 'integer',
+        'is_selected' => 'boolean',
         'lead_time_days' => 'integer',
         'canvased_by' => 'integer',
+        'meta' => 'array',
     ];
 
     public function prs()

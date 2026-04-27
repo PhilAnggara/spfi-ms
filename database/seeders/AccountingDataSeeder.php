@@ -68,6 +68,7 @@ class AccountingDataSeeder extends Seeder
                     'tab' => (int)($this->readValue($row, ['tab'], 4) ?? 0),
                     'other' => $this->toBool($this->readValue($row, ['other'], 6)),
                     'selection' => $this->toBool($this->readValue($row, ['selection'], 8)),
+                    'meta' => json_encode($row),
                 ]
             );
 
@@ -103,7 +104,10 @@ class AccountingDataSeeder extends Seeder
 
             AccountingGroupCode::updateOrCreate(
                 ['group_code' => $groupCode],
-                ['group_desc' => $groupDesc]
+                [
+                    'group_desc' => $groupDesc,
+                    'meta' => json_encode($row),
+                ]
             );
 
             $processed++;
@@ -138,7 +142,10 @@ class AccountingDataSeeder extends Seeder
 
             AccountingCode::updateOrCreate(
                 ['code' => $code],
-                ['desc' => $desc]
+                [
+                    'desc' => $desc,
+                    'meta' => json_encode($row),
+                ]
             );
 
             $processed++;
@@ -191,6 +198,7 @@ class AccountingDataSeeder extends Seeder
                 [
                     'grouping_id' => $grouping?->id,
                     'major' => $major,
+                    'meta' => json_encode($row),
                 ]
             );
 

@@ -20,6 +20,7 @@ return new class extends Migration
             $table->string('type')->nullable();
             $table->integer('stock_on_hand')->default(0);
             $table->boolean('is_active')->default(true);
+            $table->json('meta')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

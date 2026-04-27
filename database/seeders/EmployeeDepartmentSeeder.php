@@ -46,6 +46,7 @@ class EmployeeDepartmentSeeder extends Seeder
                     'old_code' => $this->normalizeText($row['OldDeptCode'] ?? $row['old_dept_code'] ?? $row['old_code'] ?? null),
                     'name' => $name,
                     'is_active' => true,
+                    'meta' => json_encode($row),
                     'updated_at' => now(),
                     'deleted_at' => null,
                 ];

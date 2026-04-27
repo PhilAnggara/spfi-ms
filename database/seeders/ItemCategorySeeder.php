@@ -41,6 +41,7 @@ class ItemCategorySeeder extends Seeder
                 DB::table('item_categories')->insert([
                     'name' => $data['category_name'] ?? null,
                     'code' => $data['category_code'] ?? null,
+                    'meta' => json_encode($data),
                     'created_at' => $createdAt,
                     'updated_at' => $updatedAt,
                 ]);
@@ -94,6 +95,7 @@ class ItemCategorySeeder extends Seeder
             DB::table('item_categories')->insert([
                 'name' => $data['category_name'] ?? null,
                 'code' => $data['category_code'] ?? null,
+                'meta' => json_encode($data),
                 'created_at' => $createdAt,
                 'updated_at' => $updatedAt,
             ]);
