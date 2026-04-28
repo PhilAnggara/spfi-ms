@@ -1,6 +1,23 @@
 (function () {
     let isLoading = false;
     let pendingReplaceRequest = null;
+    const PHOTO_CROP_ASPECT_RATIO = 7 / 9;
+    const photoCropState = {
+        modalEl: null,
+        modalInstance: null,
+        imageEl: null,
+        applyButton: null,
+        resetButton: null,
+        zoomInButton: null,
+        zoomOutButton: null,
+        cropper: null,
+        activeInput: null,
+        sourceDataUrl: null,
+        sourceFileName: 'employee-photo.jpg',
+        sourceMimeType: 'image/jpeg',
+        clearOnCancel: false,
+        pendingApply: false,
+    };
     const pageContainerEl = document.getElementById('employees-page-container');
     const createModalId = pageContainerEl?.dataset.createModalId || null;
     const editModalId = pageContainerEl?.dataset.editModalId || null;
@@ -138,6 +155,208 @@
         }
     }
 
+    function getPhotoCropModalState() {
+        if (photoCropState.modalEl) {
+            return photoCropState;
+        }
+
+        const modalEl = document.getElementById('employee-photo-crop-modal');
+        if (!modalEl || !window.bootstrap || !window.Cropper) {
+            return null;
+        }
+
+        photoCropState.modalEl = modalEl;
+        photoCropState.modalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        photoCropState.imageEl = document.getElementById('employee-photo-cropper-image');
+        photoCropState.applyButton = document.getElementById('employee-photo-crop-apply');
+        photoCropState.resetButton = document.getElementById('employee-photo-crop-reset');
+        photoCropState.zoomInButton = document.getElementById('employee-photo-crop-zoom-in');
+        photoCropState.zoomOutButton = document.getElementById('employee-photo-crop-zoom-out');
+
+        if (
+            !photoCropState.imageEl ||
+            !photoCropState.applyButton ||
+            !photoCropState.resetButton ||
+            !photoCropState.zoomInButton ||
+            !photoCropState.zoomOutButton
+        ) {
+            return null;
+        }
+
+        modalEl.addEventListener('shown.bs.modal', function () {
+            if (!photoCropState.imageEl || !photoCropState.sourceDataUrl) {
+                return;
+            }
+
+            if (photoCropState.cropper) {
+                photoCropState.cropper.destroy();
+            }
+
+            photoCropState.imageEl.src = photoCropState.sourceDataUrl;
+            photoCropState.cropper = new window.Cropper(photoCropState.imageEl, {
+                aspectRatio: PHOTO_CROP_ASPECT_RATIO,
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 0.9,
+                responsive: true,
+                background: false,
+            });
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            if (photoCropState.cropper) {
+                photoCropState.cropper.destroy();
+                photoCropState.cropper = null;
+            }
+
+            if (!photoCropState.pendingApply && photoCropState.activeInput && photoCropState.clearOnCancel) {
+                photoCropState.activeInput.value = '';
+                updatePhotoUi(photoCropState.activeInput);
+            }
+
+            photoCropState.pendingApply = false;
+            photoCropState.clearOnCancel = false;
+            photoCropState.activeInput = null;
+            photoCropState.sourceDataUrl = null;
+        });
+
+        photoCropState.resetButton.addEventListener('click', function () {
+            photoCropState.cropper?.reset();
+        });
+
+        photoCropState.zoomInButton.addEventListener('click', function () {
+            photoCropState.cropper?.zoom(0.1);
+        });
+
+        photoCropState.zoomOutButton.addEventListener('click', function () {
+            photoCropState.cropper?.zoom(-0.1);
+        });
+
+        photoCropState.applyButton.addEventListener('click', function () {
+            if (!photoCropState.cropper || !photoCropState.activeInput) {
+                return;
+            }
+
+            const canvas = photoCropState.cropper.getCroppedCanvas({
+                width: 700,
+                height: 900,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+                fillColor: '#ffffff',
+            });
+
+            if (!canvas) {
+                return;
+            }
+
+            const mimeType = photoCropState.sourceMimeType === 'image/png' ? 'image/png' : 'image/jpeg';
+            canvas.toBlob(function (blob) {
+                if (!blob || !photoCropState.activeInput) {
+                    return;
+                }
+
+                const input = photoCropState.activeInput;
+                const extension = blob.type === 'image/png' ? 'png' : 'jpg';
+                const baseName = (photoCropState.sourceFileName || 'employee-photo').replace(/\.[^.]+$/, '');
+                const croppedFile = new File([blob], `${baseName}-crop.${extension}`, {
+                    type: blob.type,
+                    lastModified: Date.now(),
+                });
+
+                const transfer = new DataTransfer();
+                transfer.items.add(croppedFile);
+                input.files = transfer.files;
+
+                const removeInput = input.dataset.removeInputId
+                    ? document.getElementById(input.dataset.removeInputId)
+                    : null;
+                if (removeInput) {
+                    removeInput.value = '0';
+                }
+
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    updatePhotoUi(input, event.target?.result || null);
+                };
+                reader.readAsDataURL(croppedFile);
+
+                photoCropState.pendingApply = true;
+                photoCropState.modalInstance?.hide();
+            }, mimeType, 0.92);
+        });
+
+        return photoCropState;
+    }
+
+    function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                resolve(event.target?.result || '');
+            };
+            reader.onerror = function () {
+                reject(new Error('Unable to read image file.'));
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function imageUrlToDataUrl(url) {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error('Unable to load photo for cropping.');
+        }
+
+        const blob = await response.blob();
+        const extensionMatch = url.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+        const extension = extensionMatch ? extensionMatch[1] : 'jpg';
+
+        return {
+            dataUrl: await fileToDataUrl(new File([blob], `employee-photo.${extension}`, { type: blob.type || 'image/jpeg' })),
+            mimeType: blob.type || 'image/jpeg',
+        };
+    }
+
+    async function openPhotoCropModal(options) {
+        const state = getPhotoCropModalState();
+        if (!state || !options?.input) {
+            return false;
+        }
+
+        const input = options.input;
+        let sourceDataUrl = null;
+        let sourceMimeType = options.mimeType || 'image/jpeg';
+        const sourceFileName = options.fileName || 'employee-photo.jpg';
+
+        try {
+            if (options.file instanceof File) {
+                sourceDataUrl = await fileToDataUrl(options.file);
+                sourceMimeType = options.file.type || sourceMimeType;
+            } else if (typeof options.sourceUrl === 'string' && options.sourceUrl !== '') {
+                const loaded = await imageUrlToDataUrl(options.sourceUrl);
+                sourceDataUrl = loaded.dataUrl;
+                sourceMimeType = loaded.mimeType;
+            }
+        } catch (_) {
+            return false;
+        }
+
+        if (!sourceDataUrl) {
+            return false;
+        }
+
+        state.activeInput = input;
+        state.sourceDataUrl = sourceDataUrl;
+        state.sourceFileName = sourceFileName;
+        state.sourceMimeType = sourceMimeType;
+        state.clearOnCancel = options.clearOnCancel === true;
+        state.pendingApply = false;
+
+        state.modalInstance?.show();
+
+        return true;
+    }
+
     function bindPhotoEventsOnce() {
         if (window.__employeePhotoEventsBound) {
             return;
@@ -164,14 +383,76 @@
                 return;
             }
 
-            const reader = new FileReader();
-            reader.onload = function (loadEvent) {
-                updatePhotoUi(input, loadEvent.target?.result || null);
-            };
-            reader.readAsDataURL(file);
+            if (file.type && file.type.startsWith('image/')) {
+                openPhotoCropModal({
+                    input,
+                    file,
+                    fileName: file.name || input.dataset.existingFileName || 'employee-photo.jpg',
+                    mimeType: file.type,
+                    clearOnCancel: true,
+                }).then(function (opened) {
+                    if (!opened) {
+                        const reader = new FileReader();
+                        reader.onload = function (loadEvent) {
+                            updatePhotoUi(input, loadEvent.target?.result || null);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+
+                return;
+            }
+
+            updatePhotoUi(input);
         });
 
         document.addEventListener('click', function (event) {
+            const cropButton = event.target.closest('[data-photo-open-crop]');
+            if (cropButton) {
+                const input = document.getElementById(cropButton.dataset.inputId || '');
+                if (!input) {
+                    return;
+                }
+
+                const removeInput = input.dataset.removeInputId
+                    ? document.getElementById(input.dataset.removeInputId)
+                    : null;
+                const removingExisting = removeInput ? removeInput.value === '1' : false;
+
+                const file = input.files && input.files[0] ? input.files[0] : null;
+                if (file && file.type && file.type.startsWith('image/')) {
+                    openPhotoCropModal({
+                        input,
+                        file,
+                        fileName: file.name,
+                        mimeType: file.type,
+                        clearOnCancel: false,
+                    });
+
+                    return;
+                }
+
+                if (removingExisting) {
+                    return;
+                }
+
+                const existingSrc = input.dataset.existingSrc || '';
+                const defaultSrc = input.dataset.defaultSrc || '';
+                if (existingSrc === '' || existingSrc === defaultSrc) {
+                    return;
+                }
+
+                openPhotoCropModal({
+                    input,
+                    sourceUrl: existingSrc,
+                    fileName: input.dataset.existingFileName || 'employee-photo.jpg',
+                    mimeType: 'image/jpeg',
+                    clearOnCancel: false,
+                });
+
+                return;
+            }
+
             const clearButton = event.target.closest('[data-photo-clear]');
             if (clearButton) {
                 const input = document.getElementById(clearButton.dataset.photoClear);

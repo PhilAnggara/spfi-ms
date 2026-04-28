@@ -90,6 +90,14 @@
     justify-content: center;
 }
 
+.employee-photo-preview-stack {
+    width: 100%;
+    max-width: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
 .employee-photo-upload-preview {
     width: 100%;
     max-width: 160px;
@@ -99,6 +107,28 @@
     border: 3px solid #fff;
     background: #e2e8f0;
     box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+}
+
+.employee-cropper-frame {
+    width: 100%;
+    min-height: 440px;
+    max-height: 68vh;
+    border-radius: 1rem;
+    background: radial-gradient(circle at top right, rgba(37, 99, 235, 0.18), rgba(15, 23, 42, 0.9));
+    overflow: hidden;
+}
+
+.employee-cropper-image {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+}
+
+.employee-cropper-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
 .employee-photo-upload-content {
@@ -374,6 +404,14 @@
 
     .employee-photo-upload-preview {
         max-width: 180px;
+    }
+
+    .employee-photo-preview-stack {
+        max-width: 180px;
+    }
+
+    .employee-cropper-frame {
+        min-height: 320px;
     }
 
     .employee-photo-dropzone {

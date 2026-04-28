@@ -21,12 +21,23 @@
     <div class="col-12">
         <div class="employee-photo-upload-card">
             <div class="employee-photo-upload-preview-wrap">
-                <img
-                    src="{{ $photoPreviewUrl }}"
-                    alt="Employee photo preview"
-                    class="employee-photo-upload-preview"
-                    id="{{ $prefix }}-photo-preview"
-                >
+                <div class="employee-photo-preview-stack">
+                    <img
+                        src="{{ $photoPreviewUrl }}"
+                        alt="Employee photo preview"
+                        class="employee-photo-upload-preview"
+                        id="{{ $prefix }}-photo-preview"
+                    >
+                    <button
+                        type="button"
+                        class="btn btn-outline-primary btn-sm w-100"
+                        data-photo-open-crop
+                        data-input-id="{{ $photoInputId }}"
+                    >
+                        <i class="fa-light fa-crop-simple me-1"></i>
+                        Crop Photo
+                    </button>
+                </div>
             </div>
 
             <div class="employee-photo-upload-content">

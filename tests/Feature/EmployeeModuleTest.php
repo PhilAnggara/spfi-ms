@@ -80,6 +80,49 @@ class EmployeeModuleTest extends TestCase
             ->assertSee('Alice Example');
     }
 
+    public function test_employee_index_filters_by_photo_presence(): void
+    {
+        $department = EmployeeDepartment::create([
+            'code' => '70483',
+            'old_code' => '7048A',
+            'name' => 'HUMAN RESOURCES PHOTO TEST',
+        ]);
+
+        Employee::create([
+            'employee_department_id' => $department->id,
+            'employee_id' => 'PHOTO-001',
+            'code_employee' => 'CP-001',
+            'employee_name' => 'Eve With Photo',
+            'photo_path' => 'assets/images/employee_photos/cp-001-fake.jpg',
+        ]);
+
+        Employee::create([
+            'employee_department_id' => $department->id,
+            'employee_id' => 'PHOTO-002',
+            'code_employee' => 'CP-002',
+            'employee_name' => 'Frank No Photo',
+            'photo_path' => null,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('employees.index', ['has_photo' => 'yes']))
+            ->assertOk()
+            ->assertSee('Eve With Photo')
+            ->assertDontSee('Frank No Photo');
+
+        $this->actingAs($this->admin)
+            ->get(route('employees.index', ['has_photo' => 'no']))
+            ->assertOk()
+            ->assertSee('Frank No Photo')
+            ->assertDontSee('Eve With Photo');
+
+        $this->actingAs($this->admin)
+            ->get(route('employees.index'))
+            ->assertOk()
+            ->assertSee('Eve With Photo')
+            ->assertSee('Frank No Photo');
+    }
+
     public function test_employee_can_be_stored_updated_and_soft_deleted(): void
     {
         $department = EmployeeDepartment::create([

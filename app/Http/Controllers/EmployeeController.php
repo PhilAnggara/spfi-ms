@@ -91,11 +91,14 @@ class EmployeeController extends Controller
             'created_at',
         ];
 
+        $hasPhoto = mb_strtolower(trim((string) $request->query('has_photo', '')));
+
         return [
             'keyword' => trim((string) $request->query('keyword', '')),
             'department' => trim((string) $request->query('department', '')),
             'gender' => trim((string) $request->query('gender', '')),
             'status' => trim((string) $request->query('status', '')),
+            'has_photo' => in_array($hasPhoto, ['yes', 'no'], true) ? $hasPhoto : '',
             'sort_by' => in_array($sortBy, $allowedSortBy, true) ? $sortBy : 'created_at',
             'sort_direction' => in_array($sortDirection, ['asc', 'desc'], true) ? $sortDirection : 'desc',
         ];
@@ -144,6 +147,14 @@ class EmployeeController extends Controller
             })
             ->when($filters['status'] === 'terminated', function ($query) {
                 $query->whereDate('date_terminated', '<=', now()->toDateString());
+            })
+            ->when($filters['has_photo'] === 'yes', function ($query) {
+                $query->whereNotNull('photo_path')->where('photo_path', '!=', '');
+            })
+            ->when($filters['has_photo'] === 'no', function ($query) {
+                $query->where(function ($sub) {
+                    $sub->whereNull('photo_path')->orWhere('photo_path', '');
+                });
             });
     }
 

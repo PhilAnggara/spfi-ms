@@ -45,23 +45,31 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-4 col-xl-1">
+                    <div class="col-4 col-md-2 col-xl-1">
                         <label for="filter-employee-gender" class="form-label mb-1">Gender</label>
                         <select id="filter-employee-gender" class="form-select">
-                            <option value="">All Gender</option>
+                            <option value="">All</option>
                             <option value="M" @selected(($filters['gender'] ?? '') === 'M')>Male</option>
                             <option value="F" @selected(($filters['gender'] ?? '') === 'F')>Female</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-4 col-xl-1">
+                    <div class="col-4 col-md-2 col-xl-1">
                         <label for="filter-employee-status" class="form-label mb-1">Status</label>
                         <select id="filter-employee-status" class="form-select">
-                            <option value="">All Status</option>
+                            <option value="">All</option>
                             <option value="active" @selected(($filters['status'] ?? '') === 'active')>Active</option>
                             <option value="terminated" @selected(($filters['status'] ?? '') === 'terminated')>Terminated</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-4 col-xl-2">
+                    <div class="col-4 col-md-2 col-xl-1">
+                        <label for="filter-employee-has-photo" class="form-label mb-1">Photo</label>
+                        <select id="filter-employee-has-photo" class="form-select">
+                            <option value="">All</option>
+                            <option value="yes" @selected(($filters['has_photo'] ?? '') === 'yes')>Has Photo</option>
+                            <option value="no" @selected(($filters['has_photo'] ?? '') === 'no')>No Photo</option>
+                        </select>
+                    </div>
+                    <div class="col-8 col-md-4 col-xl-2">
                         <label for="filter-employee-sort-by" class="form-label mb-1">Sort By</label>
                         <select id="filter-employee-sort-by" class="form-select">
                             <option value="created_at" @selected(($filters['sort_by'] ?? 'created_at') === 'created_at')>Created Date</option>
@@ -73,14 +81,14 @@
                             <option value="date_terminated" @selected(($filters['sort_by'] ?? 'created_at') === 'date_terminated')>Date Terminated</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-4 col-xl-1">
+                    <div class="col-6 col-md-3 col-xl-1">
                         <label for="filter-employee-sort-direction" class="form-label mb-1">Order</label>
                         <select id="filter-employee-sort-direction" class="form-select">
-                            <option value="asc" @selected(($filters['sort_direction'] ?? 'desc') === 'asc')>Ascending</option>
-                            <option value="desc" @selected(($filters['sort_direction'] ?? 'desc') === 'desc')>Descending</option>
+                            <option value="asc" @selected(($filters['sort_direction'] ?? 'desc') === 'asc')>Asc</option>
+                            <option value="desc" @selected(($filters['sort_direction'] ?? 'desc') === 'desc')>Desc</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-4 col-xl-2">
+                    <div class="col-6 col-md-3 col-xl-1">
                         <button type="button" id="reset-employee-filter" class="btn btn-light-secondary w-100">
                             <i class="fa-regular fa-rotate-left me-1"></i>
                             Reset
@@ -132,7 +140,7 @@
                                         <th>Name</th>
                                         <th>Department</th>
                                         <th>Gender</th>
-                                        <th>Position</th>
+                                        <th>Date of Birth</th>
                                         <th>Hired Date</th>
                                         <th>Status</th>
                                         <th>Actions</th>
@@ -172,7 +180,7 @@
                                                 </span>
                                             </td>
                                             <td>{{ $employee->gender === 'F' ? 'Female' : ($employee->gender === 'M' ? 'Male' : '-') }}</td>
-                                            <td>{{ $employee->position_name ?? '-' }}</td>
+                                            <td>{{ optional($employee->date_of_birth)->format('d M Y') ?? '-' }}</td>
                                             <td>{{ optional($employee->date_hired)->format('d M Y') ?? '-' }}</td>
                                             <td>
                                                 <span class="badge {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
@@ -479,14 +487,58 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="employee-photo-crop-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header employee-modal-header">
+                <div>
+                    <h5 class="modal-title mb-1">Crop Employee Photo</h5>
+                    <small class="text-muted">Adjust photo for ID card frame (35mm x 45mm).</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="employee-cropper-frame" id="employee-photo-cropper-frame">
+                    <img id="employee-photo-cropper-image" alt="Employee photo crop canvas" class="employee-cropper-image">
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <div class="employee-cropper-actions">
+                    <button type="button" class="btn btn-light-secondary btn-sm" id="employee-photo-crop-reset">
+                        <i class="fa-light fa-arrow-rotate-left me-1"></i>
+                        Reset
+                    </button>
+                    <button type="button" class="btn btn-light-secondary btn-sm" id="employee-photo-crop-zoom-out">
+                        <i class="fa-light fa-magnifying-glass-minus me-1"></i>
+                        Zoom Out
+                    </button>
+                    <button type="button" class="btn btn-light-secondary btn-sm" id="employee-photo-crop-zoom-in">
+                        <i class="fa-light fa-magnifying-glass-plus me-1"></i>
+                        Zoom In
+                    </button>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="employee-photo-crop-apply">
+                        <i class="fa-light fa-check me-1"></i>
+                        Apply Crop
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('addon-style')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
     <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/modules/employees-index.css') }}">
 @endpush
 
 @push('addon-script')
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
     <script src="{{ url('assets/scripts/modules/employees-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/employees-index.js') }}"></script>
 @endpush
