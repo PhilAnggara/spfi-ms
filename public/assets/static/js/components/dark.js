@@ -12,12 +12,12 @@ function toggleDarkTheme() {
 /**
  * Set theme for mazer
  * @param {"dark"|"light"} theme
- * @param {boolean} persist 
+ * @param {boolean} persist
  */
 function setTheme(theme, persist = false) {
   document.body.classList.add(theme)
   document.documentElement.setAttribute('data-bs-theme', theme)
-  
+
   if (persist) {
     localStorage.setItem(THEME_KEY, theme)
   }
@@ -32,6 +32,10 @@ function initTheme() {
   if (storedTheme) {
     return setTheme(storedTheme)
   }
+
+  // Default to light mode until the user explicitly chooses a theme.
+  setTheme("light")
+
   //Detect if the user set his preferred color scheme to dark
   if (!window.matchMedia) {
     return
@@ -44,7 +48,6 @@ function initTheme() {
   mediaQuery.addEventListener("change", (e) =>
     setTheme(e.matches ? "dark" : "light", true)
   )
-  return setTheme(mediaQuery.matches ? "dark" : "light", true)
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -53,7 +56,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   if(toggler) {
     toggler.checked = theme === "dark"
-    
+
     toggler.addEventListener("input", (e) => {
       setTheme(e.target.checked ? "dark" : "light", true)
     })
