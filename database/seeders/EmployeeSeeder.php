@@ -134,16 +134,7 @@ class EmployeeSeeder extends Seeder
 
         $this->command?->info("✓ [employee] Inserted/Updated: {$inserted}, Skipped: {$skipped}");
         $this->command?->info("✓ [employee] Duplicate code_employee adjusted: {$duplicateAdjusted}");
-        $this->command?->info("✓ [employee] Photo relinked: {$relinkStats['relinked']}, Missing photo candidates: {$relinkStats['missing']}");
-        $this->command?->info(
-            "✓ [employee] Photo match source => new-pattern: {$relinkStats['matched_new']}, legacy-pattern: {$relinkStats['matched_legacy']}"
-        );
-        $this->command?->info(
-            "✓ [employee] Photo relink source => new-pattern: {$relinkStats['relinked_new']}, legacy-pattern: {$relinkStats['relinked_legacy']}"
-        );
-        $this->command?->info(
-            "✓ [employee] Photo already-linked => new-pattern: {$relinkStats['already_linked_new']}, legacy-pattern: {$relinkStats['already_linked_legacy']}"
-        );
+        $this->command?->info("✓ [employee] Photo relinked: {$relinkStats['relinked']}, Already linked: {$relinkStats['already_linked']}, Missing: {$relinkStats['missing']}");
     }
 
     /**
@@ -310,22 +301,13 @@ class EmployeeSeeder extends Seeder
     }
 
     /**
-     * @return array{relinked:int,missing:int,matched_new:int,matched_legacy:int,relinked_new:int,relinked_legacy:int,already_linked_new:int,already_linked_legacy:int}
+     * @return array{relinked:int,missing:int,already_linked:int}
      */
     private function relinkPhotoPaths(): array
     {
         $directory = public_path('assets/images/employee_photos');
         if (! File::isDirectory($directory)) {
-            return [
-                'relinked' => 0,
-                'missing' => 0,
-                'matched_new' => 0,
-                'matched_legacy' => 0,
-                'relinked_new' => 0,
-                'relinked_legacy' => 0,
-                'already_linked_new' => 0,
-                'already_linked_legacy' => 0,
-            ];
+            return ['relinked' => 0, 'missing' => 0, 'already_linked' => 0];
         }
 
         $photoFiles = [];
@@ -337,57 +319,31 @@ class EmployeeSeeder extends Seeder
         }
 
         if ($photoFiles === []) {
-            return [
-                'relinked' => 0,
-                'missing' => 0,
-                'matched_new' => 0,
-                'matched_legacy' => 0,
-                'relinked_new' => 0,
-                'relinked_legacy' => 0,
-                'already_linked_new' => 0,
-                'already_linked_legacy' => 0,
-            ];
+            return ['relinked' => 0, 'missing' => 0, 'already_linked' => 0];
         }
 
         $employees = DB::table('employees')
-            ->select(['id', 'employee_id', 'code_employee', 'photo_path'])
-            ->whereNotNull('employee_id')
+            ->select(['id', 'code_employee', 'employee_name', 'photo_path'])
             ->whereNotNull('code_employee')
             ->get();
 
         $relinked = 0;
         $missing = 0;
-        $matchedNew = 0;
-        $matchedLegacy = 0;
-        $relinkedNew = 0;
-        $relinkedLegacy = 0;
-        $alreadyLinkedNew = 0;
-        $alreadyLinkedLegacy = 0;
+        $alreadyLinked = 0;
 
         foreach ($employees as $employee) {
-            $codeSlug = Str::slug((string) $employee->code_employee, '-');
-            $employeeSlug = Str::slug((string) $employee->employee_id, '-');
+            $codeToken = $this->sanitizeCodeEmployeeForFilename((string) $employee->code_employee);
+            $employeeNameSlug = Str::slug((string) $employee->employee_name, '-') ?: 'employee';
 
-            $candidate = $this->findLatestPhotoByPatterns($photoFiles, $codeSlug, $employeeSlug);
+            $candidate = $this->findLatestPhotoByNewPattern($photoFiles, $codeToken, $employeeNameSlug);
             if ($candidate === null) {
                 $missing++;
                 continue;
             }
 
-            if ($candidate['source'] === 'new') {
-                $matchedNew++;
-            } else {
-                $matchedLegacy++;
-            }
-
             $path = 'assets/images/employee_photos/' . $candidate['name'];
             if ((string) $employee->photo_path === $path) {
-                if ($candidate['source'] === 'new') {
-                    $alreadyLinkedNew++;
-                } else {
-                    $alreadyLinkedLegacy++;
-                }
-
+                $alreadyLinked++;
                 continue;
             }
 
@@ -399,56 +355,34 @@ class EmployeeSeeder extends Seeder
                 ]);
 
             $relinked++;
-            if ($candidate['source'] === 'new') {
-                $relinkedNew++;
-            } else {
-                $relinkedLegacy++;
-            }
         }
 
-        return [
-            'relinked' => $relinked,
-            'missing' => $missing,
-            'matched_new' => $matchedNew,
-            'matched_legacy' => $matchedLegacy,
-            'relinked_new' => $relinkedNew,
-            'relinked_legacy' => $relinkedLegacy,
-            'already_linked_new' => $alreadyLinkedNew,
-            'already_linked_legacy' => $alreadyLinkedLegacy,
-        ];
+        return ['relinked' => $relinked, 'missing' => $missing, 'already_linked' => $alreadyLinked];
     }
 
     /**
      * @param  array<int, array{name:string,mtime:int}>  $photoFiles
-     * @return array{name:string,source:'new'|'legacy'}|null
+     * @return array{name:string,mtime:int}|null
      */
-    private function findLatestPhotoByPatterns(array $photoFiles, string $codeSlug, string $employeeSlug): ?array
-    {
-        $newPattern = null;
-        if ($codeSlug !== '') {
-            $newPattern = '/^' . preg_quote($codeSlug, '/') . '-\\d{14}-[a-z0-9]{6}\\.[a-z0-9]+$/i';
+    private function findLatestPhotoByNewPattern(
+        array $photoFiles,
+        string $codeToken,
+        string $employeeNameSlug
+    ): ?array {
+        if ($codeToken === '' || $employeeNameSlug === '') {
+            return null;
         }
 
-        $legacyPattern = null;
-        if ($employeeSlug !== '') {
-            $legacyPattern = '/^' . preg_quote($employeeSlug, '/') . '-\\d{14}-[a-z0-9]{6}\\.[a-z0-9]+$/i';
-        }
+        $pattern = '/^'
+            . preg_quote($codeToken, '/')
+            . '-'
+            . preg_quote($employeeNameSlug, '/')
+            . '-\d{8}_\d{6}_\d{3}(?:-\d+)?\.[a-z0-9]+$/i';
 
         $matches = [];
-
-        if ($newPattern !== null) {
-            foreach ($photoFiles as $photoFile) {
-                if (preg_match($newPattern, $photoFile['name']) === 1) {
-                    $matches[] = $photoFile;
-                }
-            }
-        }
-
-        if ($matches === [] && $legacyPattern !== null) {
-            foreach ($photoFiles as $photoFile) {
-                if (preg_match($legacyPattern, $photoFile['name']) === 1) {
-                    $matches[] = $photoFile;
-                }
+        foreach ($photoFiles as $photoFile) {
+            if (preg_match($pattern, $photoFile['name']) === 1) {
+                $matches[] = $photoFile;
             }
         }
 
@@ -458,10 +392,17 @@ class EmployeeSeeder extends Seeder
 
         usort($matches, static fn (array $a, array $b) => $b['mtime'] <=> $a['mtime']);
 
-        return [
-            'name' => $matches[0]['name'],
-            'source' => $newPattern !== null && preg_match($newPattern, $matches[0]['name']) === 1 ? 'new' : 'legacy',
-        ];
+        return $matches[0];
+    }
+
+    private function sanitizeCodeEmployeeForFilename(string $codeEmployee): string
+    {
+        $normalized = trim($codeEmployee);
+        $normalized = preg_replace('/[\\\\\/:*?"<>|]+/', '-', $normalized) ?? '';
+        $normalized = preg_replace('/\s+/', '-', $normalized) ?? '';
+        $normalized = trim($normalized, " .-_");
+
+        return $normalized === '' ? 'employee-code' : $normalized;
     }
 
     private function resolveDepartmentId(?string $code, array $lookup): ?int

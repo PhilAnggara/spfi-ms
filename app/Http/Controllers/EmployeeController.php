@@ -168,7 +168,8 @@ class EmployeeController extends Controller
         $validated = $this->validateEmployee($request);
         $department = EmployeeDepartment::query()->findOrFail((int) $validated['employee_department_id']);
         $codeEmployee = trim((string) $validated['code_employee']);
-        $photoPath = $this->storeEmployeePhoto($request, $codeEmployee);
+        $employeeName = trim((string) $validated['employee_name']);
+        $photoPath = $this->storeEmployeePhoto($request, $codeEmployee, $employeeName);
 
         Employee::create($this->employeePayload($validated, $department, $photoPath, $codeEmployee));
 
@@ -184,7 +185,8 @@ class EmployeeController extends Controller
 
         $validated = $this->validateEmployee($request, $employee);
         $department = EmployeeDepartment::query()->findOrFail((int) $validated['employee_department_id']);
-        $photoPath = $this->resolveUpdatedPhotoPath($request, $employee);
+        $employeeName = trim((string) ($validated['employee_name'] ?? $employee->employee_name));
+        $photoPath = $this->resolveUpdatedPhotoPath($request, $employee, $employeeName);
 
         // code_employee is immutable after creation; ignore any tampered payload values.
         $employee->update($this->employeePayload($validated, $department, $photoPath, (string) $employee->code_employee));
@@ -350,7 +352,12 @@ class EmployeeController extends Controller
         return $normalized === '' ? null : $normalized;
     }
 
-    private function storeEmployeePhoto(Request $request, string $codeEmployee, ?string $oldPhotoPath = null): ?string
+    private function storeEmployeePhoto(
+        Request $request,
+        string $codeEmployee,
+        string $employeeName,
+        ?string $oldPhotoPath = null
+    ): ?string
     {
         if (! $request->hasFile('photo')) {
             return $oldPhotoPath;
@@ -360,11 +367,13 @@ class EmployeeController extends Controller
         File::ensureDirectoryExists($directory);
 
         $file = $request->file('photo');
+        $sanitizedCodeEmployee = $this->sanitizeCodeEmployeeForFilename($codeEmployee);
+        $employeeNameSlug = Str::slug($employeeName, '-') ?: 'employee';
         $filename = sprintf(
             '%s-%s-%s.%s',
-            Str::slug($codeEmployee, '-') ?: 'employee-photo',
-            now()->format('YmdHis'),
-            Str::lower(Str::random(6)),
+            $sanitizedCodeEmployee,
+            $employeeNameSlug,
+            now()->format('Ymd_His_v'),
             $file->getClientOriginalExtension()
         );
 
@@ -375,10 +384,15 @@ class EmployeeController extends Controller
         return 'assets/images/employee_photos/' . $filename;
     }
 
-    private function resolveUpdatedPhotoPath(Request $request, Employee $employee): ?string
+    private function resolveUpdatedPhotoPath(Request $request, Employee $employee, string $employeeName): ?string
     {
         if ($request->hasFile('photo')) {
-            return $this->storeEmployeePhoto($request, (string) $employee->code_employee, $employee->photo_path);
+            return $this->storeEmployeePhoto(
+                $request,
+                (string) $employee->code_employee,
+                $employeeName,
+                $employee->photo_path
+            );
         }
 
         if ($request->boolean('remove_photo')) {
@@ -388,6 +402,16 @@ class EmployeeController extends Controller
         }
 
         return $employee->photo_path;
+    }
+
+    private function sanitizeCodeEmployeeForFilename(string $codeEmployee): string
+    {
+        $normalized = trim($codeEmployee);
+        $normalized = preg_replace('/[\\\\\/:*?"<>|]+/', '-', $normalized) ?? '';
+        $normalized = preg_replace('/\s+/', '-', $normalized) ?? '';
+        $normalized = trim($normalized, " .-_");
+
+        return $normalized === '' ? 'employee-code' : $normalized;
     }
 
     private function deleteEmployeePhoto(?string $photoPath): void

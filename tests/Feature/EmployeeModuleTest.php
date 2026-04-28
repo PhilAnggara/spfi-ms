@@ -29,6 +29,10 @@ class EmployeeModuleTest extends TestCase
             File::delete($path);
         }
 
+        foreach (File::glob(public_path('assets/images/employee_photos/C-002-*')) ?: [] as $path) {
+            File::delete($path);
+        }
+
         parent::tearDown();
     }
 
@@ -165,7 +169,7 @@ class EmployeeModuleTest extends TestCase
         $this->assertSame('70331', $employee->legacy_department_code);
         $this->assertNotNull($employee->photo_path);
         $this->assertTrue(File::exists(public_path($employee->photo_path)));
-        $this->assertMatchesRegularExpression('/^assets\/images\/employee_photos\/c-002-\d{14}-[a-z0-9]{6}\.[a-z0-9]+$/i', $employee->photo_path);
+        $this->assertMatchesRegularExpression('/^assets\/images\/employee_photos\/C-002-budi-example-\d{8}_\d{6}_\d{3}(?:-\d+)?\.[a-z0-9]+$/', $employee->photo_path);
 
         $oldPhotoPath = $employee->photo_path;
 
@@ -203,7 +207,7 @@ class EmployeeModuleTest extends TestCase
         $this->assertSame('2025-12-31', optional($employee->date_terminated)->toDateString());
         $this->assertNotNull($employee->photo_path);
         $this->assertTrue(File::exists(public_path($employee->photo_path)));
-        $this->assertMatchesRegularExpression('/^assets\/images\/employee_photos\/c-002-\d{14}-[a-z0-9]{6}\.[a-z0-9]+$/i', $employee->photo_path);
+        $this->assertMatchesRegularExpression('/^assets\/images\/employee_photos\/C-002-budi-example-updated-\d{8}_\d{6}_\d{3}(?:-\d+)?\.[a-z0-9]+$/', $employee->photo_path);
         $this->assertNotSame($oldPhotoPath, $employee->photo_path);
         $this->assertFalse(File::exists(public_path($oldPhotoPath)));
 
