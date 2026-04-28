@@ -14,6 +14,7 @@
     $clearButtonId = $prefix . '-photo-clear';
     $removeExistingButtonId = $prefix . '-photo-remove-existing';
     $removeInputId = $prefix . '-remove-photo';
+    $isEditMode = $employee !== null;
 @endphp
 
 <div class="row g-3">
@@ -105,7 +106,15 @@
     </div>
     <div class="col-12 col-md-4">
         <label for="{{ $prefix }}-code-employee" class="form-label mb-1">Code Employee</label>
-        <input type="text" id="{{ $prefix }}-code-employee" name="code_employee" class="form-control @error('code_employee') is-invalid @enderror" value="{{ $fieldValue('code_employee', $employee?->code_employee) }}" maxlength="100">
+        <input
+            type="text"
+            id="{{ $prefix }}-code-employee"
+            name="code_employee"
+            class="form-control @error('code_employee') is-invalid @enderror"
+            value="{{ $fieldValue('code_employee', $employee?->code_employee) }}"
+            maxlength="100"
+            @if($isEditMode) readonly @else required @endif
+        >
         @error('code_employee')
             <div class="invalid-feedback">{{ $message }}</div>
         @enderror

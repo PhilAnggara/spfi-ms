@@ -156,9 +156,10 @@ class EmployeeController extends Controller
 
         $validated = $this->validateEmployee($request);
         $department = EmployeeDepartment::query()->findOrFail((int) $validated['employee_department_id']);
-        $photoPath = $this->storeEmployeePhoto($request, trim((string) $validated['employee_id']));
+        $codeEmployee = trim((string) $validated['code_employee']);
+        $photoPath = $this->storeEmployeePhoto($request, $codeEmployee);
 
-        Employee::create($this->employeePayload($validated, $department, $photoPath));
+        Employee::create($this->employeePayload($validated, $department, $photoPath, $codeEmployee));
 
         return redirect()->back()->with('success', 'Employee has been created successfully.');
     }
@@ -172,9 +173,10 @@ class EmployeeController extends Controller
 
         $validated = $this->validateEmployee($request, $employee);
         $department = EmployeeDepartment::query()->findOrFail((int) $validated['employee_department_id']);
-        $photoPath = $this->resolveUpdatedPhotoPath($request, $validated, $employee);
+        $photoPath = $this->resolveUpdatedPhotoPath($request, $employee);
 
-        $employee->update($this->employeePayload($validated, $department, $photoPath));
+        // code_employee is immutable after creation; ignore any tampered payload values.
+        $employee->update($this->employeePayload($validated, $department, $photoPath, (string) $employee->code_employee));
 
         return redirect()->back()->with('success', "Employee {$employee->employee_name} has been updated successfully.");
     }
@@ -235,6 +237,16 @@ class EmployeeController extends Controller
     private function validateEmployee(Request $request, ?Employee $employee = null): array
     {
         $employeeId = $employee?->id;
+        $codeEmployeeRules = [
+            'required',
+            'string',
+            'max:100',
+            Rule::unique('employees', 'code_employee')->ignore($employeeId),
+        ];
+
+        if ($employee !== null) {
+            $codeEmployeeRules = ['sometimes', 'nullable', 'string', 'max:100'];
+        }
 
         return $request->validate([
             'employee_department_id' => ['required', 'exists:employee_departments,id'],
@@ -244,11 +256,7 @@ class EmployeeController extends Controller
                 'max:50',
                 Rule::unique('employees', 'employee_id')->ignore($employeeId)->whereNull('deleted_at'),
             ],
-            'code_employee' => [
-                'nullable',
-                'string',
-                'max:100',
-            ],
+            'code_employee' => $codeEmployeeRules,
             'id_biometrik' => [
                 'nullable',
                 'string',
@@ -280,12 +288,23 @@ class EmployeeController extends Controller
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
-    private function employeePayload(array $validated, EmployeeDepartment $department, ?string $photoPath = null): array
+    private function employeePayload(
+        array $validated,
+        EmployeeDepartment $department,
+        ?string $photoPath = null,
+        ?string $codeEmployee = null
+    ): array
     {
+        $resolvedCodeEmployee = $this->nullableText($codeEmployee);
+
+        if ($resolvedCodeEmployee === null) {
+            $resolvedCodeEmployee = $this->nullableText($validated['code_employee'] ?? null);
+        }
+
         return [
             'employee_department_id' => (int) $department->id,
             'employee_id' => trim((string) $validated['employee_id']),
-            'code_employee' => $this->nullableText($validated['code_employee'] ?? null),
+            'code_employee' => $resolvedCodeEmployee,
             'id_biometrik' => $this->nullableText($validated['id_biometrik'] ?? null),
             'employee_name' => trim((string) $validated['employee_name']),
             'photo_path' => $photoPath,
@@ -320,7 +339,7 @@ class EmployeeController extends Controller
         return $normalized === '' ? null : $normalized;
     }
 
-    private function storeEmployeePhoto(Request $request, string $employeeId, ?string $oldPhotoPath = null): ?string
+    private function storeEmployeePhoto(Request $request, string $codeEmployee, ?string $oldPhotoPath = null): ?string
     {
         if (! $request->hasFile('photo')) {
             return $oldPhotoPath;
@@ -332,7 +351,7 @@ class EmployeeController extends Controller
         $file = $request->file('photo');
         $filename = sprintf(
             '%s-%s-%s.%s',
-            Str::slug($employeeId, '-'),
+            Str::slug($codeEmployee, '-') ?: 'employee-photo',
             now()->format('YmdHis'),
             Str::lower(Str::random(6)),
             $file->getClientOriginalExtension()
@@ -345,13 +364,13 @@ class EmployeeController extends Controller
         return 'assets/images/employee_photos/' . $filename;
     }
 
-    private function resolveUpdatedPhotoPath(Request $request, array $validated, Employee $employee): ?string
+    private function resolveUpdatedPhotoPath(Request $request, Employee $employee): ?string
     {
         if ($request->hasFile('photo')) {
-            return $this->storeEmployeePhoto($request, trim((string) $validated['employee_id']), $employee->photo_path);
+            return $this->storeEmployeePhoto($request, (string) $employee->code_employee, $employee->photo_path);
         }
 
-        if ((bool) ($validated['remove_photo'] ?? false)) {
+        if ($request->boolean('remove_photo')) {
             $this->deleteEmployeePhoto($employee->photo_path);
 
             return null;
