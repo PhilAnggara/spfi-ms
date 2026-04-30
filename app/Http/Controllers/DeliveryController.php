@@ -337,7 +337,7 @@ class DeliveryController extends Controller
             ->when($drEnd !== '', function ($subQuery) use ($drEnd) {
                 $subQuery->whereDate('d.dr_date', '<=', $drEnd);
             })
-            ->orderByDesc('d.id');
+            ->orderByDesc('d.created_at');
 
         if (! $this->isSqlServerConnection()) {
             return $query
@@ -352,7 +352,7 @@ class DeliveryController extends Controller
         $rankedIdsQuery = (clone $query)
             ->reorder()
             ->select('d.id')
-            ->selectRaw('ROW_NUMBER() OVER (ORDER BY d.id DESC) as row_num');
+            ->selectRaw('ROW_NUMBER() OVER (ORDER BY d.created_at DESC) as row_num');
 
         $ids = DB::query()
             ->fromSub($rankedIdsQuery, 'ranked_deliveries')

@@ -368,7 +368,7 @@ class TransferSlipController extends Controller
             ->when($tsEnd !== '', function ($subQuery) use ($tsEnd) {
                 $subQuery->whereDate('ts.ts_date', '<=', $tsEnd);
             })
-            ->orderByDesc('ts.id');
+            ->orderByDesc('ts.created_at');
 
         if (! $this->isSqlServer()) {
             return $query
@@ -383,7 +383,7 @@ class TransferSlipController extends Controller
         $rankedIdsQuery = (clone $query)
             ->reorder()
             ->select('ts.id')
-            ->selectRaw('ROW_NUMBER() OVER (ORDER BY ts.id DESC) as row_num');
+            ->selectRaw('ROW_NUMBER() OVER (ORDER BY ts.created_at DESC) as row_num');
 
         $ids = DB::query()
             ->fromSub($rankedIdsQuery, 'ranked_ts')
