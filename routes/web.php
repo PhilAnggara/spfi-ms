@@ -156,6 +156,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {
         Route::get('/', [TransferSlipController::class, 'index'])->name('index');
+        Route::get('/{transferSlip}/print', [TransferSlipController::class, 'print'])->name('print');
     });
 
     Route::middleware('permission:create-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {
@@ -169,6 +170,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view-delivery')->prefix('deliveries')->name('deliveries.')->group(function () {
         Route::get('/', [DeliveryController::class, 'index'])->name('index');
+        Route::get('/{delivery}/print', [DeliveryController::class, 'print'])->name('print');
     });
 
     Route::middleware('permission:create-delivery')->prefix('deliveries')->name('deliveries.')->group(function () {

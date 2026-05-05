@@ -172,7 +172,7 @@
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-view-modal-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
                                                     <i class="fa-light fa-eye text-primary"></i>
                                                 </button>
-                                                <a href="{{ route('receiving-reports.print', ['receivingReport' => $rr, 'mode' => 'print']) }}" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print Isi Saja">
+                                                <a href="{{ route('receiving-reports.print', ['receivingReport' => $rr, 'mode' => 'print']) }}" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
                                                     <i class="fa-light fa-print text-primary"></i>
                                                 </a>
                                                 @role('administrator|im-manager|im-supervisor|im-staff')

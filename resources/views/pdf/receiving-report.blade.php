@@ -38,6 +38,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            font-weight: bold;
         }
 
         .po-number {
@@ -87,7 +88,7 @@
     @php
         $po = $receivingReport->purchaseOrder;
         $rowStartTopMm = 73;
-        $rowHeightMm = 9.2;
+        $rowHeightMm = 8;
         $maxRows = 11;
         $rows = $receivingReport->items->take($maxRows)->values();
         $rowCount = $rows->count();
@@ -192,9 +193,9 @@
             <img src="{{ $backgroundImageDataUri }}" alt="" class="rr-bg">
         @endif
 
-        <div class="field" style="left: 43mm; top: 41mm; width: 88mm;">{{ $po?->supplier?->name ?? '-' }}</div>
-        <div class="field po-number" style="left: 167mm; top: 38mm; width: 48mm;">{{ $po?->po_number ?? '-' }}</div>
-        <div class="field" style="left: 169mm; top: 49mm; width: 48mm;">{{ $poDateText }}</div>
+        <div class="field" style="left: 37mm; top: 41mm; width: 88mm;">{{ $po?->supplier?->name ?? '-' }}</div>
+        <div class="field po-number" style="left: 161mm; top: 38mm; width: 48mm;">{{ $po?->po_number ?? '-' }}</div>
+        <div class="field" style="left: 160mm; top: 49mm; width: 48mm;">{{ $poDateText }}</div>
 
         @foreach($rows as $index => $rrItem)
             @php
@@ -207,22 +208,22 @@
                 $top = $rowStartTopMm + ($index * $rowHeightMm);
             @endphp
 
-            <div class="cell item-cell" style="left: 18mm; top: {{ $top }}mm; width: 65mm;">{{ $item?->name ?? '-' }}</div>
-            <div class="cell" style="left: 94mm; top: {{ $top }}mm; width: 19mm;">{{ $item?->code ?? '-' }}</div>
-            <div class="cell center" style="left: 114mm; top: {{ $top }}mm; width: 24mm;">{{ $departmentCode }}</div>
-            <div class="cell right" style="left: 140mm; top: {{ $top }}mm; width: 20mm;">{{ number_format($qtyTotal, 2, '.', ',') }}</div>
-            <div class="cell center" style="left: 167mm; top: {{ $top }}mm; width: 20mm;">{{ $item?->unit?->name ?? 'PCS' }}</div>
-            <div class="cell right" style="left: 188mm; top: {{ $top }}mm; width: 30mm;">{{ number_format($unitCost, 2, '.', ',') }}</div>
-            <div class="cell right" style="left: 228mm; top: {{ $top }}mm; width: 38mm;">{{ number_format($amount, 2, '.', ',') }}</div>
+            <div class="cell item-cell" style="left: 15mm; top: {{ $top }}mm; width: 65mm;">{{ $item?->name ?? '-' }}</div>
+            <div class="cell center" style="left: 83mm; top: {{ $top }}mm; width: 20mm;">{{ $item?->code ?? '-' }}</div>
+            <div class="cell center" style="left: 108mm; top: {{ $top }}mm; width: 25mm;">{{ $departmentCode }}</div>
+            <div class="cell right" style="left: 138mm; top: {{ $top }}mm; width: 23mm;">{{ number_format($qtyTotal, 2, '.', ',') }}</div>
+            <div class="cell center" style="left: 163mm; top: {{ $top }}mm; width: 23mm;">{{ $item?->unit?->name ?? 'PCS' }}</div>
+            <div class="cell right" style="left: 189mm; top: {{ $top }}mm; width: 35mm;">{{ number_format($unitCost, 2, '.', ',') }}</div>
+            <div class="cell right" style="left: 228mm; top: {{ $top }}mm; width: 50mm;">{{ number_format($amount, 2, '.', ',') }}</div>
         @endforeach
 
         @if($rowCount > 1)
-            <div style="position: absolute; left: 235mm; top: {{ $amountLineTop }}mm; width: 38mm; border-top: 1px solid #111827;"></div>
-            <div class="cell right" style="left: 228mm; top: {{ $amountTotalTop }}mm; width: 38mm; font-weight: bold;">{{ number_format($totalAmount, 2, '.', ',') }}</div>
+            <div style="position: absolute; left: 228mm; top: {{ $amountLineTop }}mm; width: 50mm; border-top: 1px solid #111827;"></div>
+            <div class="cell right" style="left: 228mm; top: {{ $amountTotalTop }}mm; width: 50mm; font-weight: bold;">{{ number_format($totalAmount, 2, '.', ',') }}</div>
         @endif
 
         @php
-            $entryStartTop = 170;
+            $entryStartTop = 166;
             $entryRowHeight = 5.2;
             $entryRows = collect($accountingEntries)->take(5)->values();
         @endphp
@@ -230,14 +231,14 @@
         @foreach($entryRows as $entryIndex => $entry)
             @php $entryTop = $entryStartTop + ($entryIndex * $entryRowHeight); @endphp
             <div class="acct-cell" style="left: 16mm; top: {{ $entryTop }}mm; width: 20mm;">{{ $entry['cost_center'] !== '' ? $entry['cost_center'] : '' }}</div>
-            <div class="acct-cell" style="left: 38mm; top: {{ $entryTop }}mm; width: 20mm;">{{ $entry['account'] !== '' ? $entry['account'] : '' }}</div>
-            <div class="acct-cell right" style="left: 60mm; top: {{ $entryTop }}mm; width: 28mm;">{{ $entry['debit'] !== null ? number_format((float) $entry['debit'], 2, '.', ',') : '' }}</div>
-            <div class="acct-cell right" style="left: 91mm; top: {{ $entryTop }}mm; width: 28mm;">{{ $entry['credit'] !== null ? number_format((float) $entry['credit'], 2, '.', ',') : '' }}</div>
+            <div class="acct-cell" style="left: 30mm; top: {{ $entryTop }}mm; width: 20mm;">{{ $entry['account'] !== '' ? $entry['account'] : '' }}</div>
+            <div class="acct-cell right" style="left: 40mm; top: {{ $entryTop }}mm; width: 30mm;">{{ $entry['debit'] !== null ? number_format((float) $entry['debit'], 2, '.', ',') : '' }}</div>
+            <div class="acct-cell right" style="left: 70mm; top: {{ $entryTop }}mm; width: 30mm;">{{ $entry['credit'] !== null ? number_format((float) $entry['credit'], 2, '.', ',') : '' }}</div>
         @endforeach
 
-        <div class="field center" style="left: 175mm; top: 170mm; width: 47mm;">{{ $receivingReport->createdBy?->name ?? '-' }}</div>
-        <div class="field center" style="left: 233mm; top: 170mm; width: 45mm;">{{ $approvedByName ?? '-' }}</div>
-        <div class="field center" style="left: 235mm; top: 193mm; width: 45mm;">{{ $rrDateText }}</div>
+        <div class="field center" style="left: 175mm; top: 168mm; width: 47mm;">{{ $receivingReport->createdBy?->name ?? '-' }}</div>
+        <div class="field center" style="left: 233mm; top: 168mm; width: 45mm;">{{ $approvedByName ?? '-' }}</div>
+        <div class="field center" style="left: 235mm; top: 185mm; width: 45mm;">{{ $rrDateText }}</div>
     </div>
 </body>
 </html>

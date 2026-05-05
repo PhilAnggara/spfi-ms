@@ -159,6 +159,9 @@
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#ts-detail-modal-{{ $transferSlip->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="View detail">
                                                     <i class="fa-light fa-eye text-primary"></i>
                                                 </button>
+                                                <a href="####" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
+                                                    <i class="fa-light fa-print text-primary"></i>
+                                                </a>
                                                 @can('delete-transfer')
                                                     <button type="button" class="btn icon" onclick="confirmDeleteTransferSlip({{ $transferSlip->id }}, '{{ $transferSlip->ts_number }}')" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
                                                         <i class="fa-light fa-trash text-secondary"></i>
@@ -259,6 +262,13 @@
                                                 </tbody>
                                             </table>
                                         </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <a href="###" target="_blank" rel="noopener" class="btn btn-outline-primary">
+                                            <i class="fa-duotone fa-solid fa-file-pdf"></i>
+                                            Preview Form
+                                        </a>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                     </div>
                                 </div>
                             </div>
