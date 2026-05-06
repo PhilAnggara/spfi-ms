@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountingReportController;
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CurrencyController;
@@ -90,6 +91,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/po-registered-department', [PurchasingReportController::class, 'poRegisteredPerDepartment'])->name('procurement.reports.po-registered-department');
         Route::post('/reports/po-registered-item', [PurchasingReportController::class, 'poRegisteredPerItem'])->name('procurement.reports.po-registered-item');
         Route::post('/reports/po-registered-supplier', [PurchasingReportController::class, 'poRegisteredPerSupplier'])->name('procurement.reports.po-registered-supplier');
+    });
+
+    Route::middleware('role:administrator|purchasing-manager')->prefix('accounting')->group(function () {
+        Route::get('/reports', [AccountingReportController::class, 'index'])->name('accounting.reports.index');
+        Route::post('/reports/stock-card', [AccountingReportController::class, 'stockCard'])->name('accounting.reports.stock-card');
+        Route::post('/reports/transaction', [AccountingReportController::class, 'transaction'])->name('accounting.reports.transaction');
+        Route::post('/reports/restatement', [AccountingReportController::class, 'restatement'])->name('accounting.reports.restatement');
+        Route::post('/reports/stock-card-count', [AccountingReportController::class, 'stockCardCount'])->name('accounting.reports.stock-card-count');
+        Route::post('/reports/document-summary', [AccountingReportController::class, 'documentSummary'])->name('accounting.reports.document-summary');
+        Route::post('/reports/purchase', [AccountingReportController::class, 'purchase'])->name('accounting.reports.purchase');
     });
 
     Route::middleware('role:administrator|purchasing-staff')->group(function () {

@@ -243,7 +243,16 @@
                             <li class="sidebar-item {{ Request::is('procurement/reports') ? 'active' : '' }}">
                                 <a href="{{ route('procurement.reports.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-file-chart-column {{ Request::is('procurement/reports') ? 'fa-fade' : '' }}"></i>
-                                    <span>Reports</span>
+                                    <span>Purchasing Reports</span>
+                                </a>
+                            </li>
+                        @endrole
+
+                        @role('administrator|purchasing-manager')
+                            <li class="sidebar-item {{ Request::is('accounting/reports') ? 'active' : '' }}">
+                                <a href="{{ route('accounting.reports.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-file-invoice-dollar {{ Request::is('accounting/reports') ? 'fa-fade' : '' }}"></i>
+                                    <span>Accounting Reports</span>
                                 </a>
                             </li>
                         @endrole
