@@ -15,9 +15,9 @@
         <div class="error-page container">
             <div class="col-md-8 col-12 offset-md-2">
                 <div class="text-center">
-                    <img class="img-error" src="{{ url('assets/compiled/svg/error-500.svg') }}" alt="Service Unavailable">
-                    <h1 class="error-title">Maintenance</h1>
-                    <p class="fs-5 text-gray-600">Sorry, this page is currently under maintenance. Please try again shortly.</p>
+                    <img class="img-error" src="{{ url('assets/compiled/svg/maintenance-3.svg') }}" alt="Service Unavailable">
+                    <h1 class="error-title">Under Maintenance</h1>
+                    <p class="fs-5 text-gray-600">We are currently performing maintenance on the system. Please try again shortly.</p>
                     <p class="fs-5 text-gray-600">For urgent assistance, please contact <strong>SPFI IT Department</strong> at <strong>145</strong> or <strong>127</strong>.</p>
                     <a href="{{ url('/') }}" class="btn btn-lg btn-outline-primary mt-3">Go Home</a>
                 </div>
