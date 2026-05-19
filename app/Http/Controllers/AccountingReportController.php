@@ -325,69 +325,45 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        $selectedMonth = Carbon::createFromFormat('Y-m', Carbon::parse($validated['date_from'])->format('Y-m'));
-        $year = $selectedMonth->year;
-        $month = $selectedMonth->month;
+        $groups = collect([
+            [
+                'type' => 'RR',
+                'title' => 'Receiving Report',
+                'rows' => $this->receivingReportSummaryRows($validated),
+            ],
+            [
+                'type' => 'TS',
+                'title' => 'Transfer Slip',
+                'rows' => $this->transferSlipSummaryRows($validated),
+            ],
+            [
+                'type' => 'DR',
+                'title' => 'Delivery Receipt',
+                'rows' => $this->deliverySummaryRows($validated),
+            ],
+        ])->map(function (array $group) {
+            $group['total'] = $group['rows']->sum('amount');
 
-        $legacyRows = DB::connection('legacy_sqlsrv_2')
-            ->table('tbl_InventoryMonthly')
-            ->selectRaw('ItemCode, UCost, SUM(Ending) AS Ending, SUM(Begining) AS Beginning')
-            ->where('Category', $validated['category'])
-            ->whereRaw('YEAR(TranDate) = ? AND MONTH(TranDate) = ?', [$year, $month])
-            ->groupBy('ItemCode', 'UCost')
-            ->orderBy('ItemCode')
-            ->get();
-
-        $itemCodes = $legacyRows->pluck('ItemCode')
-            ->map(fn ($code) => strtoupper((string) $code))
-            ->unique()
-            ->values()
-            ->all();
-
-        $localItems = Item::whereIn(DB::raw('UPPER(code)'), $itemCodes)
-            ->with('unit')
-            ->get()
-            ->keyBy(fn (Item $item) => strtoupper($item->code));
-
-        $rows = $legacyRows->map(function ($row) use ($localItems) {
-            $itemCode = strtoupper((string) $row->ItemCode);
-            $item = $localItems->get($itemCode);
-            $ending = (float) $row->Ending;
-            $beginning = (float) $row->Beginning;
-            $unitCost = (float) $row->UCost;
-            $amount = $ending * $unitCost;
-            $beginningAmount = $beginning * $unitCost;
-            $transaction = $amount - $beginningAmount;
-
-            return [
-                'item_code' => $row->ItemCode,
-                'item_description' => $item?->name,
-                'unit' => $item?->unit?->name,
-                'qty' => $ending,
-                'unit_cost' => $unitCost,
-                'amount' => $amount,
-                'beginning_amount' => $beginningAmount,
-                'transaction' => $transaction,
-            ];
+            return $group;
         });
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
-            'title' => 'Document Summary per Doc',
-            'month' => Carbon::parse($validated['date_from'])->format('Y-m'),
+            'title' => 'Document Summary per Document',
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
             'category' => $validated['category'],
-            'rows' => $rows,
+            'groups' => $groups,
+            'grand_total' => $groups->sum('total'),
         ];
 
         return $this->exportReport(
             $validated['format'],
-            'exports.accounting-stock-card',
+            'exports.accounting-document-summary',
             $data,
-            'accounting-document-summary'
+            'accounting-document-summary',
+            'portrait'
         );
-
-        // Implementation will be added later
-        return response()->json(['message' => 'Document Summary per Doc report - Implementation pending']);
     }
 
     public function purchase(Request $request)
@@ -461,7 +437,7 @@ class AccountingReportController extends Controller
         );
     }
 
-    private function exportReport(string $format, string $view, array $data, string $filePrefix)
+    private function exportReport(string $format, string $view, array $data, string $filePrefix, string $orientation = 'landscape')
     {
         if ($format === 'excel') {
             return $this->streamExcel($filePrefix, $view, $data);
@@ -470,7 +446,7 @@ class AccountingReportController extends Controller
         $filename = sprintf('%s-%s.pdf', $filePrefix, now()->format('Ymd-His'));
 
         return Pdf::loadView($view, $data)
-            ->setPaper('a4', 'landscape')
+            ->setPaper('a4', $orientation)
             ->stream($filename);
     }
 
@@ -483,5 +459,96 @@ class AccountingReportController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.ms-excel',
         ]);
+    }
+
+    private function receivingReportSummaryRows(array $filters)
+    {
+        return DB::table('receiving_reports as rr')
+            ->join('receiving_report_items as rri', 'rri.receiving_report_id', '=', 'rr.id')
+            ->join('purchase_order_items as poi', 'poi.id', '=', 'rri.purchase_order_item_id')
+            ->join('items as i', 'i.id', '=', 'poi.item_id')
+            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->whereNull('rr.deleted_at')
+            ->whereDate('rr.received_date', '>=', $filters['date_from'])
+            ->whereDate('rr.received_date', '<=', $filters['date_to'])
+            ->where('ic.name', $filters['category'])
+            ->groupBy('rr.id', 'rr.rr_number', 'rr.received_date')
+            ->orderBy('rr.received_date')
+            ->orderBy('rr.rr_number')
+            ->select([
+                'rr.rr_number as number',
+                'rr.received_date as date',
+                DB::raw('SUM(COALESCE(rri.qty_good, 0) * COALESCE(poi.unit_price, 0)) as amount'),
+            ])
+            ->get()
+            ->map(fn ($row) => [
+                'number' => $row->number,
+                'date' => $row->date,
+                'amount' => (float) $row->amount,
+            ]);
+    }
+
+    private function transferSlipSummaryRows(array $filters)
+    {
+        return DB::table('transfer_slips as ts')
+            ->join('transfer_slip_items as tsi', 'tsi.transfer_slip_id', '=', 'ts.id')
+            ->join('items as i', 'i.id', '=', 'tsi.item_id')
+            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->leftJoin('stock_inventories as si', function ($join) {
+                $join->on('si.item_id', '=', 'tsi.item_id')
+                    ->where('si.is_active', true)
+                    ->where('si.is_delete', false);
+            })
+            ->whereNull('ts.deleted_at')
+            ->whereNull('tsi.deleted_at')
+            ->whereDate('ts.ts_date', '>=', $filters['date_from'])
+            ->whereDate('ts.ts_date', '<=', $filters['date_to'])
+            ->where('ic.name', $filters['category'])
+            ->groupBy('ts.id', 'ts.ts_number', 'ts.ts_date')
+            ->orderBy('ts.ts_date')
+            ->orderBy('ts.ts_number')
+            ->select([
+                'ts.ts_number as number',
+                'ts.ts_date as date',
+                DB::raw('SUM(COALESCE(tsi.quantity, 0) * COALESCE(si.average_price, 0)) as amount'),
+            ])
+            ->get()
+            ->map(fn ($row) => [
+                'number' => $row->number,
+                'date' => $row->date,
+                'amount' => (float) $row->amount,
+            ]);
+    }
+
+    private function deliverySummaryRows(array $filters)
+    {
+        return DB::table('deliveries as d')
+            ->join('delivery_items as di', 'di.delivery_id', '=', 'd.id')
+            ->join('items as i', 'i.id', '=', 'di.item_id')
+            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->leftJoin('stock_inventories as si', function ($join) {
+                $join->on('si.item_id', '=', 'di.item_id')
+                    ->where('si.is_active', true)
+                    ->where('si.is_delete', false);
+            })
+            ->whereNull('d.deleted_at')
+            ->whereNull('di.deleted_at')
+            ->whereDate('d.dr_date', '>=', $filters['date_from'])
+            ->whereDate('d.dr_date', '<=', $filters['date_to'])
+            ->where('ic.name', $filters['category'])
+            ->groupBy('d.id', 'd.dr_number', 'd.dr_date')
+            ->orderBy('d.dr_date')
+            ->orderBy('d.dr_number')
+            ->select([
+                'd.dr_number as number',
+                'd.dr_date as date',
+                DB::raw('SUM(COALESCE(di.quantity, 0) * COALESCE(si.average_price, 0)) as amount'),
+            ])
+            ->get()
+            ->map(fn ($row) => [
+                'number' => $row->number,
+                'date' => $row->date,
+                'amount' => (float) $row->amount,
+            ]);
     }
 }
