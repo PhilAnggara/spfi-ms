@@ -4,11 +4,11 @@
     <meta charset="utf-8">
     <title>{{ $title }}</title>
     <style>
-        body { font-family: Arial, sans-serif; font-size: 10px; color: #111; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #999; padding: 4px 5px; vertical-align: top; }
-        th { background: #f0f0f0; text-align: center; font-weight: bold; }
-        .no-border td { border: none; padding: 2px 0; }
+        body { font-family: Arial, sans-serif; font-size: 8.5px; color: #111; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 3px; }
+        th, td { border: none; padding: 2px 5px; vertical-align: top; }
+        th { font-size: 7.5px; text-align: left; font-weight: bold; text-transform: uppercase; }
+        .no-border td { padding: 1px 0; }
         .center { text-align: center; }
         .right { text-align: right; }
         .bold { font-weight: bold; }
@@ -44,9 +44,9 @@
             <th>Item Code</th>
             <th>Item Name</th>
             <th>UoM</th>
-            <th>Quantity</th>
-            <th>Unit Price</th>
-            <th>Amount</th>
+            <th class="right">Quantity</th>
+            <th class="right">Unit Price</th>
+            <th class="right">Amount</th>
         </tr>
         @forelse ($rows as $row)
             <tr>

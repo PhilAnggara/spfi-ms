@@ -4,11 +4,12 @@
     <meta charset="utf-8">
     <title>{{ $title }}</title>
     <style>
-        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; }
+        body { font-family: Arial, sans-serif; font-size: 9.5px; color: #111; }
         .sheet { width: 100%; }
-        table { width: 100%; border-collapse: collapse; }
-        td, th { border: 1px solid #ccc; padding: 4px 6px; }
-        .no-border td { border: none; padding: 2px 0; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 3px; }
+        td, th { border: none; padding: 2px 7px; }
+        th { font-size: 8.5px; font-weight: bold; text-align: left; text-transform: uppercase; }
+        .no-border td { padding: 1px 0; }
         .center { text-align: center; }
         .right { text-align: right; }
         .bold { font-weight: bold; }
@@ -46,8 +47,8 @@
             <th>Date</th>
             <th>Code</th>
             <th>Description</th>
-            <th>Stock on Hand</th>
-            <th>Quantity</th>
+            <th class="right">Stock on Hand</th>
+            <th class="right">Quantity</th>
             <th>Unit</th>
             <th>Code</th>
             <th>Name</th>

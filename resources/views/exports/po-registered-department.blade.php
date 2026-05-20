@@ -4,10 +4,11 @@
     <meta charset="utf-8">
     <title>{{ $title }}</title>
     <style>
-        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; }
-        table { width: 100%; border-collapse: collapse; }
-        td, th { border: 1px solid #ccc; padding: 4px 6px; }
-        .no-border td { border: none; padding: 2px 0; }
+        body { font-family: Arial, sans-serif; font-size: 8px; color: #111; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 3px; }
+        td, th { border: none; padding: 2px 4px; }
+        th { font-size: 7.2px; font-weight: bold; text-align: left; text-transform: uppercase; }
+        .no-border td { padding: 1px 0; }
         .center { text-align: center; }
         .right { text-align: right; }
         .bold { font-weight: bold; }
@@ -54,19 +55,19 @@
             <th>Supplier</th>
             <th>Code</th>
             <th>Description</th>
-            <th>Quantity</th>
+            <th class="right">Quantity</th>
             <th>Unit</th>
             <th></th>
             <th></th>
             <th></th>
             <th></th>
             <th></th>
-            <th>IDR</th>
-            <th>PHP</th>
-            <th>EUR</th>
-            <th>GBP</th>
-            <th>USD</th>
-            <th>YEN</th>
+            <th class="right">IDR</th>
+            <th class="right">PHP</th>
+            <th class="right">EUR</th>
+            <th class="right">GBP</th>
+            <th class="right">USD</th>
+            <th class="right">YEN</th>
             <th></th>
             <th></th>
         </tr>

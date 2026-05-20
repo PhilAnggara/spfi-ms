@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <title>{{ $title }}</title>
     <style>
-        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-        th, td { border: 1px solid #999; padding: 5px 6px; vertical-align: top; }
-        th { background: #f0f0f0; text-align: center; font-weight: bold; }
-        .no-border td { border: none; padding: 2px 0; }
-        .section-title td { background: #e8e8e8; font-weight: bold; }
+        body { font-family: Arial, sans-serif; font-size: 9px; color: #111; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 3px; margin-bottom: 10px; }
+        th, td { border: none; padding: 2px 7px; vertical-align: top; }
+        th { font-size: 8px; text-align: left; font-weight: bold; text-transform: uppercase; }
+        .no-border td { padding: 1px 0; }
+        .section-title td { font-weight: bold; padding-top: 8px; }
         .center { text-align: center; }
         .right { text-align: right; }
         .bold { font-weight: bold; }
@@ -44,7 +44,7 @@
             <tr>
                 <th style="width: 35%;">Number</th>
                 <th style="width: 25%;">Date</th>
-                <th style="width: 40%;">Amount</th>
+                <th class="right" style="width: 40%;">Amount</th>
             </tr>
             @forelse ($group['rows'] as $row)
                 <tr>

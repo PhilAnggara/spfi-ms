@@ -10,23 +10,26 @@
         }
         body {
             font-family: Arial, sans-serif;
-            font-size: 11px;
+            font-size: 9px;
             line-height: 1.4;
+            margin: 18px 24px;
         }
         table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0 3px;
             margin-top: 10px;
         }
         th, td {
-            border: 1px solid #000;
-            padding: 6px;
+            border: none;
+            padding: 2px 6px;
             text-align: left;
         }
         th {
-            background-color: #f0f0f0;
+            font-size: 8px;
             font-weight: bold;
-            text-align: center;
+            text-align: left;
+            text-transform: uppercase;
         }
         .header {
             text-align: center;
@@ -42,7 +45,7 @@
             margin-top: 5px;
         }
         .report-info {
-            font-size: 10px;
+            font-size: 8px;
             margin-top: 5px;
             display: flex;
             justify-content: center;
@@ -78,11 +81,11 @@
                     <th style="width: 10%;">Code</th>
                     <th style="width: 35%;">Item Description</th>
                     <th style="width: 10%;">Unit</th>
-                    <th style="width: 10%;">Qty</th>
-                    <th style="width: 10%;">Unit Cost</th>
-                    <th style="width: 10%;">Amount</th>
-                    <th style="width: 10%;">Beginning</th>
-                    <th style="width: 10%;">Transaction</th>
+                    <th class="number-right" style="width: 10%;">Qty</th>
+                    <th class="number-right" style="width: 10%;">Unit Cost</th>
+                    <th class="number-right" style="width: 10%;">Amount</th>
+                    <th class="number-right" style="width: 10%;">Beginning</th>
+                    <th class="number-right" style="width: 10%;">Transaction</th>
                 </tr>
             </thead>
             <tbody>

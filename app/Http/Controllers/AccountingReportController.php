@@ -83,7 +83,8 @@ class AccountingReportController extends Controller
             $validated['format'],
             'exports.accounting-stock-card',
             $data,
-            'accounting-stock-card'
+            'accounting-stock-card',
+            'portrait'
         );
     }
 
