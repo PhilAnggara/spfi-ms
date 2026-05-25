@@ -19,8 +19,9 @@ function initPurchaseOrderFilters() {
         createdStart: document.getElementById('filter-po-created-start'),
         createdEnd: document.getElementById('filter-po-created-end'),
         reset: document.getElementById('reset-po-filter'),
-        statusChips: Array.from(document.querySelectorAll('.po-status-chip')),
     };
+
+    const getStatusChips = () => Array.from(document.querySelectorAll('.po-status-chip'));
 
     const setQueryParam = (searchParams, key, value) => {
         const normalizedValue = String(value || '').trim();
@@ -47,7 +48,7 @@ function initPurchaseOrderFilters() {
 
     const syncStatusChip = () => {
         const activeStatus = String(filterElements.status?.value || '');
-        filterElements.statusChips.forEach((chip) => {
+        getStatusChips().forEach((chip) => {
             const chipStatus = String(chip.dataset.statusValue || '');
             chip.classList.toggle('active', chipStatus === activeStatus);
         });
@@ -75,8 +76,15 @@ function initPurchaseOrderFilters() {
         debounceTimer = setTimeout(doRequest, 350);
     };
 
-    filterElements.statusChips.forEach((chip) => {
-        chip.addEventListener('click', function () {
+    if (filterForm.dataset.statusChipInitialized !== '1') {
+        filterForm.dataset.statusChipInitialized = '1';
+
+        document.addEventListener('click', function (event) {
+            const chip = event.target.closest('.po-status-chip');
+            if (!chip) {
+                return;
+            }
+
             if (!filterElements.status) {
                 return;
             }
@@ -85,7 +93,7 @@ function initPurchaseOrderFilters() {
             syncStatusChip();
             applyServerFilter(false);
         });
-    });
+    }
 
     if (filterElements.keyword) {
         filterElements.keyword.addEventListener('input', () => applyServerFilter(true));

@@ -86,6 +86,7 @@
             </div>
         </div>
 
+        <div id="prs-page-results">
         <div class="card shadow-sm border-0">
             <div class="card-body position-relative">
                 <div id="prs-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
@@ -206,10 +207,13 @@
                 </div>
             </div>
         </div>
+        </div>
     </section>
 </div>
-@include('includes.modals.prs-modal')
-@include('includes.modals.prs-export')
+<div id="prs-page-modals">
+    @include('includes.modals.prs-modal')
+    @include('includes.modals.prs-export')
+</div>
 </div>
 @endsection
 

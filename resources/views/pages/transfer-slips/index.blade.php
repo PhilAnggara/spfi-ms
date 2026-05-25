@@ -87,6 +87,7 @@
             </div>
         </div>
 
+        <div id="ts-page-results">
         <div class="card shadow-sm border-0">
             <div class="card-body position-relative">
                 <div id="ts-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
@@ -276,6 +277,7 @@
                     @endforeach
                 @endif
             </div>
+        </div>
         </div>
     </section>
 
