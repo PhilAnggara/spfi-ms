@@ -68,7 +68,9 @@
             </tr>
         @endforelse
         <tr>
-            <td colspan="10" class="right bold">Grand Total</td>
+            <td colspan="8" class="right bold">Grand Total</td>
+            <td class="right bold">{{ $fmtQty($total_quantity) }}</td>
+            <td></td>
             <td class="right bold">{{ $fmtMoney($total_amount) }}</td>
         </tr>
     </table>

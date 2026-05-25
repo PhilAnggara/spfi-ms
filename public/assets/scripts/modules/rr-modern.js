@@ -114,37 +114,34 @@ function initRrCustomsDocumentFields() {
     const createType = document.getElementById('create_customs_document_type_id');
     const createDate = document.getElementById('create_customs_document_date');
 
-    if (createFields && createFields.dataset.customsInitialized === '1') {
-        return;
-    }
-    if (createFields) {
+    if (createFields && createFields.dataset.customsInitialized !== '1') {
         createFields.dataset.customsInitialized = '1';
+
+        const syncCreateCustomsFields = function () {
+            if (!createToggles.length || !createFields || !createNumber || !createType || !createDate) {
+                return;
+            }
+
+            const selectedToggle = Array.from(createToggles).find((input) => input.checked);
+            const isRequired = selectedToggle ? selectedToggle.value === '1' : false;
+
+            createFields.classList.toggle('d-none', !isRequired);
+            createNumber.required = isRequired;
+            createType.required = isRequired;
+            createDate.required = isRequired;
+
+            if (!isRequired) {
+                createNumber.value = '';
+                createType.value = '';
+                createDate.value = '';
+            }
+        };
+
+        createToggles.forEach((input) => {
+            input.addEventListener('change', syncCreateCustomsFields);
+        });
+        syncCreateCustomsFields();
     }
-
-    const syncCreateCustomsFields = function () {
-        if (!createToggles.length || !createFields || !createNumber || !createType || !createDate) {
-            return;
-        }
-
-        const selectedToggle = Array.from(createToggles).find((input) => input.checked);
-        const isRequired = selectedToggle ? selectedToggle.value === '1' : false;
-
-        createFields.classList.toggle('d-none', !isRequired);
-        createNumber.required = isRequired;
-        createType.required = isRequired;
-        createDate.required = isRequired;
-
-        if (!isRequired) {
-            createNumber.value = '';
-            createType.value = '';
-            createDate.value = '';
-        }
-    };
-
-    createToggles.forEach((input) => {
-        input.addEventListener('change', syncCreateCustomsFields);
-    });
-    syncCreateCustomsFields();
 
     document.querySelectorAll('.rr-edit-customs-toggle').forEach((toggleGroup) => {
         if (toggleGroup.dataset.customsInitialized === '1') {

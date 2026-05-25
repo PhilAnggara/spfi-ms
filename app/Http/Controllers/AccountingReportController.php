@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Item;
-use App\Models\PurchaseOrderItem;
+use App\Models\ReceivingReportItem;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -376,44 +376,40 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        $rows = PurchaseOrderItem::with([
-            'purchaseOrder.supplier',
-            'purchaseOrder.currency',
-            'receivingReportItems.receivingReport',
-            'item.unit',
-            'item.category',
+        $rows = ReceivingReportItem::with([
+            'receivingReport',
+            'purchaseOrderItem.purchaseOrder.supplier',
+            'purchaseOrderItem.purchaseOrder.currency',
+            'purchaseOrderItem.item.unit',
+            'purchaseOrderItem.item.category',
         ])
-            ->whereHas('purchaseOrder', function ($query) use ($validated) {
-                $query->whereDate('created_at', '>=', $validated['date_from'])
-                    ->whereDate('created_at', '<=', $validated['date_to']);
+            ->whereHas('receivingReport', function ($query) use ($validated) {
+                $query->whereDate('received_date', '>=', $validated['date_from'])
+                    ->whereDate('received_date', '<=', $validated['date_to']);
             })
-            ->whereHas('item.category', function ($query) use ($validated) {
+            ->whereHas('purchaseOrderItem.item.category', function ($query) use ($validated) {
                 $query->where('name', $validated['category']);
             })
-            ->orderBy('purchase_order_id')
+            ->orderBy('receiving_report_id')
             ->orderBy('id')
             ->get()
-            ->map(function (PurchaseOrderItem $item) {
-                $po = $item->purchaseOrder;
-                $quantity = (float) $item->quantity;
-                $unitPrice = (float) $item->unit_price;
-                $amount = $item->line_subtotal !== null
-                    ? (float) $item->line_subtotal
-                    : $quantity * $unitPrice;
+            ->map(function (ReceivingReportItem $receivedItem) {
+                $poItem = $receivedItem->purchaseOrderItem;
+                $po = $poItem?->purchaseOrder;
+                $rr = $receivedItem->receivingReport;
+                $quantity = (float) $receivedItem->qty_good;
+                $unitPrice = (float) ($poItem?->unit_price ?? 0);
+                $amount = $quantity * $unitPrice;
 
                 return [
                     'supplier_name' => $po?->supplier?->name,
                     'po_number' => $po?->po_number ?? ($po ? '#' . $po->id : ''),
-                    'rr_number' => $item->receivingReportItems
-                        ->pluck('receivingReport.rr_number')
-                        ->filter()
-                        ->unique()
-                        ->implode(', '),
-                    'date' => $po?->created_at?->toDateString(),
+                    'rr_number' => $rr?->rr_number,
+                    'date' => $rr?->received_date?->toDateString(),
                     'currency' => $po?->currency?->code ?? 'IDR',
-                    'item_code' => $item->item?->code,
-                    'item_name' => $item->item?->name,
-                    'unit' => $item->item?->unit?->name ?? '',
+                    'item_code' => $poItem?->item?->code,
+                    'item_name' => $poItem?->item?->name,
+                    'unit' => $poItem?->item?->unit?->name ?? '',
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'amount' => $amount,
@@ -427,6 +423,7 @@ class AccountingReportController extends Controller
             'date_to' => $validated['date_to'],
             'category' => $validated['category'],
             'rows' => $rows,
+            'total_quantity' => $rows->sum('quantity'),
             'total_amount' => $rows->sum('amount'),
         ];
 

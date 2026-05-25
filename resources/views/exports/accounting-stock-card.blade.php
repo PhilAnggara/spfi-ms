@@ -54,6 +54,9 @@
         .number-right {
             text-align: right;
         }
+        .nowrap {
+            white-space: nowrap;
+        }
         .footer {
             margin-top: 20px;
             font-size: 9px;
@@ -101,6 +104,14 @@
                         <td class="number-right">{{ number_format($row['transaction'], 2) }}</td>
                     </tr>
                 @endforeach
+                <tr class="nowrap">
+                    <td colspan="3" style="font-weight: bold;">GRAND TOTAL</td>
+                    <td class="number-right" style="font-weight: bold;">{{ number_format($rows->sum('qty'), 2) }}</td>
+                    <td></td>
+                    <td class="number-right" style="font-weight: bold;">{{ number_format($rows->sum('amount'), 2) }}</td>
+                    <td class="number-right" style="font-weight: bold;">{{ number_format($rows->sum('beginning_amount'), 2) }}</td>
+                    <td class="number-right" style="font-weight: bold;">{{ number_format($rows->sum('transaction'), 2) }}</td>
+                </tr>
             </tbody>
         </table>
     @endif

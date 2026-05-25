@@ -16,6 +16,24 @@
         });
     }
 
+    function disposeBootstrapInstances(scope) {
+        if (!window.bootstrap || !scope) {
+            return;
+        }
+
+        if (window.bootstrap.Tooltip) {
+            scope.querySelectorAll('[data-bstooltip-toggle="tooltip"]').forEach((el) => {
+                window.bootstrap.Tooltip.getInstance(el)?.dispose();
+            });
+        }
+
+        if (window.bootstrap.Modal) {
+            scope.querySelectorAll('.modal').forEach((el) => {
+                window.bootstrap.Modal.getInstance(el)?.dispose();
+            });
+        }
+    }
+
     function setLoading(active) {
         const loadingEl = document.getElementById('rr-page-loading');
         if (!loadingEl) {
@@ -56,25 +74,33 @@
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const newResults = doc.querySelector('#rr-page-results');
+            const newModals = doc.querySelector('#rr-page-modals');
             const currentResults = document.querySelector('#rr-page-results');
+            const currentModals = document.querySelector('#rr-page-modals');
 
             const hasNewerPendingRequest = pendingReplaceRequest && pendingReplaceRequest.url !== normalizedUrl;
             if (hasNewerPendingRequest) {
                 return;
             }
 
-            if (!newResults || !currentResults) {
+            if (!newResults || !currentResults || !newModals || !currentModals) {
                 window.location.href = normalizedUrl;
                 return;
             }
 
+            disposeBootstrapInstances(currentResults);
+            disposeBootstrapInstances(currentModals);
             currentResults.replaceWith(newResults);
+            currentModals.replaceWith(newModals);
 
             if (pushState) {
                 window.history.pushState({}, '', normalizedUrl);
             }
 
             initPageTooltips(newResults);
+            if (typeof window.initReceivingReportPage === 'function') {
+                window.initReceivingReportPage();
+            }
 
             if (window.feather && typeof window.feather.replace === 'function') {
                 window.feather.replace();

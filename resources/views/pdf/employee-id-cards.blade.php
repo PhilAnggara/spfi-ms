@@ -50,6 +50,7 @@
         .id-card-header {
             padding: 2.8mm 3mm 2.4mm;
             background-color: #0f4c81;
+            background-color: #ffffff;
             background-image: linear-gradient(128deg, #0a3b6b 0%, #0f4c81 50%, #0ea5e9 100%);
             border-top-left-radius: 3.5mm;
             border-top-right-radius: 3.5mm;
@@ -60,6 +61,7 @@
             margin-top: 1.6mm;
             border-radius: 999px;
             background: rgba(255, 255, 255, 0.28);
+            background: rgba(15, 76, 129, 0.8);
         }
 
         .brand-table {
@@ -89,6 +91,7 @@
             font-size: 8pt;
             font-weight: bold;
             color: #ffffff;
+            color: #0f4c81;
             line-height: 1.25;
             letter-spacing: 0.02em;
         }
@@ -208,7 +211,7 @@
             width: 32mm;
             height: 32mm;
             border-radius: 50%;
-            background: rgba(14, 165, 233, 0.07);
+            /* background: rgba(14, 165, 233, 0.07); */
             bottom: -10mm;
             right: -10mm;
         }

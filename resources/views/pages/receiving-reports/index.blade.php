@@ -337,100 +337,101 @@
         </div>
     @endrole
 
-    @php $renderedPoModal = []; @endphp
-    @foreach ($receivingReports as $rr)
-        @php
-            $po = $rr->purchaseOrder;
-            $rrGood = (float) $rr->items->sum('qty_good');
-            $rrBad = (float) $rr->items->sum('qty_bad');
-            $customsDocType = $rr->customsDocumentType;
-        @endphp
+    <div id="rr-page-modals">
+        @php $renderedPoModal = []; @endphp
+        @foreach ($receivingReports as $rr)
+            @php
+                $po = $rr->purchaseOrder;
+                $rrGood = (float) $rr->items->sum('qty_good');
+                $rrBad = (float) $rr->items->sum('qty_bad');
+                $customsDocType = $rr->customsDocumentType;
+            @endphp
 
-        <div class="modal fade" id="rr-view-modal-{{ $rr->id }}" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">RR Detail - {{ $rr->rr_number ?? ('#' . $rr->id) }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">PO Number</small><div class="fw-semibold">{{ $po?->po_number ?? '-' }}</div></div></div>
-                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Supplier</small><div class="fw-semibold">{{ $po?->supplier?->name ?? '-' }}</div></div></div>
-                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Received Date</small><div class="fw-semibold">{{ optional($rr->received_date)->format('d M Y') }}</div></div></div>
+            <div class="modal fade" id="rr-view-modal-{{ $rr->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">RR Detail - {{ $rr->rr_number ?? ('#' . $rr->id) }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Need Customs Document</small><div class="fw-semibold">{{ $rr->requires_customs_document ? 'Yes' : 'No' }}</div></div></div>
-                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Customs Document Number</small><div class="fw-semibold">{{ $rr->customs_document_number ?: '-' }}</div></div></div>
-                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Customs Document Type</small><div class="fw-semibold">{{ $customsDocType ? ($customsDocType->code . ' - ' . $customsDocType->name) : '-' }}</div></div></div>
-                        </div>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Customs Document Date</small><div class="fw-semibold">{{ optional($rr->customs_document_date)->format('d M Y') ?: '-' }}</div></div></div>
-                        </div>
-                        <div class="mb-3"><small class="text-muted">Notes</small><div class="fw-semibold">{{ $rr->notes ?: '-' }}</div></div>
-                        <div class="table-responsive">
-                            <table class="table table-striped align-middle text-nowrap">
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>Code</th>
-                                        <th>Unit</th>
-                                        <th class="text-end">Qty Good</th>
-                                        <th class="text-end">Qty Bad</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($rr->items as $rrItem)
+                        <div class="modal-body">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">PO Number</small><div class="fw-semibold">{{ $po?->po_number ?? '-' }}</div></div></div>
+                                <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Supplier</small><div class="fw-semibold">{{ $po?->supplier?->name ?? '-' }}</div></div></div>
+                                <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Received Date</small><div class="fw-semibold">{{ optional($rr->received_date)->format('d M Y') }}</div></div></div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Need Customs Document</small><div class="fw-semibold">{{ $rr->requires_customs_document ? 'Yes' : 'No' }}</div></div></div>
+                                <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Customs Document Number</small><div class="fw-semibold">{{ $rr->customs_document_number ?: '-' }}</div></div></div>
+                                <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Customs Document Type</small><div class="fw-semibold">{{ $customsDocType ? ($customsDocType->code . ' - ' . $customsDocType->name) : '-' }}</div></div></div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4"><div class="border rounded p-2"><small class="text-muted">Customs Document Date</small><div class="fw-semibold">{{ optional($rr->customs_document_date)->format('d M Y') ?: '-' }}</div></div></div>
+                            </div>
+                            <div class="mb-3"><small class="text-muted">Notes</small><div class="fw-semibold">{{ $rr->notes ?: '-' }}</div></div>
+                            <div class="table-responsive">
+                                <table class="table table-striped align-middle text-nowrap">
+                                    <thead>
                                         <tr>
-                                            <td>{{ $rrItem->purchaseOrderItem?->item?->name ?? '-' }}</td>
-                                            <td>{{ $rrItem->purchaseOrderItem?->item?->code ?? '-' }}</td>
-                                            <td>{{ $rrItem->purchaseOrderItem?->item?->unit?->name ?? 'PCS' }}</td>
-                                            <td class="text-end">{{ number_format((float) $rrItem->qty_good, 2) }}</td>
-                                            <td class="text-end">{{ number_format((float) $rrItem->qty_bad, 2) }}</td>
+                                            <th>Item</th>
+                                            <th>Code</th>
+                                            <th>Unit</th>
+                                            <th class="text-end">Qty Good</th>
+                                            <th class="text-end">Qty Bad</th>
                                         </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($rr->items as $rrItem)
+                                            <tr>
+                                                <td>{{ $rrItem->purchaseOrderItem?->item?->name ?? '-' }}</td>
+                                                <td>{{ $rrItem->purchaseOrderItem?->item?->code ?? '-' }}</td>
+                                                <td>{{ $rrItem->purchaseOrderItem?->item?->unit?->name ?? 'PCS' }}</td>
+                                                <td class="text-end">{{ number_format((float) $rrItem->qty_good, 2) }}</td>
+                                                <td class="text-end">{{ number_format((float) $rrItem->qty_bad, 2) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="d-flex justify-content-end gap-3 small">
+                                <div>Total Good: <span class="fw-semibold text-success">{{ number_format($rrGood, 2) }}</span></div>
+                                <div>Total Bad: <span class="fw-semibold text-danger">{{ number_format($rrBad, 2) }}</span></div>
+                            </div>
                         </div>
-                        <div class="d-flex justify-content-end gap-3 small">
-                            <div>Total Good: <span class="fw-semibold text-success">{{ number_format($rrGood, 2) }}</span></div>
-                            <div>Total Bad: <span class="fw-semibold text-danger">{{ number_format($rrBad, 2) }}</span></div>
+                        <div class="modal-footer">
+                            <a href="{{ route('receiving-reports.print', ['receivingReport' => $rr, 'mode' => 'preview']) }}" target="_blank" rel="noopener" class="btn btn-outline-primary">
+                                <i class="fa-duotone fa-solid fa-file-pdf"></i>
+                                Preview Form
+                            </a>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <a href="{{ route('receiving-reports.print', ['receivingReport' => $rr, 'mode' => 'preview']) }}" target="_blank" rel="noopener" class="btn btn-outline-primary">
-                            <i class="fa-duotone fa-solid fa-file-pdf"></i>
-                            Preview Form
-                        </a>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
-        </div>
 
-        @role('administrator|im-manager|im-supervisor|im-staff')
-            <div class="modal fade" id="rr-edit-modal-{{ $rr->id }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                    <div class="modal-content">
-                        <form method="post" action="{{ route('receiving-reports.update', $rr) }}">
-                            @csrf
-                            @method('PUT')
-                            <div class="modal-header">
-                                <h5 class="modal-title">Edit RR - {{ $rr->rr_number ?? ('#' . $rr->id) }}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row g-3 mb-3">
-                                    <div class="col-md-3"><label class="form-label">RR Number</label><input type="text" class="form-control" value="{{ $rr->rr_number ?? '-' }}" disabled></div>
-                                    <div class="col-md-3"><label class="form-label">PO Number</label><input type="text" class="form-control" value="{{ $po?->po_number ?? '-' }}" disabled></div>
-                                    <div class="col-md-3"><label class="form-label">Supplier</label><input type="text" class="form-control" value="{{ $po?->supplier?->name ?? '-' }}" disabled></div>
-                                    <div class="col-md-3"><label class="form-label">Received Date</label><input type="date" name="received_date" class="form-control" value="{{ optional($rr->received_date)->format('Y-m-d') }}" required></div>
+            @role('administrator|im-manager|im-supervisor|im-staff')
+                <div class="modal fade" id="rr-edit-modal-{{ $rr->id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <form method="post" action="{{ route('receiving-reports.update', $rr) }}">
+                                @csrf
+                                @method('PUT')
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Edit RR - {{ $rr->rr_number ?? ('#' . $rr->id) }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
+                                <div class="modal-body">
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-3"><label class="form-label">RR Number</label><input type="text" class="form-control" value="{{ $rr->rr_number ?? '-' }}" disabled></div>
+                                        <div class="col-md-3"><label class="form-label">PO Number</label><input type="text" class="form-control" value="{{ $po?->po_number ?? '-' }}" disabled></div>
+                                        <div class="col-md-3"><label class="form-label">Supplier</label><input type="text" class="form-control" value="{{ $po?->supplier?->name ?? '-' }}" disabled></div>
+                                        <div class="col-md-3"><label class="form-label">Received Date</label><input type="date" name="received_date" class="form-control" value="{{ optional($rr->received_date)->format('Y-m-d') }}" required></div>
+                                    </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label">Notes</label>
-                                    <input type="text" name="notes" class="form-control" value="{{ $rr->notes }}">
-                                </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Notes</label>
+                                        <input type="text" name="notes" class="form-control" value="{{ $rr->notes }}">
+                                    </div>
 
                                 <div class="rr-modern-block mb-3 rr-edit-customs-section" data-rr-id="{{ $rr->id }}">
                                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
