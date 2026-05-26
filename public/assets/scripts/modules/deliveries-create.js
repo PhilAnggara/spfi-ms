@@ -28,6 +28,13 @@ function initDeliverySupplierPicker() {
 
     const modal = window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
 
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
     const assignSupplier = (supplier) => {
         if (!supplier) {
             return;
@@ -63,10 +70,13 @@ function initDeliverySupplierPicker() {
 
         pickerList.innerHTML = rows.map((supplier) => {
             const activeClass = String(supplier.id) === String(supplierIdInput.value || '') ? 'active' : '';
+            const supplierName = escapeHtml(supplier.name || '');
+            const supplierAddress = escapeHtml(supplier.address || '-');
+
             return `
                 <button type="button" class="list-group-item list-group-item-action ${activeClass}" data-supplier-id="${supplier.id}">
-                    <div class="fw-semibold">${String(supplier.name || '')}</div>
-                    <div class="small text-muted">${String(supplier.address || '-')}</div>
+                    <div class="fw-semibold">${supplierName}</div>
+                    <div class="small text-muted">${supplierAddress}</div>
                 </button>
             `;
         }).join('');
@@ -188,6 +198,7 @@ function initDeliveryCatalogAndCart() {
     const baseUrl = filterBar?.dataset.baseUrl || window.location.pathname;
     const searchInput = document.getElementById('delivery-item-search');
     const categoryFilter = document.getElementById('delivery-category-filter');
+    const stockFilter = document.getElementById('delivery-stock-filter');
     const resetFilterButton = document.getElementById('delivery-reset-filter');
     const paginationContainer = document.getElementById('delivery-pagination');
     const cartItemsContainer = document.getElementById('delivery-cart-list');
@@ -200,6 +211,8 @@ function initDeliveryCatalogAndCart() {
     const form = document.getElementById('delivery-create-form');
     const supplierIdInput = document.getElementById('delivery-supplier-id');
     const supplierNameInput = document.getElementById('delivery-to-name-display');
+    let catalogAbortController = null;
+    let catalogRequestSeq = 0;
 
     const state = {
         page: parseInt(paginationContainer?.dataset.currentPage || '1', 10) || 1,
@@ -268,6 +281,37 @@ function initDeliveryCatalogAndCart() {
             <small>Try changing your keyword or category filter to see more results.</small>
         </div>
     `;
+
+    const buildCatalogStatusMarkup = (icon, title, message) => `
+        <div class="prs-catalog-empty-state">
+            <i class="${icon} prs-catalog-empty-icon"></i>
+            <p class="mb-0 mt-2 fw-semibold">${escapeHtml(title)}</p>
+            <small>${escapeHtml(message)}</small>
+        </div>
+    `;
+
+    const renderCatalogError = () => {
+        grid.innerHTML = buildCatalogStatusMarkup(
+            'fa-duotone fa-solid fa-triangle-exclamation',
+            'Search could not be loaded.',
+            'Check your connection and try again.'
+        );
+    };
+
+    const setCatalogLoading = (isLoading) => {
+        grid.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+
+        if (isLoading) {
+            grid.innerHTML = buildCatalogStatusMarkup(
+                'fa-duotone fa-solid fa-spinner-third fa-spin',
+                'Searching items...',
+                'Please wait while the catalog is updated.'
+            );
+            if (paginationContainer) {
+                paginationContainer.innerHTML = '';
+            }
+        }
+    };
 
     const getCards = () => Array.from(grid.querySelectorAll('.prs-item-card'));
 
@@ -542,16 +586,28 @@ function initDeliveryCatalogAndCart() {
     };
 
     const fetchCatalog = async (page = 1) => {
+        const requestSeq = catalogRequestSeq + 1;
+        catalogRequestSeq = requestSeq;
+
+        if (catalogAbortController) {
+            catalogAbortController.abort();
+        }
+
+        catalogAbortController = window.AbortController ? new AbortController() : null;
         const query = new URLSearchParams();
         const search = (searchInput?.value || '').trim();
         const category = (categoryFilter?.value || '').trim();
+        const stock = (stockFilter?.value || '').trim();
 
         if (search) query.set('search', search);
         if (category) query.set('category', category);
+        if (stock) query.set('stock', stock);
         query.set('page', String(page));
 
         const targetUrl = `${baseUrl}?${query.toString()}`;
         const scrollPos = window.scrollY || window.pageYOffset;
+
+        setCatalogLoading(true);
 
         try {
             const response = await fetch(targetUrl, {
@@ -559,19 +615,33 @@ function initDeliveryCatalogAndCart() {
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                 },
+                signal: catalogAbortController?.signal,
             });
 
+            if (requestSeq !== catalogRequestSeq) {
+                return;
+            }
+
             if (!response.ok) {
+                setCatalogLoading(false);
+                renderCatalogError();
+                state.page = 1;
+                state.lastPage = 1;
                 renderPagination();
                 return;
             }
 
             const result = await response.json();
             if (!result || !Array.isArray(result.data) || !result.meta) {
+                setCatalogLoading(false);
+                renderCatalogError();
+                state.page = 1;
+                state.lastPage = 1;
                 renderPagination();
                 return;
             }
 
+            setCatalogLoading(false);
             renderGrid(result.data);
             state.page = Number(result.meta.current_page || 1);
             state.lastPage = Number(result.meta.last_page || 1);
@@ -589,7 +659,15 @@ function initDeliveryCatalogAndCart() {
             const cleanUrl = new URL(window.location.href);
             cleanUrl.search = query.toString();
             window.history.replaceState({}, '', cleanUrl.toString());
-        } catch (_) {
+        } catch (error) {
+            if (error?.name === 'AbortError' || requestSeq !== catalogRequestSeq) {
+                return;
+            }
+
+            setCatalogLoading(false);
+            renderCatalogError();
+            state.page = 1;
+            state.lastPage = 1;
             window.scrollTo(0, scrollPos);
             renderPagination();
         }
@@ -619,10 +697,15 @@ function initDeliveryCatalogAndCart() {
         categoryFilter.addEventListener('change', () => triggerFilter(true));
     }
 
+    if (stockFilter) {
+        stockFilter.addEventListener('change', () => triggerFilter(true));
+    }
+
     if (resetFilterButton) {
         resetFilterButton.addEventListener('click', () => {
             if (searchInput) searchInput.value = '';
             if (categoryFilter) categoryFilter.value = '';
+            if (stockFilter) stockFilter.value = '';
             triggerFilter(true);
         });
     }

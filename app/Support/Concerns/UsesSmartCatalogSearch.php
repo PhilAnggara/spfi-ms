@@ -40,14 +40,20 @@ trait UsesSmartCatalogSearch
             $query->where(function (Builder $subQuery) use ($term) {
                 $subQuery
                     ->whereRaw('LOWER(name) LIKE ?', ['%' . $term . '%'])
-                    ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $term . '%']);
+                    ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $term . '%'])
+                    ->orWhereHas('category', function (Builder $categoryQuery) use ($term) {
+                        $categoryQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $term . '%']);
+                    })
+                    ->orWhereHas('unit', function (Builder $unitQuery) use ($term) {
+                        $unitQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $term . '%']);
+                    });
             });
         }
     }
 
     private function searchCatalogItems(Builder $baseQuery, string $normalizedSearch, Collection $searchTerms, int $perPage): LengthAwarePaginator
     {
-        $candidateLimit = 1000;
+        $candidateLimit = min(5000, max(2500, $perPage * 100));
         $totalAvailable = (clone $baseQuery)->count();
 
         if ($totalAvailable <= 2500) {

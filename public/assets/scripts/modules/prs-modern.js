@@ -164,12 +164,15 @@ function initPrsCatalog() {
     const baseUrl = filterBar?.dataset.baseUrl || window.location.pathname;
     const searchInput = document.getElementById('prs-item-search');
     const categoryFilter = document.getElementById('prs-category-filter');
+    const stockFilter = document.getElementById('prs-stock-filter');
     const resetFilterButton = document.getElementById('prs-reset-filter');
     const paginationContainer = document.getElementById('prs-pagination');
     const initialCurrentPage = parseInt(paginationContainer?.dataset.currentPage || '1', 10);
     const initialLastPage = parseInt(paginationContainer?.dataset.lastPage || '1', 10);
     const cartItems = new Set();
     let navigationTimer = null;
+    let catalogAbortController = null;
+    let catalogRequestSeq = 0;
     const state = {
         page: Number.isNaN(initialCurrentPage) ? 1 : initialCurrentPage,
         lastPage: Number.isNaN(initialLastPage) ? 1 : initialLastPage,
@@ -191,6 +194,37 @@ function initPrsCatalog() {
             <small>Try changing your keyword or category filter to see more results.</small>
         </div>
     `;
+
+    const buildCatalogStatusMarkup = (icon, title, message) => `
+        <div class="prs-catalog-empty-state">
+            <i class="${icon} prs-catalog-empty-icon"></i>
+            <p class="mb-0 mt-2 fw-semibold">${escapeHtml(title)}</p>
+            <small>${escapeHtml(message)}</small>
+        </div>
+    `;
+
+    const renderCatalogError = () => {
+        grid.innerHTML = buildCatalogStatusMarkup(
+            'fa-duotone fa-solid fa-triangle-exclamation',
+            'Search could not be loaded.',
+            'Check your connection and try again.'
+        );
+    };
+
+    const setCatalogLoading = (isLoading) => {
+        grid.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+
+        if (isLoading) {
+            grid.innerHTML = buildCatalogStatusMarkup(
+                'fa-duotone fa-solid fa-spinner-third fa-spin',
+                'Searching items...',
+                'Please wait while the catalog is updated.'
+            );
+            if (paginationContainer) {
+                paginationContainer.innerHTML = '';
+            }
+        }
+    };
 
     const renderGrid = (items) => {
         if (!Array.isArray(items) || items.length === 0) {
@@ -297,16 +331,28 @@ function initPrsCatalog() {
     };
 
     const fetchCatalog = async (page = 1) => {
+        const requestSeq = catalogRequestSeq + 1;
+        catalogRequestSeq = requestSeq;
+
+        if (catalogAbortController) {
+            catalogAbortController.abort();
+        }
+
+        catalogAbortController = window.AbortController ? new AbortController() : null;
         const query = new URLSearchParams();
         const search = (searchInput?.value || '').trim();
         const category = (categoryFilter?.value || '').trim();
+        const stock = (stockFilter?.value || '').trim();
 
         if (search) query.set('search', search);
         if (category) query.set('category', category);
+        if (stock) query.set('stock', stock);
         query.set('page', String(page));
 
         const targetUrl = `${baseUrl}?${query.toString()}`;
         const scrollPos = window.scrollY || window.pageYOffset;
+
+        setCatalogLoading(true);
 
         try {
             const response = await fetch(targetUrl, {
@@ -314,19 +360,33 @@ function initPrsCatalog() {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                 },
+                signal: catalogAbortController?.signal,
             });
 
+            if (requestSeq !== catalogRequestSeq) {
+                return;
+            }
+
             if (!response.ok) {
+                setCatalogLoading(false);
+                renderCatalogError();
+                state.page = 1;
+                state.lastPage = 1;
                 renderPagination();
                 return;
             }
 
             const result = await response.json();
             if (!result || !Array.isArray(result.data) || !result.meta) {
+                setCatalogLoading(false);
+                renderCatalogError();
+                state.page = 1;
+                state.lastPage = 1;
                 renderPagination();
                 return;
             }
 
+            setCatalogLoading(false);
             renderGrid(result.data);
             state.page = Number(result.meta.current_page || 1);
             state.lastPage = Number(result.meta.last_page || 1);
@@ -349,7 +409,15 @@ function initPrsCatalog() {
             cleanUrl.search = query.toString();
             window.history.replaceState({}, '', cleanUrl.toString());
         } catch (error) {
+            if (error?.name === 'AbortError' || requestSeq !== catalogRequestSeq) {
+                return;
+            }
+
             console.error('Catalog fetch error:', error);
+            setCatalogLoading(false);
+            renderCatalogError();
+            state.page = 1;
+            state.lastPage = 1;
             window.scrollTo(0, scrollPos);
             renderPagination();
         }
@@ -395,10 +463,15 @@ function initPrsCatalog() {
         categoryFilter.addEventListener('change', () => triggerFilter(true));
     }
 
+    if (stockFilter) {
+        stockFilter.addEventListener('change', () => triggerFilter(true));
+    }
+
     if (resetFilterButton) {
         resetFilterButton.addEventListener('click', () => {
             if (searchInput) searchInput.value = '';
             if (categoryFilter) categoryFilter.value = '';
+            if (stockFilter) stockFilter.value = '';
             triggerFilter(true);
         });
     }
@@ -531,4 +604,3 @@ function initPrsCartCount() {
         floatingBadge.textContent = count;
     });
 }
-

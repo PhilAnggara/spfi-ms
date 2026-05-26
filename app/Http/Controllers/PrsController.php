@@ -75,11 +75,22 @@ class PrsController extends Controller
 
         $search = trim((string) $request->query('search'));
         $categoryId = trim((string) $request->query('category'));
+        $stockFilter = trim((string) $request->query('stock'));
+        if (! in_array($stockFilter, ['in_stock', 'zero_stock'], true)) {
+            $stockFilter = '';
+        }
+
         $itemsBaseQuery = Item::query()
             ->select(['id', 'name', 'code', 'stock_on_hand', 'unit_of_measure_id', 'category_id'])
             ->where('is_active', true)
             ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
                 $query->where('category_id', (int) $categoryId);
+            })
+            ->when($stockFilter === 'in_stock', function ($query) {
+                $query->where('stock_on_hand', '>', 0);
+            })
+            ->when($stockFilter === 'zero_stock', function ($query) {
+                $query->where('stock_on_hand', '<=', 0);
             });
 
         $items = $this->smartCatalogPaginator($itemsBaseQuery, $search, 36);
@@ -116,6 +127,7 @@ class PrsController extends Controller
             'items' => $items,
             'search' => $search,
             'selectedCategory' => $categoryId,
+            'selectedStockFilter' => $stockFilter,
         ]);
     }
 

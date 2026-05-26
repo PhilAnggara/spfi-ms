@@ -35,7 +35,7 @@
                             <div class="prs-catalog-toolbar" id="prs-catalog-filter-form" data-base-url="{{ route('prs.create') }}">
                                 <div class="prs-catalog-field prs-catalog-search-field">
                                     <label for="prs-item-search" class="form-label mb-1">Search Item</label>
-                                    <input type="text" class="form-control" id="prs-item-search" name="search" value="{{ $search ?? '' }}" placeholder="Item name or code">
+                                    <input type="text" class="form-control" id="prs-item-search" name="search" value="{{ $search ?? '' }}" placeholder="Item name, code, category, or unit">
                                 </div>
                                 <div class="prs-catalog-field">
                                     <label for="prs-category-filter" class="form-label mb-1">Category</label>
@@ -44,6 +44,14 @@
                                         @foreach ($categories as $category)
                                             <option value="{{ $category->id }}" @selected((string) ($selectedCategory ?? '') === (string) $category->id)>{{ $category->name }}</option>
                                         @endforeach
+                                    </select>
+                                </div>
+                                <div class="prs-catalog-field">
+                                    <label for="prs-stock-filter" class="form-label mb-1">Stock</label>
+                                    <select class="form-select" id="prs-stock-filter" name="stock">
+                                        <option value="">All stock</option>
+                                        <option value="in_stock" @selected(($selectedStockFilter ?? '') === 'in_stock')>In stock</option>
+                                        <option value="zero_stock" @selected(($selectedStockFilter ?? '') === 'zero_stock')>Zero stock</option>
                                     </select>
                                 </div>
                                 <div class="prs-catalog-reset-field">

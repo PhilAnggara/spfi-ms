@@ -58,7 +58,7 @@
                             <div class="prs-catalog-toolbar" id="delivery-catalog-filter-form" data-base-url="{{ route('deliveries.create') }}">
                                 <div class="prs-catalog-field prs-catalog-search-field">
                                     <label for="delivery-item-search" class="form-label mb-1">Search Item</label>
-                                    <input type="text" class="form-control" id="delivery-item-search" name="search" value="{{ $search ?? '' }}" placeholder="Item name or code">
+                                    <input type="text" class="form-control" id="delivery-item-search" name="search" value="{{ $search ?? '' }}" placeholder="Item name, code, category, or unit">
                                 </div>
                                 <div class="prs-catalog-field">
                                     <label for="delivery-category-filter" class="form-label mb-1">Category</label>
@@ -67,6 +67,14 @@
                                         @foreach ($categories as $category)
                                             <option value="{{ $category->id }}" @selected((string) ($selectedCategory ?? '') === (string) $category->id)>{{ $category->name }}</option>
                                         @endforeach
+                                    </select>
+                                </div>
+                                <div class="prs-catalog-field">
+                                    <label for="delivery-stock-filter" class="form-label mb-1">Stock</label>
+                                    <select class="form-select" id="delivery-stock-filter" name="stock">
+                                        <option value="">All stock</option>
+                                        <option value="in_stock" @selected(($selectedStockFilter ?? '') === 'in_stock')>In stock</option>
+                                        <option value="zero_stock" @selected(($selectedStockFilter ?? '') === 'zero_stock')>Zero stock</option>
                                     </select>
                                 </div>
                                 <div class="prs-catalog-reset-field">
@@ -158,7 +166,12 @@
                             <div class="col-12 col-md-6">
                                 <label for="delivery-to-name-display" class="form-label">To</label>
                                 <input type="hidden" id="delivery-supplier-id" name="supplier_id" value="{{ $selectedSupplierId }}" required>
-                                <input type="text" class="form-control" id="delivery-to-name-display" name="to_name_display" value="{{ $selectedSupplierName }}" placeholder="Choose supplier" readonly required>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="delivery-to-name-display" name="to_name_display" value="{{ $selectedSupplierName }}" placeholder="Choose supplier" readonly required>
+                                    <button type="button" class="btn btn-light-secondary" id="delivery-pick-supplier" aria-label="Choose supplier">
+                                        <i class="fa-light fa-magnifying-glass"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label for="delivery-to-location" class="form-label">To Location</label>
