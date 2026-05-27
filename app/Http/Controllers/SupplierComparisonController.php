@@ -3,17 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\PrsItem;
+use App\Support\Concerns\PaginatesLegacySqlServer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class SupplierComparisonController extends Controller
 {
+    use PaginatesLegacySqlServer;
+
     /**
      * Show supplier comparison per PRS item.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $prsItems = PrsItem::with([
+        $filters = [
+            'keyword' => trim((string) $request->query('keyword', '')),
+        ];
+
+        $prsItemsQuery = PrsItem::with([
             'prs.department',
             'item.unit',
             'canvasser',
@@ -23,11 +30,29 @@ class SupplierComparisonController extends Controller
             ->whereNull('purchase_order_id')
             ->where('is_direct_purchase', false)
             ->whereHas('canvassingItems')
-            ->orderByDesc('id')
-            ->get();
+            ->when($filters['keyword'] !== '', function ($query) use ($filters) {
+                $keyword = $filters['keyword'];
+
+                $query->where(function ($innerQuery) use ($keyword) {
+                    $innerQuery->whereHas('prs', function ($prsQuery) use ($keyword) {
+                        $prsQuery->where('prs_number', 'like', "%{$keyword}%");
+                    })->orWhereHas('item', function ($itemQuery) use ($keyword) {
+                        $itemQuery->where('code', 'like', "%{$keyword}%")
+                            ->orWhere('name', 'like', "%{$keyword}%");
+                    });
+                });
+            })
+            ->orderByDesc('id');
+
+        $prsItems = $this->paginateEloquentForCurrentConnection(
+            $prsItemsQuery,
+            'id DESC',
+            10
+        );
 
         return view('pages.procurement.supplier-comparison', [
             'prsItems' => $prsItems,
+            'filters' => $filters,
         ]);
     }
 
