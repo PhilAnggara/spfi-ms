@@ -76,6 +76,7 @@
                                                         @foreach ($items as $index => $prsItem)
                                                             @php
                                                                 $canvassing = $prsItem->selectedCanvassingItem;
+                                                                $item = $prsItem->item;
                                                             @endphp
                                                             <tr>
                                                                 <td>
@@ -88,11 +89,11 @@
                                                                 </td>
                                                                 <td>{{ $prsItem->prs?->prs_number ?? '-' }}</td>
                                                                 <td>
-                                                                    <div class="fw-semibold">{{ $prsItem->item->name }}</div>
-                                                                    <small class="text-muted">{{ $prsItem->item->code }}</small>
+                                                                    <div class="fw-semibold">{{ $item?->name ?? 'Item not found' }}</div>
+                                                                    <small class="text-muted">{{ $item?->code ?? '-' }}</small>
                                                                 </td>
                                                                 <td>{{ $prsItem->quantity }}</td>
-                                                                <td>{{ $prsItem->item->unit?->name ?? 'PCS' }}</td>
+                                                                <td>{{ $item?->unit?->name ?? 'PCS' }}</td>
                                                                 <td>{{ number_format($canvassing?->unit_price ?? 0, 2) }}</td>
                                                                 <td>{{ $canvassing?->notes ?? '-' }}</td>
                                                             </tr>

@@ -233,6 +233,10 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['items' => 'One or more PR items are invalid or already assigned.']);
         }
 
+        if ($prsItems->contains(fn ($item) => ! $item->item)) {
+            return redirect()->back()->withErrors(['items' => 'One or more selected PR items no longer have item master data.']);
+        }
+
         $invalidSupplierItems = $prsItems->filter(function ($item) use ($validated) {
             return $item->selectedCanvassingItem?->supplier_id !== (int) $validated['supplier_id'];
         });
@@ -317,6 +321,10 @@ class PurchaseOrderController extends Controller
 
         if ($prsItems->count() !== count($prsItemIds)) {
             return redirect()->back()->withErrors(['items' => 'One or more PR items are invalid or already assigned.']);
+        }
+
+        if ($prsItems->contains(fn ($item) => ! $item->item)) {
+            return redirect()->back()->withErrors(['items' => 'One or more selected PR items no longer have item master data.']);
         }
 
         $invalidSupplierItems = $prsItems->filter(function ($item) use ($validated) {
