@@ -20,6 +20,7 @@ return new class extends Migration
             // Preserve legacy row context for traceability and reconciliation.
             $table->json('meta')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['receiving_report_id', 'purchase_order_item_id'], 'rr_items_rrid_poid_unique');
         });

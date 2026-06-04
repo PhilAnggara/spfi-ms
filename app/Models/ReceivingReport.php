@@ -49,6 +49,21 @@ class ReceivingReport extends Model
         return $this->hasMany(ReceivingReportItem::class, 'receiving_report_id');
     }
 
+    protected static function booted()
+    {
+        static::deleting(function (ReceivingReport $receivingReport) {
+            if ($receivingReport->isForceDeleting()) {
+                $receivingReport->items()->forceDelete();
+            } else {
+                $receivingReport->items()->delete();
+            }
+        });
+
+        static::restoring(function (ReceivingReport $receivingReport) {
+            $receivingReport->items()->withTrashed()->restore();
+        });
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');

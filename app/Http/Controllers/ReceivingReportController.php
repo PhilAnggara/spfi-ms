@@ -385,6 +385,7 @@ class ReceivingReportController extends Controller
         $previousStockLines = $this->buildStockLinesFromReceivingReportItems($receivingReport->items);
 
         DB::transaction(function () use ($receivingReport, $previousStockLines) {
+            $receivingReport->items()->delete();
             $receivingReport->delete();
 
             app(StockService::class)->applyReceivingReportAdjustment(
