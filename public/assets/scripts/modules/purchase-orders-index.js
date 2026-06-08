@@ -97,6 +97,10 @@
                 initPurchaseOrderFilters();
             }
 
+            if (typeof window.initPoDraftSelection === 'function') {
+                window.initPoDraftSelection(newResults);
+            }
+
             initPageTooltips(newResults);
 
             if (window.feather && typeof window.feather.replace === 'function') {

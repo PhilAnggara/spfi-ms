@@ -169,6 +169,7 @@ class PurchaseOrderController extends Controller
     public function draft(Request $request)
     {
         $userId = $request->user()->id;
+        $keyword = trim((string) $request->query('keyword', ''));
 
         $prsItems = PrsItem::with([
             'prs',
@@ -179,6 +180,22 @@ class PurchaseOrderController extends Controller
             ->whereNull('purchase_order_id')
             ->where('is_direct_purchase', false)
             ->whereNotNull('selected_canvassing_item_id')
+            ->when($keyword !== '', function ($query) use ($keyword) {
+                $query->where(function ($searchQuery) use ($keyword) {
+                    $searchQuery
+                        ->whereHas('selectedCanvassingItem.supplier', function ($supplierQuery) use ($keyword) {
+                            $supplierQuery->where('name', 'like', "%{$keyword}%");
+                        })
+                        ->orWhereHas('item', function ($itemQuery) use ($keyword) {
+                            $itemQuery
+                                ->where('name', 'like', "%{$keyword}%")
+                                ->orWhere('code', 'like', "%{$keyword}%");
+                        })
+                        ->orWhereHas('prs', function ($prsQuery) use ($keyword) {
+                            $prsQuery->where('prs_number', 'like', "%{$keyword}%");
+                        });
+                });
+            })
             ->orderByDesc('created_at')
             ->get();
 
@@ -193,6 +210,7 @@ class PurchaseOrderController extends Controller
         return view('pages.purchase-orders.draft', [
             'itemsBySupplier' => $itemsBySupplier,
             'suppliers' => $suppliers,
+            'keyword' => $keyword,
         ]);
     }
 
