@@ -35,6 +35,16 @@
     border-radius: 0.75rem;
 }
 
+.employee-gender-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
 .employee-list-avatar {
     width: 42px;
     height: 42px;

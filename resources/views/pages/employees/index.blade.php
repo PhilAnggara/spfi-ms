@@ -179,7 +179,21 @@
                                                     {{ $department?->code ?? ($employee->legacy_department_code ?? '-') }}
                                                 </span>
                                             </td>
-                                            <td>{{ $employee->gender === 'F' ? 'Female' : ($employee->gender === 'M' ? 'Male' : '-') }}</td>
+                                            <td>
+                                                @if ($employee->gender === 'M')
+                                                    <span class="badge employee-gender-badge bg-light-primary text-primary" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Male">
+                                                        <i class="fa-solid fa-mars" aria-hidden="true"></i>
+                                                        <span class="visually-hidden">Male</span>
+                                                    </span>
+                                                @elseif ($employee->gender === 'F')
+                                                    <span class="badge employee-gender-badge bg-light-danger text-danger" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Female">
+                                                        <i class="fa-solid fa-venus" aria-hidden="true"></i>
+                                                        <span class="visually-hidden">Female</span>
+                                                    </span>
+                                                @else
+                                                    <span class="text-muted">-</span>
+                                                @endif
+                                            </td>
                                             <td>{{ optional($employee->date_of_birth)->format('d M Y') ?? '-' }}</td>
                                             <td>{{ optional($employee->date_hired)->format('d M Y') ?? '-' }}</td>
                                             <td>
