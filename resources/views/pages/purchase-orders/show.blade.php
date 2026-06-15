@@ -129,9 +129,17 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($purchaseOrder->items as $index => $item)
+                                        @php
+                                            $isCapex = (bool) ($item->prsItem?->prs?->is_capex ?? ($item->meta['is_capex'] ?? false));
+                                        @endphp
                                         <tr>
                                             <td>{{ $item->meta['prs_number'] ?? $item->prsItem?->prs?->prs_number ?? '-' }}</td>
-                                            <td>{{ $item->item?->name }}</td>
+                                            <td>
+                                                {{ $item->item?->name }}
+                                                @if ($isCapex)
+                                                    <div class="mt-1"><span class="badge bg-light-primary">CAPEX</span></div>
+                                                @endif
+                                            </td>
                                             <td>{{ $item->item?->code ?? '-' }}</td>
                                             <td>{{ $item->prsItem?->prs?->department?->name ?? '-' }}</td>
                                             <td>
@@ -284,11 +292,19 @@
                             </thead>
                             <tbody>
                                 @foreach ($purchaseOrder->items as $item)
+                                    @php
+                                        $isCapex = (bool) ($item->prsItem?->prs?->is_capex ?? ($item->meta['is_capex'] ?? false));
+                                    @endphp
                                     <tr>
                                         <td>
                                             {{ $item->meta['prs_number'] ?? $item->prsItem?->prs?->prs_number ?? '-' }}
                                         </td>
-                                        <td>{{ $item->item?->name }}</td>
+                                        <td>
+                                            {{ $item->item?->name }}
+                                            @if ($isCapex)
+                                                <div class="mt-1"><span class="badge bg-light-primary">CAPEX</span></div>
+                                            @endif
+                                        </td>
                                         <td>{{ $item->item?->code ?? '-' }}</td>
                                         <td>{{ $item->prsItem?->prs?->department?->name ?? '-' }}</td>
                                         <td>{{ number_format($item->quantity, 0, ',', '.') }}</td>

@@ -161,10 +161,11 @@
                     $dept = $item->prsItem?->prs?->department?->name ?? '-';
                     $itemCode = $item->item?->code ?? '-';
                     $unitName = $item->item?->unit?->name ?? 'PCS';
+                    $isCapex = (bool) ($item->prsItem?->prs?->is_capex ?? ($meta['is_capex'] ?? false));
                 @endphp
                 <tr>
                     <td>{{ $prsNumber }}</td>
-                    <td>{{ $item->item?->name ?? '-' }}</td>
+                    <td>{{ $item->item?->name ?? '-' }}{{ $isCapex ? ' (CAPEX)' : '' }}</td>
                     <td>{{ $itemCode }}</td>
                     <td>{{ $dept }}</td>
                     <td class="text-center">{{ number_format($item->quantity, 0, ',', '.') }}</td>

@@ -263,6 +263,10 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['items' => 'Selected items must belong to the same supplier.']);
         }
 
+        if ($this->containsMixedCapexStatus($prsItems)) {
+            return redirect()->back()->withErrors(['items' => 'Selected items cannot mix CAPEX and Non-CAPEX in one purchase order.']);
+        }
+
         $lineItems = $prsItems->map(function ($item) {
             $unitPrice = $item->selectedCanvassingItem?->unit_price ?? 0;
             $quantity = $item->quantity;
@@ -278,6 +282,7 @@ class PurchaseOrderController extends Controller
                 'notes' => $item->selectedCanvassingItem?->notes,
                 'line_total' => $lineTotal,
                 'prs_number' => $item->prs?->prs_number,
+                'is_capex' => $this->isCapexPrsItem($item),
                 'discount_rate' => 0,
                 'ppn_rate' => 0,
                 'pph_rate' => 0,
@@ -353,6 +358,10 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['items' => 'Selected items must belong to the same supplier.']);
         }
 
+        if ($this->containsMixedCapexStatus($prsItems)) {
+            return redirect()->back()->withErrors(['items' => 'Selected items cannot mix CAPEX and Non-CAPEX in one purchase order.']);
+        }
+
         $itemsById = $prsItems->keyBy('id');
 
         // Atomic create: PO header, items, and PR item marking.
@@ -417,6 +426,7 @@ class PurchaseOrderController extends Controller
                     'meta' => [
                         'prs_id' => $prsItem->prs_id,
                         'prs_number' => $prsItem->prs?->prs_number,
+                        'is_capex' => $this->isCapexPrsItem($prsItem),
                         'lead_time_days' => $canvassing?->lead_time_days,
                         'term_of_payment_type' => $canvassing?->term_of_payment_type,
                         'term_of_payment' => $canvassing?->term_of_payment,
@@ -680,5 +690,18 @@ class PurchaseOrderController extends Controller
         return Pdf::loadView('pdf.purchase-order', $data)
             ->setPaper('a4', 'portrait')
             ->stream('PO-' . $purchaseOrder->po_number . '.pdf');
+    }
+
+    private function isCapexPrsItem(?PrsItem $prsItem): bool
+    {
+        return (bool) ($prsItem?->prs?->is_capex ?? false);
+    }
+
+    private function containsMixedCapexStatus($prsItems): bool
+    {
+        return $prsItems
+            ->map(fn (PrsItem $prsItem) => $this->isCapexPrsItem($prsItem))
+            ->unique()
+            ->count() > 1;
     }
 }

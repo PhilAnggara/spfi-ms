@@ -122,6 +122,7 @@
                                 $supplierTotal = $items->sum(function ($item) {
                                     return $item->quantity * ($item->selectedCanvassingItem?->unit_price ?? 0);
                                 });
+                                $capexCount = $items->filter(fn ($item) => (bool) ($item->prs?->is_capex ?? false))->count();
                             @endphp
                             <div class="accordion-item po-draft-supplier-item">
                                 <h2 class="accordion-header" id="heading-{{ $accordionId }}">
@@ -134,6 +135,9 @@
                                             </div>
                                             <div class="po-draft-supplier-meta">
                                                 <span class="badge bg-light-secondary">{{ $items->pluck('prs_id')->filter()->unique()->count() }} PRS</span>
+                                                @if ($capexCount > 0)
+                                                    <span class="badge bg-light-primary">CAPEX {{ $capexCount }}</span>
+                                                @endif
                                                 <span class="badge bg-light-success text-success">Rp {{ number_format($supplierTotal, 2) }}</span>
                                             </div>
                                         </div>
@@ -180,17 +184,24 @@
                                                             @php
                                                                 $canvassing = $prsItem->selectedCanvassingItem;
                                                                 $item = $prsItem->item;
+                                                                $isCapex = (bool) ($prsItem->prs?->is_capex ?? false);
+                                                                $accountingCategory = $isCapex ? 'capex' : 'non_capex';
                                                             @endphp
-                                                            <tr>
+                                                            <tr data-accounting-category="{{ $accountingCategory }}">
                                                                 <td>
-                                                                    <input type="checkbox" class="form-check-input item-checkbox" checked>
+                                                                    <input type="checkbox" class="form-check-input item-checkbox" data-accounting-category="{{ $accountingCategory }}" checked>
                                                                     <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $prsItem->id }}">
                                                                     <input type="hidden" name="items[{{ $index }}][quantity]" value="{{ $prsItem->quantity }}">
                                                                     <input type="hidden" name="items[{{ $index }}][unit_price]" value="{{ $canvassing?->unit_price ?? 0 }}">
                                                                     <input type="hidden" name="items[{{ $index }}][notes]" value="{{ $canvassing?->notes }}">
                                                                     <input type="hidden" name="items[{{ $index }}][checked]" class="item-checked" value="1">
                                                                 </td>
-                                                                <td>{{ $prsItem->prs?->prs_number ?? '-' }}</td>
+                                                                <td>
+                                                                    {{ $prsItem->prs?->prs_number ?? '-' }}
+                                                                    @if ($isCapex)
+                                                                        <div class="mt-1"><span class="badge bg-light-primary">CAPEX</span></div>
+                                                                    @endif
+                                                                </td>
                                                                 <td>
                                                                     <div class="fw-semibold">{{ $item?->name ?? 'Item not found' }}</div>
                                                                     <small class="text-muted">{{ $item?->code ?? '-' }}</small>

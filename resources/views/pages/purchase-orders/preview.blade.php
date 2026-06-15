@@ -33,6 +33,7 @@
                     $selectedCurrency = $currencies->firstWhere('id', $currencyId) ?? $currencies->first();
                     $currencySymbol = $selectedCurrency?->symbol ?: ($selectedCurrency?->code ?: 'Rp');
                     $feeItemsForForm = old('fee_items', $feeItems ?? []);
+                    $hasCapexItems = collect($lineItems)->contains(fn ($item) => (bool) ($item['is_capex'] ?? false));
 
                     if (empty($feeItemsForForm)) {
                         $feeItemsForForm = [
@@ -64,6 +65,11 @@
                             <input type="text" name="remark_text" class="form-control" value="{{ $remarkText }}" placeholder="Remark">
                         </div>
                     </div>
+                    @if ($hasCapexItems)
+                        <div class="col-12">
+                            <span class="badge bg-light-primary">PO Category: CAPEX</span>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="table-responsive">
@@ -90,6 +96,9 @@
                                     <td>
                                         <div class="fw-semibold">{{ $item['item_name'] }}</div>
                                         <small class="text-muted">{{ $item['item_code'] }}</small>
+                                        @if ($item['is_capex'] ?? false)
+                                            <div class="mt-1"><span class="badge bg-light-primary">CAPEX</span></div>
+                                        @endif
                                     </td>
                                     <td>
                                         <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $item['prs_item_id'] }}">
