@@ -57,6 +57,7 @@ class ReceivingReportController extends Controller
         $purchaseOrder = PurchaseOrder::with([
             'supplier',
             'items.item.unit',
+            'items.prsItem.prs',
         ])
             ->where('po_number', $validated['po_number'])
             ->first();
@@ -85,6 +86,7 @@ class ReceivingReportController extends Controller
                 'item_code' => $item->item?->code,
                 'item_name' => $item->item?->name,
                 'unit_name' => $item->item?->unit?->name ?? 'PCS',
+                'is_capex' => $this->isCapexPurchaseOrderItem($item),
                 'qty_ordered' => $qtyOrdered,
                 'qty_received' => $qtyReceived,
                 'qty_remaining' => $qtyRemaining,
@@ -123,7 +125,10 @@ class ReceivingReportController extends Controller
 
         $requiresCustomsDocument = ($validated['requires_customs_document'] ?? '0') === '1';
 
-        $purchaseOrder = PurchaseOrder::with(['items.item'])
+        $purchaseOrder = PurchaseOrder::with([
+            'items.item',
+            'items.prsItem.prs',
+        ])
             ->findOrFail($validated['purchase_order_id']);
 
         $poItemIds = $purchaseOrder->items->pluck('id')->all();
@@ -259,7 +264,9 @@ class ReceivingReportController extends Controller
 
         $receivingReport->load([
             'purchaseOrder.items.item',
+            'purchaseOrder.items.prsItem.prs',
             'items.purchaseOrderItem.item',
+            'items.purchaseOrderItem.prsItem.prs',
         ]);
 
         $poItems = $receivingReport->purchaseOrder->items;
@@ -380,6 +387,7 @@ class ReceivingReportController extends Controller
     {
         $receivingReport->load([
             'items.purchaseOrderItem.item',
+            'items.purchaseOrderItem.prsItem.prs',
         ]);
 
         $previousStockLines = $this->buildStockLinesFromReceivingReportItems($receivingReport->items);
@@ -506,6 +514,10 @@ class ReceivingReportController extends Controller
             }
 
             $purchaseOrderItem = $poItemsById[$purchaseOrderItemId];
+            if ($this->isCapexPurchaseOrderItem($purchaseOrderItem)) {
+                continue;
+            }
+
             $item = $purchaseOrderItem->item;
 
             if (! $item) {
@@ -538,6 +550,10 @@ class ReceivingReportController extends Controller
             $item = $purchaseOrderItem?->item;
 
             if (! $purchaseOrderItem || ! $item) {
+                continue;
+            }
+
+            if ($this->isCapexPurchaseOrderItem($purchaseOrderItem)) {
                 continue;
             }
 
@@ -625,6 +641,7 @@ class ReceivingReportController extends Controller
                 'purchaseOrder.supplier',
                 'purchaseOrder.items.item.unit',
                 'items.purchaseOrderItem.item.unit',
+                'items.purchaseOrderItem.prsItem.prs',
                 'customsDocumentType',
                 'createdBy',
             ])
@@ -653,5 +670,10 @@ class ReceivingReportController extends Controller
     private function isSqlServer(): bool
     {
         return DB::connection()->getDriverName() === 'sqlsrv';
+    }
+
+    private function isCapexPurchaseOrderItem($purchaseOrderItem): bool
+    {
+        return (bool) ($purchaseOrderItem?->prsItem?->prs?->is_capex ?? false);
     }
 }

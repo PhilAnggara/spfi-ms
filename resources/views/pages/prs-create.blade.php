@@ -138,6 +138,25 @@
                                     <input type="date" id="date-needed" class="form-control" name="date_needed" value="{{ \Carbon\Carbon::now()->addDays(7)->format('Y-m-d') }}" required>
                                 </div>
                                 <div class="col-12">
+                                    <div class="prs-accounting-choice">
+                                        <label class="form-label mb-1">Accounting Category</label>
+                                        <div class="prs-accounting-toggle" role="radiogroup" aria-label="Accounting category">
+                                            <input type="radio" class="btn-check" name="is_capex" id="is-capex-no" value="0" @checked((string) old('is_capex', '0') === '0') required>
+                                            <label class="btn btn-outline-secondary" for="is-capex-no">
+                                                <i class="fa-regular fa-circle-check me-1"></i>
+                                                Non-CAPEX
+                                            </label>
+
+                                            <input type="radio" class="btn-check" name="is_capex" id="is-capex-yes" value="1" @checked((string) old('is_capex', '0') === '1') required>
+                                            <label class="btn btn-outline-primary" for="is-capex-yes">
+                                                <i class="fa-regular fa-building-columns me-1"></i>
+                                                CAPEX
+                                            </label>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">Create a separate PRS when CAPEX and Non-CAPEX items are needed.</small>
+                                    </div>
+                                </div>
+                                <div class="col-12">
                                     <label for="remarks" class="form-label">Remarks</label>
                                     <textarea class="form-control" id="remarks" name="remarks" rows="2" placeholder="Add notes if needed"></textarea>
                                 </div>

@@ -309,6 +309,7 @@
                                                 <th>Item</th>
                                                 <th>Code</th>
                                                 <th>Unit</th>
+                                                <th>Type</th>
                                                 <th class="text-end">Qty PO</th>
                                                 <th class="text-end">Qty Received</th>
                                                 <th class="text-end">Qty Remaining</th>
@@ -376,6 +377,7 @@
                                             <th>Item</th>
                                             <th>Code</th>
                                             <th>Unit</th>
+                                            <th>Type</th>
                                             <th class="text-end">Qty Good</th>
                                             <th class="text-end">Qty Bad</th>
                                         </tr>
@@ -386,6 +388,13 @@
                                                 <td>{{ $rrItem->purchaseOrderItem?->item?->name ?? '-' }}</td>
                                                 <td>{{ $rrItem->purchaseOrderItem?->item?->code ?? '-' }}</td>
                                                 <td>{{ $rrItem->purchaseOrderItem?->item?->unit?->name ?? 'PCS' }}</td>
+                                                <td>
+                                                    @if ($rrItem->purchaseOrderItem?->prsItem?->prs?->is_capex)
+                                                        <span class="badge bg-light-primary">CAPEX</span>
+                                                    @else
+                                                        <span class="badge bg-light-secondary">Stock</span>
+                                                    @endif
+                                                </td>
                                                 <td class="text-end">{{ number_format((float) $rrItem->qty_good, 2) }}</td>
                                                 <td class="text-end">{{ number_format((float) $rrItem->qty_bad, 2) }}</td>
                                             </tr>
@@ -483,6 +492,7 @@
                                                 <th>Item</th>
                                                 <th>Code</th>
                                                 <th>Unit</th>
+                                                <th>Type</th>
                                                 <th class="text-end">Qty Good</th>
                                                 <th class="text-end">Qty Bad</th>
                                             </tr>
@@ -497,6 +507,13 @@
                                                     </td>
                                                     <td>{{ $rrItem->purchaseOrderItem?->item?->code ?? '-' }}</td>
                                                     <td>{{ $rrItem->purchaseOrderItem?->item?->unit?->name ?? 'PCS' }}</td>
+                                                    <td>
+                                                        @if ($rrItem->purchaseOrderItem?->prsItem?->prs?->is_capex)
+                                                            <span class="badge bg-light-primary">CAPEX</span>
+                                                        @else
+                                                            <span class="badge bg-light-secondary">Stock</span>
+                                                        @endif
+                                                    </td>
                                                     <td><input type="number" step="0.01" min="0" class="form-control form-control-sm text-end" name="items[{{ $idx }}][qty_good]" value="{{ (float) $rrItem->qty_good }}" required></td>
                                                     <td><input type="number" step="0.01" min="0" class="form-control form-control-sm text-end" name="items[{{ $idx }}][qty_bad]" value="{{ (float) $rrItem->qty_bad }}" required></td>
                                                 </tr>

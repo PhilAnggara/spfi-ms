@@ -381,6 +381,28 @@
                                 <input type="date" id="edit-date-needed-{{ $item->id }}" class="form-control" placeholder="Date Needed" name="date_needed" value="{{ $item->date_needed }}" required>
                             </div>
                         </div>
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                @php
+                                    $selectedCapex = (string) old('is_capex', $item->is_capex ? '1' : '0');
+                                @endphp
+                                <label class="form-label mb-1">Accounting Category</label>
+                                <div class="prs-accounting-toggle" role="radiogroup" aria-label="Accounting category">
+                                    <input type="radio" class="btn-check" name="is_capex" id="edit-is-capex-no-{{ $item->id }}" value="0" @checked($selectedCapex === '0') required>
+                                    <label class="btn btn-outline-secondary" for="edit-is-capex-no-{{ $item->id }}">
+                                        <i class="fa-regular fa-circle-check me-1"></i>
+                                        Non-CAPEX
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="is_capex" id="edit-is-capex-yes-{{ $item->id }}" value="1" @checked($selectedCapex === '1') required>
+                                    <label class="btn btn-outline-primary" for="edit-is-capex-yes-{{ $item->id }}">
+                                        <i class="fa-regular fa-building-columns me-1"></i>
+                                        CAPEX
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block mt-1">Keep one PRS for one accounting treatment.</small>
+                            </div>
+                        </div>
                         <div class="col-12">
                             <div class="form-floating">
                                 <textarea class="form-control" placeholder="Leave a comment here"

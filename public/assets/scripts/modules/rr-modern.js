@@ -342,6 +342,9 @@ function initRrCreateModal(poLookupUrl) {
 
     function createCreateItemRow(item, index) {
         const isDisabled = Number(item.qty_remaining) <= 0;
+        const itemTypeBadge = item.is_capex
+            ? '<span class="badge bg-light-primary">CAPEX</span>'
+            : '<span class="badge bg-light-secondary">Stock</span>';
 
         return `
                 <tr>
@@ -353,6 +356,7 @@ function initRrCreateModal(poLookupUrl) {
                     <td>${item.item_name ?? '-'}</td>
                     <td>${item.item_code ?? '-'}</td>
                     <td>${item.unit_name ?? '-'}</td>
+                    <td>${itemTypeBadge}</td>
                     <td class="text-end">${formatNumber(item.qty_ordered)}</td>
                     <td class="text-end">${formatNumber(item.qty_received)}</td>
                     <td class="text-end">${formatNumber(item.qty_remaining)}</td>

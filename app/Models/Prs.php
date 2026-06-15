@@ -20,6 +20,7 @@ class Prs extends Model
         'id' => 'integer',
         'user_id' => 'integer',
         'department_id' => 'integer',
+        'is_capex' => 'boolean',
     ];
     protected $hidden = [
 

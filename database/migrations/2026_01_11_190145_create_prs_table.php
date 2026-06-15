@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignId('department_id')->constrained()->onDelete(fk_on_delete('restrict'));
             $table->date('prs_date');
             $table->date('date_needed');
+            $table->boolean('is_capex')->default(false);
             $table->text('remarks')->nullable();
             $table->string('status')->default('REQUESTED'); // REQUESTED, CANVASSING, ON_HOLD, REVISED, PO_CREATED
             $table->json('meta')->nullable();

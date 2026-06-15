@@ -136,16 +136,31 @@ class PrsController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->all();
-        $data['prs_number'] = $this->generatePrsNumber($data['department_id']);
-        $data['user_id'] = Auth::id();
-        $data['prs_date'] = date('Y-m-d');
-        $data['status'] = 'REQUESTED';
+        $validated = $request->validate([
+            'department_id' => ['required', 'exists:departments,id'],
+            'date_needed'   => ['required', 'date'],
+            'is_capex'      => ['required', 'boolean'],
+            'remarks'       => ['nullable', 'string'],
+            'prsItems'      => ['required', 'array', 'min:1'],
+            'prsItems.*.item_id'  => ['required', 'exists:items,id'],
+            'prsItems.*.quantity' => ['required', 'numeric', 'min:1'],
+        ]);
+
+        $data = [
+            'department_id' => $validated['department_id'],
+            'date_needed'   => $validated['date_needed'],
+            'is_capex'      => (bool) $validated['is_capex'],
+            'remarks'       => $validated['remarks'] ?? null,
+            'prs_number'    => $this->generatePrsNumber($validated['department_id']),
+            'user_id'       => Auth::id(),
+            'prs_date'      => date('Y-m-d'),
+            'status'        => 'REQUESTED',
+        ];
 
         // dd($data);
         $newPrs = Prs::create($data);
 
-        foreach($data['prsItems'] as $prsItem) {
+        foreach($validated['prsItems'] as $prsItem) {
             PrsItem::create([
                 'prs_id'       => $newPrs->id,
                 'item_id'      => $prsItem['item_id'],
@@ -196,6 +211,7 @@ class PrsController extends Controller
         $validated = $request->validate([
             'department_id' => ['required', 'exists:departments,id'],
             'date_needed'   => ['required', 'date'],
+            'is_capex'      => ['required', 'boolean'],
             'remarks'       => ['nullable', 'string'],
             'prsItems'      => ['required', 'array', 'min:1'],
             'prsItems.*.item_id'  => ['required', 'exists:items,id'],
@@ -206,6 +222,7 @@ class PrsController extends Controller
 
         $prs->department_id = $validated['department_id'];
         $prs->date_needed   = $validated['date_needed'];
+        $prs->is_capex      = (bool) $validated['is_capex'];
         $prs->remarks       = $validated['remarks'] ?? null;
 
         if ($shouldRegenerate) {
