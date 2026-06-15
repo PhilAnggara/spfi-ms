@@ -53,6 +53,12 @@
                         })
                         ->filter(fn (array $row) => $row['type'] !== '' || $row['amount'] > 0)
                         ->values();
+                    $firstItemMeta = $purchaseOrder->items->first()?->meta ?? [];
+                    $termOfPaymentType = old('term_of_payment_type', $purchaseOrder->term_of_payment_type ?? ($firstItemMeta['term_of_payment_type'] ?? ''));
+                    $termOfPayment = old('term_of_payment', $purchaseOrder->term_of_payment ?? ($firstItemMeta['term_of_payment'] ?? ''));
+                    $termOfDelivery = old('term_of_delivery', $purchaseOrder->term_of_delivery ?? ($firstItemMeta['term_of_delivery'] ?? ''));
+                    $termPaymentDisplay = trim(($termOfPayment ? $termOfPayment . ' ' : '') . ($termOfPaymentType ? ucfirst($termOfPaymentType) : ''));
+                    $termPaymentDisplay = $termPaymentDisplay !== '' ? $termPaymentDisplay : '-';
                 @endphp
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-4">
@@ -100,6 +106,21 @@
                                     </select>
                                     <input type="text" name="remark_text" class="form-control" value="{{ $purchaseOrder->remark_text }}" placeholder="Remark">
                                 </div>
+                            </div>
+                            <div class="col-12 col-lg-5">
+                                <label class="form-label">Term of Payment <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <select name="term_of_payment_type" class="form-select" style="max-width: 120px;" required>
+                                        <option value="">Select</option>
+                                        <option value="cash" @selected($termOfPaymentType === 'cash')>Cash</option>
+                                        <option value="credit" @selected($termOfPaymentType === 'credit')>Credit</option>
+                                    </select>
+                                    <input type="text" name="term_of_payment" class="form-control" value="{{ $termOfPayment }}" required>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-7">
+                                <label class="form-label">Term of Delivery</label>
+                                <input type="text" name="term_of_delivery" class="form-control" value="{{ $termOfDelivery }}">
                             </div>
                         </div>
 
@@ -262,6 +283,15 @@
                                 <div class="text-muted small">Remark</div>
                                 <div class="fw-semibold">{{ $purchaseOrder->remark_type ?? '-' }}</div>
                                 <div class="text-muted small">{{ $purchaseOrder->remark_text ?? '-' }}</div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-muted small">Term of Payment</div>
+                                <div class="fw-semibold">{{ $termPaymentDisplay }}</div>
+                                @if ($termOfDelivery)
+                                    <div class="text-muted small mt-1">Term of Delivery: {{ $termOfDelivery }}</div>
+                                @endif
                             </div>
                         </div>
                     </div>

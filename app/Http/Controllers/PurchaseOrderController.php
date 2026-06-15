@@ -292,6 +292,7 @@ class PurchaseOrderController extends Controller
         $subtotal = $lineItems->sum('line_total');
         $currencies = Currency::query()->orderBy('id')->get();
         $currencyId = $currencies->first()?->id;
+        $defaultTerms = $this->defaultTermsFromPrsItems($prsItems);
 
         return view('pages.purchase-orders.preview', [
             'supplier' => Supplier::findOrFail($validated['supplier_id']),
@@ -301,6 +302,9 @@ class PurchaseOrderController extends Controller
             'currencyId' => $currencyId,
             'remarkType' => 'Normal',
             'remarkText' => '',
+            'termOfPaymentType' => $defaultTerms['term_of_payment_type'],
+            'termOfPayment' => $defaultTerms['term_of_payment'],
+            'termOfDelivery' => $defaultTerms['term_of_delivery'],
             'feeItems' => [],
         ]);
     }
@@ -319,6 +323,9 @@ class PurchaseOrderController extends Controller
             'fee_items.*.amount' => ['nullable', 'numeric', 'min:0'],
             'remark_type' => ['required', 'in:Normal,Confirmatory'],
             'remark_text' => ['nullable', 'string', 'max:255'],
+            'term_of_payment_type' => ['required', 'in:cash,credit'],
+            'term_of_payment' => ['required', 'string', 'max:255'],
+            'term_of_delivery' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -379,6 +386,9 @@ class PurchaseOrderController extends Controller
                 'pph_rate' => 0,
                 'remark_type' => $validated['remark_type'],
                 'remark_text' => $validated['remark_text'],
+                'term_of_payment_type' => $validated['term_of_payment_type'],
+                'term_of_payment' => $validated['term_of_payment'],
+                'term_of_delivery' => $validated['term_of_delivery'] ?? null,
                 'submitted_at' => $validated['action'] === 'submit' ? now() : null,
             ]);
 
@@ -428,9 +438,9 @@ class PurchaseOrderController extends Controller
                         'prs_number' => $prsItem->prs?->prs_number,
                         'is_capex' => $this->isCapexPrsItem($prsItem),
                         'lead_time_days' => $canvassing?->lead_time_days,
-                        'term_of_payment_type' => $canvassing?->term_of_payment_type,
-                        'term_of_payment' => $canvassing?->term_of_payment,
-                        'term_of_delivery' => $canvassing?->term_of_delivery,
+                        'term_of_payment_type' => $validated['term_of_payment_type'],
+                        'term_of_payment' => $validated['term_of_payment'],
+                        'term_of_delivery' => $validated['term_of_delivery'] ?? $canvassing?->term_of_delivery,
                     ],
                 ]);
             }
@@ -554,6 +564,9 @@ class PurchaseOrderController extends Controller
             'fee_items.*.amount' => ['nullable', 'numeric', 'min:0'],
             'remark_type' => ['required', 'in:Normal,Confirmatory'],
             'remark_text' => ['nullable', 'string', 'max:255'],
+            'term_of_payment_type' => ['required', 'in:cash,credit'],
+            'term_of_payment' => ['required', 'string', 'max:255'],
+            'term_of_delivery' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'distinct', 'exists:purchase_order_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -613,6 +626,7 @@ class PurchaseOrderController extends Controller
                     'pph_amount' => $pphAmount,
                     'total' => $lineTotal,
                     'notes' => $row['notes'] ?? null,
+                    'meta' => $this->syncPoItemTermMeta($poItem->meta ?? [], $validated),
                 ]);
             }
 
@@ -622,6 +636,9 @@ class PurchaseOrderController extends Controller
                 'fees_breakdown' => $feesBreakdown,
                 'remark_type' => $validated['remark_type'],
                 'remark_text' => $validated['remark_text'],
+                'term_of_payment_type' => $validated['term_of_payment_type'],
+                'term_of_payment' => $validated['term_of_payment'],
+                'term_of_delivery' => $validated['term_of_delivery'] ?? null,
                 'subtotal' => $subtotal,
                 'tax_amount' => 0,
                 'discount_amount' => $discountTotal,
@@ -703,5 +720,37 @@ class PurchaseOrderController extends Controller
             ->map(fn (PrsItem $prsItem) => $this->isCapexPrsItem($prsItem))
             ->unique()
             ->count() > 1;
+    }
+
+    private function defaultTermsFromPrsItems($prsItems): array
+    {
+        $selectedCanvassing = $prsItems
+            ->pluck('selectedCanvassingItem')
+            ->filter()
+            ->first(function ($canvassing) {
+                return filled($canvassing?->term_of_payment_type) || filled($canvassing?->term_of_payment);
+            });
+
+        if (! $selectedCanvassing) {
+            $selectedCanvassing = $prsItems
+                ->pluck('selectedCanvassingItem')
+                ->filter()
+                ->first();
+        }
+
+        return [
+            'term_of_payment_type' => $selectedCanvassing?->term_of_payment_type,
+            'term_of_payment' => $selectedCanvassing?->term_of_payment,
+            'term_of_delivery' => $selectedCanvassing?->term_of_delivery,
+        ];
+    }
+
+    private function syncPoItemTermMeta(array $meta, array $validated): array
+    {
+        $meta['term_of_payment_type'] = $validated['term_of_payment_type'];
+        $meta['term_of_payment'] = $validated['term_of_payment'];
+        $meta['term_of_delivery'] = $validated['term_of_delivery'] ?? ($meta['term_of_delivery'] ?? null);
+
+        return $meta;
     }
 }

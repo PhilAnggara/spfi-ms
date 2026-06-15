@@ -34,6 +34,9 @@
                     $currencySymbol = $selectedCurrency?->symbol ?: ($selectedCurrency?->code ?: 'Rp');
                     $feeItemsForForm = old('fee_items', $feeItems ?? []);
                     $hasCapexItems = collect($lineItems)->contains(fn ($item) => (bool) ($item['is_capex'] ?? false));
+                    $selectedTermType = old('term_of_payment_type', $termOfPaymentType ?? '');
+                    $selectedTermPayment = old('term_of_payment', $termOfPayment ?? '');
+                    $selectedTermDelivery = old('term_of_delivery', $termOfDelivery ?? '');
 
                     if (empty($feeItemsForForm)) {
                         $feeItemsForForm = [
@@ -64,6 +67,22 @@
                             </select>
                             <input type="text" name="remark_text" class="form-control" value="{{ $remarkText }}" placeholder="Remark">
                         </div>
+                    </div>
+                    <div class="col-12 col-lg-5">
+                        <label class="form-label">Term of Payment <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <select name="term_of_payment_type" class="form-select" style="max-width: 120px;" required>
+                                <option value="">Select</option>
+                                <option value="cash" @selected($selectedTermType === 'cash')>Cash</option>
+                                <option value="credit" @selected($selectedTermType === 'credit')>Credit</option>
+                            </select>
+                            <input type="text" name="term_of_payment" class="form-control" value="{{ $selectedTermPayment }}" placeholder="e.g., 40% DP : 60% before delivery" required>
+                        </div>
+                        <small class="text-muted">Default from canvassing can be changed before creating PO.</small>
+                    </div>
+                    <div class="col-12 col-lg-7">
+                        <label class="form-label">Term of Delivery</label>
+                        <input type="text" name="term_of_delivery" class="form-control" value="{{ $selectedTermDelivery }}" placeholder="e.g., FOB, CIF">
                     </div>
                     @if ($hasCapexItems)
                         <div class="col-12">

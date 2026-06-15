@@ -108,8 +108,8 @@
         $supplier = $purchaseOrder->supplier;
         $firstItem = $purchaseOrder->items->first();
         $firstMeta = $firstItem?->meta ?? [];
-        $termType = $firstMeta['term_of_payment_type'] ?? null;
-        $termValue = $firstMeta['term_of_payment'] ?? null;
+        $termType = $purchaseOrder->term_of_payment_type ?? ($firstMeta['term_of_payment_type'] ?? null);
+        $termValue = $purchaseOrder->term_of_payment ?? ($firstMeta['term_of_payment'] ?? null);
         $termPayment = trim(($termValue ? $termValue . ' ' : '') . ($termType ?? ''));
         $termPayment = $termPayment !== '' ? $termPayment : '-';
     @endphp

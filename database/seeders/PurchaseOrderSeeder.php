@@ -184,6 +184,9 @@ class PurchaseOrderSeeder extends Seeder
                         'legacy_po_code' => $poCode,
                         'legacy_detail_id' => $detailId,
                         'legacy_detail_created_by' => $this->normalizeValue($detailRow['created_by'] ?? null),
+                        'term_of_payment_type' => $prsCandidate['term_of_payment_type'] ?? null,
+                        'term_of_payment' => $prsCandidate['term_of_payment'] ?? null,
+                        'term_of_delivery' => $prsCandidate['term_of_delivery'] ?? null,
                     ],
                     'created_at' => $detailCreatedAt,
                     'updated_at' => $detailUpdatedAt,
@@ -191,6 +194,7 @@ class PurchaseOrderSeeder extends Seeder
             }
 
             $total = $lineSubtotalTotal - $discountAmountTotal + $ppnAmountTotal - $pphAmountTotal + $feeAmount;
+            $poTerms = $this->resolvePoTermsFromDetailPayloads($detailPayloads);
 
             $signatureMeta = [
                 'legacy' => [
@@ -233,6 +237,7 @@ class PurchaseOrderSeeder extends Seeder
                 $pphRate,
                 $pphAmountTotal,
                 $remarkType,
+                $poTerms,
                 $detailPayloads,
                 &$insertedDetail,
                 &$skippedDetail
@@ -262,6 +267,7 @@ class PurchaseOrderSeeder extends Seeder
                     $pphRate,
                     $pphAmountTotal,
                     $remarkType,
+                    $poTerms,
                     $detailPayloads,
                     &$insertedDetail,
                     &$skippedDetail
@@ -295,6 +301,9 @@ class PurchaseOrderSeeder extends Seeder
                             'pph_amount' => round($pphAmountTotal, 2),
                             'remark_type' => $remarkType,
                             'remark_text' => $remarks,
+                            'term_of_payment_type' => $poTerms['term_of_payment_type'],
+                            'term_of_payment' => $poTerms['term_of_payment'],
+                            'term_of_delivery' => $poTerms['term_of_delivery'],
                         ]
                     );
 
@@ -499,19 +508,23 @@ class PurchaseOrderSeeder extends Seeder
     }
 
     /**
-     * @return array{strict: array<string, array<int, array{id: int, quantity: float}>>, loose: array<string, array<int, array{id: int, quantity: float}>>}
+     * @return array{strict: array<string, array<int, array{id: int, quantity: float, term_of_payment_type: string|null, term_of_payment: string|null, term_of_delivery: string|null}>>, loose: array<string, array<int, array{id: int, quantity: float, term_of_payment_type: string|null, term_of_payment: string|null, term_of_delivery: string|null}>>}
      */
     private function buildPrsItemCandidates(): array
     {
         $rows = DB::table('prs_items')
             ->join('prs', 'prs.id', '=', 'prs_items.prs_id')
             ->leftJoin('departments', 'departments.id', '=', 'prs.department_id')
+            ->leftJoin('prs_canvassing_items as selected_canvassing', 'selected_canvassing.id', '=', 'prs_items.selected_canvassing_item_id')
             ->select([
                 'prs_items.id as id',
                 'prs_items.item_id as item_id',
                 'prs_items.quantity as quantity',
                 'prs.prs_number as prs_number',
                 'departments.code as department_code',
+                'selected_canvassing.term_of_payment_type as term_of_payment_type',
+                'selected_canvassing.term_of_payment as term_of_payment',
+                'selected_canvassing.term_of_delivery as term_of_delivery',
             ])
             ->orderBy('prs_items.id')
             ->get();
@@ -530,6 +543,9 @@ class PurchaseOrderSeeder extends Seeder
             $candidate = [
                 'id' => (int) $row->id,
                 'quantity' => (float) $row->quantity,
+                'term_of_payment_type' => $this->normalizeValue($row->term_of_payment_type ?? null),
+                'term_of_payment' => $this->normalizeValue($row->term_of_payment ?? null),
+                'term_of_delivery' => $this->normalizeValue($row->term_of_delivery ?? null),
             ];
 
             $strictKey = $this->buildPrsKey($prsNumber, $itemId, $departmentCode);
@@ -546,8 +562,8 @@ class PurchaseOrderSeeder extends Seeder
     }
 
     /**
-     * @param  array{strict: array<string, array<int, array{id: int, quantity: float}>>, loose: array<string, array<int, array{id: int, quantity: float}>>}  $prsCandidates
-     * @return array{id: int, quantity: float}|null
+     * @param  array{strict: array<string, array<int, array{id: int, quantity: float, term_of_payment_type: string|null, term_of_payment: string|null, term_of_delivery: string|null}>>, loose: array<string, array<int, array{id: int, quantity: float, term_of_payment_type: string|null, term_of_payment: string|null, term_of_delivery: string|null}>>}  $prsCandidates
+     * @return array{id: int, quantity: float, term_of_payment_type: string|null, term_of_payment: string|null, term_of_delivery: string|null}|null
      */
     private function consumePrsItemCandidate(array &$prsCandidates, ?string $prsNumber, int $itemId, ?string $departmentCode): ?array
     {
@@ -575,7 +591,7 @@ class PurchaseOrderSeeder extends Seeder
     }
 
     /**
-     * @param  array<string, array<int, array{id: int, quantity: float}>>  $queue
+     * @param  array<string, array<int, array{id: int, quantity: float, term_of_payment_type: string|null, term_of_payment: string|null, term_of_delivery: string|null}>>  $queue
      */
     private function removeCandidateById(array &$queue, int $candidateId): void
     {
@@ -616,6 +632,38 @@ class PurchaseOrderSeeder extends Seeder
         }
 
         return str_contains(strtolower($remark), 'confirm') ? 'Confirmatory' : 'Normal';
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $detailPayloads
+     * @return array{term_of_payment_type: string|null, term_of_payment: string|null, term_of_delivery: string|null}
+     */
+    private function resolvePoTermsFromDetailPayloads(array $detailPayloads): array
+    {
+        foreach ($detailPayloads as $payload) {
+            $meta = $payload['meta'] ?? [];
+            if (! is_array($meta)) {
+                continue;
+            }
+
+            $termType = $this->normalizeValue($meta['term_of_payment_type'] ?? null);
+            $termPayment = $this->normalizeValue($meta['term_of_payment'] ?? null);
+            $termDelivery = $this->normalizeValue($meta['term_of_delivery'] ?? null);
+
+            if ($termType !== null || $termPayment !== null || $termDelivery !== null) {
+                return [
+                    'term_of_payment_type' => $termType,
+                    'term_of_payment' => $termPayment,
+                    'term_of_delivery' => $termDelivery,
+                ];
+            }
+        }
+
+        return [
+            'term_of_payment_type' => null,
+            'term_of_payment' => null,
+            'term_of_delivery' => null,
+        ];
     }
 
     /**

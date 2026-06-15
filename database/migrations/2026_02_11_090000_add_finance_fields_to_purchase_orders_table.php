@@ -21,6 +21,9 @@ return new class extends Migration
             $table->decimal('pph_amount', 15, 2)->default(0);
             $table->string('remark_type')->nullable();
             $table->text('remark_text')->nullable();
+            $table->string('term_of_payment_type')->nullable();
+            $table->string('term_of_payment')->nullable();
+            $table->string('term_of_delivery')->nullable();
         });
     }
 
@@ -39,6 +42,9 @@ return new class extends Migration
                 'pph_amount',
                 'remark_type',
                 'remark_text',
+                'term_of_payment_type',
+                'term_of_payment',
+                'term_of_delivery',
             ]);
             $table->dropConstrainedForeignId('currency_id');
         });
