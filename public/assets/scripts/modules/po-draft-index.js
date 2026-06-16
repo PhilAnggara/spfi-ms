@@ -1,4 +1,6 @@
 (function () {
+    const MAX_ITEMS_PER_PO = 11;
+
     const toggleItemChecked = (checkbox, checked) => {
         const row = checkbox.closest('tr');
         const checkedInput = row?.querySelector('.item-checked');
@@ -16,19 +18,31 @@
         return checked?.dataset.accountingCategory || null;
     };
 
-    const syncCategoryLock = (form) => {
+    const getCheckedCount = (form) => {
+        return form.querySelectorAll('.item-checkbox:checked').length;
+    };
+
+    const syncSelectionRules = (form) => {
         const activeCategory = getActiveCategory(form);
 
         form.querySelectorAll('.item-checkbox').forEach((checkbox) => {
             const category = checkbox.dataset.accountingCategory || 'non_capex';
-            const shouldDisable = activeCategory !== null && category !== activeCategory;
+            const categoryLocked = activeCategory !== null && category !== activeCategory;
 
-            checkbox.disabled = shouldDisable;
-
-            if (shouldDisable && checkbox.checked) {
+            if (categoryLocked && checkbox.checked) {
                 checkbox.checked = false;
                 toggleItemChecked(checkbox, false);
             }
+        });
+
+        const checkedCount = getCheckedCount(form);
+
+        form.querySelectorAll('.item-checkbox').forEach((checkbox) => {
+            const category = checkbox.dataset.accountingCategory || 'non_capex';
+            const categoryLocked = activeCategory !== null && category !== activeCategory;
+            const maxLocked = !checkbox.checked && checkedCount >= MAX_ITEMS_PER_PO;
+
+            checkbox.disabled = categoryLocked || maxLocked;
         });
     };
 
@@ -47,7 +61,7 @@
         const initializedForms = new Set();
 
         scope.querySelectorAll('.po-supplier-form').forEach((form) => {
-            syncCategoryLock(form);
+            syncSelectionRules(form);
         });
 
         scope.querySelectorAll('.item-checkbox').forEach((checkbox) => {
@@ -62,10 +76,15 @@
                 const currentCheckbox = event.target;
                 const form = currentCheckbox.closest('form');
 
+                if (form && currentCheckbox.checked && getCheckedCount(form) > MAX_ITEMS_PER_PO) {
+                    currentCheckbox.checked = false;
+                    alert(`A purchase order can contain a maximum of ${MAX_ITEMS_PER_PO} items.`);
+                }
+
                 toggleItemChecked(currentCheckbox, currentCheckbox.checked);
 
                 if (form) {
-                    syncCategoryLock(form);
+                    syncSelectionRules(form);
                 }
             });
 
@@ -75,7 +94,7 @@
             }
         });
 
-        initializedForms.forEach(syncCategoryLock);
+        initializedForms.forEach(syncSelectionRules);
 
         scope.querySelectorAll('.select-all').forEach((button) => {
             if (button.dataset.poDraftInitialized === '1') {
@@ -94,13 +113,21 @@
                     return;
                 }
 
+                let selectedCount = 0;
+
                 form.querySelectorAll('.item-checkbox').forEach((checkbox) => {
                     const shouldCheck = (checkbox.dataset.accountingCategory || 'non_capex') === targetCategory;
-                    checkbox.checked = shouldCheck;
-                    toggleItemChecked(checkbox, shouldCheck);
+                    const canSelect = shouldCheck && selectedCount < MAX_ITEMS_PER_PO;
+
+                    checkbox.checked = canSelect;
+                    toggleItemChecked(checkbox, canSelect);
+
+                    if (canSelect) {
+                        selectedCount += 1;
+                    }
                 });
 
-                syncCategoryLock(form);
+                syncSelectionRules(form);
             });
         });
     }

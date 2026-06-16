@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderController extends Controller
 {
+    private const MAX_ITEMS_PER_PO = 11;
+
     /**
      * Normalize fee item payload and calculate fee total.
      */
@@ -237,6 +239,10 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['items' => 'Please select at least one item.']);
         }
 
+        if (count($checkedItems) > self::MAX_ITEMS_PER_PO) {
+            return redirect()->back()->withErrors(['items' => 'A purchase order can contain a maximum of ' . self::MAX_ITEMS_PER_PO . ' items.']);
+        }
+
         $userId = $request->user()->id;
         $checkedItemIds = array_map('intval', array_column($checkedItems, 'prs_item_id'));
 
@@ -328,7 +334,7 @@ class PurchaseOrderController extends Controller
             'term_of_payment_type' => ['required', 'in:cash,credit'],
             'term_of_payment' => ['nullable', 'string', 'max:255'],
             'term_of_delivery' => ['nullable', 'string', 'max:255'],
-            'items' => ['required', 'array', 'min:1'],
+            'items' => ['required', 'array', 'min:1', 'max:' . self::MAX_ITEMS_PER_PO],
             'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],

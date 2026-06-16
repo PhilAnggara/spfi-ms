@@ -152,7 +152,7 @@
                                             <div class="po-draft-form-toolbar">
                                                 <div class="text-muted small">
                                                     <i class="fa-light fa-circle-check me-1"></i>
-                                                    {{ itemOrItems($items->count()) }} ready for preview
+                                                    {{ itemOrItems($items->count()) }} ready for preview. Max 11 items per PO.
                                                 </div>
                                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                                     <button type="button" class="btn btn-sm btn-outline-secondary select-all" data-supplier="{{ $supplierId }}">
@@ -186,15 +186,16 @@
                                                                 $item = $prsItem->item;
                                                                 $isCapex = (bool) ($prsItem->prs?->is_capex ?? false);
                                                                 $accountingCategory = $isCapex ? 'capex' : 'non_capex';
+                                                                $isInitiallySelected = $index < 11;
                                                             @endphp
                                                             <tr data-accounting-category="{{ $accountingCategory }}">
                                                                 <td>
-                                                                    <input type="checkbox" class="form-check-input item-checkbox" data-accounting-category="{{ $accountingCategory }}" checked>
+                                                                    <input type="checkbox" class="form-check-input item-checkbox" data-accounting-category="{{ $accountingCategory }}" @checked($isInitiallySelected)>
                                                                     <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $prsItem->id }}">
                                                                     <input type="hidden" name="items[{{ $index }}][quantity]" value="{{ $prsItem->quantity }}">
                                                                     <input type="hidden" name="items[{{ $index }}][unit_price]" value="{{ $canvassing?->unit_price ?? 0 }}">
                                                                     <input type="hidden" name="items[{{ $index }}][notes]" value="{{ $canvassing?->notes }}">
-                                                                    <input type="hidden" name="items[{{ $index }}][checked]" class="item-checked" value="1">
+                                                                    <input type="hidden" name="items[{{ $index }}][checked]" class="item-checked" value="{{ $isInitiallySelected ? '1' : '0' }}">
                                                                 </td>
                                                                 <td>
                                                                     {{ $prsItem->prs?->prs_number ?? '-' }}
