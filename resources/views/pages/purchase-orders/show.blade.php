@@ -108,14 +108,14 @@
                                 </div>
                             </div>
                             <div class="col-12 col-lg-5">
-                                <label class="form-label">Term of Payment <span class="text-danger">*</span></label>
+                                <label class="form-label">Term of Payment Type <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <select name="term_of_payment_type" class="form-select" style="max-width: 120px;" required>
                                         <option value="">Select</option>
                                         <option value="cash" @selected($termOfPaymentType === 'cash')>Cash</option>
                                         <option value="credit" @selected($termOfPaymentType === 'credit')>Credit</option>
                                     </select>
-                                    <input type="text" name="term_of_payment" class="form-control" value="{{ $termOfPayment }}" required>
+                                    <input type="text" name="term_of_payment" class="form-control" value="{{ $termOfPayment }}" placeholder="Description optional">
                                 </div>
                             </div>
                             <div class="col-12 col-lg-7">

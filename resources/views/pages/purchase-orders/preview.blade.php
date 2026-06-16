@@ -69,14 +69,14 @@
                         </div>
                     </div>
                     <div class="col-12 col-lg-5">
-                        <label class="form-label">Term of Payment <span class="text-danger">*</span></label>
+                        <label class="form-label">Term of Payment Type <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <select name="term_of_payment_type" class="form-select" style="max-width: 120px;" required>
                                 <option value="">Select</option>
                                 <option value="cash" @selected($selectedTermType === 'cash')>Cash</option>
                                 <option value="credit" @selected($selectedTermType === 'credit')>Credit</option>
                             </select>
-                            <input type="text" name="term_of_payment" class="form-control" value="{{ $selectedTermPayment }}" placeholder="e.g., 40% DP : 60% before delivery" required>
+                            <input type="text" name="term_of_payment" class="form-control" value="{{ $selectedTermPayment }}" placeholder="Description optional, e.g. 40% DP : 60% before delivery">
                         </div>
                         <small class="text-muted">Default from canvassing can be changed before creating PO.</small>
                     </div>
@@ -181,7 +181,7 @@
                             <div id="fee-items-container" class="d-flex flex-column gap-2">
                                 @foreach ($feeItemsForForm as $index => $feeItem)
                                     <div class="fee-item-row border rounded-2 p-2 bg-white" data-fee-index="{{ $index }}">
-                                        <div class="row g-2 align-items-center">
+                                        <div class="row g-2 align-items-end">
                                             <div class="col-12 col-md-6">
                                                 <label class="form-label form-label-sm mb-1">Charge Type</label>
                                                 <input
@@ -207,7 +207,7 @@
                                                     >
                                                 </div>
                                             </div>
-                                            <div class="col-2 col-md-2 d-flex align-items-end">
+                                            <div class="col-2 col-md-2">
                                                 <button type="button" class="btn btn-sm btn-outline-danger w-100 remove-fee-btn" aria-label="Remove charge">
                                                     <i class="fa-duotone fa-solid fa-trash"></i>
                                                 </button>

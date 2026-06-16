@@ -238,14 +238,16 @@ class PurchaseOrderController extends Controller
         }
 
         $userId = $request->user()->id;
-        $checkedItemIds = array_column($checkedItems, 'prs_item_id');
+        $checkedItemIds = array_map('intval', array_column($checkedItems, 'prs_item_id'));
 
         $prsItems = PrsItem::with(['prs', 'item.unit', 'selectedCanvassingItem'])
             ->whereIn('id', $checkedItemIds)
             ->where('canvasser_id', $userId)
             ->whereNull('purchase_order_id')
             ->whereNotNull('selected_canvassing_item_id')
-            ->get();
+            ->get()
+            ->sortBy(fn (PrsItem $item) => array_search($item->id, $checkedItemIds, true))
+            ->values();
 
         if ($prsItems->count() !== count($checkedItemIds)) {
             return redirect()->back()->withErrors(['items' => 'One or more PR items are invalid or already assigned.']);
@@ -324,7 +326,7 @@ class PurchaseOrderController extends Controller
             'remark_type' => ['required', 'in:Normal,Confirmatory'],
             'remark_text' => ['nullable', 'string', 'max:255'],
             'term_of_payment_type' => ['required', 'in:cash,credit'],
-            'term_of_payment' => ['required', 'string', 'max:255'],
+            'term_of_payment' => ['nullable', 'string', 'max:255'],
             'term_of_delivery' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
@@ -565,7 +567,7 @@ class PurchaseOrderController extends Controller
             'remark_type' => ['required', 'in:Normal,Confirmatory'],
             'remark_text' => ['nullable', 'string', 'max:255'],
             'term_of_payment_type' => ['required', 'in:cash,credit'],
-            'term_of_payment' => ['required', 'string', 'max:255'],
+            'term_of_payment' => ['nullable', 'string', 'max:255'],
             'term_of_delivery' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'distinct', 'exists:purchase_order_items,id'],
@@ -739,7 +741,7 @@ class PurchaseOrderController extends Controller
         }
 
         return [
-            'term_of_payment_type' => $selectedCanvassing?->term_of_payment_type,
+            'term_of_payment_type' => strtolower(trim((string) ($selectedCanvassing?->term_of_payment_type ?? ''))),
             'term_of_payment' => $selectedCanvassing?->term_of_payment,
             'term_of_delivery' => $selectedCanvassing?->term_of_delivery,
         ];

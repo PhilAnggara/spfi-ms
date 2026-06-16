@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function () {
         row.setAttribute('data-fee-index', String(index));
 
         row.innerHTML = `
-            <div class="row g-2 align-items-center">
+            <div class="row g-2 align-items-end">
                 <div class="col-12 col-md-6">
                     <label class="form-label form-label-sm mb-1">Charge Type</label>
                     <input
@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         >
                     </div>
                 </div>
-                <div class="col-2 col-md-2 d-flex align-items-end">
+                <div class="col-2 col-md-2">
                     <button type="button" class="btn btn-sm btn-outline-danger w-100 remove-fee-btn" aria-label="Remove charge">
                         <i class="fa-duotone fa-solid fa-trash"></i>
                     </button>
