@@ -21,7 +21,7 @@ class DocumentNumberService
     {
         $last = $this->lastNumberParts($type);
         $nextRunningNumber = $last['running_number'] + 1;
-        $padding = max($last['padding'], self::DEFAULT_PADDING);
+        $padding = $last['running_number'] > 0 ? $last['padding'] : self::DEFAULT_PADDING;
         $attempts = 0;
 
         do {
@@ -97,18 +97,21 @@ class DocumentNumberService
             'padding' => self::DEFAULT_PADDING,
         ];
 
-        $numbers = DB::table($config['table'])
-            ->whereNotNull($config['column'])
+        $query = DB::table($config['table'])
+            ->whereNotNull($config['column']);
+
+        if ($this->hasSoftDeleteColumn($config['table'])) {
+            $query->whereNull('deleted_at');
+        }
+
+        $lastNumber = $query
+            ->orderByDesc('created_at')
             ->orderByDesc('id')
-            ->limit(500)
-            ->pluck($config['column']);
+            ->value($config['column']);
 
-        foreach ($numbers as $number) {
-            $parts = $this->extractRunningNumber($number);
-
-            if ($parts !== null) {
-                return $parts;
-            }
+        $parts = $this->extractRunningNumber($lastNumber);
+        if ($parts !== null) {
+            return $parts;
         }
 
         return $best;
@@ -142,6 +145,17 @@ class DocumentNumberService
         return DB::table($config['table'])
             ->where($config['column'], $number)
             ->exists();
+    }
+
+    private function hasSoftDeleteColumn(string $table): bool
+    {
+        static $cache = [];
+
+        if (! array_key_exists($table, $cache)) {
+            $cache[$table] = DB::getSchemaBuilder()->hasColumn($table, 'deleted_at');
+        }
+
+        return $cache[$table];
     }
 
     /**
