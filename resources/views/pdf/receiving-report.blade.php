@@ -93,6 +93,12 @@
         $rows = $receivingReport->items->take($maxRows)->values();
         $rowCount = $rows->count();
         $allItems = $receivingReport->items;
+        $supplierName = trim((string) ($po?->supplier?->name ?? ''));
+        $supplierCode = trim((string) ($po?->supplier?->code ?? ''));
+        $supplierDisplay = $supplierName !== '' ? $supplierName : '-';
+        if ($supplierCode !== '') {
+            $supplierDisplay .= ' | '.$supplierCode;
+        }
 
         $categoryAccountMap = [
             'OFFICE SUPPLIES' => '153',
@@ -123,6 +129,9 @@
 
         $debitRows = [];
         $totalAmountAllItems = 0.0;
+        $totalPpnAmountAllItems = 0.0;
+        $totalPphAmountAllItems = 0.0;
+        $creditAmountAllItems = 0.0;
 
         foreach ($allItems as $rrItem) {
             $poItem = $rrItem->purchaseOrderItem;
@@ -130,11 +139,21 @@
 
             $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
             $unitCost = (float) ($poItem?->unit_price ?? 0);
+            $orderedQty = (float) ($poItem?->quantity ?? 0);
+            $receivedRatio = $orderedQty > 0 ? min(1, max(0, $qtyTotal / $orderedQty)) : 0;
             $amount = $qtyTotal * $unitCost;
+            $ppnAmount = (float) ($poItem?->ppn_amount ?? 0) * $receivedRatio;
+            $pphAmount = (float) ($poItem?->pph_amount ?? 0) * $receivedRatio;
+            $lineTotal = $amount + $ppnAmount - $pphAmount;
             $totalAmountAllItems += $amount;
+            $totalPpnAmountAllItems += $ppnAmount;
+            $totalPphAmountAllItems += $pphAmount;
+            $creditAmountAllItems += $lineTotal;
 
-            $costCenter = trim((string) ($poItem?->prsItem?->prs?->department?->code ?? ''));
             $categoryName = strtoupper(trim((string) ($item?->category?->name ?? 'OTHERS')));
+            $costCenter = $categoryName === 'CHEM'
+                ? trim((string) ($poItem?->prsItem?->prs?->department?->code ?? ''))
+                : '';
             $debitAccount = $categoryAccountMap[$categoryName] ?? ($categoryAccountMap['OTHERS'] ?? '');
 
             $groupKey = $costCenter.'|'.$debitAccount;
@@ -168,12 +187,28 @@
             ->values()
             ->all();
 
+        if ($totalPpnAmountAllItems > 0) {
+            $accountingEntries[] = [
+                'cost_center' => '',
+                'account' => '551',
+                'debit' => $totalPpnAmountAllItems,
+                'credit' => null,
+            ];
+        }
+
         $accountingEntries[] = [
             'cost_center' => '',
             'account' => $creditAccount,
             'debit' => null,
-            'credit' => $totalAmountAllItems,
+            'credit' => $creditAmountAllItems,
         ];
+
+        $accountingCodeTotal = collect($accountingEntries)
+            ->sum(function (array $entry) {
+                $accountCode = trim((string) ($entry['account'] ?? ''));
+
+                return is_numeric($accountCode) ? (int) $accountCode : 0;
+            });
 
         $totalAmount = $rows->sum(function ($rrItem) {
             $poItem = $rrItem->purchaseOrderItem;
@@ -193,7 +228,7 @@
             <img src="{{ $backgroundImageDataUri }}" alt="" class="rr-bg">
         @endif
 
-        <div class="field" style="left: 37mm; top: 41mm; width: 88mm;">{{ $po?->supplier?->name ?? '-' }}</div>
+        <div class="field" style="left: 37mm; top: 41mm; width: 88mm;">{{ $supplierDisplay }}</div>
         <div class="field po-number" style="left: 161mm; top: 38mm; width: 48mm;">{{ $po?->po_number ?? '-' }}</div>
         <div class="field" style="left: 160mm; top: 49mm; width: 48mm;">{{ $poDateText }}</div>
 
@@ -225,7 +260,9 @@
         @php
             $entryStartTop = 166;
             $entryRowHeight = 5.2;
-            $entryRows = collect($accountingEntries)->take(5)->values();
+            $entryRows = collect($accountingEntries)->take(4)->values();
+            $totalLineTop = $entryStartTop + ($entryRows->count() * $entryRowHeight) - 1.2;
+            $totalEntryTop = $entryStartTop + ($entryRows->count() * $entryRowHeight) - 0.9;
         @endphp
 
         @foreach($entryRows as $entryIndex => $entry)
@@ -235,6 +272,9 @@
             <div class="acct-cell right" style="left: 40mm; top: {{ $entryTop }}mm; width: 30mm;">{{ $entry['debit'] !== null ? number_format((float) $entry['debit'], 2, '.', ',') : '' }}</div>
             <div class="acct-cell right" style="left: 70mm; top: {{ $entryTop }}mm; width: 30mm;">{{ $entry['credit'] !== null ? number_format((float) $entry['credit'], 2, '.', ',') : '' }}</div>
         @endforeach
+
+        <div style="position: absolute; left: 30mm; top: {{ $totalLineTop }}mm; width: 12mm; border-top: 1px solid #111827;"></div>
+        <div class="acct-cell" style="left: 30mm; top: {{ $totalEntryTop }}mm; width: 12mm; font-weight: bold;">{{ $accountingCodeTotal }}</div>
 
         <div class="field center" style="left: 175mm; top: 168mm; width: 47mm;">{{ $receivingReport->createdBy?->name ?? '-' }}</div>
         <div class="field center" style="left: 233mm; top: 168mm; width: 45mm;">{{ $approvedByName ?? '-' }}</div>
