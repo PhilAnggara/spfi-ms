@@ -298,7 +298,9 @@
                             <div class="row g-3 mb-3">
                                 <div class="col-md-4">
                                     <label for="create_ts_number" class="form-label">TS Number</label>
-                                    <input type="text" class="form-control" id="create_ts_number" name="ts_number" value="{{ old('ts_number') }}" required>
+                                    <input type="text" class="form-control" id="create_ts_number" name="ts_number" value="{{ old('ts_number', $nextTsNumber ?? '') }}">
+                                    <input type="hidden" name="ts_number_suggested" value="{{ $nextTsNumber ?? '' }}">
+                                    <div class="form-text">Auto-generated, but editable if using existing pre-numbered forms.</div>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="create_ts_date" class="form-label">TS Date</label>

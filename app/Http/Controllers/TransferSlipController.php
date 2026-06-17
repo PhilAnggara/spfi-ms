@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
+use App\Services\DocumentNumberService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
@@ -38,6 +40,7 @@ class TransferSlipController extends Controller
             'transferSlipItems' => $transferSlipItems,
             'departmentOptions' => $departmentOptions,
             'filters' => $filters,
+            'nextTsNumber' => app(DocumentNumberService::class)->previewNext('TS'),
         ]);
     }
 
@@ -128,7 +131,8 @@ class TransferSlipController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'ts_number' => ['required', 'string', 'max:50', 'unique:transfer_slips,ts_number'],
+            'ts_number' => ['nullable', 'string', 'max:50'],
+            'ts_number_suggested' => ['nullable', 'string', 'max:50'],
             'ts_date' => ['required', 'date'],
             'remarks' => ['nullable', 'string'],
             'for_production' => ['required', 'in:0,1'],
@@ -213,60 +217,82 @@ class TransferSlipController extends Controller
 
         $authUserId = Auth::id();
         $now = now();
+        $numberService = app(DocumentNumberService::class);
+        $createdTsNumber = null;
+        $maxAttempts = 2;
 
-        DB::transaction(function () use ($validated, $requestedItems, $sourceItems, $authUserId, $now): void {
-            $transferSlipId = DB::table('transfer_slips')->insertGetId([
-                'ts_number' => $validated['ts_number'],
-                'ts_date' => $validated['ts_date'],
-                'store_withdrawal_id' => (int) $validated['store_withdrawal_id'],
-                'for_production' => ((string) $validated['for_production']) === '1',
-                'remarks' => $validated['remarks'] ?? null,
-                'transfer_to' => null,
-                'noted_by' => null,
-                'noted_at' => null,
-                'approved_by' => null,
-                'approved_at' => null,
-                'received_by' => null,
-                'received_at' => null,
-                'created_by' => $authUserId,
-                'updated_by' => $authUserId,
-                'meta' => json_encode([
-                    'source' => 'transfer-slip-create-modal',
-                    'sws_number' => $validated['sws_number'],
-                    'item_count' => $requestedItems->count(),
-                ]),
-                'created_at' => $now,
-                'updated_at' => $now,
-                'deleted_at' => null,
-            ]);
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $resolvedNumber = $numberService->resolve('TS', $validated['ts_number'] ?? null, $validated['ts_number_suggested'] ?? null);
+            $numberService->assertUnique('TS', $resolvedNumber['number']);
 
-            $detailRows = $requestedItems->map(function (array $row) use ($transferSlipId, $sourceItems, $authUserId, $now): array {
-                $sourceItem = $sourceItems->get($row['store_withdrawal_item_id']);
+            try {
+                DB::transaction(function () use ($validated, $requestedItems, $sourceItems, $authUserId, $now, $resolvedNumber, &$createdTsNumber): void {
+                    $transferSlipId = DB::table('transfer_slips')->insertGetId([
+                        'ts_number' => $resolvedNumber['number'],
+                        'ts_date' => $validated['ts_date'],
+                        'store_withdrawal_id' => (int) $validated['store_withdrawal_id'],
+                        'for_production' => ((string) $validated['for_production']) === '1',
+                        'remarks' => $validated['remarks'] ?? null,
+                        'transfer_to' => null,
+                        'noted_by' => null,
+                        'noted_at' => null,
+                        'approved_by' => null,
+                        'approved_at' => null,
+                        'received_by' => null,
+                        'received_at' => null,
+                        'created_by' => $authUserId,
+                        'updated_by' => $authUserId,
+                        'meta' => json_encode([
+                            'source' => 'transfer-slip-create-modal',
+                            'sws_number' => $validated['sws_number'],
+                            'item_count' => $requestedItems->count(),
+                        ]),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                        'deleted_at' => null,
+                    ]);
 
-                return [
-                    'transfer_slip_id' => (int) $transferSlipId,
-                    'store_withdrawal_item_id' => $row['store_withdrawal_item_id'],
-                    'item_id' => $row['item_id'],
-                    'product_code' => $sourceItem->product_code,
-                    'quantity' => $row['quantity'],
-                    'created_by' => $authUserId,
-                    'updated_by' => $authUserId,
-                    'meta' => json_encode([
-                        'sws_uom' => $sourceItem->uom,
-                        'source_quantity' => round((float) $sourceItem->quantity, 3),
-                    ]),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                    'deleted_at' => null,
-                ];
-            })->values()->all();
+                    $detailRows = $requestedItems->map(function (array $row) use ($transferSlipId, $sourceItems, $authUserId, $now): array {
+                        $sourceItem = $sourceItems->get($row['store_withdrawal_item_id']);
 
-            DB::table('transfer_slip_items')->insert($detailRows);
-        });
+                        return [
+                            'transfer_slip_id' => (int) $transferSlipId,
+                            'store_withdrawal_item_id' => $row['store_withdrawal_item_id'],
+                            'item_id' => $row['item_id'],
+                            'product_code' => $sourceItem->product_code,
+                            'quantity' => $row['quantity'],
+                            'created_by' => $authUserId,
+                            'updated_by' => $authUserId,
+                            'meta' => json_encode([
+                                'sws_uom' => $sourceItem->uom,
+                                'source_quantity' => round((float) $sourceItem->quantity, 3),
+                            ]),
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                            'deleted_at' => null,
+                        ];
+                    })->values()->all();
+
+                    DB::table('transfer_slip_items')->insert($detailRows);
+                    $createdTsNumber = $resolvedNumber['number'];
+                });
+                break;
+            } catch (QueryException $exception) {
+                $canRetry = $resolvedNumber['source'] === 'auto'
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception);
+
+                if ($canRetry) {
+                    continue;
+                }
+
+                throw $exception;
+            }
+        }
 
         return redirect()
             ->route('transfer-slips.index')
-            ->with('success', "Transfer slip {$validated['ts_number']} has been created successfully.");
+            ->with('success', "Transfer slip {$createdTsNumber} has been created successfully.");
     }
 
     public function destroy(string $transferSlip)

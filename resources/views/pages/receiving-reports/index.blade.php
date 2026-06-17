@@ -220,7 +220,9 @@
                             <div class="row g-3 align-items-end">
                                 <div class="col-12 col-md-3">
                                     <label class="form-label">RR Number <span class="text-danger">*</span></label>
-                                    <input type="text" name="rr_number" class="form-control" placeholder="e.g. RR-001" required>
+                                    <input type="text" name="rr_number" class="form-control" value="{{ old('rr_number', $nextRrNumber ?? '') }}" placeholder="Auto number">
+                                    <input type="hidden" name="rr_number_suggested" value="{{ $nextRrNumber ?? '' }}">
+                                    <div class="form-text">Auto-generated, but editable if using existing pre-numbered forms.</div>
                                 </div>
                                 <div class="col-12 col-md-3">
                                     <label class="form-label">PO Number <span class="text-danger">*</span></label>

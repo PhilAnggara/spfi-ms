@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Supplier;
+use App\Services\DocumentNumberService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\UsesSmartCatalogSearch;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
@@ -106,13 +108,15 @@ class DeliveryController extends Controller
             'selectedCategory' => $categoryId,
             'selectedStockFilter' => $stockFilter,
             'suppliers' => $suppliers,
+            'nextDrNumber' => app(DocumentNumberService::class)->previewNext('DR'),
         ]);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'dr_number' => ['required', 'string', 'max:50', 'unique:deliveries,dr_number'],
+            'dr_number' => ['nullable', 'string', 'max:50'],
+            'dr_number_suggested' => ['nullable', 'string', 'max:50'],
             'dr_date' => ['required', 'date'],
             'from_name' => ['required', 'string', 'max:120'],
             'from_location' => ['nullable', 'string', 'max:120'],
@@ -198,55 +202,77 @@ class DeliveryController extends Controller
 
         $authUserId = Auth::id();
         $now = now();
+        $numberService = app(DocumentNumberService::class);
+        $createdDrNumber = null;
+        $maxAttempts = 2;
 
-        DB::transaction(function () use ($validated, $requestedItems, $itemRows, $authUserId, $now): void {
-            $deliveryId = DB::table('deliveries')->insertGetId([
-                'dr_number' => $validated['dr_number'],
-                'dr_date' => $validated['dr_date'],
-                'from_name' => trim((string) $validated['from_name']),
-                'from_location' => trim((string) ($validated['from_location'] ?? '')) ?: null,
-                'supplier_id' => (int) $validated['supplier_id'],
-                'to_location' => trim((string) ($validated['to_location'] ?? '')) ?: null,
-                'remarks' => $validated['remarks'] ?? null,
-                'or_number' => trim((string) ($validated['or_number'] ?? '')) ?: null,
-                'dm_number' => trim((string) ($validated['dm_number'] ?? '')) ?: null,
-                'created_by' => $authUserId,
-                'updated_by' => $authUserId,
-                'meta' => json_encode([
-                    'source' => 'delivery-create-page',
-                    'item_count' => $requestedItems->count(),
-                ]),
-                'created_at' => $now,
-                'updated_at' => $now,
-                'deleted_at' => null,
-            ]);
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $resolvedNumber = $numberService->resolve('DR', $validated['dr_number'] ?? null, $validated['dr_number_suggested'] ?? null);
+            $numberService->assertUnique('DR', $resolvedNumber['number']);
 
-            $detailRows = $requestedItems->map(function (array $row) use ($deliveryId, $itemRows, $authUserId, $now): array {
-                $item = $itemRows[$row['item_id']];
+            try {
+                DB::transaction(function () use ($validated, $requestedItems, $itemRows, $authUserId, $now, $resolvedNumber, &$createdDrNumber): void {
+                    $deliveryId = DB::table('deliveries')->insertGetId([
+                        'dr_number' => $resolvedNumber['number'],
+                        'dr_date' => $validated['dr_date'],
+                        'from_name' => trim((string) $validated['from_name']),
+                        'from_location' => trim((string) ($validated['from_location'] ?? '')) ?: null,
+                        'supplier_id' => (int) $validated['supplier_id'],
+                        'to_location' => trim((string) ($validated['to_location'] ?? '')) ?: null,
+                        'remarks' => $validated['remarks'] ?? null,
+                        'or_number' => trim((string) ($validated['or_number'] ?? '')) ?: null,
+                        'dm_number' => trim((string) ($validated['dm_number'] ?? '')) ?: null,
+                        'created_by' => $authUserId,
+                        'updated_by' => $authUserId,
+                        'meta' => json_encode([
+                            'source' => 'delivery-create-page',
+                            'item_count' => $requestedItems->count(),
+                        ]),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                        'deleted_at' => null,
+                    ]);
 
-                return [
-                    'delivery_id' => (int) $deliveryId,
-                    'item_id' => $row['item_id'],
-                    'product_code' => $item->code,
-                    'uom' => $item->uom_name,
-                    'quantity' => $row['quantity'],
-                    'created_by' => $authUserId,
-                    'updated_by' => $authUserId,
-                    'meta' => json_encode([
-                        'stock_on_hand_snapshot' => round((float) ($item->stock_on_hand ?? 0), 3),
-                    ]),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                    'deleted_at' => null,
-                ];
-            })->values()->all();
+                    $detailRows = $requestedItems->map(function (array $row) use ($deliveryId, $itemRows, $authUserId, $now): array {
+                        $item = $itemRows[$row['item_id']];
 
-            DB::table('delivery_items')->insert($detailRows);
-        });
+                        return [
+                            'delivery_id' => (int) $deliveryId,
+                            'item_id' => $row['item_id'],
+                            'product_code' => $item->code,
+                            'uom' => $item->uom_name,
+                            'quantity' => $row['quantity'],
+                            'created_by' => $authUserId,
+                            'updated_by' => $authUserId,
+                            'meta' => json_encode([
+                                'stock_on_hand_snapshot' => round((float) ($item->stock_on_hand ?? 0), 3),
+                            ]),
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                            'deleted_at' => null,
+                        ];
+                    })->values()->all();
+
+                    DB::table('delivery_items')->insert($detailRows);
+                    $createdDrNumber = $resolvedNumber['number'];
+                });
+                break;
+            } catch (QueryException $exception) {
+                $canRetry = $resolvedNumber['source'] === 'auto'
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception);
+
+                if ($canRetry) {
+                    continue;
+                }
+
+                throw $exception;
+            }
+        }
 
         return redirect()
             ->route('deliveries.index')
-            ->with('success', "Delivery {$validated['dr_number']} has been created successfully.");
+            ->with('success', "Delivery {$createdDrNumber} has been created successfully.");
     }
 
     public function destroy(string $delivery)

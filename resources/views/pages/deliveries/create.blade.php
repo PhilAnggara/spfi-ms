@@ -149,7 +149,9 @@
                         <div class="row g-2">
                             <div class="col-12 col-md-6">
                                 <label for="delivery-dr-number" class="form-label">DR Number</label>
-                                <input type="text" class="form-control" id="delivery-dr-number" name="dr_number" value="{{ old('dr_number') }}" required>
+                                <input type="text" class="form-control" id="delivery-dr-number" name="dr_number" value="{{ old('dr_number', $nextDrNumber ?? '') }}">
+                                <input type="hidden" name="dr_number_suggested" value="{{ $nextDrNumber ?? '' }}">
+                                <div class="form-text">Auto-generated, but editable if using existing pre-numbered forms.</div>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label for="delivery-dr-date" class="form-label">DR Date</label>

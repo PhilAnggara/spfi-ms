@@ -37,6 +37,7 @@
                     $selectedTermType = old('term_of_payment_type', $termOfPaymentType ?? '');
                     $selectedTermPayment = old('term_of_payment', $termOfPayment ?? '');
                     $selectedTermDelivery = old('term_of_delivery', $termOfDelivery ?? '');
+                    $selectedPoNumber = old('po_number', $nextPoNumber ?? '');
 
                     if (empty($feeItemsForForm)) {
                         $feeItemsForForm = [
@@ -46,6 +47,12 @@
                 @endphp
 
                 <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">PO Number</label>
+                        <input type="text" name="po_number" class="form-control" value="{{ $selectedPoNumber }}" placeholder="Auto number">
+                        <input type="hidden" name="po_number_suggested" value="{{ $nextPoNumber ?? '' }}">
+                        <small class="text-muted">Auto-generated, but editable if using existing pre-numbered forms.</small>
+                    </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label" for="currency-id">Currency</label>
                         <select name="currency_id" id="currency-id" class="form-select" @disabled($currencies->isEmpty())>
@@ -58,7 +65,7 @@
                             @endforelse
                         </select>
                     </div>
-                    <div class="col-12 col-md-8">
+                    <div class="col-12 col-md-4">
                         <label class="form-label">Remark</label>
                         <div class="input-group">
                             <select name="remark_type" class="form-select" style="max-width: 180px;">

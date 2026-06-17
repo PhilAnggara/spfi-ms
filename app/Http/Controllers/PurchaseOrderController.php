@@ -9,7 +9,9 @@ use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Notifications\PoSubmittedNotification;
+use App\Services\DocumentNumberService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -313,6 +315,7 @@ class PurchaseOrderController extends Controller
             'termOfPaymentType' => $defaultTerms['term_of_payment_type'],
             'termOfPayment' => $defaultTerms['term_of_payment'],
             'termOfDelivery' => $defaultTerms['term_of_delivery'],
+            'nextPoNumber' => app(DocumentNumberService::class)->previewNext('PO'),
             'feeItems' => [],
         ]);
     }
@@ -326,6 +329,8 @@ class PurchaseOrderController extends Controller
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'currency_id' => ['required', 'exists:currencies,id'],
             'action' => ['required', 'in:draft,submit'],
+            'po_number' => ['nullable', 'string', 'max:50'],
+            'po_number_suggested' => ['nullable', 'string', 'max:50'],
             'fee_items' => ['nullable', 'array'],
             'fee_items.*.type' => ['nullable', 'string', 'max:100'],
             'fee_items.*.amount' => ['nullable', 'numeric', 'min:0'],
@@ -379,26 +384,36 @@ class PurchaseOrderController extends Controller
 
         $itemsById = $prsItems->keyBy('id');
 
-        // Atomic create: PO header, items, and PR item marking.
-        $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $fees, $feesBreakdown, $request) {
-            $purchaseOrder = PurchaseOrder::create([
-                'supplier_id' => $validated['supplier_id'],
-                'currency_id' => $validated['currency_id'],
-                'created_by' => $request->user()->id,
-                'status' => $validated['action'] === 'submit' ? 'PENDING_APPROVAL' : 'DRAFT',
-                'tax_rate' => 0,
-                'fees' => $fees,
-                'fees_breakdown' => $feesBreakdown,
-                'discount_rate' => 0,
-                'ppn_rate' => 0,
-                'pph_rate' => 0,
-                'remark_type' => $validated['remark_type'],
-                'remark_text' => $validated['remark_text'],
-                'term_of_payment_type' => $validated['term_of_payment_type'],
-                'term_of_payment' => $validated['term_of_payment'],
-                'term_of_delivery' => $validated['term_of_delivery'] ?? null,
-                'submitted_at' => $validated['action'] === 'submit' ? now() : null,
-            ]);
+        $numberService = app(DocumentNumberService::class);
+        $purchaseOrder = null;
+        $maxAttempts = 2;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $resolvedNumber = $numberService->resolve('PO', $validated['po_number'] ?? null, $validated['po_number_suggested'] ?? null);
+            $numberService->assertUnique('PO', $resolvedNumber['number']);
+
+            try {
+                // Atomic create: PO header, items, and PR item marking.
+                $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $fees, $feesBreakdown, $request, $resolvedNumber) {
+                    $purchaseOrder = PurchaseOrder::create([
+                        'po_number' => $resolvedNumber['number'],
+                        'supplier_id' => $validated['supplier_id'],
+                        'currency_id' => $validated['currency_id'],
+                        'created_by' => $request->user()->id,
+                        'status' => $validated['action'] === 'submit' ? 'PENDING_APPROVAL' : 'DRAFT',
+                        'tax_rate' => 0,
+                        'fees' => $fees,
+                        'fees_breakdown' => $feesBreakdown,
+                        'discount_rate' => 0,
+                        'ppn_rate' => 0,
+                        'pph_rate' => 0,
+                        'remark_type' => $validated['remark_type'],
+                        'remark_text' => $validated['remark_text'],
+                        'term_of_payment_type' => $validated['term_of_payment_type'],
+                        'term_of_payment' => $validated['term_of_payment'],
+                        'term_of_delivery' => $validated['term_of_delivery'] ?? null,
+                        'submitted_at' => $validated['action'] === 'submit' ? now() : null,
+                    ]);
 
             $subtotal = 0;
             $discountTotal = 0;
@@ -484,8 +499,25 @@ class PurchaseOrderController extends Controller
                     ]);
             }
 
-            return $purchaseOrder;
-        });
+                    return $purchaseOrder;
+                });
+                break;
+            } catch (QueryException $exception) {
+                $canRetry = $resolvedNumber['source'] === 'auto'
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception);
+
+                if ($canRetry) {
+                    continue;
+                }
+
+                throw $exception;
+            }
+        }
+
+        if (! $purchaseOrder) {
+            return redirect()->back()->withErrors(['po_number' => 'Unable to generate PO number. Please try again.']);
+        }
 
         if ($validated['action'] === 'submit') {
             $purchasingManagers = User::role('purchasing-manager')->get();
@@ -515,6 +547,11 @@ class PurchaseOrderController extends Controller
 
         if ($purchaseOrder->created_by !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
             abort(403);
+        }
+
+        if (! $purchaseOrder->po_number) {
+            $this->savePoNumberFromRequest($request, $purchaseOrder);
+            $purchaseOrder->refresh();
         }
 
         $purchaseOrder->update([
@@ -549,6 +586,7 @@ class PurchaseOrderController extends Controller
 
         return view('pages.purchase-orders.show', [
             'purchaseOrder' => $purchaseOrder,
+            'nextPoNumber' => app(DocumentNumberService::class)->previewNext('PO'),
         ]);
     }
 
@@ -664,13 +702,7 @@ class PurchaseOrderController extends Controller
      */
     public function updateNumber(Request $request, PurchaseOrder $purchaseOrder)
     {
-        $validated = $request->validate([
-            'po_number' => ['required', 'string', 'max:50'],
-        ]);
-
-        $purchaseOrder->update([
-            'po_number' => $validated['po_number'],
-        ]);
+        $this->savePoNumberFromRequest($request, $purchaseOrder);
 
         return redirect()->back()->with('success', 'PO number updated.');
     }
@@ -694,14 +726,9 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['message' => 'PO must be approved before printing.']);
         }
 
-        if ($request->filled('po_number')) {
-            $validated = $request->validate([
-                'po_number' => ['required', 'string', 'max:50'],
-            ]);
-
-            $purchaseOrder->update([
-                'po_number' => $validated['po_number'],
-            ]);
+        if ($request->isMethod('post') || $request->filled('po_number')) {
+            $this->savePoNumberFromRequest($request, $purchaseOrder);
+            $purchaseOrder->refresh();
         }
 
         if (! $purchaseOrder->po_number) {
@@ -715,6 +742,39 @@ class PurchaseOrderController extends Controller
         return Pdf::loadView('pdf.purchase-order', $data)
             ->setPaper('a4', 'portrait')
             ->stream('PO-' . $purchaseOrder->po_number . '.pdf');
+    }
+
+    private function savePoNumberFromRequest(Request $request, PurchaseOrder $purchaseOrder): void
+    {
+        $validated = $request->validate([
+            'po_number' => ['nullable', 'string', 'max:50'],
+            'po_number_suggested' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $numberService = app(DocumentNumberService::class);
+        $maxAttempts = 2;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $resolvedNumber = $numberService->resolve('PO', $validated['po_number'] ?? null, $validated['po_number_suggested'] ?? null);
+            $numberService->assertUnique('PO', $resolvedNumber['number'], $purchaseOrder->id);
+
+            try {
+                $purchaseOrder->update([
+                    'po_number' => $resolvedNumber['number'],
+                ]);
+                break;
+            } catch (QueryException $exception) {
+                $canRetry = $resolvedNumber['source'] === 'auto'
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception);
+
+                if ($canRetry) {
+                    continue;
+                }
+
+                throw $exception;
+            }
+        }
     }
 
     private function isCapexPrsItem(?PrsItem $prsItem): bool

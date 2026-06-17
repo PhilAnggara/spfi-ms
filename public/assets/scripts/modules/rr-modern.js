@@ -447,4 +447,15 @@ function initRrCreateModal(poLookupUrl) {
         });
         updateCreateSummary();
     });
+
+    createForm.addEventListener('submit', function (event) {
+        if (createForm.dataset.submitting === '1') {
+            event.preventDefault();
+            return;
+        }
+
+        createForm.dataset.submitting = '1';
+        createSaveButton.disabled = true;
+        createSaveButton.textContent = 'Saving...';
+    });
 }

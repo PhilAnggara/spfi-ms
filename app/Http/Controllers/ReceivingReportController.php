@@ -8,10 +8,12 @@ use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
 use App\Models\User;
 use App\Services\NotificationRecipientService;
+use App\Services\DocumentNumberService;
 use App\Services\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -40,6 +42,7 @@ class ReceivingReportController extends Controller
             'totalGood'             => (float) ($totals->total_good ?? 0),
             'totalBad'              => (float) ($totals->total_bad ?? 0),
             'filters'              => $filters,
+            'nextRrNumber'          => app(DocumentNumberService::class)->previewNext('RR'),
             'customsDocumentTypes'  => CustomsDocumentType::query()
                 ->orderBy('name')
                 ->whereLike('name', '%Pemasukan%')
@@ -108,7 +111,8 @@ class ReceivingReportController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'rr_number' => ['required', 'string', 'max:50', 'unique:receiving_reports,rr_number'],
+            'rr_number' => ['nullable', 'string', 'max:50'],
+            'rr_number_suggested' => ['nullable', 'string', 'max:50'],
             'purchase_order_id' => ['required', 'exists:purchase_orders,id'],
             'received_date' => ['required', 'date'],
             'requires_customs_document' => ['required', 'in:0,1'],
@@ -186,40 +190,62 @@ class ReceivingReportController extends Controller
             }
         }
 
-        $receivingReport = DB::transaction(function () use ($validated, $selectedRows, $request, $currentStockLines, $requiresCustomsDocument) {
-            $receivingReport = ReceivingReport::create([
-                'rr_number' => $validated['rr_number'],
-                'purchase_order_id' => $validated['purchase_order_id'],
-                'received_date' => $validated['received_date'],
-                'requires_customs_document' => $requiresCustomsDocument,
-                'customs_document_number' => $requiresCustomsDocument ? ($validated['customs_document_number'] ?? null) : null,
-                'customs_document_type_id' => $requiresCustomsDocument ? ($validated['customs_document_type_id'] ?? null) : null,
-                'customs_document_date' => $requiresCustomsDocument ? ($validated['customs_document_date'] ?? null) : null,
-                'notes' => $validated['notes'] ?? null,
-                'created_by' => $request->user()->id,
-            ]);
+        $numberService = app(DocumentNumberService::class);
+        $receivingReport = null;
+        $maxAttempts = 2;
 
-            foreach ($selectedRows as $row) {
-                ReceivingReportItem::create([
-                    'receiving_report_id' => $receivingReport->id,
-                    'purchase_order_item_id' => $row['purchase_order_item_id'],
-                    'qty_good' => (float) ($row['qty_good'] ?? 0),
-                    'qty_bad' => (float) ($row['qty_bad'] ?? 0),
-                ]);
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $resolvedNumber = $numberService->resolve('RR', $validated['rr_number'] ?? null, $validated['rr_number_suggested'] ?? null);
+            $numberService->assertUnique('RR', $resolvedNumber['number']);
+
+            try {
+                $receivingReport = DB::transaction(function () use ($validated, $selectedRows, $request, $currentStockLines, $requiresCustomsDocument, $resolvedNumber) {
+                    $receivingReport = ReceivingReport::create([
+                        'rr_number' => $resolvedNumber['number'],
+                        'purchase_order_id' => $validated['purchase_order_id'],
+                        'received_date' => $validated['received_date'],
+                        'requires_customs_document' => $requiresCustomsDocument,
+                        'customs_document_number' => $requiresCustomsDocument ? ($validated['customs_document_number'] ?? null) : null,
+                        'customs_document_type_id' => $requiresCustomsDocument ? ($validated['customs_document_type_id'] ?? null) : null,
+                        'customs_document_date' => $requiresCustomsDocument ? ($validated['customs_document_date'] ?? null) : null,
+                        'notes' => $validated['notes'] ?? null,
+                        'created_by' => $request->user()->id,
+                    ]);
+
+                    foreach ($selectedRows as $row) {
+                        ReceivingReportItem::create([
+                            'receiving_report_id' => $receivingReport->id,
+                            'purchase_order_item_id' => $row['purchase_order_item_id'],
+                            'qty_good' => (float) ($row['qty_good'] ?? 0),
+                            'qty_bad' => (float) ($row['qty_bad'] ?? 0),
+                        ]);
+                    }
+
+                    app(StockService::class)->applyReceivingReportAdjustment(
+                        receivingReport: $receivingReport,
+                        currentLines: $currentStockLines,
+                        previousLines: [],
+                        userId: $request->user()->id,
+                    );
+
+                    // Trigger PRS status check for all affected items
+                    $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
+
+                    return $receivingReport;
+                });
+                break;
+            } catch (QueryException $exception) {
+                $canRetry = $resolvedNumber['source'] === 'auto'
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception);
+
+                if ($canRetry) {
+                    continue;
+                }
+
+                throw $exception;
             }
-
-            app(StockService::class)->applyReceivingReportAdjustment(
-                receivingReport: $receivingReport,
-                currentLines: $currentStockLines,
-                previousLines: [],
-                userId: $request->user()->id,
-            );
-
-            // Trigger PRS status check for all affected items
-            $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
-
-            return $receivingReport;
-        });
+        }
 
         $recipients = app(NotificationRecipientService::class)->uniqueUsers(
             app(NotificationRecipientService::class)->inventoryTeam(),

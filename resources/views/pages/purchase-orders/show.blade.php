@@ -409,9 +409,11 @@
                             @csrf
                             <label class="form-label">PO Number</label>
                             <div class="input-group">
-                                <input type="text" name="po_number" class="form-control" value="{{ $purchaseOrder->po_number }}" required>
+                                <input type="text" name="po_number" class="form-control" value="{{ old('po_number', $purchaseOrder->po_number ?: ($nextPoNumber ?? '')) }}">
+                                <input type="hidden" name="po_number_suggested" value="{{ $nextPoNumber ?? '' }}">
                                 <button type="submit" class="btn btn-outline-primary">Save Number</button>
                             </div>
+                            <div class="form-text">Auto-generated, but editable if using existing pre-numbered forms.</div>
                         </form>
                     </div>
                     <div class="col-12 col-md-6 text-md-end">
