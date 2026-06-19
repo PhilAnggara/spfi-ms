@@ -6,7 +6,7 @@
     $totalItems = method_exists($prsItems, 'total') ? $prsItems->total() : $prsItems->count();
     $keyword = $filters['keyword'] ?? '';
 @endphp
-<div id="supplier-comparison-page-container">
+<div id="supplier-comparison-page-container" data-highlight-prs-item-id="{{ $highlightPrsItemId ?: '' }}">
 <div id="supplier-comparison-page" class="page-heading po-page sc-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
@@ -83,7 +83,7 @@
                                 $isLocked = (bool) $prsItem->purchase_order_id;
                                 $hasSelectedSupplier = (bool) $prsItem->selected_canvassing_item_id;
                             @endphp
-                            <div class="card shadow-sm border-0 sc-comparison-card">
+                            <div class="card shadow-sm border-0 sc-comparison-card" id="supplier-comparison-item-{{ $prsItem->id }}" data-prs-item-id="{{ $prsItem->id }}">
                                 <div class="card-body">
                                     <div class="sc-card-header">
                                         <div class="sc-item-heading">

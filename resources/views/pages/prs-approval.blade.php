@@ -2,7 +2,7 @@
 @section('title', ' | Canvasser Assignment')
 
 @section('content')
-<div id="prs-approval-page-container">
+<div id="prs-approval-page-container" data-auto-open-prs-id="{{ $autoOpenPrsId ?: '' }}">
 <div class="page-heading po-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">

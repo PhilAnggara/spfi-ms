@@ -26,6 +26,22 @@
         loadingEl.classList.toggle('d-flex', active);
     }
 
+    function openRequestedPrsModal() {
+        const container = document.getElementById('prs-approval-page-container');
+        const prsId = container?.dataset.autoOpenPrsId;
+        if (!prsId || !window.bootstrap?.Modal) {
+            return;
+        }
+
+        const modalEl = document.getElementById(`detail-modal-${prsId}`);
+        if (!modalEl) {
+            return;
+        }
+
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        container.dataset.autoOpenPrsId = '';
+    }
+
     async function replacePageContent(url, pushState = true) {
         const normalizedUrl = new URL(url, window.location.origin).toString();
 
@@ -75,6 +91,7 @@
             }
 
             initPageTooltips(newResults);
+            openRequestedPrsModal();
 
             if (window.feather && typeof window.feather.replace === 'function') {
                 window.feather.replace();
@@ -131,6 +148,8 @@
             setQueryParam(url.searchParams, 'date_from', filterElements.dateStart?.value);
             setQueryParam(url.searchParams, 'date_to', filterElements.dateEnd?.value);
 
+            url.searchParams.delete('prs');
+            url.searchParams.delete('open');
             url.searchParams.delete('page');
 
             return url.toString();
@@ -193,6 +212,7 @@
 
     initFilters();
     initPageTooltips(document);
+    openRequestedPrsModal();
     if (window.feather && typeof window.feather.replace === 'function') {
         window.feather.replace();
     }

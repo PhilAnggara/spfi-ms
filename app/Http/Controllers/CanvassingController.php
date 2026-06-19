@@ -6,6 +6,7 @@ use App\Models\PrsItem;
 use App\Models\PrsCanvassingItem;
 use App\Models\Department;
 use App\Models\Supplier;
+use App\Services\NotificationRecipientService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -212,7 +213,32 @@ class CanvassingController extends Controller
             ],
         ]);
 
-        // return redirect()->route('canvassing.index')->with('success', 'Canvassing data saved.');
+        $prsItem->load(['prs', 'item', 'canvasser']);
+        $supplierCount = $rows->count();
+        $recipientService = app(NotificationRecipientService::class);
+
+        $recipientService->notify($recipientService->purchasingManagers(), [
+            'type' => 'canvassing_results_saved',
+            'title' => 'Canvassing Results Ready',
+            'message' => sprintf(
+                'PRS #%s item %s saved by %s (%d supplier quote%s).',
+                $prsItem->prs?->prs_number ?? $prsItem->prs_id,
+                $prsItem->item?->code ?? $prsItem->id,
+                $prsItem->canvasser?->name ?? $request->user()->name,
+                $supplierCount,
+                $supplierCount === 1 ? '' : 's'
+            ),
+            'action_url' => '/procurement/supplier-comparison?prs_item='.$prsItem->id,
+            'icon' => 'fa-light fa-scale-balanced',
+            'icon_color' => 'bg-info',
+            'meta' => [
+                'prs_id' => $prsItem->prs_id,
+                'prs_item_id' => $prsItem->id,
+                'supplier_count' => $supplierCount,
+                'canvasser_id' => $prsItem->canvasser_id,
+            ],
+        ]);
+
         return redirect()->back()->with('success', 'Canvassing data saved.');
     }
 

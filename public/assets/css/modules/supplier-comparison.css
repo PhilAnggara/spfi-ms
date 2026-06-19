@@ -108,6 +108,12 @@
     transform: translateY(-1px);
 }
 
+.sc-comparison-card.sc-highlighted {
+    border-color: var(--sc-primary) !important;
+    box-shadow: 0 0 0 0.2rem rgba(31, 122, 140, 0.2), 0 0.75rem 1.5rem rgba(15, 23, 42, 0.08) !important;
+    transform: none;
+}
+
 .sc-card-header {
     display: flex;
     align-items: flex-start;

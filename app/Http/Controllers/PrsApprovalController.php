@@ -21,7 +21,9 @@ class PrsApprovalController extends Controller
             'status' => trim((string) $request->query('status', '')),
             'date_from' => trim((string) $request->query('date_from', '')),
             'date_to' => trim((string) $request->query('date_to', '')),
+            'prs' => (int) $request->query('prs', 0),
         ];
+        $autoOpenPrsId = $request->query('open') === 'modal' ? $filters['prs'] : 0;
 
         $items = $this->paginatePrsForApproval($filters, perPage: 20);
         $canvassers = User::role('purchasing-staff')->orderBy('name')->get();
@@ -41,6 +43,7 @@ class PrsApprovalController extends Controller
             'canvassers' => $canvassers,
             'filters' => $filters,
             'statusOptions' => $statusOptions,
+            'autoOpenPrsId' => $autoOpenPrsId,
         ]);
     }
 
@@ -82,7 +85,7 @@ class PrsApprovalController extends Controller
             'type' => 'prs_on_hold',
             'title' => 'PRS On Hold',
             'message' => 'PRS #'.$prs->prs_number.' is on hold.',
-            'action_url' => '/procurement/approval/'.$prs->id,
+            'action_url' => '/prs',
             'icon' => 'fa-light fa-circle-pause',
             'icon_color' => 'bg-warning',
             'meta' => [
@@ -166,17 +169,13 @@ class PrsApprovalController extends Controller
             ]);
         });
 
-        $assignedCanvassers = User::whereIn('id', $assignments->pluck('canvasser_id')->unique()->all())->get();
-        $recipients = app(NotificationRecipientService::class)->uniqueUsers(
-            collect([$prs->user])->filter(),
-            $assignedCanvassers
-        );
+        $recipientService = app(NotificationRecipientService::class);
 
-        app(NotificationRecipientService::class)->notify($recipients, [
+        $recipientService->notify(collect([$prs->user])->filter(), [
             'type' => 'prs_approved_canvassing',
             'title' => 'PRS Assigned',
             'message' => 'PRS #'.$prs->prs_number.' has been assigned and moved to canvassing.',
-            'action_url' => '/procurement/approval/'.$prs->id,
+            'action_url' => '/prs',
             'icon' => 'fa-light fa-badge-check',
             'icon_color' => 'bg-success',
             'meta' => [
@@ -184,6 +183,31 @@ class PrsApprovalController extends Controller
                 'previous_status' => $previousStatus,
             ],
         ]);
+
+        $assignedItems = $prs->items()
+            ->with(['canvasser', 'item'])
+            ->whereIn('id', $assignments->keys()->all())
+            ->get();
+
+        foreach ($assignedItems as $assignedItem) {
+            if (! $assignedItem->canvasser) {
+                continue;
+            }
+
+            $recipientService->notify(collect([$assignedItem->canvasser]), [
+                'type' => 'prs_approved_canvassing',
+                'title' => 'PRS Assigned',
+                'message' => 'PRS #'.$prs->prs_number.' item '.($assignedItem->item?->code ?? $assignedItem->id).' has been assigned to you for canvassing.',
+                'action_url' => '/canvassing/'.$assignedItem->id,
+                'icon' => 'fa-light fa-badge-check',
+                'icon_color' => 'bg-success',
+                'meta' => [
+                    'prs_id' => $prs->id,
+                    'prs_item_id' => $assignedItem->id,
+                    'previous_status' => $previousStatus,
+                ],
+            ]);
+        }
 
         return redirect()->back()->with('success', 'PRS has been assigned and moved to canvassing.');
     }
@@ -199,9 +223,13 @@ class PrsApprovalController extends Controller
         $status = trim((string) ($filters['status'] ?? ''));
         $dateFrom = trim((string) ($filters['date_from'] ?? ''));
         $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        $prsId = (int) ($filters['prs'] ?? 0);
         $keywordLike = "%{$keyword}%";
 
         $query = Prs::query()
+            ->when($prsId > 0, function ($subQuery) use ($prsId) {
+                $subQuery->whereKey($prsId);
+            })
             ->when($keyword !== '', function ($subQuery) use ($keywordLike) {
                 $subQuery->where(function ($whereQuery) use ($keywordLike) {
                     $whereQuery->whereRaw("LOWER(COALESCE(prs_number, '')) LIKE ?", [$keywordLike])

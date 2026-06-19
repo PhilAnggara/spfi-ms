@@ -66,7 +66,7 @@ class PrsSubmittedNotification extends Notification implements ShouldQueue
             'department' => $this->prs->department->name,
             'requester' => $this->prs->user->name,
             'items_count' => $this->prs->items->count(),
-            'action_url' => '/prs',
+            'action_url' => '/procurement/approval?prs=' . $this->prs->id . '&open=modal',
             'icon' => 'bi-file-earmark-plus',
             'icon_color' => 'bg-primary',
         ];

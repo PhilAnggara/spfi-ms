@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PrsItem;
+use App\Services\NotificationRecipientService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -16,8 +17,11 @@ class SupplierComparisonController extends Controller
      */
     public function index(Request $request)
     {
+        $prsItemId = (int) $request->query('prs_item', 0);
+
         $filters = [
             'keyword' => trim((string) $request->query('keyword', '')),
+            'prs_item' => $prsItemId,
         ];
 
         $prsItemsQuery = PrsItem::with([
@@ -30,6 +34,9 @@ class SupplierComparisonController extends Controller
             ->whereNull('purchase_order_id')
             ->where('is_direct_purchase', false)
             ->whereHas('canvassingItems')
+            ->when($prsItemId > 0, function ($query) use ($prsItemId) {
+                $query->whereKey($prsItemId);
+            })
             ->when($filters['keyword'] !== '', function ($query) use ($filters) {
                 $keyword = $filters['keyword'];
 
@@ -53,6 +60,7 @@ class SupplierComparisonController extends Controller
         return view('pages.procurement.supplier-comparison', [
             'prsItems' => $prsItems,
             'filters' => $filters,
+            'highlightPrsItemId' => $prsItemId,
         ]);
     }
 
@@ -90,6 +98,37 @@ class SupplierComparisonController extends Controller
                 'canvassing_item_id' => $canvassing->id,
             ],
         ]);
+
+        $prsItem->load(['prs', 'item', 'canvasser', 'selectedCanvassingItem.supplier']);
+
+        if ($prsItem->canvasser) {
+            $prsNumber = (string) ($prsItem->prs?->prs_number ?? $prsItem->prs_id);
+            $supplierName = $prsItem->selectedCanvassingItem?->supplier?->name ?? '-';
+
+            app(NotificationRecipientService::class)->notify(
+                collect([$prsItem->canvasser]),
+                [
+                    'type' => 'supplier_selected',
+                    'title' => 'Supplier Selected',
+                    'message' => sprintf(
+                        'PRS #%s item %s — supplier %s selected. Ready to create PO.',
+                        $prsNumber,
+                        $prsItem->item?->code ?? $prsItem->id,
+                        $supplierName
+                    ),
+                    'action_url' => '/purchase-orders/draft?keyword='.rawurlencode($prsNumber),
+                    'icon' => 'fa-light fa-bag-shopping',
+                    'icon_color' => 'bg-success',
+                    'meta' => [
+                        'prs_id' => $prsItem->prs_id,
+                        'prs_item_id' => $prsItem->id,
+                        'supplier_id' => $canvassing->supplier_id,
+                        'canvassing_item_id' => $canvassing->id,
+                        'canvasser_id' => $prsItem->canvasser_id,
+                    ],
+                ]
+            );
+        }
 
         return redirect()->back()->with('success', 'Supplier selected for this item.');
     }

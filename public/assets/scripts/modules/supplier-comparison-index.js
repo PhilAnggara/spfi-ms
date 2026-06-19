@@ -33,6 +33,38 @@
         }
     }
 
+    function syncHighlightFromUrl(url) {
+        const container = document.getElementById('supplier-comparison-page-container');
+        if (!container) {
+            return;
+        }
+
+        const prsItemId = new URL(url, window.location.origin).searchParams.get('prs_item') || '';
+        container.dataset.highlightPrsItemId = prsItemId;
+    }
+
+    function highlightRequestedPrsItem() {
+        const container = document.getElementById('supplier-comparison-page-container');
+        const prsItemId = container?.dataset.highlightPrsItemId;
+        if (!prsItemId) {
+            return;
+        }
+
+        const card = document.getElementById(`supplier-comparison-item-${prsItemId}`);
+        if (!card) {
+            return;
+        }
+
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        card.classList.add('sc-highlighted');
+
+        window.setTimeout(() => {
+            card.classList.remove('sc-highlighted');
+        }, 3000);
+
+        container.dataset.highlightPrsItemId = '';
+    }
+
     function setLoading(active) {
         const loadingEl = document.getElementById('supplier-comparison-page-loading');
         if (!loadingEl) {
@@ -143,7 +175,9 @@
             }
 
             updateKeywordFromUrl(normalizedUrl);
+            syncHighlightFromUrl(normalizedUrl);
             initSelectionForms(newResults);
+            highlightRequestedPrsItem();
 
             if (window.feather && typeof window.feather.replace === 'function') {
                 window.feather.replace();
@@ -178,6 +212,7 @@
             const url = new URL(window.location.href);
 
             setQueryParam(url.searchParams, 'keyword', keywordInput?.value);
+            url.searchParams.delete('prs_item');
             url.searchParams.delete('page');
 
             return url.toString();
@@ -242,6 +277,8 @@
     document.addEventListener('DOMContentLoaded', function () {
         initSupplierComparisonFilters();
         initSelectionForms(document);
+        syncHighlightFromUrl(window.location.href);
+        highlightRequestedPrsItem();
     });
 
     document.addEventListener('click', function (event) {
