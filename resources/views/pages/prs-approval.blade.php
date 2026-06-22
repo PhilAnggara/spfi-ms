@@ -307,10 +307,15 @@
                     @endphp
 
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                        <span class="badge {{ $headerStatusClass }} px-3 py-2">
-                            <i class="{{ $headerStatusIcon }}"></i>
-                            {{ $headerStatusText }}
-                        </span>
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <span class="badge {{ $headerStatusClass }} px-3 py-2">
+                                <i class="{{ $headerStatusIcon }}"></i>
+                                {{ $headerStatusText }}
+                            </span>
+                            @if ($item->is_capex)
+                                <span class="badge bg-light-primary px-3 py-2">CAPEX</span>
+                            @endif
+                        </div>
                         <span class="fw-semibold text-muted">Progress {{ $headerProgress }}%</span>
                     </div>
 

@@ -112,6 +112,9 @@
         $termValue = $purchaseOrder->term_of_payment ?? ($firstMeta['term_of_payment'] ?? null);
         $termPayment = trim(($termValue ? $termValue . ' ' : '') . ($termType ?? ''));
         $termPayment = $termPayment !== '' ? $termPayment : '-';
+        $firstPoItem = $purchaseOrder->items->first();
+        $firstPoMeta = $firstPoItem?->meta ?? [];
+        $isCapex = (bool) ($firstPoItem?->prsItem?->prs?->is_capex ?? ($firstPoMeta['is_capex'] ?? false));
     @endphp
 
     <div class="header">
@@ -131,7 +134,9 @@
         </tr>
         <tr>
             <td class="label">Term Payment</td>
-            <td colspan="3">: {{ $termPayment }}</td>
+            <td>: {{ $termPayment }}</td>
+            <td class="label text-right">Transaction Type</td>
+            <td class="text-right">: <strong>{{ $isCapex ? 'CAPEX' : 'Non-CAPEX' }}</strong></td>
         </tr>
     </table>
 
@@ -161,11 +166,10 @@
                     $dept = $item->prsItem?->prs?->department?->name ?? '-';
                     $itemCode = $item->item?->code ?? '-';
                     $unitName = $item->item?->unit?->name ?? 'PCS';
-                    $isCapex = (bool) ($item->prsItem?->prs?->is_capex ?? ($meta['is_capex'] ?? false));
                 @endphp
                 <tr>
                     <td>{{ $prsNumber }}</td>
-                    <td>{{ $item->item?->name ?? '-' }}{{ $isCapex ? ' (CAPEX)' : '' }}</td>
+                    <td>{{ $item->item?->name ?? '-' }}</td>
                     <td>{{ $itemCode }}</td>
                     <td>{{ $dept }}</td>
                     <td class="text-center">{{ number_format($item->quantity, 0, ',', '.') }}</td>

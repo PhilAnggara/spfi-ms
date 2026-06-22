@@ -238,7 +238,9 @@ function initRrCreateModal(poLookupUrl) {
     const createPoItemsBody = document.getElementById('create-po-items-body');
     const createPurchaseOrderIdInput = document.getElementById('create_purchase_order_id');
     const createSelectAllButton = document.getElementById('create-select-all');
+    const createReceiveAllButton = document.getElementById('create-receive-all');
     const createClearAllButton = document.getElementById('create-clear-all');
+    const createPoCapexBadge = document.getElementById('create-po-capex-badge');
     const createSummaryItems = document.getElementById('create-summary-items');
     const createSummaryGood = document.getElementById('create-summary-good');
     const createSummaryBad = document.getElementById('create-summary-bad');
@@ -342,9 +344,6 @@ function initRrCreateModal(poLookupUrl) {
 
     function createCreateItemRow(item, index) {
         const isDisabled = Number(item.qty_remaining) <= 0;
-        const itemTypeBadge = item.is_capex
-            ? '<span class="badge bg-light-primary">CAPEX</span>'
-            : '<span class="badge bg-light-secondary">Stock</span>';
 
         return `
                 <tr>
@@ -356,7 +355,6 @@ function initRrCreateModal(poLookupUrl) {
                     <td>${item.item_name ?? '-'}</td>
                     <td>${item.item_code ?? '-'}</td>
                     <td>${item.unit_name ?? '-'}</td>
-                    <td>${itemTypeBadge}</td>
                     <td class="text-end">${formatNumber(item.qty_ordered)}</td>
                     <td class="text-end">${formatNumber(item.qty_received)}</td>
                     <td class="text-end">${formatNumber(item.qty_remaining)}</td>
@@ -366,11 +364,20 @@ function initRrCreateModal(poLookupUrl) {
             `;
     }
 
+    function setCreatePoCapexBadge(isCapex) {
+        if (!createPoCapexBadge) {
+            return;
+        }
+
+        createPoCapexBadge.classList.toggle('d-none', !isCapex);
+    }
+
     async function loadPoForCreate() {
         hideCreateError();
         createPoDetails.classList.add('d-none');
         createPoItemsBody.innerHTML = '';
         createPurchaseOrderIdInput.value = '';
+        setCreatePoCapexBadge(false);
         updateCreateSummary();
 
         const poNumber = createPoNumberInput.value.trim();
@@ -410,6 +417,7 @@ function initRrCreateModal(poLookupUrl) {
             createPoDetailNumber.textContent = data.purchase_order.po_number ?? '-';
             createPoDetailSupplier.textContent = data.purchase_order.supplier_name ?? '-';
             createPoDetailDate.textContent = data.purchase_order.po_date ?? '-';
+            setCreatePoCapexBadge(Boolean(data.purchase_order.is_capex));
 
             createPoItemsBody.innerHTML = data.items.map((item, index) => createCreateItemRow(item, index)).join('');
             bindCreateRows();
@@ -436,6 +444,26 @@ function initRrCreateModal(poLookupUrl) {
                 checkbox.checked = true;
                 toggleCreateInputs(checkbox);
             }
+        });
+        updateCreateSummary();
+    });
+
+    createReceiveAllButton?.addEventListener('click', function () {
+        document.querySelectorAll('#create-po-items-body tr').forEach((row) => {
+            const checkbox = row.querySelector('.create-item-check');
+            const goodInput = row.querySelector('.create-qty-good');
+            const badInput = row.querySelector('.create-qty-bad');
+
+            if (!checkbox || checkbox.disabled || !goodInput || !badInput) {
+                return;
+            }
+
+            checkbox.checked = true;
+            toggleCreateInputs(checkbox);
+
+            const max = Number(goodInput.getAttribute('max') || 0);
+            goodInput.value = max > 0 ? String(max) : '';
+            badInput.value = '0';
         });
         updateCreateSummary();
     });

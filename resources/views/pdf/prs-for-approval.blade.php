@@ -13,6 +13,56 @@
             border-left: 4px solid #3b82f6;
         }
 
+        .doc-info--capex {
+            background: #fffef8;
+            border-left-color: #c99700;
+        }
+
+        .capex-notice {
+            margin: 12px 0 14px;
+            border: 1px solid #e3cc7a;
+            border-radius: 4px;
+            background: #fffdf5;
+            overflow: hidden;
+        }
+
+        .capex-notice-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .capex-notice-accent {
+            width: 7px;
+            background: #c99700;
+        }
+
+        .capex-notice-body {
+            padding: 11px 16px 10px;
+        }
+
+        .capex-notice-eyebrow {
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: #92710a;
+            margin-bottom: 3px;
+        }
+
+        .capex-notice-title {
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: #1f4e79;
+            line-height: 1.1;
+        }
+
+        .capex-notice-desc {
+            font-size: 9px;
+            color: #6b5a1e;
+            margin-top: 4px;
+        }
+
         .info-grid {
             display: table;
             width: 100%;
@@ -155,8 +205,21 @@
 <body>
     @include('pdf.partials.header', ['documentTitle' => 'Purchase Requisition Slip (PRS) - for General Manager Approval'])
 
+    @if ($prs->is_capex)
+        <table class="capex-notice" role="presentation" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="capex-notice-accent"></td>
+                <td class="capex-notice-body">
+                    <div class="capex-notice-eyebrow">Transaction Classification</div>
+                    <div class="capex-notice-title">CAPEX</div>
+                    <div class="capex-notice-desc">Capital Expenditure Request</div>
+                </td>
+            </tr>
+        </table>
+    @endif
+
     <!-- Informasi Dokumen -->
-    <div class="doc-info">
+    <div class="doc-info{{ $prs->is_capex ? ' doc-info--capex' : '' }}">
         <div class="info-grid">
             <div class="info-row">
                 <div class="info-label">PRS Number :</div>

@@ -219,25 +219,24 @@
 
                             <div class="row g-3 align-items-end">
                                 <div class="col-12 col-md-3">
-                                    <label class="form-label">RR Number <span class="text-danger">*</span></label>
+                                    <label class="form-label mb-1">RR Number <span class="text-danger">*</span> <small class="text-muted fw-normal">(editable)</small></label>
                                     <input type="text" name="rr_number" class="form-control" value="{{ old('rr_number', $nextRrNumber ?? '') }}" placeholder="Auto number">
                                     <input type="hidden" name="rr_number_suggested" value="{{ $nextRrNumber ?? '' }}">
-                                    <div class="form-text">Auto-generated, editable.</div>
                                 </div>
                                 <div class="col-12 col-md-3">
-                                    <label class="form-label">PO Number <span class="text-danger">*</span></label>
+                                    <label class="form-label mb-1">PO Number <span class="text-danger">*</span></label>
                                     <input type="text" id="create_po_number" class="form-control" placeholder="e.g. PO-2026-001">
                                 </div>
-                                <div class="col-12 col-md-2 d-grid">
-                                    <label class="form-label d-none d-md-block">&nbsp;</label>
-                                    <button type="button" id="create-load-po" class="btn btn-outline-primary">Load PO</button>
+                                <div class="col-12 col-md-2">
+                                    <label class="form-label mb-1 d-none d-md-block">&nbsp;</label>
+                                    <button type="button" id="create-load-po" class="btn btn-outline-primary w-100">Load PO</button>
                                 </div>
                                 <div class="col-12 col-md-2">
-                                    <label class="form-label">Received Date <span class="text-danger">*</span></label>
+                                    <label class="form-label mb-1">Received Date <span class="text-danger">*</span></label>
                                     <input type="date" name="received_date" class="form-control" value="{{ now()->toDateString() }}" required>
                                 </div>
                                 <div class="col-12 col-md-2">
-                                    <label class="form-label">Notes</label>
+                                    <label class="form-label mb-1">Notes</label>
                                     <input type="text" name="notes" class="form-control" placeholder="Optional">
                                 </div>
                             </div>
@@ -291,9 +290,13 @@
 
                             <div id="create-po-details" class="mt-4 d-none">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                                    <div class="small text-muted">Select received items, then enter good and bad quantities.</div>
-                                    <div class="d-flex gap-2">
+                                    <div class="d-flex align-items-center flex-wrap gap-2">
+                                        <div class="small text-muted">Select received items, then enter good and bad quantities.</div>
+                                        <span id="create-po-capex-badge" class="badge bg-light-primary d-none">CAPEX</span>
+                                    </div>
+                                    <div class="d-flex gap-2 flex-wrap">
                                         <button type="button" id="create-select-all" class="btn btn-sm btn-outline-success">Select All</button>
+                                        <button type="button" id="create-receive-all" class="btn btn-sm btn-outline-primary">Receive All</button>
                                         <button type="button" id="create-clear-all" class="btn btn-sm btn-outline-secondary">Clear</button>
                                     </div>
                                 </div>
@@ -312,7 +315,6 @@
                                                 <th>Item</th>
                                                 <th>Code</th>
                                                 <th>Unit</th>
-                                                <th>Type</th>
                                                 <th class="text-end">Qty PO</th>
                                                 <th class="text-end">Qty Received</th>
                                                 <th class="text-end">Qty Remaining</th>
@@ -349,13 +351,19 @@
                 $rrGood = (float) $rr->items->sum('qty_good');
                 $rrBad = (float) $rr->items->sum('qty_bad');
                 $customsDocType = $rr->customsDocumentType;
+                $isRrCapex = (bool) ($rr->items->first()?->purchaseOrderItem?->prsItem?->prs?->is_capex ?? false);
             @endphp
 
             <div class="modal fade" id="rr-view-modal-{{ $rr->id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-scrollable">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">RR Detail - {{ $rr->rr_number ?? ('#' . $rr->id) }}</h5>
+                            <div class="d-flex align-items-center flex-wrap gap-2 me-auto">
+                                <h5 class="modal-title mb-0">RR Detail - {{ $rr->rr_number ?? ('#' . $rr->id) }}</h5>
+                                @if ($isRrCapex)
+                                    <span class="badge bg-light-primary">CAPEX</span>
+                                @endif
+                            </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
@@ -380,7 +388,6 @@
                                             <th>Item</th>
                                             <th>Code</th>
                                             <th>Unit</th>
-                                            <th>Type</th>
                                             <th class="text-end">Qty Good</th>
                                             <th class="text-end">Qty Bad</th>
                                         </tr>
@@ -391,13 +398,6 @@
                                                 <td>{{ $rrItem->purchaseOrderItem?->item?->name ?? '-' }}</td>
                                                 <td>{{ $rrItem->purchaseOrderItem?->item?->code ?? '-' }}</td>
                                                 <td>{{ $rrItem->purchaseOrderItem?->item?->unit?->name ?? 'PCS' }}</td>
-                                                <td>
-                                                    @if ($rrItem->purchaseOrderItem?->prsItem?->prs?->is_capex)
-                                                        <span class="badge bg-light-primary">CAPEX</span>
-                                                    @else
-                                                        <span class="badge bg-light-secondary">Stock</span>
-                                                    @endif
-                                                </td>
                                                 <td class="text-end">{{ number_format((float) $rrItem->qty_good, 2) }}</td>
                                                 <td class="text-end">{{ number_format((float) $rrItem->qty_bad, 2) }}</td>
                                             </tr>
@@ -429,7 +429,12 @@
                                 @csrf
                                 @method('PUT')
                                 <div class="modal-header">
-                                    <h5 class="modal-title">Edit RR - {{ $rr->rr_number ?? ('#' . $rr->id) }}</h5>
+                                    <div class="d-flex align-items-center flex-wrap gap-2 me-auto">
+                                        <h5 class="modal-title mb-0">Edit RR - {{ $rr->rr_number ?? ('#' . $rr->id) }}</h5>
+                                        @if ($isRrCapex)
+                                            <span class="badge bg-light-primary">CAPEX</span>
+                                        @endif
+                                    </div>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body">
@@ -495,7 +500,6 @@
                                                 <th>Item</th>
                                                 <th>Code</th>
                                                 <th>Unit</th>
-                                                <th>Type</th>
                                                 <th class="text-end">Qty Good</th>
                                                 <th class="text-end">Qty Bad</th>
                                             </tr>
@@ -510,13 +514,6 @@
                                                     </td>
                                                     <td>{{ $rrItem->purchaseOrderItem?->item?->code ?? '-' }}</td>
                                                     <td>{{ $rrItem->purchaseOrderItem?->item?->unit?->name ?? 'PCS' }}</td>
-                                                    <td>
-                                                        @if ($rrItem->purchaseOrderItem?->prsItem?->prs?->is_capex)
-                                                            <span class="badge bg-light-primary">CAPEX</span>
-                                                        @else
-                                                            <span class="badge bg-light-secondary">Stock</span>
-                                                        @endif
-                                                    </td>
                                                     <td><input type="number" step="0.01" min="0" class="form-control form-control-sm text-end" name="items[{{ $idx }}][qty_good]" value="{{ (float) $rrItem->qty_good }}" required></td>
                                                     <td><input type="number" step="0.01" min="0" class="form-control form-control-sm text-end" name="items[{{ $idx }}][qty_bad]" value="{{ (float) $rrItem->qty_bad }}" required></td>
                                                 </tr>

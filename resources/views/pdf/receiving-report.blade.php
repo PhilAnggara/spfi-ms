@@ -47,6 +47,12 @@
             letter-spacing: 0.2px;
         }
 
+        .capex-label {
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 0.3px;
+        }
+
         .cell {
             position: absolute;
             font-size: 12px;
@@ -133,28 +139,54 @@
         $totalPphAmountAllItems = 0.0;
         $creditAmountAllItems = 0.0;
 
+        $resolveReceivedLineAmounts = function ($poItem, float $qtyTotal): array {
+            $orderedQty = (float) ($poItem?->quantity ?? 0);
+            $receivedRatio = $orderedQty > 0 ? min(1, max(0, $qtyTotal / $orderedQty)) : 0;
+            $lineSubtotal = (float) ($poItem?->line_subtotal ?? ($orderedQty * (float) ($poItem?->unit_price ?? 0)));
+            $discountAmount = (float) ($poItem?->discount_amount ?? 0);
+            $netLineAmount = max(0, $lineSubtotal - $discountAmount);
+            $baseAmount = $netLineAmount * $receivedRatio;
+            $discountedUnitCost = $orderedQty > 0
+                ? $netLineAmount / $orderedQty
+                : (float) ($poItem?->unit_price ?? 0);
+            $ppnAmount = (float) ($poItem?->ppn_amount ?? 0) * $receivedRatio;
+            $pphAmount = (float) ($poItem?->pph_amount ?? 0) * $receivedRatio;
+
+            return [
+                'ordered_qty' => $orderedQty,
+                'discounted_unit_cost' => $discountedUnitCost,
+                'base_amount' => $baseAmount,
+                'ppn_amount' => $ppnAmount,
+                'pph_amount' => $pphAmount,
+                'line_total' => $baseAmount + $ppnAmount - $pphAmount,
+            ];
+        };
+
+        $isCapex = (bool) ($po?->items?->first()?->prsItem?->prs?->is_capex ?? false);
+
         foreach ($allItems as $rrItem) {
             $poItem = $rrItem->purchaseOrderItem;
             $item = $poItem?->item;
 
             $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
-            $unitCost = (float) ($poItem?->unit_price ?? 0);
-            $orderedQty = (float) ($poItem?->quantity ?? 0);
-            $receivedRatio = $orderedQty > 0 ? min(1, max(0, $qtyTotal / $orderedQty)) : 0;
-            $amount = $qtyTotal * $unitCost;
-            $ppnAmount = (float) ($poItem?->ppn_amount ?? 0) * $receivedRatio;
-            $pphAmount = (float) ($poItem?->pph_amount ?? 0) * $receivedRatio;
-            $lineTotal = $amount + $ppnAmount - $pphAmount;
+            $lineAmounts = $resolveReceivedLineAmounts($poItem, $qtyTotal);
+            $amount = $lineAmounts['base_amount'];
+            $ppnAmount = $lineAmounts['ppn_amount'];
+            $pphAmount = $lineAmounts['pph_amount'];
+            $lineTotal = $lineAmounts['line_total'];
             $totalAmountAllItems += $amount;
             $totalPpnAmountAllItems += $ppnAmount;
             $totalPphAmountAllItems += $pphAmount;
             $creditAmountAllItems += $lineTotal;
 
             $categoryName = strtoupper(trim((string) ($item?->category?->name ?? 'OTHERS')));
-            $costCenter = $categoryName === 'CHEM'
+            $costCenterCategories = ['CHEM', 'SL/C'];
+            $costCenter = in_array($categoryName, $costCenterCategories, true)
                 ? trim((string) ($poItem?->prsItem?->prs?->department?->code ?? ''))
                 : '';
-            $debitAccount = $categoryAccountMap[$categoryName] ?? ($categoryAccountMap['OTHERS'] ?? '');
+            $debitAccount = $isCapex
+                ? '169'
+                : ($categoryAccountMap[$categoryName] ?? ($categoryAccountMap['OTHERS'] ?? ''));
 
             $groupKey = $costCenter.'|'.$debitAccount;
             if (! isset($debitRows[$groupKey])) {
@@ -196,6 +228,15 @@
             ];
         }
 
+        if ($totalPphAmountAllItems > 0) {
+            $accountingEntries[] = [
+                'cost_center' => '',
+                'account' => '206',
+                'debit' => null,
+                'credit' => $totalPphAmountAllItems,
+            ];
+        }
+
         $accountingEntries[] = [
             'cost_center' => '',
             'account' => $creditAccount,
@@ -210,15 +251,31 @@
                 return is_numeric($accountCode) ? (int) $accountCode : 0;
             });
 
-        $totalAmount = $rows->sum(function ($rrItem) {
-            $poItem = $rrItem->purchaseOrderItem;
-            $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
-            $unitCost = (float) ($poItem?->unit_price ?? 0);
-
-            return $qtyTotal * $unitCost;
-        });
-        $amountLineTop = $rowStartTopMm + (($rowCount - 1) * $rowHeightMm) + 7.2;
-        $amountTotalTop = $amountLineTop + 1.2;
+        $displaySubTotal = $totalAmountAllItems;
+        $displayPpnTotal = $totalPpnAmountAllItems;
+        $displayPphTotal = $totalPphAmountAllItems;
+        $displayPpnRate = (float) collect($allItems)
+            ->map(fn ($rrItem) => (float) ($rrItem->purchaseOrderItem?->ppn_rate ?? 0))
+            ->first(fn ($rate) => $rate > 0);
+        $displayPphRate = (float) collect($allItems)
+            ->map(fn ($rrItem) => (float) ($rrItem->purchaseOrderItem?->pph_rate ?? 0))
+            ->first(fn ($rate) => $rate > 0);
+        $formatTaxRate = static function (float $rate): string {
+            return rtrim(rtrim(number_format($rate, 2, '.', ''), '0'), '.');
+        };
+        $hasPph = $displayPphTotal > 0;
+        $hasPpn = $displayPpnTotal > 0;
+        $showSubTotal = $rowCount > 1;
+        $showFinalTotal = $hasPpn || $hasPph;
+        $subTotalPlusPpn = $displaySubTotal + $displayPpnTotal;
+        $displayGrandTotal = $subTotalPlusPpn - $displayPphTotal;
+        $summaryBaseTop = $rowCount > 0 ? $rowStartTopMm + ($rowCount * $rowHeightMm) + 0.8 : 0;
+        $subTotalTop = $summaryBaseTop + 1.2;
+        $ppnTop = $subTotalTop + 5;
+        $intermediateTop = ($displayPpnTotal > 0 ? $ppnTop : $subTotalTop) + 5;
+        $pphTop = $intermediateTop + 5;
+        $summaryTotalLineTop = ($hasPph ? $pphTop : ($displayPpnTotal > 0 ? $ppnTop : $subTotalTop)) + 4.2;
+        $summaryTotalTop = $summaryTotalLineTop + 1.2;
         $poDateText = $po?->created_at ? $po->created_at->locale('id')->translatedFormat('d M Y') : '-';
         $rrDateText = $receivingReport->created_at ? $receivingReport->created_at->locale('id')->translatedFormat('d M Y') : '-';
     @endphp
@@ -226,6 +283,17 @@
     <div class="rr-form-page">
         @if($isPreview && !empty($backgroundImageDataUri))
             <img src="{{ $backgroundImageDataUri }}" alt="" class="rr-bg">
+        @endif
+
+        @if ($isCapex)
+            <div class="cell capex-label" style="left: 15mm; top: 33mm; width: 40mm;">CAPEX</div>
+        @endif
+
+        @if ($isPreview)
+            @php $rrNumberText = trim((string) ($receivingReport->rr_number ?? '')); @endphp
+            @if ($rrNumberText !== '')
+                <div class="field po-number" style="left: 207mm; top: 28mm; width: 55mm; text-align: right;">{{ $rrNumberText }}</div>
+            @endif
         @endif
 
         <div class="field" style="left: 37mm; top: 41mm; width: 88mm;">{{ $supplierDisplay }}</div>
@@ -238,8 +306,9 @@
                 $item = $poItem?->item;
                 $departmentCode = $poItem?->prsItem?->prs?->department?->code ?? '-';
                 $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
-                $unitCost = (float) ($poItem?->unit_price ?? 0);
-                $amount = $qtyTotal * $unitCost;
+                $lineAmounts = $resolveReceivedLineAmounts($poItem, $qtyTotal);
+                $unitCost = $lineAmounts['discounted_unit_cost'];
+                $amount = $lineAmounts['base_amount'];
                 $top = $rowStartTopMm + ($index * $rowHeightMm);
             @endphp
 
@@ -252,15 +321,33 @@
             <div class="cell right" style="left: 228mm; top: {{ $top }}mm; width: 50mm;">{{ number_format($amount, 2, '.', ',') }}</div>
         @endforeach
 
-        @if($rowCount > 1)
-            <div style="position: absolute; left: 228mm; top: {{ $amountLineTop }}mm; width: 50mm; border-top: 1px solid #111827;"></div>
-            <div class="cell right" style="left: 228mm; top: {{ $amountTotalTop }}mm; width: 50mm; font-weight: bold;">{{ number_format($totalAmount, 2, '.', ',') }}</div>
+        @if ($rowCount > 0)
+            @if ($showSubTotal)
+                <div style="position: absolute; left: 189mm; top: {{ $summaryBaseTop }}mm; width: 89mm; border-top: 1px solid #111827;"></div>
+                <div class="cell right" style="left: 189mm; top: {{ $subTotalTop }}mm; width: 35mm; font-weight: bold;">Sub Total</div>
+                <div class="cell right" style="left: 228mm; top: {{ $subTotalTop }}mm; width: 50mm; font-weight: bold;">{{ number_format($displaySubTotal, 2, '.', ',') }}</div>
+            @endif
+            @if ($hasPpn)
+                <div class="cell right" style="left: 189mm; top: {{ $ppnTop }}mm; width: 35mm; font-weight: bold;">PPn {{ $formatTaxRate($displayPpnRate) }}%</div>
+                <div class="cell right" style="left: 228mm; top: {{ $ppnTop }}mm; width: 50mm; font-weight: bold;">{{ number_format($displayPpnTotal, 2, '.', ',') }}</div>
+            @endif
+            @if ($hasPph)
+                <div style="position: absolute; left: 228mm; top: {{ $intermediateTop - 1.2 }}mm; width: 50mm; border-top: 1px solid #111827;"></div>
+                <div class="cell right" style="left: 228mm; top: {{ $intermediateTop }}mm; width: 50mm; font-weight: bold;">{{ number_format($subTotalPlusPpn, 2, '.', ',') }}</div>
+                <div class="cell right" style="left: 189mm; top: {{ $pphTop }}mm; width: 35mm; font-weight: bold;">PPh {{ $formatTaxRate($displayPphRate) }}%</div>
+                <div class="cell right" style="left: 228mm; top: {{ $pphTop }}mm; width: 50mm; font-weight: bold;">{{ number_format($displayPphTotal, 2, '.', ',') }}</div>
+            @endif
+            @if ($showFinalTotal)
+                <div style="position: absolute; left: 228mm; top: {{ $summaryTotalTop - 1.2 }}mm; width: 50mm; border-top: 1px solid #111827;"></div>
+                <div class="cell right" style="left: 189mm; top: {{ $summaryTotalTop }}mm; width: 35mm; font-weight: bold;">Total</div>
+                <div class="cell right" style="left: 228mm; top: {{ $summaryTotalTop }}mm; width: 50mm; font-weight: bold;">{{ number_format($hasPph ? $displayGrandTotal : $subTotalPlusPpn, 2, '.', ',') }}</div>
+            @endif
         @endif
 
         @php
             $entryStartTop = 166;
             $entryRowHeight = 5.2;
-            $entryRows = collect($accountingEntries)->take(4)->values();
+            $entryRows = collect($accountingEntries)->take(6)->values();
             $totalLineTop = $entryStartTop + ($entryRows->count() * $entryRowHeight) - 1.2;
             $totalEntryTop = $entryStartTop + ($entryRows->count() * $entryRowHeight) - 0.9;
         @endphp

@@ -103,6 +103,7 @@ class ReceivingReportController extends Controller
                 'po_date' => optional($purchaseOrder->created_at)->format('Y-m-d'),
                 'status' => $purchaseOrder->status,
                 'supplier_name' => $purchaseOrder->supplier?->name,
+                'is_capex' => $this->isCapexPurchaseOrderItem($purchaseOrder->items->first()),
             ],
             'items' => $items,
         ]);
@@ -463,6 +464,7 @@ class ReceivingReportController extends Controller
 
         $receivingReport->load([
             'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
             'items.purchaseOrderItem.item.unit',
             'items.purchaseOrderItem.item.category',
             'items.purchaseOrderItem.prsItem.prs.department',
