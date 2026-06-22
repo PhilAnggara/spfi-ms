@@ -325,7 +325,12 @@
                                         <div class="col-12 col-md-6">
                                             <div class="employee-info-card">
                                                 <small>Date of Birth</small>
-                                                <div>{{ optional($employee->date_of_birth)->format('d M Y') ?? '-' }}</div>
+                                                <div>
+                                                    {{ optional($employee->date_of_birth)->format('d M Y') ?? '-' }}
+                                                    @if ($employee->age !== null)
+                                                        <span class="text-muted">({{ $employee->age }} years old)</span>
+                                                    @endif
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="col-12 col-md-4">

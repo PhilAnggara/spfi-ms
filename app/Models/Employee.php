@@ -60,6 +60,11 @@ class Employee extends Model
         return (string) ($this->code_employee ?: $this->employee_id);
     }
 
+    public function getAgeAttribute(): ?int
+    {
+        return $this->date_of_birth?->age;
+    }
+
     public function getPhotoUrlAttribute(): string
     {
         $defaultPath = 'assets/images/employee-default.svg';
