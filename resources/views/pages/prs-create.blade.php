@@ -54,11 +54,24 @@
                                         <option value="zero_stock" @selected(($selectedStockFilter ?? '') === 'zero_stock')>Zero stock</option>
                                     </select>
                                 </div>
+                                <div class="prs-catalog-layout-field">
+                                    <label class="form-label mb-1">Layout</label>
+                                    <div class="btn-group prs-layout-toggle w-100" role="group" aria-label="Catalog layout">
+                                        <button type="button" class="btn btn-light-secondary active" data-layout="grid" aria-pressed="true" title="Grid view">
+                                            <i class="fa-light fa-grid-2"></i>
+                                            <span class="d-none d-xl-inline ms-1">Grid</span>
+                                        </button>
+                                        <button type="button" class="btn btn-light-secondary" data-layout="list" aria-pressed="false" title="List view">
+                                            <i class="fa-light fa-list"></i>
+                                            <span class="d-none d-xl-inline ms-1">List</span>
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="prs-catalog-reset-field">
                                     <button type="button" class="btn btn-light-secondary w-100" id="prs-reset-filter">Reset</button>
                                 </div>
                             </div>
-                            <div class="prs-item-grid" id="prs-item-grid">
+                            <div class="prs-item-grid" id="prs-item-grid" data-layout="grid">
                                 @forelse ($items as $item)
                                     <div class="prs-item-card" data-name="{{ strtolower($item->name) }}" data-code="{{ strtolower($item->code) }}" data-category="{{ strtolower($item->category?->name ?? '') }}" data-item-id="{{ $item->id }}">
                                         {{-- <div class="prs-item-thumb" data-category="{{ category_data_attr($item->category?->name) }}">

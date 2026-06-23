@@ -160,12 +160,14 @@ function initPrsCatalog() {
         return;
     }
 
+    const LAYOUT_KEY = 'prs-create-catalog-layout';
     const filterBar = document.getElementById('prs-catalog-filter-form');
     const baseUrl = filterBar?.dataset.baseUrl || window.location.pathname;
     const searchInput = document.getElementById('prs-item-search');
     const categoryFilter = document.getElementById('prs-category-filter');
     const stockFilter = document.getElementById('prs-stock-filter');
     const resetFilterButton = document.getElementById('prs-reset-filter');
+    const layoutToggle = filterBar?.querySelector('.prs-layout-toggle');
     const paginationContainer = document.getElementById('prs-pagination');
     const initialCurrentPage = parseInt(paginationContainer?.dataset.currentPage || '1', 10);
     const initialLastPage = parseInt(paginationContainer?.dataset.lastPage || '1', 10);
@@ -173,12 +175,14 @@ function initPrsCatalog() {
     let navigationTimer = null;
     let catalogAbortController = null;
     let catalogRequestSeq = 0;
+    let catalogLayout = localStorage.getItem(LAYOUT_KEY) === 'list' ? 'list' : 'grid';
+    let lastCatalogItems = [];
     const state = {
         page: Number.isNaN(initialCurrentPage) ? 1 : initialCurrentPage,
         lastPage: Number.isNaN(initialLastPage) ? 1 : initialLastPage,
     };
 
-    const getCards = () => Array.from(grid.querySelectorAll('.prs-item-card'));
+    const getCatalogRows = () => Array.from(grid.querySelectorAll('.prs-item-card, .prs-catalog-row'));
 
     const escapeHtml = (value) => String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -226,58 +230,142 @@ function initPrsCatalog() {
         }
     };
 
-    const renderGrid = (items) => {
+    const buildGridCardMarkup = (item) => {
+        const itemName = escapeHtml(item.name);
+        const itemCode = escapeHtml(item.code);
+        const itemCategory = escapeHtml(item.category || 'Uncategorized');
+        const unit = escapeHtml(item.unit || 'PCS');
+        const stock = escapeHtml(item.stock_on_hand ?? 0);
+
+        return `
+            <div class="prs-item-card" data-name="${itemName.toLowerCase()}" data-code="${itemCode.toLowerCase()}" data-category="${itemCategory.toLowerCase()}" data-item-id="${item.id}">
+                <div class="prs-item-body">
+                    <div class="prs-item-title">${itemName}</div>
+                    <div class="prs-item-meta">
+                        <span class="badge bg-light-primary">${itemCode}</span>
+                        <span class="text-muted">Stock ${stock} ${unit}</span>
+                    </div>
+                    <div class="prs-item-meta text-muted">${itemCategory}</div>
+                    <div class="prs-item-actions">
+                        <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
+                            <i class="fa-light fa-minus"></i>
+                        </button>
+                        <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                        <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
+                            <i class="fa-light fa-plus"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="${item.id}">
+                            <i class="fa-light fa-plus"></i>
+                            Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+
+    const buildListRowMarkup = (item) => {
+        const itemName = escapeHtml(item.name);
+        const itemCode = escapeHtml(item.code);
+        const itemCategory = escapeHtml(item.category || 'Uncategorized');
+        const unit = escapeHtml(item.unit || 'PCS');
+        const stock = escapeHtml(item.stock_on_hand ?? 0);
+
+        return `
+            <tr class="prs-catalog-row" data-name="${itemName.toLowerCase()}" data-code="${itemCode.toLowerCase()}" data-category="${itemCategory.toLowerCase()}" data-item-id="${item.id}">
+                <td data-label="Code"><span class="badge bg-light-primary">${itemCode}</span></td>
+                <td data-label="Name"><span class="prs-catalog-item-name">${itemName}</span></td>
+                <td data-label="Category" class="text-muted">${itemCategory}</td>
+                <td data-label="Stock" class="text-muted">${stock} ${unit}</td>
+                <td data-label="Qty">
+                    <div class="prs-catalog-list-qty">
+                        <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
+                            <i class="fa-light fa-minus"></i>
+                        </button>
+                        <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                        <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
+                            <i class="fa-light fa-plus"></i>
+                        </button>
+                    </div>
+                </td>
+                <td data-label="Action" class="text-end">
+                    <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="${item.id}">
+                        <i class="fa-light fa-plus"></i>
+                        Add
+                    </button>
+                </td>
+            </tr>
+        `;
+    };
+
+    const renderCatalog = (items, layout = catalogLayout) => {
+        grid.dataset.layout = layout;
+        grid.classList.toggle('prs-item-grid', layout === 'grid');
+        grid.classList.toggle('prs-catalog-list-mode', layout === 'list');
+
         if (!Array.isArray(items) || items.length === 0) {
             grid.innerHTML = buildEmptyStateMarkup();
             return;
         }
 
-        grid.innerHTML = items.map((item) => {
-            const itemName = escapeHtml(item.name);
-            const itemCode = escapeHtml(item.code);
-            const itemCategory = escapeHtml(item.category || 'Uncategorized');
-            const unit = escapeHtml(item.unit || 'PCS');
-            const stock = escapeHtml(item.stock_on_hand ?? 0);
-            const categoryIcon = escapeHtml(item.category_icon || 'fa-box');
-            const categoryData = escapeHtml(item.category_data || 'other');
-
-            let optionalThumbnail = `
-                    <div class="prs-item-thumb" data-category="${categoryData}">
-                        <div class="prs-item-thumb-icon">
-                            <i class="fa-duotone fa-solid ${categoryIcon}"></i>
-                        </div>
-                    </div>`;
-
-            optionalThumbnail = ''; // Disable thumbnail for now, as per design change
-
-            return `
-                <div class="prs-item-card" data-name="${itemName.toLowerCase()}" data-code="${itemCode.toLowerCase()}" data-category="${itemCategory.toLowerCase()}" data-item-id="${item.id}">
-                    ${optionalThumbnail}
-                    <div class="prs-item-body">
-                        <div class="prs-item-title">${itemName}</div>
-                        <div class="prs-item-meta">
-                            <span class="badge bg-light-primary">${itemCode}</span>
-                            <span class="text-muted">Stock ${stock} ${unit}</span>
-                        </div>
-                        <div class="prs-item-meta text-muted">${itemCategory}</div>
-                        <div class="prs-item-actions">
-                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
-                                <i class="fa-light fa-minus"></i>
-                            </button>
-                            <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
-                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
-                                <i class="fa-light fa-plus"></i>
-                            </button>
-                            <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="${item.id}">
-                                <i class="fa-light fa-plus"></i>
-                                Add
-                            </button>
-                            <span class="prs-in-cart-label d-none">Already in cart</span>
-                        </div>
-                    </div>
+        if (layout === 'list') {
+            grid.innerHTML = `
+                <div class="prs-item-list">
+                    <table class="table table-sm prs-catalog-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Stock</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map((item) => buildListRowMarkup(item)).join('')}
+                        </tbody>
+                    </table>
                 </div>
             `;
-        }).join('');
+            return;
+        }
+
+        grid.innerHTML = items.map((item) => buildGridCardMarkup(item)).join('');
+    };
+
+    const setLayoutActiveState = () => {
+        if (!layoutToggle) {
+            return;
+        }
+
+        layoutToggle.querySelectorAll('[data-layout]').forEach((button) => {
+            const isActive = button.dataset.layout === catalogLayout;
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+    };
+
+    const applyLayout = (layout, { persist = true, rerender = true } = {}) => {
+        catalogLayout = layout === 'list' ? 'list' : 'grid';
+
+        if (persist) {
+            localStorage.setItem(LAYOUT_KEY, catalogLayout);
+        }
+
+        setLayoutActiveState();
+
+        if (!rerender) {
+            return;
+        }
+
+        if (lastCatalogItems.length > 0) {
+            renderCatalog(lastCatalogItems, catalogLayout);
+            updateInCartState();
+            return;
+        }
+
+        fetchCatalog(state.page);
     };
 
     const buildPageItems = (current, last) => {
@@ -387,7 +475,8 @@ function initPrsCatalog() {
             }
 
             setCatalogLoading(false);
-            renderGrid(result.data);
+            lastCatalogItems = result.data;
+            renderCatalog(lastCatalogItems, catalogLayout);
             state.page = Number(result.meta.current_page || 1);
             state.lastPage = Number(result.meta.last_page || 1);
             renderPagination();
@@ -439,9 +528,9 @@ function initPrsCatalog() {
     };
 
     const updateInCartState = () => {
-        getCards().forEach((card) => {
-            const itemId = parseInt(card.dataset.itemId || '0', 10);
-            const addButton = card.querySelector('.prs-item-add');
+        getCatalogRows().forEach((row) => {
+            const itemId = parseInt(row.dataset.itemId || '0', 10);
+            const addButton = row.querySelector('.prs-item-add');
             if (!itemId || !addButton) {
                 return;
             }
@@ -454,6 +543,17 @@ function initPrsCatalog() {
                 : '<i class="fa-light fa-plus"></i> Add';
         });
     };
+
+    if (layoutToggle) {
+        layoutToggle.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-layout]');
+            if (!button || button.classList.contains('active')) {
+                return;
+            }
+
+            applyLayout(button.dataset.layout);
+        });
+    }
 
     if (searchInput) {
         searchInput.addEventListener('input', () => triggerFilter(false));
@@ -498,8 +598,8 @@ function initPrsCatalog() {
     grid.addEventListener('click', (event) => {
         const qtyPlus = event.target.closest('.prs-qty-plus');
         if (qtyPlus) {
-            const card = qtyPlus.closest('.prs-item-card');
-            const qtyInput = card?.querySelector('.prs-item-qty');
+            const row = qtyPlus.closest('.prs-item-card, .prs-catalog-row');
+            const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
                 const current = parseInt(qtyInput.value || '1', 10);
                 qtyInput.value = Number.isNaN(current) ? 1 : current + 1;
@@ -509,8 +609,8 @@ function initPrsCatalog() {
 
         const qtyMinus = event.target.closest('.prs-qty-minus');
         if (qtyMinus) {
-            const card = qtyMinus.closest('.prs-item-card');
-            const qtyInput = card?.querySelector('.prs-item-qty');
+            const row = qtyMinus.closest('.prs-item-card, .prs-catalog-row');
+            const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
                 const current = parseInt(qtyInput.value || '1', 10);
                 qtyInput.value = Math.max(1, Number.isNaN(current) ? 1 : current - 1);
@@ -523,12 +623,12 @@ function initPrsCatalog() {
             return;
         }
 
-        const card = addButton.closest('.prs-item-card');
-        if (!card) {
+        const row = addButton.closest('.prs-item-card, .prs-catalog-row');
+        if (!row) {
             return;
         }
 
-        const qtyInput = card.querySelector('.prs-item-qty');
+        const qtyInput = row.querySelector('.prs-item-qty');
         const qtyValue = parseInt(qtyInput?.value || '1', 10);
         const quantity = Number.isNaN(qtyValue) || qtyValue < 1 ? 1 : qtyValue;
         if (qtyInput) {
@@ -558,8 +658,14 @@ function initPrsCatalog() {
         updateInCartState();
     });
 
-    renderPagination();
-    updateInCartState();
+    setLayoutActiveState();
+
+    if (catalogLayout === 'list') {
+        fetchCatalog(state.page);
+    } else {
+        renderPagination();
+        updateInCartState();
+    }
 }
 
 function initPrsCartCount() {

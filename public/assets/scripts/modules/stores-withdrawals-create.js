@@ -58,6 +58,7 @@ function initSwsCatalogAndCart() {
     const categoryFilter = document.getElementById('sws-category-filter');
     const stockFilter = document.getElementById('sws-stock-filter');
     const resetFilterButton = document.getElementById('sws-reset-filter');
+    const layoutToggle = filterBar?.querySelector('.prs-layout-toggle');
     const paginationContainer = document.getElementById('sws-pagination');
     const typeSelect = document.getElementById('sws-type');
     const cartItemsContainer = document.getElementById('sws-cart-list');
@@ -70,6 +71,9 @@ function initSwsCatalogAndCart() {
     const form = document.getElementById('sws-create-form');
     let catalogAbortController = null;
     let catalogRequestSeq = 0;
+    const LAYOUT_KEY = 'sws-create-catalog-layout';
+    let catalogLayout = window.CatalogLayout?.readLayout(LAYOUT_KEY) || 'grid';
+    let lastCatalogItems = [];
 
     const state = {
         page: parseInt(paginationContainer?.dataset.currentPage || '1', 10) || 1,
@@ -184,22 +188,14 @@ function initSwsCatalogAndCart() {
         }
     };
 
-    const getCards = () => Array.from(grid.querySelectorAll('.prs-item-card'));
+    const getCards = () => window.CatalogLayout?.getCatalogRows(grid) || [];
 
-    const getCardPayload = (card) => {
-        const itemId = parseInt(card.dataset.itemId || '0', 10);
-        const name = String(card.querySelector('.prs-item-title')?.textContent || '').trim();
-        const code = String(card.querySelector('.badge')?.textContent || '').trim();
-        const unit = String(card.dataset.unit || 'PCS').trim();
-        const stock = Number(card.dataset.stock || 0);
-
-        return {
-            itemId,
-            name,
-            code,
-            unit,
-            stock,
-        };
+    const getCardPayload = (row) => window.CatalogLayout?.getRowPayload(row) || {
+        itemId: 0,
+        name: '',
+        code: '',
+        unit: 'PCS',
+        stock: 0,
     };
 
     const updateCatalogButtons = () => {
@@ -422,6 +418,42 @@ function initSwsCatalogAndCart() {
         renderCart();
     };
 
+    const renderCatalogView = (items) => {
+        window.CatalogLayout?.renderCatalog(
+            grid,
+            items,
+            catalogLayout,
+            buildEmptyStateMarkup(),
+            { withStockAttrs: true }
+        );
+        updateCatalogButtons();
+    };
+
+    const setLayoutActiveState = () => {
+        window.CatalogLayout?.setToggleActive(layoutToggle, catalogLayout);
+    };
+
+    const applyLayout = (layout, { persist = true, rerender = true } = {}) => {
+        catalogLayout = layout === 'list' ? 'list' : 'grid';
+
+        if (persist) {
+            window.CatalogLayout?.saveLayout(LAYOUT_KEY, catalogLayout);
+        }
+
+        setLayoutActiveState();
+
+        if (!rerender) {
+            return;
+        }
+
+        if (lastCatalogItems.length > 0) {
+            renderCatalogView(lastCatalogItems);
+            return;
+        }
+
+        fetchCatalog(state.page);
+    };
+
     const buildPageItems = (current, last) => {
         const pages = [];
         const add = (value) => pages.push(value);
@@ -475,53 +507,7 @@ function initSwsCatalogAndCart() {
     };
 
     const renderGrid = (items) => {
-        if (!Array.isArray(items) || items.length === 0) {
-            grid.innerHTML = buildEmptyStateMarkup();
-            updateCatalogButtons();
-            return;
-        }
-
-        grid.innerHTML = items.map((item) => {
-            const itemName = escapeHtml(item.name);
-            const itemCode = escapeHtml(item.code);
-            const itemCategory = escapeHtml(item.category || 'Uncategorized');
-            const unit = escapeHtml(item.unit || 'PCS');
-            const stock = Number(item.stock_on_hand || 0);
-
-            return `
-                <div class="prs-item-card"
-                    data-item-id="${item.id}"
-                    data-name="${itemName.toLowerCase()}"
-                    data-code="${itemCode.toLowerCase()}"
-                    data-category="${itemCategory.toLowerCase()}"
-                    data-stock="${stock}"
-                    data-unit="${unit}">
-                    <div class="prs-item-body">
-                        <div class="prs-item-title">${itemName}</div>
-                        <div class="prs-item-meta">
-                            <span class="badge bg-light-primary">${itemCode}</span>
-                            <span class="text-muted">Stock ${stock} ${unit}</span>
-                        </div>
-                        <div class="prs-item-meta text-muted">${itemCategory}</div>
-                        <div class="prs-item-actions">
-                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
-                                <i class="fa-light fa-minus"></i>
-                            </button>
-                            <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
-                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
-                                <i class="fa-light fa-plus"></i>
-                            </button>
-                            <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="${item.id}">
-                                <i class="fa-light fa-plus"></i>
-                                Add
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        updateCatalogButtons();
+        renderCatalogView(items);
     };
 
     const fetchCatalog = async (page = 1) => {
@@ -581,7 +567,8 @@ function initSwsCatalogAndCart() {
             }
 
             setCatalogLoading(false);
-            renderGrid(result.data);
+            lastCatalogItems = result.data;
+            renderCatalogView(lastCatalogItems);
             state.page = Number(result.meta.current_page || 1);
             state.lastPage = Number(result.meta.last_page || 1);
             renderPagination();
@@ -628,6 +615,17 @@ function initSwsCatalogAndCart() {
         filterTimer = setTimeout(run, 350);
     };
 
+    if (layoutToggle) {
+        layoutToggle.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-layout]');
+            if (!button || button.classList.contains('active')) {
+                return;
+            }
+
+            applyLayout(button.dataset.layout);
+        });
+    }
+
     if (searchInput) {
         searchInput.addEventListener('input', () => triggerFilter(false));
     }
@@ -671,10 +669,10 @@ function initSwsCatalogAndCart() {
     grid.addEventListener('click', (event) => {
         const plus = event.target.closest('.prs-qty-plus');
         if (plus) {
-            const card = plus.closest('.prs-item-card');
-            const qtyInput = card?.querySelector('.prs-item-qty');
+            const row = plus.closest('.prs-item-card, .prs-catalog-row');
+            const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
-                const payload = card ? getCardPayload(card) : null;
+                const payload = row ? getCardPayload(row) : null;
                 const current = Number(qtyInput.value || '1');
                 const nextValue = (Number.isNaN(current) ? 1 : current + 1);
                 const allowedQuantity = payload ? getAllowedQuantity(payload.stock, nextValue) : nextValue;
@@ -689,8 +687,8 @@ function initSwsCatalogAndCart() {
 
         const minus = event.target.closest('.prs-qty-minus');
         if (minus) {
-            const card = minus.closest('.prs-item-card');
-            const qtyInput = card?.querySelector('.prs-item-qty');
+            const row = minus.closest('.prs-item-card, .prs-catalog-row');
+            const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
                 const current = parseInt(qtyInput.value || '1', 10);
                 qtyInput.value = Math.max(1, Number.isNaN(current) ? 1 : current - 1);
@@ -703,13 +701,13 @@ function initSwsCatalogAndCart() {
             return;
         }
 
-        const card = addButton.closest('.prs-item-card');
-        if (!card) {
+        const row = addButton.closest('.prs-item-card, .prs-catalog-row');
+        if (!row) {
             return;
         }
 
-        const payload = getCardPayload(card);
-        const qtyInput = card.querySelector('.prs-item-qty');
+        const payload = getCardPayload(row);
+        const qtyInput = row.querySelector('.prs-item-qty');
         const quantity = Math.max(1, Number(qtyInput?.value || '1') || 1);
 
         if (qtyInput) {
@@ -725,8 +723,8 @@ function initSwsCatalogAndCart() {
             return;
         }
 
-        const card = qtyInput.closest('.prs-item-card');
-        const payload = card ? getCardPayload(card) : null;
+        const row = qtyInput.closest('.prs-item-card, .prs-catalog-row');
+        const payload = row ? getCardPayload(row) : null;
         const quantity = Math.max(1, Number(qtyInput.value || '1') || 1);
         const allowedQuantity = payload ? getAllowedQuantity(payload.stock, quantity) : quantity;
 
@@ -872,7 +870,13 @@ function initSwsCatalogAndCart() {
         observer.observe(topCartBtn);
     }
 
-    renderPagination();
-    renderCart();
-    updateCatalogButtons();
+    setLayoutActiveState();
+
+    if (catalogLayout === 'list') {
+        fetchCatalog(state.page);
+    } else {
+        renderPagination();
+        renderCart();
+        updateCatalogButtons();
+    }
 }
