@@ -17,6 +17,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PrsController extends Controller
 {
@@ -353,6 +354,102 @@ class PrsController extends Controller
         return Pdf::loadView('pdf.prs-report', $data)
             ->setPaper('a4', 'portrait')
             ->stream($filename);
+    }
+
+    /**
+     * Export PRS list grouped by department (PDF or Excel).
+     */
+    public function exportByDepartment(Request $request)
+    {
+        $validated = $request->validate([
+            'start_month' => ['required', 'date_format:Y-m'],
+            'end_month' => ['required', 'date_format:Y-m', 'after_or_equal:start_month'],
+            'format' => ['required', 'in:pdf,excel'],
+            'department_id' => ['nullable', 'exists:departments,id'],
+        ]);
+
+        $user = Auth::user();
+        $isAdministrator = $user && $user->hasRole('administrator');
+
+        $departmentId = null;
+        if ($isAdministrator) {
+            if (! empty($validated['department_id'])) {
+                $departmentId = (int) $validated['department_id'];
+            }
+        } else {
+            $departmentId = $user?->department_id;
+            if (! $departmentId) {
+                return redirect()
+                    ->back()
+                    ->withErrors(['department_id' => 'Your account is not linked to a department.']);
+            }
+        }
+
+        $start = Carbon::createFromFormat('Y-m', $validated['start_month'])->startOfMonth();
+        $end = Carbon::createFromFormat('Y-m', $validated['end_month'])->endOfMonth();
+
+        $prsQuery = Prs::with(['department', 'user', 'items.item.unit', 'items.canvasser', 'items.purchaseOrder'])
+            ->whereBetween('prs_date', [$start, $end])
+            ->orderBy('department_id')
+            ->orderByDesc('prs_date');
+
+        if ($departmentId) {
+            $prsQuery->where('department_id', $departmentId);
+        }
+
+        $prsCollection = $prsQuery->get();
+
+        $groups = $prsCollection
+            ->groupBy('department_id')
+            ->map(function ($prsList, $deptId) {
+                $department = $prsList->first()?->department;
+
+                return [
+                    'department_id' => (int) $deptId,
+                    'department_code' => $department?->code ?? 'UNKNOWN',
+                    'department_name' => $department?->name ?? 'Unknown Department',
+                    'prs_list' => $prsList->values(),
+                ];
+            })
+            ->sortBy('department_code')
+            ->values();
+
+        $scopedDepartment = $departmentId
+            ? Department::query()->find($departmentId)
+            : null;
+
+        $data = [
+            'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
+            'title' => 'Purchase Requisition Slip Report per Department',
+            'start' => $start,
+            'end' => $end,
+            'generated_at' => now(),
+            'groups' => $groups,
+            'scoped_department' => $scopedDepartment,
+        ];
+
+        $filePrefix = sprintf('prs-by-department-%s-to-%s', $start->format('Ym'), $end->format('Ym'));
+
+        if ($validated['format'] === 'excel') {
+            return $this->streamPrsExcel($filePrefix, 'exports.prs-by-department', $data);
+        }
+
+        $filename = sprintf('%s.pdf', $filePrefix);
+
+        return Pdf::loadView('pdf.prs-report-by-department', $data)
+            ->setPaper('a4', 'landscape')
+            ->stream($filename);
+    }
+
+    private function streamPrsExcel(string $filePrefix, string $view, array $data): StreamedResponse
+    {
+        $filename = sprintf('%s-%s.xls', $filePrefix, now()->format('Ymd-His'));
+
+        return response()->streamDownload(function () use ($view, $data) {
+            echo view($view, $data)->render();
+        }, $filename, [
+            'Content-Type' => 'application/vnd.ms-excel',
+        ]);
     }
 
     // Sinkron dengan sistem lama: {DEPTCODE}{#######}, urutan naik per department.

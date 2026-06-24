@@ -91,6 +91,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/po-registered-department', [PurchasingReportController::class, 'poRegisteredPerDepartment'])->name('procurement.reports.po-registered-department');
         Route::post('/reports/po-registered-item', [PurchasingReportController::class, 'poRegisteredPerItem'])->name('procurement.reports.po-registered-item');
         Route::post('/reports/po-registered-supplier', [PurchasingReportController::class, 'poRegisteredPerSupplier'])->name('procurement.reports.po-registered-supplier');
+        Route::post('/reports/purchasing-lead-time', [PurchasingReportController::class, 'purchasingLeadTime'])->name('procurement.reports.purchasing-lead-time');
     });
 
     Route::middleware('role:administrator|purchasing-manager')->prefix('accounting')->group(function () {
@@ -196,6 +197,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
     Route::resource('prs', PrsController::class);
     Route::post('prs/export', [PrsController::class, 'export'])->name('prs.export');
+    Route::post('prs/export-by-department', [PrsController::class, 'exportByDepartment'])->name('prs.export-by-department');
     Route::get('prs/{prs}/print', [PrsController::class, 'print'])->name('prs.print');
 
     // ===== Notification Routes =====

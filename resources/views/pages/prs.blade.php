@@ -18,6 +18,10 @@
                         <i class="fa-duotone fa-solid fa-file-pdf"></i>
                         Export PDF
                     </button>
+                    <button type="button" class="btn btn-outline-secondary icon icon-left" data-bs-toggle="modal" data-bs-target="#export-by-department-modal">
+                        <i class="fa-duotone fa-solid fa-building"></i>
+                        PRS per Department
+                    </button>
                     <a href="{{ route('prs.create') }}" class="btn btn-success icon icon-left">
                         <i class="fa-duotone fa-solid fa-plus"></i>
                         Create PRS
@@ -213,6 +217,7 @@
 <div id="prs-page-modals">
     @include('includes.modals.prs-modal')
     @include('includes.modals.prs-export')
+    @include('includes.modals.prs-export-by-department')
 </div>
 </div>
 @endsection

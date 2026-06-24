@@ -206,6 +206,45 @@
                     </div>
                 </div>
             </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Purchasing Lead Time</h5>
+                        <p class="text-muted small mb-3">Lead time is calculated from assigned canvasser date to each receiving report date. Items with multiple RRs are listed on separate rows.</p>
+                        <form method="post" action="{{ route('procurement.reports.purchasing-lead-time') }}" class="row g-3">
+                            @csrf
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="lead-time-from">Date From</label>
+                                <input type="date" id="lead-time-from" name="date_from" class="form-control" required>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="lead-time-to">Date To</label>
+                                <input type="date" id="lead-time-to" name="date_to" class="form-control" value="{{ $today }}" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="lead-time-canvasser">Canvasser</label>
+                                <select id="lead-time-canvasser" name="canvasser_id" class="form-select">
+                                    <option value="">All</option>
+                                    @foreach ($canvassers as $canvasser)
+                                        <option value="{{ $canvasser->id }}">{{ $canvasser->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-12 d-flex flex-wrap gap-2">
+                                <button type="submit" name="format" value="pdf" formtarget="_blank" class="btn btn-sm icon icon-left btn-outline-secondary">
+                                    <i class="fa-thin fa-file-pdf"></i>
+                                    Export PDF
+                                </button>
+                                <button type="submit" name="format" value="excel" class="btn btn-sm icon icon-left btn-success">
+                                    <i class="fa-thin fa-file-spreadsheet"></i>
+                                    Export Excel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 </div>

@@ -9,6 +9,7 @@ use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PurchasingReportController extends Controller
@@ -462,8 +463,116 @@ class PurchasingReportController extends Controller
         );
     }
 
+    public function purchasingLeadTime(Request $request)
+    {
+        $validated = $request->validate([
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+            'canvasser_id' => ['nullable', 'exists:users,id'],
+            'format' => ['required', 'in:pdf,excel'],
+        ]);
+
+        $dateFrom = Carbon::parse($validated['date_from'])->startOfDay();
+        $dateTo = Carbon::parse($validated['date_to'])->endOfDay();
+
+        $rrRowsQuery = DB::table('prs_items as pi')
+            ->join('purchase_order_items as poi', 'poi.prs_item_id', '=', 'pi.id')
+            ->join('receiving_report_items as rri', 'rri.purchase_order_item_id', '=', 'poi.id')
+            ->join('receiving_reports as rr', 'rr.id', '=', 'rri.receiving_report_id')
+            ->whereNull('pi.deleted_at')
+            ->whereNull('rri.deleted_at')
+            ->whereNull('rr.deleted_at')
+            ->whereNotNull('pi.assigned_canvasser_at')
+            ->whereBetween('rr.created_at', [$dateFrom, $dateTo]);
+
+        if (! empty($validated['canvasser_id'])) {
+            $rrRowsQuery->where('pi.canvasser_id', $validated['canvasser_id']);
+        }
+
+        $rrRows = $rrRowsQuery
+            ->select([
+                'pi.id as prs_item_id',
+                'rr.rr_number',
+                'rr.created_at as rr_date',
+            ])
+            ->orderBy('rr.created_at')
+            ->orderBy('pi.id')
+            ->get();
+
+        $rows = collect();
+
+        if ($rrRows->isNotEmpty()) {
+            $prsItems = PrsItem::with([
+                'prs',
+                'item.unit',
+                'canvasser',
+                'purchaseOrder.supplier',
+            ])
+                ->whereIn('id', $rrRows->pluck('prs_item_id')->unique())
+                ->get()
+                ->keyBy('id');
+
+            $rows = $rrRows->map(function ($rrRow) use ($prsItems) {
+                $prsItem = $prsItems->get($rrRow->prs_item_id);
+                if (! $prsItem) {
+                    return null;
+                }
+
+                $assignedAt = $prsItem->assigned_canvasser_at;
+                if (! $assignedAt) {
+                    return null;
+                }
+
+                $rrDate = Carbon::parse($rrRow->rr_date);
+                $leadTimeDays = $assignedAt->copy()->startOfDay()->diffInDays($rrDate->copy()->startOfDay());
+                $prs = $prsItem->prs;
+                $po = $prsItem->purchaseOrder;
+
+                return [
+                    'prs_id' => $prs?->id,
+                    'prs_number' => $prs?->prs_number,
+                    'prs_date' => $prs?->prs_date,
+                    'item_code' => $prsItem->item?->code,
+                    'item_name' => $prsItem->item?->name,
+                    'quantity' => $prsItem->quantity,
+                    'unit' => $prsItem->item?->unit?->name ?? '',
+                    'canvasser' => $prsItem->canvasser?->name,
+                    'assigned_canvasser_at' => $assignedAt,
+                    'po_number' => $po?->po_number,
+                    'po_date' => $po?->created_at,
+                    'supplier_name' => $po?->supplier?->name,
+                    'rr_number' => $rrRow->rr_number,
+                    'rr_date' => $rrDate,
+                    'lead_time_days' => $leadTimeDays,
+                ];
+            })->filter()->values();
+        }
+
+        $data = [
+            'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
+            'title' => 'Purchasing Lead Time Report',
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
+            'canvasser' => $this->canvasserName($validated['canvasser_id'] ?? null),
+            'logo_path' => $validated['format'] === 'excel'
+                ? url('assets/images/sinar.png')
+                : public_path('assets/images/sinar.png'),
+            'rows' => $rows,
+        ];
+
+        return $this->exportReport(
+            $validated['format'],
+            'exports.purchasing-lead-time',
+            $data,
+            'purchasing-lead-time'
+        );
+    }
+
     private function exportReport(string $format, string $view, array $data, string $filePrefix)
     {
+        $data['format'] = $format;
+        $data['printed_at'] = $data['printed_at'] ?? now()->format('d-m-Y H:i');
+
         if ($format === 'excel') {
             return $this->streamExcel($filePrefix, $view, $data);
         }
@@ -472,6 +581,7 @@ class PurchasingReportController extends Controller
 
         return Pdf::loadView($view, $data)
             ->setPaper('a4', 'landscape')
+            ->setOption('isPhpEnabled', true)
             ->stream($filename);
     }
 
