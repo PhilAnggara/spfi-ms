@@ -211,7 +211,10 @@
                 <div class="card shadow-sm h-100">
                     <div class="card-body">
                         <h5 class="card-title">Purchasing Lead Time</h5>
-                        <p class="text-muted small mb-3">Lead time is calculated from assigned canvasser date to each receiving report date. Items with multiple RRs are listed on separate rows.</p>
+                        <p class="text-muted small mb-3">Lead time is calculated from assigned canvasser date to each receiving report date. Items with multiple RRs are listed on separate rows. PDF is limited to 800 rows; use Excel for larger date ranges.</p>
+                        @if ($errors->has('format'))
+                            <div class="alert alert-warning py-2 small mb-3">{{ $errors->first('format') }}</div>
+                        @endif
                         <form method="post" action="{{ route('procurement.reports.purchasing-lead-time') }}" class="row g-3">
                             @csrf
                             <div class="col-12 col-md-6">

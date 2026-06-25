@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <title>{{ $title }}</title>
     <style>
-        @if (($format ?? 'pdf') === 'pdf')
         @page {
             size: A4 landscape;
             margin: 26mm 10mm 8mm 10mm;
@@ -22,11 +21,6 @@
             right: 0;
         }
         .data-table { margin-top: 3mm; }
-        @else
-        body { font-family: Arial, sans-serif; font-size: 8px; color: #111; margin: 0; }
-        .report-header { margin-bottom: 10px; }
-        @endif
-
         .report-header-table { width: 100%; border-collapse: collapse; }
         .report-header-table td { padding: 0; vertical-align: top; border: none; }
         .logo-cell { width: 70px; padding-right: 4px !important; }
@@ -35,7 +29,7 @@
         .doc-title { font-size: 9.5px; font-weight: bold; margin-top: 1px; line-height: 1.2; }
         .header-meta { font-size: 7.5px; line-height: 1.35; margin-top: 2px; }
         .header-meta .muted { font-size: 7px; color: #6b7280; }
-        .header-right { text-align: right; font-size: 7.5px; line-height: 1.45; white-space: nowrap; color: #374151; }
+        .header-right { width: 110px; }
         .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
         .data-table td, .data-table th { border: none; padding: 2px 4px; vertical-align: top; }
         .data-table thead { display: table-header-group; }
@@ -73,25 +67,17 @@
             white-space: nowrap;
             min-width: 42px;
         }
-        .time-part { display: block; font-size: 7px; color: #4b5563; white-space: nowrap; }
+        .text-wrap-max {
+            max-width: 150px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
     @php
-        $isPdf = ($format ?? 'pdf') === 'pdf';
-        $fmtDate = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d-m-Y') : '';
+        $fmtDate = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d M Y') : '';
         $fmtQty = fn ($value) => number_format((float) $value, 2, ',', '.');
-        $fmtAssigned = function ($value) {
-            if (! $value) {
-                return ['date' => '', 'time' => ''];
-            }
-            $dt = \Carbon\Carbon::parse($value);
-
-            return [
-                'date' => $dt->format('d-m-Y'),
-                'time' => $dt->format('H:i') !== '00:00' ? $dt->format('H:i') : '',
-            ];
-        };
     @endphp
 
     <div class="report-header">
@@ -109,12 +95,7 @@
                         <span class="muted">Lead Time (days) = RR Date - Assigned Canvasser Date. Each receiving report is listed separately.</span>
                     </div>
                 </td>
-                <td width="110" class="header-right">
-                    @unless ($isPdf)
-                        <div>Page 1 of 1</div>
-                        <div>Printed: <span class="nowrap-date">{{ $printed_at }}</span></div>
-                    @endunless
-                </td>
+                <td class="header-right"></td>
             </tr>
         </table>
     </div>
@@ -149,24 +130,18 @@
         </thead>
         <tbody>
             @forelse ($rows as $row)
-                @php $assigned = $fmtAssigned($row['assigned_canvasser_at']); @endphp
                 <tr>
                     <td>{{ $row['prs_id'] }}</td>
                     <td>{{ $row['prs_number'] }}</td>
                     <td class="nowrap-date">{{ $fmtDate($row['prs_date']) }}</td>
                     <td>{{ $row['item_code'] }}</td>
-                    <td style="max-width: 150px; white-space: normal;">{{ $row['item_name'] }}</td>
+                    <td class="text-wrap-max">{{ $row['item_name'] }}</td>
                     <td class="right">{{ $fmtQty($row['quantity']) }} {{ $row['unit'] }}</td>
                     <td>{{ $row['canvasser'] ?? '-' }}</td>
-                    <td class="nowrap-date">
-                        {{ $assigned['date'] }}
-                        @if ($assigned['time'] !== '')
-                            <span class="time-part">{{ $assigned['time'] = '' }}</span>
-                        @endif
-                    </td>
+                    <td class="nowrap-date">{{ $fmtDate($row['assigned_canvasser_at']) }}</td>
                     <td>{{ $row['po_number'] ?? '-' }}</td>
                     <td class="nowrap-date">{{ $fmtDate($row['po_date']) }}</td>
-                    <td style="max-width: 150px; white-space: normal;">{{ $row['supplier_name'] ?? '-' }}</td>
+                    <td class="text-wrap-max">{{ $row['supplier_name'] ?? '-' }}</td>
                     <td>{{ $row['rr_number'] ?? '-' }}</td>
                     <td class="nowrap-date">{{ $fmtDate($row['rr_date']) }}</td>
                     <td class="right lead-time-col">{{ $row['lead_time_days'] }}</td>
@@ -179,28 +154,26 @@
         </tbody>
     </table>
 
-    @if ($isPdf)
-        <script type="text/php">
-            if (isset($pdf)) {
-                $pdf->page_script('
-                    $font = $fontMetrics->getFont("DejaVu Sans", "normal");
-                    if (! $font) {
-                        $font = $fontMetrics->getFont("helvetica", "normal");
-                    }
+    <script type="text/php">
+        if (isset($pdf)) {
+            $pdf->page_script('
+                $font = $fontMetrics->getFont("DejaVu Sans", "normal");
+                if (! $font) {
+                    $font = $fontMetrics->getFont("helvetica", "normal");
+                }
 
-                    $fontSize = 7;
-                    $rightEdge = $pdf->get_width() - 28.35;
+                $fontSize = 7;
+                $rightEdge = $pdf->get_width() - 28.35;
 
-                    $pageLabel = "Page " . $PAGE_NUM . " of " . $PAGE_COUNT;
-                    $pageLabelWidth = $fontMetrics->get_text_width($pageLabel, $font, $fontSize);
-                    $pdf->text($rightEdge - $pageLabelWidth, 24, $pageLabel, $font, $fontSize, array(0.2, 0.2, 0.2));
+                $pageLabel = "Page " . $PAGE_NUM . " of " . $PAGE_COUNT;
+                $pageLabelWidth = $fontMetrics->get_text_width($pageLabel, $font, $fontSize);
+                $pdf->text($rightEdge - $pageLabelWidth, 24, $pageLabel, $font, $fontSize, array(0.2, 0.2, 0.2));
 
-                    $printedLabel = "Printed: " . {!! json_encode($printed_at) !!};
-                    $printedLabelWidth = $fontMetrics->get_text_width($printedLabel, $font, $fontSize);
-                    $pdf->text($rightEdge - $printedLabelWidth, 34, $printedLabel, $font, $fontSize, array(0.2, 0.2, 0.2));
-                ');
-            }
-        </script>
-    @endif
+                $printedLabel = "Printed: " . {!! json_encode($printed_at) !!};
+                $printedLabelWidth = $fontMetrics->get_text_width($printedLabel, $font, $fontSize);
+                $pdf->text($rightEdge - $printedLabelWidth, 34, $printedLabel, $font, $fontSize, array(0.2, 0.2, 0.2));
+            ');
+        }
+    </script>
 </body>
 </html>

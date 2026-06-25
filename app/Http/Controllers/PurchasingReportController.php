@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\PurchasingLeadTimeSpreadsheet;
 use App\Models\PrsItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -14,6 +15,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PurchasingReportController extends Controller
 {
+    private const LEAD_TIME_PDF_MAX_ROWS = 800;
+
+    private const LEAD_TIME_QUERY_CHUNK_SIZE = 500;
+
     public function index()
     {
         $canvassers = User::role('purchasing-staff')
@@ -465,6 +470,8 @@ class PurchasingReportController extends Controller
 
     public function purchasingLeadTime(Request $request)
     {
+        set_time_limit(300);
+
         $validated = $request->validate([
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
@@ -475,78 +482,31 @@ class PurchasingReportController extends Controller
         $dateFrom = Carbon::parse($validated['date_from'])->startOfDay();
         $dateTo = Carbon::parse($validated['date_to'])->endOfDay();
 
-        $rrRowsQuery = DB::table('prs_items as pi')
-            ->join('purchase_order_items as poi', 'poi.prs_item_id', '=', 'pi.id')
-            ->join('receiving_report_items as rri', 'rri.purchase_order_item_id', '=', 'poi.id')
-            ->join('receiving_reports as rr', 'rr.id', '=', 'rri.receiving_report_id')
-            ->whereNull('pi.deleted_at')
-            ->whereNull('rri.deleted_at')
-            ->whereNull('rr.deleted_at')
-            ->whereNotNull('pi.assigned_canvasser_at')
-            ->whereBetween('rr.created_at', [$dateFrom, $dateTo]);
+        if ($validated['format'] === 'pdf') {
+            $rowCount = $this->countPurchasingLeadTimeRows(
+                $dateFrom,
+                $dateTo,
+                $validated['canvasser_id'] ?? null
+            );
 
-        if (! empty($validated['canvasser_id'])) {
-            $rrRowsQuery->where('pi.canvasser_id', $validated['canvasser_id']);
+            if ($rowCount > self::LEAD_TIME_PDF_MAX_ROWS) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'format' => sprintf(
+                            'PDF tidak dapat dihasilkan karena data terlalu banyak (%s baris). Maksimal %s baris untuk PDF. Gunakan Export Excel atau persempit rentang tanggal.',
+                            number_format($rowCount),
+                            number_format(self::LEAD_TIME_PDF_MAX_ROWS)
+                        ),
+                    ]);
+            }
         }
 
-        $rrRows = $rrRowsQuery
-            ->select([
-                'pi.id as prs_item_id',
-                'rr.rr_number',
-                'rr.created_at as rr_date',
-            ])
-            ->orderBy('rr.created_at')
-            ->orderBy('pi.id')
-            ->get();
-
-        $rows = collect();
-
-        if ($rrRows->isNotEmpty()) {
-            $prsItems = PrsItem::with([
-                'prs',
-                'item.unit',
-                'canvasser',
-                'purchaseOrder.supplier',
-            ])
-                ->whereIn('id', $rrRows->pluck('prs_item_id')->unique())
-                ->get()
-                ->keyBy('id');
-
-            $rows = $rrRows->map(function ($rrRow) use ($prsItems) {
-                $prsItem = $prsItems->get($rrRow->prs_item_id);
-                if (! $prsItem) {
-                    return null;
-                }
-
-                $assignedAt = $prsItem->assigned_canvasser_at;
-                if (! $assignedAt) {
-                    return null;
-                }
-
-                $rrDate = Carbon::parse($rrRow->rr_date);
-                $leadTimeDays = $assignedAt->copy()->startOfDay()->diffInDays($rrDate->copy()->startOfDay());
-                $prs = $prsItem->prs;
-                $po = $prsItem->purchaseOrder;
-
-                return [
-                    'prs_id' => $prs?->id,
-                    'prs_number' => $prs?->prs_number,
-                    'prs_date' => $prs?->prs_date,
-                    'item_code' => $prsItem->item?->code,
-                    'item_name' => $prsItem->item?->name,
-                    'quantity' => $prsItem->quantity,
-                    'unit' => $prsItem->item?->unit?->name ?? '',
-                    'canvasser' => $prsItem->canvasser?->name,
-                    'assigned_canvasser_at' => $assignedAt,
-                    'po_number' => $po?->po_number,
-                    'po_date' => $po?->created_at,
-                    'supplier_name' => $po?->supplier?->name,
-                    'rr_number' => $rrRow->rr_number,
-                    'rr_date' => $rrDate,
-                    'lead_time_days' => $leadTimeDays,
-                ];
-            })->filter()->values();
-        }
+        $rows = $this->buildPurchasingLeadTimeRows(
+            $dateFrom,
+            $dateTo,
+            $validated['canvasser_id'] ?? null
+        );
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
@@ -554,11 +514,17 @@ class PurchasingReportController extends Controller
             'date_from' => $validated['date_from'],
             'date_to' => $validated['date_to'],
             'canvasser' => $this->canvasserName($validated['canvasser_id'] ?? null),
-            'logo_path' => $validated['format'] === 'excel'
-                ? url('assets/images/sinar.png')
-                : public_path('assets/images/sinar.png'),
+            'printed_at' => now()->format('d M Y H:i'),
             'rows' => $rows,
         ];
+
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('purchasing-lead-time-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new PurchasingLeadTimeSpreadsheet($data))->download($filename);
+        }
+
+        $data['logo_path'] = public_path('assets/images/sinar.png');
 
         return $this->exportReport(
             $validated['format'],
@@ -566,6 +532,122 @@ class PurchasingReportController extends Controller
             $data,
             'purchasing-lead-time'
         );
+    }
+
+    private function leadTimeReceivingReportIds(Carbon $dateFrom, Carbon $dateTo)
+    {
+        return DB::table('receiving_reports')
+            ->whereNull('deleted_at')
+            ->whereBetween('created_at', [$dateFrom, $dateTo])
+            ->pluck('id');
+    }
+
+    private function leadTimeRowsQuery($rrIds, ?int $canvasserId)
+    {
+        $query = DB::table('receiving_reports as rr')
+            ->whereIn('rr.id', $rrIds)
+            ->join('receiving_report_items as rri', function ($join) {
+                $join->on('rri.receiving_report_id', '=', 'rr.id')
+                    ->whereNull('rri.deleted_at');
+            })
+            ->join('purchase_order_items as poi', 'poi.id', '=', 'rri.purchase_order_item_id')
+            ->join('prs_items as pi', 'pi.id', '=', 'poi.prs_item_id')
+            ->join('prs', 'prs.id', '=', 'pi.prs_id')
+            ->join('items', 'items.id', '=', 'pi.item_id')
+            ->leftJoin('unit_of_measures as uom', 'uom.id', '=', 'items.unit_of_measure_id')
+            ->leftJoin('users as canvasser', 'canvasser.id', '=', 'pi.canvasser_id')
+            ->leftJoin('purchase_orders as po', 'po.id', '=', 'poi.purchase_order_id')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'po.supplier_id')
+            ->whereNull('pi.deleted_at')
+            ->whereNotNull('pi.assigned_canvasser_at');
+
+        if ($canvasserId) {
+            $query->where('pi.canvasser_id', $canvasserId);
+        }
+
+        return $query;
+    }
+
+    private function countPurchasingLeadTimeRows(Carbon $dateFrom, Carbon $dateTo, ?int $canvasserId): int
+    {
+        $rrIds = $this->leadTimeReceivingReportIds($dateFrom, $dateTo);
+
+        if ($rrIds->isEmpty()) {
+            return 0;
+        }
+
+        $total = 0;
+
+        foreach ($rrIds->chunk(self::LEAD_TIME_QUERY_CHUNK_SIZE) as $chunk) {
+            $total += $this->leadTimeRowsQuery($chunk, $canvasserId)->count();
+        }
+
+        return $total;
+    }
+
+    private function mapPurchasingLeadTimeRow(object $row): array
+    {
+        return [
+            'prs_id' => $row->prs_id,
+            'prs_number' => $row->prs_number,
+            'prs_date' => $row->prs_date,
+            'item_code' => $row->item_code,
+            'item_name' => $row->item_name,
+            'quantity' => $row->quantity,
+            'unit' => $row->unit ?? '',
+            'canvasser' => $row->canvasser,
+            'assigned_canvasser_at' => $row->assigned_canvasser_at,
+            'po_number' => $row->po_number,
+            'po_date' => $row->po_date,
+            'supplier_name' => $row->supplier_name,
+            'rr_number' => $row->rr_number,
+            'rr_date' => $row->rr_date,
+            'lead_time_days' => (int) $row->lead_time_days,
+        ];
+    }
+
+    private function buildPurchasingLeadTimeRows(Carbon $dateFrom, Carbon $dateTo, ?int $canvasserId)
+    {
+        $rrIds = $this->leadTimeReceivingReportIds($dateFrom, $dateTo);
+
+        if ($rrIds->isEmpty()) {
+            return collect();
+        }
+
+        $select = [
+            'prs.id as prs_id',
+            'prs.prs_number',
+            'prs.prs_date',
+            'items.code as item_code',
+            'items.name as item_name',
+            'pi.quantity',
+            'uom.name as unit',
+            'canvasser.name as canvasser',
+            'pi.assigned_canvasser_at',
+            'po.po_number',
+            'po.created_at as po_date',
+            'suppliers.name as supplier_name',
+            'rr.rr_number',
+            'rr.created_at as rr_date',
+            DB::raw('DATEDIFF(DATE(rr.created_at), DATE(pi.assigned_canvasser_at)) as lead_time_days'),
+        ];
+
+        $rows = collect();
+
+        foreach ($rrIds->chunk(self::LEAD_TIME_QUERY_CHUNK_SIZE) as $chunk) {
+            $batch = $this->leadTimeRowsQuery($chunk, $canvasserId)
+                ->select($select)
+                ->orderBy('rr.created_at')
+                ->orderBy('pi.id')
+                ->get()
+                ->map(fn ($row) => $this->mapPurchasingLeadTimeRow($row));
+
+            $rows = $rows->concat($batch);
+        }
+
+        return $rows
+            ->sortBy(fn (array $row) => [$row['rr_date'], $row['prs_id']])
+            ->values();
     }
 
     private function exportReport(string $format, string $view, array $data, string $filePrefix)
