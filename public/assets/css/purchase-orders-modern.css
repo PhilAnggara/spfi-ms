@@ -286,3 +286,148 @@
         min-height: auto;
     }
 }
+
+/* Supplier detail modal */
+.supplier-detail-panel,
+.supplier-summary-panel {
+    border: 1px solid #e3e8f0;
+    border-radius: 0.85rem;
+    background: #f8fafc;
+    padding: 1rem 1.1rem;
+}
+
+.supplier-detail-heading {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #3a4252;
+    margin-bottom: 0.85rem;
+}
+
+.supplier-info-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+}
+
+@media (min-width: 576px) {
+    .supplier-info-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.supplier-info-item {
+    min-width: 0;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #e8edf4;
+    border-radius: 0.65rem;
+    background: #fff;
+}
+
+.supplier-info-item--full {
+    grid-column: 1 / -1;
+}
+
+.supplier-info-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #7a8499;
+    margin-bottom: 0.35rem;
+}
+
+.supplier-info-label i {
+    width: 0.9rem;
+    text-align: center;
+    color: #1f7a8c;
+}
+
+.supplier-info-value {
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #2f3640;
+    line-height: 1.45;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.supplier-info-value a,
+.supplier-info-link {
+    color: #1f7a8c;
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.supplier-info-value a:hover,
+.supplier-info-link:hover {
+    text-decoration: underline;
+}
+
+#supplier-purchase-history-summary-body {
+    min-height: 4.5rem;
+}
+
+.supplier-summary-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.supplier-summary-body--stacked {
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+.supplier-summary-body .supplier-summary-card {
+    min-width: min(100%, 240px);
+    flex: 1 1 240px;
+}
+
+.supplier-summary-body--stacked .supplier-summary-card {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+}
+
+.supplier-summary-card {
+    border: 1px solid #e8edf4;
+    border-radius: 0.65rem;
+    background: #fff;
+    padding: 0.75rem 0.85rem;
+    height: 100%;
+}
+
+.supplier-summary-card-title {
+    font-weight: 700;
+    color: #2f3640;
+    margin-bottom: 0.5rem;
+}
+
+.supplier-summary-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem 0.75rem;
+}
+
+@media (max-width: 575px) {
+    .supplier-summary-metrics {
+        grid-template-columns: 1fr;
+    }
+}
+
+.supplier-summary-metric-label {
+    font-size: 0.72rem;
+    color: #7a8499;
+    margin-bottom: 0.1rem;
+}
+
+.supplier-summary-metric-value {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #2f3640;
+    word-break: break-word;
+}

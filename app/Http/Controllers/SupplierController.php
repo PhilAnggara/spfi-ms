@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class SupplierController extends Controller
@@ -15,9 +17,292 @@ class SupplierController extends Controller
      */
     public function index()
     {
-        $suppliers = Supplier::all()->sortDesc();
+        $editingSupplier = null;
+        $editingSupplierId = session('editing_supplier_id');
 
-        return view('pages.supplier', compact('suppliers'));
+        if ($editingSupplierId) {
+            $editingSupplier = Supplier::query()->find($editingSupplierId);
+        }
+
+        return view('pages.supplier', [
+            'editingSupplier' => $editingSupplier,
+            'filters' => [
+                'keyword' => request('keyword', ''),
+                'has_po' => request('has_po', ''),
+            ],
+            'canManageSuppliers' => auth()->user()?->hasRole('administrator') ?? false,
+            'canViewPurchaseOrders' => auth()->user()?->hasAnyRole([
+                'administrator',
+                'purchasing-staff',
+                'purchasing-manager',
+                'general-manager',
+            ]) ?? false,
+        ]);
+    }
+
+    /**
+     * Server-side datatable data.
+     */
+    public function datatable(Request $request)
+    {
+        $columns = [
+            'suppliers.id',
+            'suppliers.code',
+            'suppliers.name',
+            'suppliers.address',
+            'po_stats.po_count',
+            'amount_stats.total_amount',
+            'po_stats.last_po_date',
+        ];
+
+        $poStatsSubquery = DB::table('purchase_orders as po')
+            ->whereNull('po.deleted_at')
+            ->select([
+                'po.supplier_id',
+                DB::raw('COUNT(DISTINCT po.id) as po_count'),
+                DB::raw('MAX(po.created_at) as last_po_date'),
+            ])
+            ->groupBy('po.supplier_id');
+
+        $rankedAmountSql = '
+            SELECT po.supplier_id,
+                   c.code AS currency_code,
+                   SUM(poi.quantity * poi.unit_price) AS total_amount,
+                   ROW_NUMBER() OVER (PARTITION BY po.supplier_id ORDER BY SUM(poi.quantity * poi.unit_price) DESC) AS rn
+            FROM purchase_order_items poi
+            INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id AND po.deleted_at IS NULL
+            INNER JOIN currencies c ON c.id = po.currency_id
+            GROUP BY po.supplier_id, c.code
+        ';
+
+        $amountStatsSubquery = DB::table(DB::raw("({$rankedAmountSql}) as ranked_amounts"))
+            ->where('rn', 1)
+            ->select('supplier_id', 'currency_code', 'total_amount');
+
+        $baseQuery = Supplier::query()
+            ->leftJoinSub($poStatsSubquery, 'po_stats', 'po_stats.supplier_id', '=', 'suppliers.id')
+            ->leftJoinSub($amountStatsSubquery, 'amount_stats', 'amount_stats.supplier_id', '=', 'suppliers.id')
+            ->select([
+                'suppliers.id',
+                'suppliers.code',
+                'suppliers.name',
+                'suppliers.address',
+                'suppliers.phone',
+                'suppliers.fax',
+                'suppliers.email',
+                'suppliers.contact_person',
+                'suppliers.remarks',
+                'po_stats.po_count',
+                'po_stats.last_po_date',
+                'amount_stats.total_amount as primary_total_amount',
+                'amount_stats.currency_code as primary_total_currency',
+            ]);
+
+        $recordsTotal = Supplier::query()->count();
+
+        $searchValue = trim((string) ($request->input('keyword') ?: $request->input('search.value', '')));
+        if ($searchValue !== '') {
+            $baseQuery->where(function ($query) use ($searchValue) {
+                $likeValue = '%' . $searchValue . '%';
+                $query->where('suppliers.code', 'like', $likeValue)
+                    ->orWhere('suppliers.name', 'like', $likeValue)
+                    ->orWhere('suppliers.address', 'like', $likeValue)
+                    ->orWhere('suppliers.phone', 'like', $likeValue)
+                    ->orWhere('suppliers.email', 'like', $likeValue)
+                    ->orWhere('suppliers.contact_person', 'like', $likeValue);
+            });
+        }
+
+        if ($request->input('has_po') === '1') {
+            $baseQuery->where('po_stats.po_count', '>', 0);
+        } elseif ($request->input('has_po') === '0') {
+            $baseQuery->where(function ($query) {
+                $query->whereNull('po_stats.po_count')
+                    ->orWhere('po_stats.po_count', '=', 0);
+            });
+        }
+
+        $recordsFiltered = (clone $baseQuery)->count();
+
+        $orderColumnIndex = (int) $request->input('order.0.column', 0);
+        $orderDirection = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
+        $orderColumn = $columns[$orderColumnIndex] ?? 'suppliers.id';
+
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 10);
+        $length = $length > 0 ? $length : 10;
+
+        $rows = $baseQuery
+            ->orderBy($orderColumn, $orderDirection)
+            ->skip($start)
+            ->take($length)
+            ->get();
+
+        $supplierIds = $rows->pluck('id');
+
+        $purchaseTotalsBySupplier = $supplierIds->isEmpty()
+            ? collect()
+            : DB::table('purchase_order_items as poi')
+                ->join('purchase_orders as po', 'po.id', '=', 'poi.purchase_order_id')
+                ->join('currencies as c', 'c.id', '=', 'po.currency_id')
+                ->whereNull('po.deleted_at')
+                ->whereIn('po.supplier_id', $supplierIds)
+                ->groupBy('po.supplier_id', 'c.code')
+                ->orderBy('c.code')
+                ->select([
+                    'po.supplier_id',
+                    'c.code as currency',
+                    DB::raw('ROUND(SUM(poi.quantity * poi.unit_price), 2) as total_amount'),
+                ])
+                ->get()
+                ->groupBy('supplier_id');
+
+        $data = $rows->map(function ($row) use ($purchaseTotalsBySupplier) {
+            $purchaseTotals = ($purchaseTotalsBySupplier[$row->id] ?? collect())
+                ->map(fn ($totalRow) => [
+                    'currency' => $totalRow->currency,
+                    'total_amount' => $totalRow->total_amount !== null ? (float) $totalRow->total_amount : null,
+                ])
+                ->values();
+
+            return [
+                'id' => $row->id,
+                'code' => $row->code,
+                'name' => $row->name,
+                'address' => $row->address,
+                'phone' => $row->phone,
+                'fax' => $row->fax,
+                'email' => $row->email,
+                'contact_person' => $row->contact_person,
+                'remarks' => $row->remarks,
+                'po_count' => (int) ($row->po_count ?? 0),
+                'last_po_date' => $row->last_po_date,
+                'primary_total_amount' => $row->primary_total_amount !== null ? round((float) $row->primary_total_amount, 2) : null,
+                'primary_total_currency' => $row->primary_total_currency,
+                'purchase_totals' => $purchaseTotals,
+            ];
+        });
+
+        return response()->json([
+            'draw' => (int) $request->input('draw', 1),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
+        ]);
+    }
+
+    public function purchaseHistory(Request $request, Supplier $supplier)
+    {
+        $columns = [
+            'po.po_number',
+            'po.created_at',
+            'currencies.code',
+            'items.code',
+            'items.name',
+            'purchase_order_items.quantity',
+            'purchase_order_items.unit_price',
+            'canvasser',
+        ];
+
+        $baseQuery = PurchaseOrderItem::query()
+            ->join('purchase_orders as po', 'po.id', '=', 'purchase_order_items.purchase_order_id')
+            ->where('po.supplier_id', $supplier->id)
+            ->whereNull('po.deleted_at')
+            ->leftJoin('prs_items as pi', 'pi.id', '=', 'purchase_order_items.prs_item_id')
+            ->leftJoin('items', 'items.id', '=', 'purchase_order_items.item_id')
+            ->leftJoin('currencies', 'currencies.id', '=', 'po.currency_id')
+            ->leftJoin('users as prs_canvasser', 'prs_canvasser.id', '=', 'pi.canvasser_id')
+            ->leftJoin('users as po_creator', 'po_creator.id', '=', 'po.created_by')
+            ->select([
+                'purchase_order_items.id',
+                'po.id as purchase_order_id',
+                'po.po_number',
+                'po.created_at as po_date',
+                'currencies.code as currency',
+                'items.code as item_code',
+                'items.name as item_name',
+                'purchase_order_items.quantity',
+                'purchase_order_items.unit_price',
+                DB::raw('COALESCE(prs_canvasser.name, po_creator.name) as canvasser'),
+            ]);
+
+        $recordsTotal = PurchaseOrderItem::query()
+            ->whereHas('purchaseOrder', fn ($query) => $query
+                ->where('supplier_id', $supplier->id)
+                ->whereNull('deleted_at'))
+            ->count();
+
+        $searchValue = $request->input('search.value');
+        if ($searchValue) {
+            $likeValue = '%' . $searchValue . '%';
+            $baseQuery->where(function ($query) use ($likeValue) {
+                $query->where('po.po_number', 'like', $likeValue)
+                    ->orWhere('items.code', 'like', $likeValue)
+                    ->orWhere('items.name', 'like', $likeValue)
+                    ->orWhere('prs_canvasser.name', 'like', $likeValue)
+                    ->orWhere('po_creator.name', 'like', $likeValue);
+            });
+        }
+
+        $recordsFiltered = (clone $baseQuery)->count();
+
+        $avgUnitPrices = (clone $baseQuery)
+            ->reorder()
+            ->select([
+                'currencies.code as currency',
+                DB::raw('ROUND(SUM(purchase_order_items.quantity * purchase_order_items.unit_price) / NULLIF(SUM(purchase_order_items.quantity), 0), 2) as avg_unit_price'),
+                DB::raw('SUM(purchase_order_items.quantity) as total_qty'),
+                DB::raw('ROUND(SUM(purchase_order_items.quantity * purchase_order_items.unit_price), 2) as total_amount'),
+            ])
+            ->groupBy('currencies.code')
+            ->orderBy('currencies.code')
+            ->get()
+            ->map(fn ($row) => [
+                'currency' => $row->currency,
+                'avg_unit_price' => $row->avg_unit_price !== null ? (float) $row->avg_unit_price : null,
+                'total_qty' => (float) $row->total_qty,
+                'total_amount' => $row->total_amount !== null ? (float) $row->total_amount : null,
+            ])
+            ->values();
+
+        $orderColumnIndex = (int) $request->input('order.0.column', 1);
+        $orderDirection = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
+        $orderColumn = $columns[$orderColumnIndex] ?? 'po.created_at';
+
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 10);
+        $length = $length > 0 ? $length : 10;
+
+        if ($orderColumn === 'canvasser') {
+            $baseQuery->orderByRaw('COALESCE(prs_canvasser.name, po_creator.name) ' . $orderDirection);
+        } else {
+            $baseQuery->orderBy($orderColumn, $orderDirection);
+        }
+
+        $data = $baseQuery
+            ->skip($start)
+            ->take($length)
+            ->get()
+            ->map(fn ($row) => [
+                'id' => $row->id,
+                'purchase_order_id' => $row->purchase_order_id,
+                'po_number' => $row->po_number,
+                'po_date' => $row->po_date,
+                'currency' => $row->currency,
+                'item_code' => $row->item_code,
+                'item_name' => $row->item_name,
+                'quantity' => $row->quantity,
+                'unit_price' => $row->unit_price,
+                'canvasser' => $row->canvasser,
+            ]);
+
+        return response()->json([
+            'draw' => (int) $request->input('draw', 1),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'avgUnitPrices' => $avgUnitPrices,
+            'data' => $data,
+        ]);
     }
 
     /**
@@ -82,7 +367,6 @@ class SupplierController extends Controller
     {
         $supplier = Supplier::findOrFail($id);
 
-        // Flag for error-handling to reopen the correct modal
         $request->session()->flash('editing_supplier_id', $id);
 
         $request->validate([

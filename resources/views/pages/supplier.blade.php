@@ -2,122 +2,122 @@
 @section('title', ' | Supplier')
 
 @section('content')
-<div
-    class="page-heading"
-    data-modal-restore="true"
-    data-open-create-modal="{{ $errors->any() ? '1' : '0' }}"
-    data-edit-modal-id="{{ session('editing_supplier_id') ? 'edit-modal-' . session('editing_supplier_id') : '' }}"
-    data-create-modal-id="create-modal">
-    <div class="page-title">
-        <div class="row mb-4">
-            <div class="col-12 col-md-6 order-md-1">
-                <h3>Supplier</h3>
+<div id="supplier-page-container">
+<div class="page-heading po-page">
+    <div class="page-title mb-4">
+        <div class="row g-3 align-items-center">
+            <div class="col-12 col-lg-7">
+                <div class="po-hero">
+                    <h3 class="mb-1">Supplier</h3>
+                    <p class="text-muted mb-0">Browse suppliers with instant search, live filters, and purchase history for canvassing.</p>
+                </div>
             </div>
-            <div class="col-12 col-md-6 order-md-2">
-                <div class="float-md-end">
-                    <button type="button" class="btn btn-sm icon icon-left btn-outline-success" data-bs-toggle="modal" data-bs-target="#create-modal">
-                        <i class="fa-duotone fa-solid fa-plus"></i>
-                        Add Supplier
-                    </button>
+            @if ($canManageSuppliers)
+                <div class="col-12 col-lg-5">
+                    <div class="po-top-actions text-lg-end">
+                        <button type="button" class="btn btn-success icon icon-left" data-bs-toggle="modal" data-bs-target="#create-modal">
+                            <i class="fa-duotone fa-solid fa-plus"></i>
+                            Add Supplier
+                        </button>
+                    </div>
+                </div>
+            @endif
+        </div>
+    </div>
+
+    <section class="section">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end po-filter-grid" id="supplier-filter-form">
+                    <div class="col-12 col-md-6 col-xl-6">
+                        <label for="filter-supplier-keyword" class="form-label mb-1">Search Supplier</label>
+                        <input type="text" id="filter-supplier-keyword" class="form-control" value="{{ $filters['keyword'] }}" placeholder="Code / name / address / phone / email / contact">
+                    </div>
+                    <div class="col-6 col-md-3 col-xl-3">
+                        <label for="filter-supplier-has-po" class="form-label mb-1">PO History</label>
+                        <select id="filter-supplier-has-po" class="form-select">
+                            <option value="" @selected($filters['has_po'] === '')>All Suppliers</option>
+                            <option value="1" @selected($filters['has_po'] === '1')>With PO</option>
+                            <option value="0" @selected($filters['has_po'] === '0')>Without PO</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3 col-xl-3">
+                        <button type="button" id="reset-supplier-filter" class="btn btn-light-secondary w-100">
+                            <i class="fa-regular fa-rotate-left me-1"></i>
+                            Reset
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <section class="section">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <table class="table table-striped text-center text-nowrap" id="table1">
-                    <thead>
-                        <tr>
-                            <th class="text-center">Action</th>
-                            <th class="text-center">Code</th>
-                            <th class="text-center">Name</th>
-                            <th class="text-center">Address</th>
-                            <th class="text-center">Phone</th>
-                            <th class="text-center">Email</th>
-                            <th class="text-center">Contact Person</th>
-                            <th class="text-center">Created By</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($suppliers as $supplier)
-                            <tr>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $supplier->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
-                                            <i class="fa-light fa-edit text-primary"></i>
-                                        </button>
-                                        <button type="button" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete" onclick="hapusData({{ $supplier->id }}, 'Delete Supplier', 'Are you sure want to delete {{ $supplier->name }}?')">
-                                            <i class="fa-light fa-trash text-secondary"></i>
-                                        </button>
-                                        <form action="{{ route('supplier.destroy', $supplier->id) }}" id="hapus-{{ $supplier->id }}" method="POST">
-                                            @method('delete')
-                                            @csrf
-                                        </form>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $supplier->code }}')">{{ $supplier->code }}</span>
-                                </td>
-                                <td class="text-start">{{ $supplier->name }}</td>
-                                <td class="text-start">{{ $supplier->address }}</td>
-                                <td>
-                                    @if ($supplier->phone)
-                                        <i class="fa-light fa-phone"></i> {{ $supplier->phone }}
-                                    @else
-                                        -
-                                    @endif
-                                </td>
-                                <td>
-                                    @if ($supplier->email)
-                                        <a href="mailto:{{ $supplier->email }}" target="_blank" class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill">
-                                            <i class="far fa-envelope text-danger"></i>
-                                            {{ $supplier->email }}
-                                        </a>
-                                    @else
-                                        -
-                                    @endif
-                                </td>
-                                <td>
-                                    @if ($supplier->contact_person)
-                                        <i class="fa-duotone fa-light fa-address-card"></i>
-                                        {{ $supplier->contact_person }}
-                                    @else
-                                        -
-                                    @endif
-                                </td>
-                                <td>
-                                    <small>
-                                        <i class="fa-regular fa-user-pen"></i>
-                                        {{ $supplier->creator->name ?? '-' }}
-                                    </small>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+
+        <div id="supplier-page-results">
+            <div class="card shadow-sm border-0">
+                <div class="card-body position-relative">
+                    <div id="supplier-page-loading" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 align-items-center justify-content-center" style="z-index: 20;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                            <div class="mt-2 text-muted">Loading data...</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                        <h5 class="card-title mb-0">Supplier List</h5>
+                        <span class="badge bg-light-primary" id="supplier-filter-result">0 records</span>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table
+                            class="table table-striped align-middle po-table text-nowrap w-100"
+                            id="supplier-table"
+                            data-source="{{ route('supplier.datatables') }}"
+                            data-csrf-token="{{ csrf_token() }}"
+                            data-update-route-template="{{ route('supplier.update', '__ID__') }}"
+                            data-destroy-route-template="{{ route('supplier.destroy', '__ID__') }}"
+                            data-history-route-template="{{ route('supplier.purchase-history', '__ID__') }}"
+                            data-po-show-route-template="{{ route('purchase-orders.show', '__ID__') }}"
+                            data-can-manage="{{ $canManageSuppliers ? '1' : '0' }}"
+                            data-can-view-po="{{ $canViewPurchaseOrders ? '1' : '0' }}"
+                            data-open-create-modal="{{ $errors->any() && !session('editing_supplier_id') ? '1' : '0' }}"
+                            data-editing-supplier-id="{{ (string) session('editing_supplier_id', '') }}">
+                            <thead>
+                                <tr>
+                                    <th class="d-none">ID</th>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Address</th>
+                                    <th class="text-end">PO Count</th>
+                                    <th class="text-end">Total Amount</th>
+                                    <th>Last PO Date</th>
+                                    <th class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
-
     </section>
 </div>
-@include('includes.modals.supplier-modal')
+</div>
+
+@if ($canManageSuppliers)
+    @include('includes.modals.supplier-modal')
+@endif
+@include('includes.modals.supplier-purchase-history-modal')
 @endsection
 
-@push('prepend-style')
-    <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
-@endpush
 @push('addon-style')
-    <link rel="stylesheet" href="{{ url('assets/extensions/simple-datatables/style.css') }}">
-    <link rel="stylesheet" href="{{ url('assets/compiled/css/table-datatable.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
 @endpush
 @push('addon-script')
-    <script src="{{ url('assets/extensions/simple-datatables/umd/simple-datatables.js') }}"></script>
-    <script src="{{ url('assets/scripts/simple-datatables.js') }}"></script>
-    <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
-    <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 @endpush
 
 @push('addon-script')
-    <script src="{{ url('assets/scripts/modules/master-modal-restore.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/supplier-index.js') }}"></script>
 @endpush

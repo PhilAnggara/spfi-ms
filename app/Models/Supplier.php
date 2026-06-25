@@ -33,4 +33,9 @@ class Supplier extends Model
     {
         return $this->belongsTo(User::class, 'updated_by', 'id');
     }
+
+    public function purchaseOrders()
+    {
+        return $this->hasMany(PurchaseOrder::class, 'supplier_id');
+    }
 }

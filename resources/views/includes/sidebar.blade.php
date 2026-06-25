@@ -248,6 +248,21 @@
                             </li>
                         @endrole
 
+                        @role('purchasing-staff|purchasing-manager')
+                            <li class="sidebar-item {{ Request::is('master/product') ? 'active' : '' }}">
+                                <a href="{{ route('product.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-boxes-stacked {{ Request::is('master/product') ? 'fa-fade' : '' }}"></i>
+                                    <span>Product Lookup</span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item {{ Request::is('master/supplier') ? 'active' : '' }}">
+                                <a href="{{ route('supplier.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-truck-field {{ Request::is('master/supplier') ? 'fa-fade' : '' }}"></i>
+                                    <span>Supplier Lookup</span>
+                                </a>
+                            </li>
+                        @endrole
+
                         @role('administrator|purchasing-manager')
                             <li class="sidebar-item {{ Request::is('accounting/reports') ? 'active' : '' }}">
                                 <a href="{{ route('accounting.reports.index') }}" class='sidebar-link'>

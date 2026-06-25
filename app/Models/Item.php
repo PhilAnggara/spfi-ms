@@ -33,4 +33,9 @@ class Item extends Model
     {
         return $this->belongsTo(ItemCategory::class, 'category_id')->withTrashed();
     }
+
+    public function purchaseOrderItems()
+    {
+        return $this->hasMany(PurchaseOrderItem::class, 'item_id');
+    }
 }
