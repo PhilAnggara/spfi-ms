@@ -7,7 +7,7 @@ use App\Models\PrsItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\User;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\PdfReport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -94,7 +94,8 @@ class PurchasingReportController extends Controller
             $validated['format'],
             'exports.prs-not-yet-po',
             $data,
-            'prs-not-yet-po'
+            'prs-not-yet-po',
+            'pdf.reports.prs-not-yet-po'
         );
     }
 
@@ -168,7 +169,8 @@ class PurchasingReportController extends Controller
             $validated['format'],
             'exports.po-not-yet-delivered',
             $data,
-            'po-not-yet-delivered'
+            'po-not-yet-delivered',
+            'pdf.reports.po-not-yet-delivered'
         );
     }
 
@@ -244,7 +246,8 @@ class PurchasingReportController extends Controller
             $validated['format'],
             'exports.po-registered-period',
             $data,
-            'po-registered-period'
+            'po-registered-period',
+            'pdf.reports.po-registered-period'
         );
     }
 
@@ -326,7 +329,8 @@ class PurchasingReportController extends Controller
             $validated['format'],
             'exports.po-registered-department',
             $data,
-            'po-registered-department'
+            'po-registered-department',
+            'pdf.reports.po-registered-department'
         );
     }
 
@@ -403,7 +407,8 @@ class PurchasingReportController extends Controller
             $validated['format'],
             'exports.po-registered-item',
             $data,
-            'po-registered-item'
+            'po-registered-item',
+            'pdf.reports.po-registered-item'
         );
     }
 
@@ -464,7 +469,8 @@ class PurchasingReportController extends Controller
             $validated['format'],
             'exports.po-registered-supplier',
             $data,
-            'po-registered-supplier'
+            'po-registered-supplier',
+            'pdf.reports.po-registered-supplier'
         );
     }
 
@@ -524,14 +530,9 @@ class PurchasingReportController extends Controller
             return (new PurchasingLeadTimeSpreadsheet($data))->download($filename);
         }
 
-        $data['logo_path'] = public_path('assets/images/sinar.png');
+        $filename = sprintf('purchasing-lead-time-%s.pdf', now()->format('Ymd-His'));
 
-        return $this->exportReport(
-            $validated['format'],
-            'exports.purchasing-lead-time',
-            $data,
-            'purchasing-lead-time'
-        );
+        return PdfReport::analytical('pdf.reports.purchasing-lead-time', $data, $filename);
     }
 
     private function leadTimeReceivingReportIds(Carbon $dateFrom, Carbon $dateTo)
@@ -650,21 +651,20 @@ class PurchasingReportController extends Controller
             ->values();
     }
 
-    private function exportReport(string $format, string $view, array $data, string $filePrefix)
-    {
-        $data['format'] = $format;
-        $data['printed_at'] = $data['printed_at'] ?? now()->format('d-m-Y H:i');
-
+    private function exportReport(
+        string $format,
+        string $excelView,
+        array $data,
+        string $filePrefix,
+        string $pdfView
+    ) {
         if ($format === 'excel') {
-            return $this->streamExcel($filePrefix, $view, $data);
+            return $this->streamExcel($filePrefix, $excelView, $data);
         }
 
         $filename = sprintf('%s-%s.pdf', $filePrefix, now()->format('Ymd-His'));
 
-        return Pdf::loadView($view, $data)
-            ->setPaper('a4', 'landscape')
-            ->setOption('isPhpEnabled', true)
-            ->stream($filename);
+        return PdfReport::analytical($pdfView, $data, $filename);
     }
 
     private function streamExcel(string $filePrefix, string $view, array $data): StreamedResponse

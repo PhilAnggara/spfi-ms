@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Item;
 use App\Models\ReceivingReportItem;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\PdfReport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -84,7 +84,7 @@ class AccountingReportController extends Controller
             'exports.accounting-stock-card',
             $data,
             'accounting-stock-card',
-            'portrait'
+            'pdf.reports.accounting-stock-card'
         );
     }
 
@@ -155,7 +155,8 @@ class AccountingReportController extends Controller
             $validated['format'],
             'exports.accounting-stock-card',
             $data,
-            'accounting-transaction-report'
+            'accounting-transaction-report',
+            'pdf.reports.accounting-stock-card'
         );
 
         // Implementation will be added later
@@ -228,7 +229,8 @@ class AccountingReportController extends Controller
             $validated['format'],
             'exports.accounting-stock-card',
             $data,
-            'accounting-restatement'
+            'accounting-restatement',
+            'pdf.reports.accounting-stock-card'
         );
 
         // Implementation will be added later
@@ -301,7 +303,8 @@ class AccountingReportController extends Controller
             $validated['format'],
             'exports.accounting-stock-card',
             $data,
-            'accounting-stock-card-count'
+            'accounting-stock-card-count',
+            'pdf.reports.accounting-stock-card'
         );
 
         return response()->json([
@@ -363,7 +366,7 @@ class AccountingReportController extends Controller
             'exports.accounting-document-summary',
             $data,
             'accounting-document-summary',
-            'portrait'
+            'pdf.reports.accounting-document-summary'
         );
     }
 
@@ -431,21 +434,25 @@ class AccountingReportController extends Controller
             $validated['format'],
             'exports.accounting-purchase-report',
             $data,
-            'accounting-purchase-report'
+            'accounting-purchase-report',
+            'pdf.reports.accounting-purchase-report'
         );
     }
 
-    private function exportReport(string $format, string $view, array $data, string $filePrefix, string $orientation = 'landscape')
-    {
+    private function exportReport(
+        string $format,
+        string $excelView,
+        array $data,
+        string $filePrefix,
+        string $pdfView
+    ) {
         if ($format === 'excel') {
-            return $this->streamExcel($filePrefix, $view, $data);
+            return $this->streamExcel($filePrefix, $excelView, $data);
         }
 
         $filename = sprintf('%s-%s.pdf', $filePrefix, now()->format('Ymd-His'));
 
-        return Pdf::loadView($view, $data)
-            ->setPaper('a4', $orientation)
-            ->stream($filename);
+        return PdfReport::analytical($pdfView, $data, $filename);
     }
 
     private function streamExcel(string $filePrefix, string $view, array $data): StreamedResponse
