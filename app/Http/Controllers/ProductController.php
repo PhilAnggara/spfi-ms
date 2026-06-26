@@ -2,17 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\PurchaseOrderItem;
 use App\Models\UnitOfMeasure;
+use App\Support\Concerns\PaginatesLegacySqlServer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
+    use PaginatesLegacySqlServer;
+
     /**
      * Display a listing of the resource.
      */
@@ -105,7 +107,7 @@ class ProductController extends Controller
         $searchValue = trim((string) ($request->input('keyword') ?: $request->input('search.value', '')));
         if ($searchValue !== '') {
             $baseQuery->where(function ($query) use ($searchValue) {
-                $likeValue = '%' . $searchValue . '%';
+                $likeValue = '%'.$searchValue.'%';
                 $query->where('items.code', 'like', $likeValue)
                     ->orWhere('items.name', 'like', $likeValue)
                     ->orWhere('unit_of_measures.name', 'like', $likeValue)
@@ -127,7 +129,7 @@ class ProductController extends Controller
         }
 
         // Total data setelah filter
-        $recordsFiltered = (clone $baseQuery)->count();
+        $recordsFiltered = (clone $baseQuery)->reorder()->count();
 
         // Sorting yang dikirim DataTables (default id desc di sisi client)
         $orderColumnIndex = (int) $request->input('order.0.column', 0);
@@ -139,11 +141,19 @@ class ProductController extends Controller
         $length = (int) $request->input('length', 10);
         $length = $length > 0 ? $length : 10;
 
-        $data = $baseQuery
-            ->orderBy($orderColumn, $orderDirection)
-            ->skip($start)
-            ->take($length)
-            ->get()
+        $orderBySql = $this->buildDataTableOrderBySql($orderColumn, $orderDirection, 'items.id');
+
+        if (! $this->isSqlServerConnection()) {
+            $baseQuery->orderBy($orderColumn, $orderDirection);
+        }
+
+        $data = $this->sliceEloquentQueryForDataTables(
+            $baseQuery,
+            'items.id',
+            $orderBySql,
+            $start,
+            $length
+        )
             ->map(fn ($row) => [
                 'id' => $row->id,
                 'code' => $row->code,
@@ -208,7 +218,7 @@ class ProductController extends Controller
 
         $searchValue = $request->input('search.value');
         if ($searchValue) {
-            $likeValue = '%' . $searchValue . '%';
+            $likeValue = '%'.$searchValue.'%';
             $baseQuery->where(function ($query) use ($likeValue) {
                 $query->where('po.po_number', 'like', $likeValue)
                     ->orWhere('suppliers.code', 'like', $likeValue)
@@ -246,7 +256,7 @@ class ProductController extends Controller
         $length = $length > 0 ? $length : 10;
 
         if ($orderColumn === 'canvasser') {
-            $baseQuery->orderByRaw('COALESCE(prs_canvasser.name, po_creator.name) ' . $orderDirection);
+            $baseQuery->orderByRaw('COALESCE(prs_canvasser.name, po_creator.name) '.$orderDirection);
         } else {
             $baseQuery->orderBy($orderColumn, $orderDirection);
         }
@@ -367,6 +377,6 @@ class ProductController extends Controller
         $itemName = $item->name;
         $item->delete();
 
-        return redirect()->back()->with('success', 'Product ' . $itemName . ' has been deleted successfully.');
+        return redirect()->back()->with('success', 'Product '.$itemName.' has been deleted successfully.');
     }
 }
