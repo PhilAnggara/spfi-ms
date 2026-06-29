@@ -147,6 +147,9 @@
                                                             <i class="fa-light fa-pen-to-square"></i>
                                                         </a>
                                                         @if (!$prsItem->purchase_order_id)
+                                                            <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#canvasser-hold-modal-{{ $prsItem->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Request Quantity Revision">
+                                                                <i class="fa-light fa-circle-pause text-warning"></i>
+                                                            </button>
                                                             <form action="{{ route('canvassing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
                                                                 @csrf
                                                                 <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">
@@ -172,6 +175,33 @@
             </div>
         </section>
     </div>
+
+    @foreach ($prsItems as $prsItem)
+        <div class="modal fade" id="canvasser-hold-modal-{{ $prsItem->id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form action="{{ route('canvassing.hold', $prsItem->id) }}" method="POST">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title">Request Quantity Revision</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted small">This will hold the entire PRS so the requester can adjust quantities only.</p>
+                            <div class="form-group">
+                                <label for="hold-message-{{ $prsItem->id }}" class="form-label">Reason</label>
+                                <textarea id="hold-message-{{ $prsItem->id }}" name="message" class="form-control" rows="4" required placeholder="Explain why the requested item/specification needs quantity revision"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-warning">Submit Hold</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endforeach
 </div>
 @endsection
 

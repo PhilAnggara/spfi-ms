@@ -12,8 +12,9 @@ class Prs extends Model
     use SoftDeletes;
 
     protected $table = 'prs';
+
     protected $guarded = [
-        'id'
+        'id',
     ];
 
     protected $casts = [
@@ -22,6 +23,7 @@ class Prs extends Model
         'department_id' => 'integer',
         'is_capex' => 'boolean',
     ];
+
     protected $hidden = [
 
     ];
@@ -30,14 +32,17 @@ class Prs extends Model
     {
         return $this->hasMany(PrsItem::class, 'prs_id', 'id');
     }
+
     public function logs()
     {
         return $this->hasMany(PrsLog::class, 'prs_id', 'id');
     }
+
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
     }
+
     public function department()
     {
         return $this->belongsTo(Department::class, 'department_id', 'id');
@@ -78,7 +83,8 @@ class Prs extends Model
         }
 
         $totalProgress = $items->sum('delivery_progress');
-        return (int)($totalProgress / $items->count());
+
+        return (int) ($totalProgress / $items->count());
     }
 
     /**
@@ -104,5 +110,22 @@ class Prs extends Model
     public function checkAndUpdateDeliveryStatus()
     {
         return $this->isDeliveryComplete();
+    }
+
+    public function isCanvasserHold(): bool
+    {
+        return $this->status === 'CANVASSER_HOLD';
+    }
+
+    public function latestCanvasserHoldLog(): ?PrsLog
+    {
+        return $this->logs
+            ->firstWhere('action', 'CANVASSER_HOLD');
+    }
+
+    public function latestPurchasingHoldLog(): ?PrsLog
+    {
+        return $this->logs
+            ->firstWhere('action', 'HOLD');
     }
 }

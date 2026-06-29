@@ -9,6 +9,7 @@ use App\Models\Prs;
 use App\Models\PrsItem;
 use App\Models\User;
 use App\Notifications\PrsSubmittedNotification;
+use App\Services\NotificationRecipientService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\UsesSmartCatalogSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -209,8 +210,16 @@ class PrsController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $prs = Prs::findOrFail($id);
+        $prs = Prs::with('items')->findOrFail($id);
         $this->ensureUserCanManagePrs($request, $prs);
+
+        if ($prs->status === 'CANVASSER_HOLD') {
+            return $this->updateCanvasserHoldQuantities($request, $prs);
+        }
+
+        if (! in_array($prs->status, ['REQUESTED', 'ON_HOLD', 'REVISED'], true)) {
+            abort(403, 'This PRS cannot be edited in its current status.');
+        }
 
         $validated = $request->validate([
             'department_id' => ['required', 'exists:departments,id'],
@@ -240,7 +249,6 @@ class PrsController extends Controller
 
         $prs->save();
 
-        // Reset items then re-create based on submitted rows
         PrsItem::where('prs_id', $prs->id)->delete();
 
         foreach ($validated['prsItems'] as $itemRow) {
@@ -263,6 +271,74 @@ class PrsController extends Controller
         }
 
         return redirect()->back()->with('success', 'PRS has been updated successfully.');
+    }
+
+    private function updateCanvasserHoldQuantities(Request $request, Prs $prs)
+    {
+        $validated = $request->validate([
+            'prsItems' => ['required', 'array', 'min:1'],
+            'prsItems.*.prs_item_id' => ['required', 'integer', 'distinct'],
+            'prsItems.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'prsItems.*.quantity' => ['required', 'numeric', 'min:1'],
+        ]);
+
+        $existingItems = $prs->items->keyBy('id');
+
+        if (count($validated['prsItems']) !== $existingItems->count()) {
+            return redirect()->back()->withErrors(['prsItems' => 'Item list cannot be changed during quantity revision.']);
+        }
+
+        foreach ($validated['prsItems'] as $row) {
+            $prsItemId = (int) $row['prs_item_id'];
+            $existing = $existingItems->get($prsItemId);
+
+            if (! $existing) {
+                return redirect()->back()->withErrors(['prsItems' => 'Invalid PRS item submitted.']);
+            }
+
+            if ((int) $existing->item_id !== (int) $row['item_id']) {
+                return redirect()->back()->withErrors(['prsItems' => 'Items cannot be changed during quantity revision.']);
+            }
+
+            $existing->update([
+                'quantity' => $row['quantity'],
+            ]);
+        }
+
+        $previousStatus = $prs->status;
+        $prs->status = 'CANVASSING';
+        $prs->save();
+
+        $prs->logs()->create([
+            'user_id' => $request->user()?->id,
+            'action' => 'QUANTITY_REVISED',
+            'message' => 'PRS quantities updated after canvasser hold.',
+            'meta' => [
+                'previous_status' => $previousStatus,
+                'quantities' => collect($validated['prsItems'])
+                    ->mapWithKeys(fn (array $row) => [(int) $row['prs_item_id'] => (float) $row['quantity']])
+                    ->all(),
+            ],
+        ]);
+
+        $canvassers = User::query()
+            ->whereIn('id', $prs->items()->whereNotNull('canvasser_id')->pluck('canvasser_id'))
+            ->get();
+
+        app(NotificationRecipientService::class)->notify($canvassers, [
+            'type' => 'prs_quantity_revised',
+            'title' => 'PRS Quantities Revised',
+            'message' => 'PRS #'.$prs->prs_number.' quantities have been revised and returned to canvassing.',
+            'action_url' => '/canvassing',
+            'icon' => 'fa-light fa-badge-check',
+            'icon_color' => 'bg-success',
+            'meta' => [
+                'prs_id' => $prs->id,
+                'previous_status' => $previousStatus,
+            ],
+        ]);
+
+        return redirect()->back()->with('success', 'PRS quantities have been updated and returned to canvassing.');
     }
 
     /**
@@ -289,12 +365,11 @@ class PrsController extends Controller
         $prs = Prs::with(['user', 'department', 'items.item'])->findOrFail($id);
 
         // Ubah status kembali ke tahap pengajuan setelah perbaikan dari hold.
-        if ($prs->status === 'DRAFT' || $prs->status === 'ON_HOLD') {
+        if ($prs->status === 'ON_HOLD') {
             $previousStatus = $prs->status;
             $prs->status = 'REQUESTED';
             $prs->save();
 
-            // Log perubahan status jika sebelumnya DRAFT atau ON_HOLD
             $prs->logs()->create([
                 'user_id' => Auth::id(),
                 'action' => 'REQUEST',
@@ -563,7 +638,7 @@ class PrsController extends Controller
             $itemsById = Prs::with([
                 'department',
                 'user',
-                'items.item',
+                'items.item.unit',
                 'items.canvasser',
                 'items.canvassingItems',
                 'items.selectedCanvassingItem',

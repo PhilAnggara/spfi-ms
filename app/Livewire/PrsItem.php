@@ -4,35 +4,39 @@ namespace App\Livewire;
 
 use App\Models\Item;
 use Illuminate\Support\Str;
-use Livewire\Component;
 use Livewire\Attributes\On;
+use Livewire\Component;
 
 class PrsItem extends Component
 {
     public $prsItems = [];
+
     public $mode = 'form';
 
-    public function mount($existingItems = [], $mode = 'form')
+    public string $contextId = '';
+
+    public function mount($existingItems = [], $mode = 'form', string $contextId = '')
     {
         $this->mode = $mode;
+        $this->contextId = $contextId;
 
-        // When editing, seed with existing PRS items; otherwise start with one empty row
         if ($existingItems instanceof \Illuminate\Support\Collection) {
-            $existingItems = $existingItems->load('item');
+            $existingItems = $existingItems->load(['item.unit']);
         }
 
-        if (!empty($existingItems)) {
+        if (! empty($existingItems)) {
             foreach ($existingItems as $existing) {
                 $itemModel = $existing->item ?? null;
 
                 $this->prsItems[] = [
-                    'row_id'        => $existing->id ?? (string) Str::uuid(),
-                    'item_id'       => $existing->item_id ?? null,
-                    'item_code'     => $itemModel->code ?? '',
-                    'item_name'     => $itemModel->name ?? '',
+                    'prs_item_id' => $existing->id ?? null,
+                    'row_id' => $existing->id ?? (string) Str::uuid(),
+                    'item_id' => $existing->item_id ?? null,
+                    'item_code' => $itemModel->code ?? '',
+                    'item_name' => $itemModel->name ?? '',
                     'stock_on_hand' => $itemModel->stock_on_hand ?? 0,
-                    'unit'          => $itemModel?->unit?->name ?? 'PCS',
-                    'quantity'      => $existing->quantity ?? 1,
+                    'unit' => $itemModel?->unit?->name ?? 'PCS',
+                    'quantity' => $existing->quantity ?? 1,
                 ];
             }
             $this->updateCartCount();
@@ -47,19 +51,18 @@ class PrsItem extends Component
 
     public function addPrsItem()
     {
-        // Each row carries a UUID to keep wire:key stable even after deletions
         $this->prsItems[] = [
-            'row_id'        => (string) Str::uuid(),
-            'item_id'       => null,
-            'item_code'     => '',
-            'item_name'     => '',
+            'prs_item_id' => null,
+            'row_id' => (string) Str::uuid(),
+            'item_id' => null,
+            'item_code' => '',
+            'item_name' => '',
             'stock_on_hand' => 0,
-            'unit'          => 'PCS',
-            'quantity'      => 1,
+            'unit' => 'PCS',
+            'quantity' => 1,
         ];
 
-        // Re-init Choices.js after Livewire DOM changes
-        $this->dispatch('choices:refresh');
+        $this->dispatch('choices:refresh', contextId: $this->contextId);
         $this->updateCartCount();
     }
 
@@ -68,14 +71,13 @@ class PrsItem extends Component
         unset($this->prsItems[$index]);
         $this->prsItems = array_values($this->prsItems);
 
-        // Keep dropdowns in sync after a row is removed
-        $this->dispatch('choices:refresh');
+        $this->dispatch('choices:refresh', contextId: $this->contextId);
         $this->updateCartCount();
     }
 
     public function incrementQuantity($index)
     {
-        if (!isset($this->prsItems[$index])) {
+        if (! isset($this->prsItems[$index])) {
             return;
         }
 
@@ -86,7 +88,7 @@ class PrsItem extends Component
 
     public function decrementQuantity($index)
     {
-        if (!isset($this->prsItems[$index])) {
+        if (! isset($this->prsItems[$index])) {
             return;
         }
 
@@ -97,7 +99,7 @@ class PrsItem extends Component
 
     public function addFromCatalog($itemId, $quantity = 1)
     {
-        if (!$itemId || !is_numeric($itemId)) {
+        if (! $itemId || ! is_numeric($itemId)) {
             return;
         }
 
@@ -107,7 +109,7 @@ class PrsItem extends Component
         }
 
         $item = Item::query()->where('is_active', true)->find($itemId);
-        if (!$item) {
+        if (! $item) {
             return;
         }
 
@@ -115,18 +117,20 @@ class PrsItem extends Component
             if (($row['item_id'] ?? null) == $item->id) {
                 $this->prsItems[$index]['quantity'] = $quantity;
                 $this->updateCartCount();
+
                 return;
             }
         }
 
         $this->prsItems[] = [
-            'row_id'        => (string) Str::uuid(),
-            'item_id'       => $item->id,
-            'item_code'     => $item->code,
-            'item_name'     => $item->name,
+            'prs_item_id' => null,
+            'row_id' => (string) Str::uuid(),
+            'item_id' => $item->id,
+            'item_code' => $item->code,
+            'item_name' => $item->name,
             'stock_on_hand' => $item->stock_on_hand ?? 0,
-            'unit'          => $item->unit?->name ?? 'PCS',
-            'quantity'      => $quantity,
+            'unit' => $item->unit?->name ?? 'PCS',
+            'quantity' => $quantity,
         ];
 
         $this->updateCartCount();
@@ -138,12 +142,10 @@ class PrsItem extends Component
             $this->updateCartCount();
         }
 
-        // React only when item_id changes on any row
         if (preg_match('/prsItems\.(\d+)\.item_id/', $property, $matches)) {
             $index = (int) $matches[1];
             $itemId = $this->prsItems[$index]['item_id'] ?? null;
 
-            // Guard: Livewire can momentarily send arrays when two selects bind the same model
             if (is_array($itemId)) {
                 $itemId = null;
                 $this->prsItems[$index]['item_id'] = null;
@@ -152,7 +154,6 @@ class PrsItem extends Component
             if ($itemId && is_numeric($itemId)) {
                 $item = Item::query()->find($itemId);
                 if ($item) {
-                    // Populate the row with the selected item's fields
                     $this->prsItems[$index]['item_code'] = $item->code;
                     $this->prsItems[$index]['item_name'] = $item->name;
                     $this->prsItems[$index]['stock_on_hand'] = $item->stock_on_hand;
@@ -160,15 +161,13 @@ class PrsItem extends Component
                 }
             }
 
-            // Refresh Choices.js because options may change (due to exclusion)
-            $this->dispatch('choices:refresh');
+            $this->dispatch('choices:refresh', contextId: $this->contextId);
         }
     }
 
     #[On('updateItemSelect')]
     public function updateItemSelect($index, $itemId)
     {
-        // Called from JS when Choices.js selection changes
         if (isset($this->prsItems[$index]) && $itemId && is_numeric($itemId)) {
             $item = Item::query()->find($itemId);
             if ($item) {
@@ -180,8 +179,7 @@ class PrsItem extends Component
             }
         }
 
-        // Trigger UI refresh for other dropdowns
-        $this->dispatch('choices:refresh');
+        $this->dispatch('choices:refresh', contextId: $this->contextId);
     }
 
     public function getAvailableItems($index)
@@ -190,13 +188,24 @@ class PrsItem extends Component
 
         foreach ($this->prsItems as $key => $item) {
             if ($key !== $index && isset($item['item_id']) && $item['item_id']) {
-                $selectedItemIds[] = $item['item_id'];
+                $selectedItemIds[] = (int) $item['item_id'];
             }
         }
 
-        // Exclude items already chosen in other rows to prevent duplicates
+        $currentItemId = isset($this->prsItems[$index]['item_id']) && $this->prsItems[$index]['item_id']
+            ? (int) $this->prsItems[$index]['item_id']
+            : null;
+
         return Item::query()
-            ->whereNotIn('id', $selectedItemIds)->limit(100)
+            ->where('is_active', true)
+            ->where(function ($query) use ($selectedItemIds, $currentItemId) {
+                $query->whereNotIn('id', $selectedItemIds);
+
+                if ($currentItemId) {
+                    $query->orWhere('id', $currentItemId);
+                }
+            })
+            ->orderBy('code')
             ->get();
     }
 

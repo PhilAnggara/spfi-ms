@@ -283,9 +283,9 @@
                             $headerStatusIcon = status_badge_icon($item->status);
 
                             $headerProgress = match ($item->status) {
-                                'DRAFT' => 0,
                                 'REQUESTED' => 15,
                                 'ON_HOLD' => 15,
+                                'CANVASSER_HOLD' => 45,
                                 'REVISED' => 30,
                                 'CANVASSING' => 50,
                                 'PO_CREATED' => 70,

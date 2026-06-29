@@ -15,7 +15,8 @@
             <div class="modal-body">
 
                 @php
-                    $holdLog = $item->logs?->firstWhere('action', 'HOLD');
+                    $holdLog = $item->latestPurchasingHoldLog();
+                    $canvasserHoldLog = $item->latestCanvasserHoldLog();
                     $isDeliveryPhase = in_array($item->status, ['PO_CREATED', 'APPROVED', 'DELIVERY_COMPLETE'], true);
                     $deliveryProgressRaw = max(0, min(100, (int) $item->overall_delivery_progress));
 
@@ -47,9 +48,9 @@
                         $headerStatusIcon = status_badge_icon($item->status);
 
                         $headerProgress = match ($item->status) {
-                            'DRAFT' => 0,
                             'REQUESTED' => 15,
                             'ON_HOLD' => 15,
+                            'CANVASSER_HOLD' => 45,
                             'REVISED' => 30,
                             'CANVASSING' => 50,
                             'PO_CREATED' => 70,
@@ -134,6 +135,12 @@
                 @if ($item->status === 'ON_HOLD' && $holdLog)
                     <div class="alert alert-warning" role="alert">
                         <strong>Hold Reason:</strong> {{ $holdLog->message }}
+                    </div>
+                @endif
+
+                @if ($item->status === 'CANVASSER_HOLD' && $canvasserHoldLog)
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Canvasser Hold Reason:</strong> {{ $canvasserHoldLog->message }}
                     </div>
                 @endif
 
@@ -346,14 +353,27 @@
 
 @php
     $canManagePrs = auth()->id() === $item->user_id || auth()->user()->hasRole('administrator');
+    $isQuantityOnlyEdit = $item->status === 'CANVASSER_HOLD';
+    $canShowEditModal = $canManagePrs && (
+        $isQuantityOnlyEdit
+        || in_array($item->status, ['REQUESTED', 'ON_HOLD', 'REVISED'], true)
+    );
+    $holdLog = $item->latestPurchasingHoldLog();
+    $canvasserHoldLog = $item->latestCanvasserHoldLog();
 @endphp
-@if ($canManagePrs)
+@if ($canShowEditModal)
 <div class="modal fade text-left modal-borderless" id="edit-modal-{{ $item->id }}" tabindex="-1"
     role="dialog" aria-labelledby="myModalLabel1" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Edit PRS - ({{ $item->prs_number }})</h5>
+                <h5 class="modal-title">
+                    @if ($isQuantityOnlyEdit)
+                        Revise Quantities - ({{ $item->prs_number }})
+                    @else
+                        Edit PRS - ({{ $item->prs_number }})
+                    @endif
+                </h5>
                 <button type="button" class="close rounded-pill" data-bs-dismiss="modal"
                     aria-label="Close">
                     <i data-feather="x"></i>
@@ -364,12 +384,29 @@
                 @method('PUT')
                 <div class="modal-body">
 
-                    @if ($item->status === 'ON_HOLD' && $holdLog)
+                    @if ($isQuantityOnlyEdit && $canvasserHoldLog)
+                        <div class="alert alert-warning" role="alert">
+                            <strong>Canvasser Hold Reason:</strong> {{ $canvasserHoldLog->message }}
+                        </div>
+                        <p class="text-muted small">You may only adjust quantities. Items cannot be added, removed, or replaced.</p>
+                    @elseif ($item->status === 'ON_HOLD' && $holdLog)
                         <div class="alert alert-warning" role="alert">
                             <strong>Hold Reason:</strong> {{ $holdLog->message }}
                         </div>
                     @endif
 
+                    @if ($isQuantityOnlyEdit)
+                        <div class="divider">
+                            <div class="divider-text">PRS Items (Quantity Only)</div>
+                        </div>
+
+                        <livewire:prs-item
+                            :existing-items="$item->items"
+                            mode="quantity-only"
+                            :context-id="(string) $item->id"
+                            wire:key="prs-item-qty-edit-{{ $item->id }}"
+                        />
+                    @else
                     <div class="row">
                         <div class="col-md-6 col-12">
                             <div class="form-group">
@@ -425,7 +462,13 @@
                         <div class="divider-text">PRS Items</div>
                     </div>
 
-                    <livewire:prs-item :existing-items="$item->items" wire:key="prs-item-edit-{{ $item->id }}" />
+                    <livewire:prs-item
+                        :existing-items="$item->items"
+                        mode="form"
+                        :context-id="(string) $item->id"
+                        wire:key="prs-item-edit-{{ $item->id }}"
+                    />
+                    @endif
 
                 </div>
                 <div class="modal-footer">
@@ -435,7 +478,11 @@
                     </button>
                     <button type="submit" class="btn icon icon-left btn-primary ms-1">
                         <i class="fa-thin fa-file-pen me-1"></i>
-                        Update
+                        @if ($isQuantityOnlyEdit)
+                            Update Quantities
+                        @else
+                            Update
+                        @endif
                     </button>
                 </div>
             </form>

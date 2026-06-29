@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Prs;
 use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
@@ -30,6 +29,7 @@ class MainController extends Controller
         $monthlyPrsMap = $monthlyPrsRows
             ->mapWithKeys(function ($row) {
                 $key = sprintf('%04d-%02d', (int) $row->year_num, (int) $row->month_num);
+
                 return [$key => (int) $row->total];
             });
 
@@ -42,14 +42,14 @@ class MainController extends Controller
             $monthlyPrsSeries[] = (int) ($monthlyPrsMap[$monthKey] ?? 0);
         }
 
-        $prsStatusOrder = ['REQUESTED', 'CANVASSING', 'ON_HOLD', 'REVISED', 'PO_CREATED'];
+        $prsStatusOrder = ['REQUESTED', 'CANVASSING', 'CANVASSER_HOLD', 'ON_HOLD', 'REVISED', 'PO_CREATED'];
         $prsStatusRows = Prs::query()
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
             ->get();
 
         $prsStatusMap = $prsStatusRows
-            ->mapWithKeys(fn($row) => [strtoupper((string) $row->status) => (int) $row->total]);
+            ->mapWithKeys(fn ($row) => [strtoupper((string) $row->status) => (int) $row->total]);
 
         $prsStatusLabels = [];
         $prsStatusSeries = [];
@@ -70,11 +70,11 @@ class MainController extends Controller
             ->get();
 
         $poStatusLabels = $poStatusRows
-            ->map(fn($row) => str_replace('_', ' ', strtoupper((string) $row->status)))
+            ->map(fn ($row) => str_replace('_', ' ', strtoupper((string) $row->status)))
             ->values()
             ->all();
         $poStatusSeries = $poStatusRows
-            ->map(fn($row) => (int) $row->total)
+            ->map(fn ($row) => (int) $row->total)
             ->values()
             ->all();
 
@@ -88,11 +88,11 @@ class MainController extends Controller
             ->get();
 
         $topSupplierLabels = $topSuppliersRows
-            ->map(fn($row) => optional($row->supplier)->name ?: 'Unknown Supplier')
+            ->map(fn ($row) => optional($row->supplier)->name ?: 'Unknown Supplier')
             ->values()
             ->all();
         $topSupplierSeries = $topSuppliersRows
-            ->map(fn($row) => (float) $row->total_value)
+            ->map(fn ($row) => (float) $row->total_value)
             ->values()
             ->all();
 
@@ -139,6 +139,7 @@ class MainController extends Controller
     public function cekCsv()
     {
         $data = [];
+
         return response()->json($data);
     }
 }

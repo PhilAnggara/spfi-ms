@@ -75,7 +75,7 @@ beforeEach(function () {
         'date_needed' => now()->addDays(7)->toDateString(),
         'is_capex' => false,
         'remarks' => 'Test PRS',
-        'status' => 'DRAFT',
+        'status' => 'ON_HOLD',
     ]);
 
     PrsItem::query()->create([
@@ -109,6 +109,7 @@ it('allows the creator to update a prs', function () {
     $response->assertSessionHas('success');
 
     $this->prs->refresh();
+    expect($this->prs->status)->toBe('REVISED');
     expect($this->prs->remarks)->toBe('Updated remarks');
 });
 

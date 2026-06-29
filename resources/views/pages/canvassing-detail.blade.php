@@ -44,6 +44,12 @@
                             <i class="fa-duotone fa-solid fa-arrow-left"></i>
                             Back to list
                         </a>
+                        @if (!$prsItem->purchase_order_id && $prsItem->prs?->status === 'CANVASSING')
+                            <button type="button" class="btn btn-sm icon icon-left btn-outline-warning" data-bs-toggle="modal" data-bs-target="#canvasser-hold-modal-{{ $prsItem->id }}">
+                                <i class="fa-light fa-circle-pause"></i>
+                                Request Quantity Revision
+                            </button>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -258,6 +264,33 @@
             </div>
         </div>
     </div>
+
+    @if (!$prsItem->purchase_order_id && $prsItem->prs?->status === 'CANVASSING')
+        <div class="modal fade" id="canvasser-hold-modal-{{ $prsItem->id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form action="{{ route('canvassing.hold', $prsItem->id) }}" method="POST">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title">Request Quantity Revision</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted small">This will hold the entire PRS so the requester can adjust quantities only.</p>
+                            <div class="form-group">
+                                <label for="hold-message-detail-{{ $prsItem->id }}" class="form-label">Reason</label>
+                                <textarea id="hold-message-detail-{{ $prsItem->id }}" name="message" class="form-control" rows="4" required placeholder="Explain why the requested item/specification needs quantity revision"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-warning">Submit Hold</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <script id="canvassing-supplier-term-map" type="application/json">@json($supplierTermMap)</script>
     <script id="canvassing-supplier-list" type="application/json">@json($supplierList)</script>

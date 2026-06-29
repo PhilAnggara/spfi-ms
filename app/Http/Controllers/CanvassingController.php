@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\PrsItem;
-use App\Models\PrsCanvassingItem;
 use App\Models\Department;
+use App\Models\PrsCanvassingItem;
+use App\Models\PrsItem;
 use App\Models\Supplier;
 use App\Services\NotificationRecipientService;
+use App\Services\PrsHoldService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -39,6 +40,9 @@ class CanvassingController extends Controller
             'selectedCanvassingItem.supplier',
         ])
             ->where('canvasser_id', $userId)
+            ->whereHas('prs', function ($prsQuery) {
+                $prsQuery->where('status', 'CANVASSING');
+            })
             ->when($filters['keyword'] !== '', function ($query) use ($filters) {
                 $keyword = $filters['keyword'];
 
@@ -105,6 +109,12 @@ class CanvassingController extends Controller
             'selectedCanvassingItem.supplier',
         ]);
 
+        if ($prsItem->prs?->status !== 'CANVASSING') {
+            return redirect()
+                ->route('canvassing.index')
+                ->withErrors(['message' => 'This PRS item is not available for canvassing.']);
+        }
+
         $suppliers = Supplier::orderBy('name')->get();
 
         return view('pages.canvassing-detail', [
@@ -120,6 +130,10 @@ class CanvassingController extends Controller
     {
         if ($prsItem->canvasser_id !== $request->user()->id) {
             abort(403);
+        }
+
+        if ($prsItem->prs?->status !== 'CANVASSING') {
+            return redirect()->back()->withErrors(['message' => 'This PRS item is not available for canvassing.']);
         }
 
         $validated = $request->validate([
@@ -271,7 +285,7 @@ class CanvassingController extends Controller
 
         $filename = sprintf(
             'canvassing-report-%s-%s.pdf',
-            $prsItem->item?->code ?? ('item-' . $prsItem->item_id),
+            $prsItem->item?->code ?? ('item-'.$prsItem->item_id),
             now()->format('YmdHis')
         );
 
@@ -323,6 +337,30 @@ class CanvassingController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Item marked as {$newStatus}.");
+    }
+
+    /**
+     * Hold a PRS for quantity revision by the requester.
+     */
+    public function hold(Request $request, PrsItem $prsItem, PrsHoldService $prsHoldService)
+    {
+        if ($prsItem->canvasser_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $prsItem->loadMissing('prs');
+
+        $data = $request->validate([
+            'message' => ['required', 'string'],
+        ]);
+
+        try {
+            $prsHoldService->holdByCanvasser($prsItem->prs, $prsItem, $request->user(), $data['message']);
+        } catch (ValidationException $exception) {
+            return redirect()->back()->withErrors($exception->errors());
+        }
+
+        return redirect()->back()->with('success', 'PRS has been held for quantity revision.');
     }
 
     private function sanitizeTermValue(?string $value): ?string

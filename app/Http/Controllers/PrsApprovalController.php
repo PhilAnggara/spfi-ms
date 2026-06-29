@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Prs;
 use App\Models\User;
-use App\Services\NotificationRecipientService;
+use App\Services\PrsHoldService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -32,10 +32,10 @@ class PrsApprovalController extends Controller
             'REQUESTED' => 'REQUESTED',
             'REVISED' => 'REVISED',
             'ON_HOLD' => 'ON_HOLD',
+            'CANVASSER_HOLD' => 'CANVASSER_HOLD',
             'CANVASSING' => 'CANVASSING',
             'PO_CREATED' => 'PO_CREATED',
             'REJECTED' => 'REJECTED',
-            'DRAFT' => 'DRAFT',
         ];
 
         return view('pages.prs-approval', [
@@ -50,49 +50,17 @@ class PrsApprovalController extends Controller
     /**
      * Hold a PRS with a reason.
      */
-    public function hold(Request $request, Prs $prs)
+    public function hold(Request $request, Prs $prs, PrsHoldService $prsHoldService)
     {
-        if ($prs->status === 'ON_HOLD') {
-            return redirect()->back()->withErrors(['message' => 'PRS is already on hold.']);
-        }
-        if ($prs->status === 'PO_CREATED') {
-            return redirect()->back()->withErrors(['message' => 'PRS with created PO cannot be held.']);
-        }
-
         $data = $request->validate([
             'message' => ['required', 'string'],
         ]);
 
-        $previousStatus = $prs->status;
-        $prs->status = 'ON_HOLD';
-        $prs->save();
-
-        $prs->logs()->create([
-            'user_id' => $request->user()?->id,
-            'action' => 'HOLD',
-            'message' => $data['message'],
-            'meta' => [
-                'previous_status' => $previousStatus,
-            ],
-        ]);
-
-        $recipients = app(NotificationRecipientService::class)->uniqueUsers(
-            collect([$prs->user])->filter(),
-            app(NotificationRecipientService::class)->purchasingManagers()
-        );
-
-        app(NotificationRecipientService::class)->notify($recipients, [
-            'type' => 'prs_on_hold',
-            'title' => 'PRS On Hold',
-            'message' => 'PRS #'.$prs->prs_number.' is on hold.',
-            'action_url' => '/prs',
-            'icon' => 'fa-light fa-circle-pause',
-            'icon_color' => 'bg-warning',
-            'meta' => [
-                'prs_id' => $prs->id,
-                'previous_status' => $previousStatus,
-            ],
-        ]);
+        try {
+            $prsHoldService->holdByPurchasingManager($prs, $request->user(), $data['message']);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            return redirect()->back()->withErrors($exception->errors());
+        }
 
         return redirect()->back()->with('success', 'PRS has been put on hold.');
     }

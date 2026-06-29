@@ -1,35 +1,35 @@
 <?php
 
-use App\Http\Controllers\AccountingReportController;
-use App\Http\Controllers\BatchController;
-use App\Http\Controllers\BuyerController;
-use App\Http\Controllers\CurrencyController;
-use App\Http\Controllers\DeliveryController;
-use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\Accounting\AccountingCodeController;
 use App\Http\Controllers\Accounting\AccountingGroupCodeController;
 use App\Http\Controllers\Accounting\BsGroupingController;
 use App\Http\Controllers\Accounting\GroupingController;
+use App\Http\Controllers\AccountingReportController;
+use App\Http\Controllers\BatchController;
+use App\Http\Controllers\BuyerController;
+use App\Http\Controllers\CanvassingController;
+use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FishController;
 use App\Http\Controllers\FishSizeController;
 use App\Http\Controllers\FishSupplierController;
-use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\MainController;
-use App\Http\Controllers\UnitOfMeasureController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
 use App\Http\Controllers\PrsController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\CanvassingController;
-use App\Http\Controllers\PurchasingReportController;
 use App\Http\Controllers\PurchaseOrderApprovalController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\PurchasingReportController;
 use App\Http\Controllers\ReceivingReportController;
+use App\Http\Controllers\StoreWithdrawalController;
 use App\Http\Controllers\SupplierComparisonController;
 use App\Http\Controllers\SupplierController;
-use App\Http\Controllers\StoreWithdrawalController;
 use App\Http\Controllers\TransferSlipController;
+use App\Http\Controllers\UnitOfMeasureController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VesselController;
 use Illuminate\Support\Facades\Route;
@@ -121,6 +121,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/canvassing/{prsItem}/report', [CanvassingController::class, 'report'])->name('canvassing.report');
         Route::post('/canvassing/{prsItem}', [CanvassingController::class, 'store'])->name('canvassing.store');
         Route::post('/canvassing/{prsItem}/toggle-direct-purchase', [CanvassingController::class, 'toggleDirectPurchase'])->name('canvassing.toggle-direct-purchase');
+        Route::post('/canvassing/{prsItem}/hold', [CanvassingController::class, 'hold'])->name('canvassing.hold');
 
         Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
             Route::get('/draft', [PurchaseOrderController::class, 'draft'])->name('draft');

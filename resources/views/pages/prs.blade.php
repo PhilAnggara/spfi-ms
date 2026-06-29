@@ -46,6 +46,7 @@
                             <option value="REQUESTED" @selected(request('status') === 'REQUESTED')>REQUESTED</option>
                             <option value="ON_HOLD" @selected(request('status') === 'ON_HOLD')>ON_HOLD</option>
                             <option value="REVISED" @selected(request('status') === 'REVISED')>REVISED</option>
+                            <option value="CANVASSER_HOLD" @selected(request('status') === 'CANVASSER_HOLD')>CANVASSER_HOLD</option>
                             <option value="CANVASSING" @selected(request('status') === 'CANVASSING')>CANVASSING</option>
                             <option value="PO_CREATED" @selected(request('status') === 'PO_CREATED')>PO_CREATED</option>
                             <option value="REJECTED" @selected(request('status') === 'REJECTED')>REJECTED</option>
@@ -188,11 +189,16 @@
                                             </button>
                                             @php
                                                 $canManagePrs = auth()->id() === $item->user_id || auth()->user()->hasRole('administrator');
+                                                $canFullEdit = $canManagePrs && in_array($item->status, ['REQUESTED', 'ON_HOLD', 'REVISED'], true);
+                                                $canQuantityEdit = $canManagePrs && $item->status === 'CANVASSER_HOLD';
+                                                $canDelete = $canFullEdit;
                                             @endphp
-                                            @if ($canManagePrs && in_array($item->status, ['REQUESTED', 'ON_HOLD', 'REVISED', 'DRAFT'], true))
-                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                                            @if ($canFullEdit || $canQuantityEdit)
+                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $canQuantityEdit ? 'Revise Quantities' : 'Edit' }}">
                                                     <i class="fa-light fa-edit text-primary"></i>
                                                 </button>
+                                            @endif
+                                            @if ($canDelete)
                                                 <button type="button" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete" onclick="hapusData({{ $item->id }}, 'Delete PRS', 'Are you sure want to delete PRS {{ $item->prs_number }}?')">
                                                     <i class="fa-light fa-trash text-secondary"></i>
                                                 </button>

@@ -10,7 +10,7 @@ if (! function_exists('toast')) {
     {
         session()->flash('toast', [
             'message' => $message,
-            'type'    => $type,
+            'type' => $type,
         ]);
     }
 }
@@ -74,7 +74,7 @@ if (! function_exists('get_job_title')) {
             $dept = $user->department->alias;
         }
 
-        return $dept . ' ' . $user->role;
+        return $dept.' '.$user->role;
     }
 }
 
@@ -87,6 +87,7 @@ if (! function_exists('is_active_menu')) {
                 return 'active';
             }
         }
+
         return '';
     }
 }
@@ -99,7 +100,7 @@ if (! function_exists('get_manager_name')) {
             ->where('role', 'Manager')
             ->first();
 
-        if (!$manager) {
+        if (! $manager) {
             return 'N/A';
         }
 
@@ -126,6 +127,7 @@ if (! function_exists('status_badge_color')) {
             'REQUESTED', 'SUBMITTED' => 'bg-light-secondary text-secondary',
             'REVISED', 'RESUBMITTED' => 'bg-light-secondary text-secondary',
             'ON_HOLD' => 'bg-light-warning',
+            'CANVASSER_HOLD' => 'bg-light-warning',
             'CANVASSING' => 'bg-light-info text-primary',
             'PO_CREATED', 'APPROVED' => 'bg-light-primary text-primary',
             'RECEIVED', 'DELIVERY_COMPLETE' => 'bg-light-success text-success',
@@ -143,6 +145,7 @@ if (! function_exists('status_badge_icon')) {
             'REQUESTED', 'SUBMITTED' => 'fa-duotone fa-solid fa-circle-up',
             'REVISED', 'RESUBMITTED' => 'fa-duotone fa-solid fa-circle-up text-info',
             'ON_HOLD' => 'fa-duotone fa-solid fa-circle-pause text-warning',
+            'CANVASSER_HOLD' => 'fa-duotone fa-solid fa-circle-pause text-warning',
             'CANVASSING' => 'fa-duotone fa-solid fa-circle-check text-info',
             'PO_CREATED', 'APPROVED' => 'fa-duotone fa-solid fa-file-circle-plus text-primary',
             'RECEIVED', 'DELIVERY_COMPLETE' => 'fa-duotone fa-solid fa-boxes-packing text-success',
@@ -180,7 +183,7 @@ if (! function_exists('category_icon')) {
             str_contains($name, 'label') => 'fa-tags',
             str_contains($name, 'carton') => 'fa-box',
             str_contains($name, 'can') => 'fa-jar',
-            str_contains($name, 'fish') && !str_contains($name, 'meal') => 'fa-fish',
+            str_contains($name, 'fish') && ! str_contains($name, 'meal') => 'fa-fish',
             str_contains($name, 'fishmeal') => 'fa-fish-bones',
             str_contains($name, 'bc') => 'fa-box-open',
             str_contains($name, 'coal') => 'fa-mountain',
@@ -201,24 +204,60 @@ if (! function_exists('category_data_attr')) {
         $name = strtolower($categoryName ?? 'other');
 
         // Extract key part for CSS selector matching
-        if (str_contains($name, 'office')) return 'office';
-        if (str_contains($name, 'parts')) return 'parts';
-        if (str_contains($name, 'factory')) return 'factory';
-        if (str_contains($name, 'chem')) return 'chem';
-        if (str_contains($name, 'fuel')) return 'fuel';
-        if (str_contains($name, 'label')) return 'label';
-        if (str_contains($name, 'carton')) return 'carton';
-        if (str_contains($name, 'can')) return 'can';
-        if (str_contains($name, 'fishmeal')) return 'fishmeal';
-        if (str_contains($name, 'fish')) return 'fish';
-        if (str_contains($name, 'bc')) return 'bc';
-        if (str_contains($name, 'coal')) return 'coal';
-        if (str_contains($name, 'sludge') || str_contains($name, 'oil')) return 'sludge';
-        if (str_contains($name, 'capital')) return 'capital';
-        if (str_contains($name, 'scrap')) return 'scrap';
-        if (str_contains($name, 'spice') || str_contains($name, 'ingredient')) return 'spice';
-        if (str_contains($name, 'raw')) return 'raw';
-        if (str_contains($name, 'finished')) return 'finished';
+        if (str_contains($name, 'office')) {
+            return 'office';
+        }
+        if (str_contains($name, 'parts')) {
+            return 'parts';
+        }
+        if (str_contains($name, 'factory')) {
+            return 'factory';
+        }
+        if (str_contains($name, 'chem')) {
+            return 'chem';
+        }
+        if (str_contains($name, 'fuel')) {
+            return 'fuel';
+        }
+        if (str_contains($name, 'label')) {
+            return 'label';
+        }
+        if (str_contains($name, 'carton')) {
+            return 'carton';
+        }
+        if (str_contains($name, 'can')) {
+            return 'can';
+        }
+        if (str_contains($name, 'fishmeal')) {
+            return 'fishmeal';
+        }
+        if (str_contains($name, 'fish')) {
+            return 'fish';
+        }
+        if (str_contains($name, 'bc')) {
+            return 'bc';
+        }
+        if (str_contains($name, 'coal')) {
+            return 'coal';
+        }
+        if (str_contains($name, 'sludge') || str_contains($name, 'oil')) {
+            return 'sludge';
+        }
+        if (str_contains($name, 'capital')) {
+            return 'capital';
+        }
+        if (str_contains($name, 'scrap')) {
+            return 'scrap';
+        }
+        if (str_contains($name, 'spice') || str_contains($name, 'ingredient')) {
+            return 'spice';
+        }
+        if (str_contains($name, 'raw')) {
+            return 'raw';
+        }
+        if (str_contains($name, 'finished')) {
+            return 'finished';
+        }
 
         return 'other';
     }
