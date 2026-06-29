@@ -7,18 +7,24 @@ use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
 use App\Models\User;
-use App\Services\NotificationRecipientService;
 use App\Services\DocumentNumberService;
+use App\Services\NotificationRecipientService;
 use App\Services\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class ReceivingReportController extends Controller
 {
+    private const RR_PAPER_WIDTH_MM = 215;
+
+    private const RR_PAPER_HEIGHT_MM = 160;
+
+    private const MM_TO_PT = 2.834645669;
+
     public function index(Request $request)
     {
         $filters = [
@@ -36,14 +42,14 @@ class ReceivingReportController extends Controller
             ->first();
 
         return view('pages.receiving-reports.index', [
-            'receivingReports'      => $receivingReports,
-            'totalRr'               => ReceivingReport::count(),
-            'todayRr'               => ReceivingReport::whereDate('received_date', now()->toDateString())->count(),
-            'totalGood'             => (float) ($totals->total_good ?? 0),
-            'totalBad'              => (float) ($totals->total_bad ?? 0),
-            'filters'              => $filters,
-            'nextRrNumber'          => app(DocumentNumberService::class)->previewNext('RR'),
-            'customsDocumentTypes'  => CustomsDocumentType::query()
+            'receivingReports' => $receivingReports,
+            'totalRr' => ReceivingReport::count(),
+            'todayRr' => ReceivingReport::whereDate('received_date', now()->toDateString())->count(),
+            'totalGood' => (float) ($totals->total_good ?? 0),
+            'totalBad' => (float) ($totals->total_bad ?? 0),
+            'filters' => $filters,
+            'nextRrNumber' => app(DocumentNumberService::class)->previewNext('RR'),
+            'customsDocumentTypes' => CustomsDocumentType::query()
                 ->orderBy('name')
                 ->whereLike('name', '%Pemasukan%')
                 ->orWhere('code', 'BC 2.7')
@@ -497,8 +503,15 @@ class ReceivingReportController extends Controller
             'isPreview' => $isPreview,
             'approvedByName' => $imManager?->name,
             'backgroundImageDataUri' => $backgroundImageDataUri,
+            'pageWidthMm' => self::RR_PAPER_WIDTH_MM,
+            'pageHeightMm' => self::RR_PAPER_HEIGHT_MM,
         ])
-            ->setPaper('a4', 'landscape')
+            ->setPaper([
+                0,
+                0,
+                self::RR_PAPER_WIDTH_MM * self::MM_TO_PT,
+                self::RR_PAPER_HEIGHT_MM * self::MM_TO_PT,
+            ])
             ->stream($filename);
     }
 
