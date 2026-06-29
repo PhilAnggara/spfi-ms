@@ -7,16 +7,16 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Prs;
 use App\Models\PrsItem;
-use App\Support\Concerns\PaginatesLegacySqlServer;
-use App\Support\Concerns\UsesSmartCatalogSearch;
 use App\Models\User;
 use App\Notifications\PrsSubmittedNotification;
+use App\Support\Concerns\PaginatesLegacySqlServer;
+use App\Support\Concerns\UsesSmartCatalogSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PrsController extends Controller
@@ -55,6 +55,7 @@ class PrsController extends Controller
         );
         $departments = Department::all();
         $filterDepartments = $canViewAll ? $departments : collect();
+
         return view('pages.prs', [
             'items' => $items,
             'departments' => $departments,
@@ -99,6 +100,7 @@ class PrsController extends Controller
         if ($request->expectsJson() || $request->ajax()) {
             $transformedItems = $items->getCollection()->map(function ($item) {
                 $categoryName = $item->category?->name ?? 'Uncategorized';
+
                 return [
                     'id' => $item->id,
                     'name' => $item->name,
@@ -139,33 +141,33 @@ class PrsController extends Controller
     {
         $validated = $request->validate([
             'department_id' => ['required', 'exists:departments,id'],
-            'date_needed'   => ['required', 'date'],
-            'is_capex'      => ['required', 'boolean'],
-            'remarks'       => ['nullable', 'string'],
-            'prsItems'      => ['required', 'array', 'min:1'],
-            'prsItems.*.item_id'  => ['required', 'exists:items,id'],
+            'date_needed' => ['required', 'date'],
+            'is_capex' => ['required', 'boolean'],
+            'remarks' => ['nullable', 'string'],
+            'prsItems' => ['required', 'array', 'min:1'],
+            'prsItems.*.item_id' => ['required', 'exists:items,id'],
             'prsItems.*.quantity' => ['required', 'numeric', 'min:1'],
         ]);
 
         $data = [
             'department_id' => $validated['department_id'],
-            'date_needed'   => $validated['date_needed'],
-            'is_capex'      => (bool) $validated['is_capex'],
-            'remarks'       => $validated['remarks'] ?? null,
-            'prs_number'    => $this->generatePrsNumber($validated['department_id']),
-            'user_id'       => Auth::id(),
-            'prs_date'      => date('Y-m-d'),
-            'status'        => 'REQUESTED',
+            'date_needed' => $validated['date_needed'],
+            'is_capex' => (bool) $validated['is_capex'],
+            'remarks' => $validated['remarks'] ?? null,
+            'prs_number' => $this->generatePrsNumber($validated['department_id']),
+            'user_id' => Auth::id(),
+            'prs_date' => date('Y-m-d'),
+            'status' => 'REQUESTED',
         ];
 
         // dd($data);
         $newPrs = Prs::create($data);
 
-        foreach($validated['prsItems'] as $prsItem) {
+        foreach ($validated['prsItems'] as $prsItem) {
             PrsItem::create([
-                'prs_id'       => $newPrs->id,
-                'item_id'      => $prsItem['item_id'],
-                'quantity'     => $prsItem['quantity'],
+                'prs_id' => $newPrs->id,
+                'item_id' => $prsItem['item_id'],
+                'quantity' => $prsItem['quantity'],
             ]);
         }
 
@@ -208,23 +210,24 @@ class PrsController extends Controller
     public function update(Request $request, string $id)
     {
         $prs = Prs::findOrFail($id);
+        $this->ensureUserCanManagePrs($request, $prs);
 
         $validated = $request->validate([
             'department_id' => ['required', 'exists:departments,id'],
-            'date_needed'   => ['required', 'date'],
-            'is_capex'      => ['required', 'boolean'],
-            'remarks'       => ['nullable', 'string'],
-            'prsItems'      => ['required', 'array', 'min:1'],
-            'prsItems.*.item_id'  => ['required', 'exists:items,id'],
+            'date_needed' => ['required', 'date'],
+            'is_capex' => ['required', 'boolean'],
+            'remarks' => ['nullable', 'string'],
+            'prsItems' => ['required', 'array', 'min:1'],
+            'prsItems.*.item_id' => ['required', 'exists:items,id'],
             'prsItems.*.quantity' => ['required', 'numeric', 'min:1'],
         ]);
 
         $shouldRegenerate = $prs->department_id != $validated['department_id'];
 
         $prs->department_id = $validated['department_id'];
-        $prs->date_needed   = $validated['date_needed'];
-        $prs->is_capex      = (bool) $validated['is_capex'];
-        $prs->remarks       = $validated['remarks'] ?? null;
+        $prs->date_needed = $validated['date_needed'];
+        $prs->is_capex = (bool) $validated['is_capex'];
+        $prs->remarks = $validated['remarks'] ?? null;
 
         if ($shouldRegenerate) {
             $prs->prs_number = $this->generatePrsNumber($validated['department_id']);
@@ -242,8 +245,8 @@ class PrsController extends Controller
 
         foreach ($validated['prsItems'] as $itemRow) {
             PrsItem::create([
-                'prs_id'   => $prs->id,
-                'item_id'  => $itemRow['item_id'],
+                'prs_id' => $prs->id,
+                'item_id' => $itemRow['item_id'],
                 'quantity' => $itemRow['quantity'],
             ]);
         }
@@ -265,13 +268,15 @@ class PrsController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
         $item = Prs::findOrFail($id);
+        $this->ensureUserCanManagePrs($request, $item);
         $tile = $item->prs_no;
         $item->delete();
+
         // session()->flash('delete', 'PRS ' . $tile . ' has been deleted successfully.');
-        return redirect()->back()->with('success', 'PRS ' . $tile . ' has been deleted successfully.');
+        return redirect()->back()->with('success', 'PRS '.$tile.' has been deleted successfully.');
     }
 
     /**
@@ -302,7 +307,7 @@ class PrsController extends Controller
 
         // Generate QR code sebagai SVG (tidak memerlukan Imagick)
         $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(100)->generate($prs->prs_number);
-        $qrCodeBase64 = 'data:image/svg+xml;base64,' . base64_encode($qrCode);
+        $qrCodeBase64 = 'data:image/svg+xml;base64,'.base64_encode($qrCode);
 
         // Data yang dikirim ke view PDF
         $data = [
@@ -331,11 +336,11 @@ class PrsController extends Controller
     {
         $validated = $request->validate([
             'start_month' => ['required', 'date_format:Y-m'],
-            'end_month'   => ['required', 'date_format:Y-m', 'after_or_equal:start_month'],
+            'end_month' => ['required', 'date_format:Y-m', 'after_or_equal:start_month'],
         ]);
 
         $start = Carbon::createFromFormat('Y-m', $validated['start_month'])->startOfMonth();
-        $end   = Carbon::createFromFormat('Y-m', $validated['end_month'])->endOfMonth();
+        $end = Carbon::createFromFormat('Y-m', $validated['end_month'])->endOfMonth();
 
         $prs = Prs::with(['department', 'items.item'])
             ->whereBetween('prs_date', [$start, $end])
@@ -343,9 +348,9 @@ class PrsController extends Controller
             ->get();
 
         $data = [
-            'prsList'      => $prs,
-            'start'        => $start,
-            'end'          => $end,
+            'prsList' => $prs,
+            'start' => $start,
+            'end' => $end,
             'generated_at' => now(),
         ];
 
@@ -465,7 +470,7 @@ class PrsController extends Controller
         $lastNumber = 0;
         if (is_string($lastPrsNumber)) {
             $upperLastPrsNumber = strtoupper($lastPrsNumber);
-            $exactPattern = '/^' . preg_quote($departmentCode, '/') . '(\d+)$/';
+            $exactPattern = '/^'.preg_quote($departmentCode, '/').'(\d+)$/';
 
             if (preg_match($exactPattern, $upperLastPrsNumber, $matches) === 1) {
                 $lastNumber = (int) $matches[1];
@@ -475,7 +480,7 @@ class PrsController extends Controller
         // Sequence selalu 7 digit agar konsisten: 0000001, 0000002, dst.
         $nextNumber = str_pad((string) ($lastNumber + 1), 7, '0', STR_PAD_LEFT);
 
-        return $departmentCode . $nextNumber;
+        return $departmentCode.$nextNumber;
     }
 
     /**
@@ -589,4 +594,10 @@ class PrsController extends Controller
         );
     }
 
+    private function ensureUserCanManagePrs(Request $request, Prs $prs): void
+    {
+        if ($prs->user_id !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
+            abort(403);
+        }
+    }
 }

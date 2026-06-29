@@ -344,6 +344,10 @@
 </div>
 
 
+@php
+    $canManagePrs = auth()->id() === $item->user_id || auth()->user()->hasRole('administrator');
+@endphp
+@if ($canManagePrs)
 <div class="modal fade text-left modal-borderless" id="edit-modal-{{ $item->id }}" tabindex="-1"
     role="dialog" aria-labelledby="myModalLabel1" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
@@ -438,6 +442,7 @@
         </div>
     </div>
 </div>
+@endif
 
 
 @endforeach

@@ -186,7 +186,10 @@
                                             <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#detail-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
                                                 <i class="fa-light fa-eye text-primary"></i>
                                             </button>
-                                            @if ($item->status === 'REQUESTED' || $item->status === 'ON_HOLD' || $item->status === 'REVISED' || $item->status === 'DRAFT')
+                                            @php
+                                                $canManagePrs = auth()->id() === $item->user_id || auth()->user()->hasRole('administrator');
+                                            @endphp
+                                            @if ($canManagePrs && in_array($item->status, ['REQUESTED', 'ON_HOLD', 'REVISED', 'DRAFT'], true))
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                     <i class="fa-light fa-edit text-primary"></i>
                                                 </button>
