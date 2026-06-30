@@ -14,6 +14,7 @@ use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\UsesSmartCatalogSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
@@ -70,68 +71,19 @@ class PrsController extends Controller
      */
     public function create(Request $request)
     {
-        $departments = Department::all();
-        $categories = ItemCategory::query()
-            ->select(['id', 'name'])
-            ->orderBy('name')
-            ->get();
-
-        $search = trim((string) $request->query('search'));
-        $categoryId = trim((string) $request->query('category'));
-        $stockFilter = trim((string) $request->query('stock'));
-        if (! in_array($stockFilter, ['in_stock', 'zero_stock'], true)) {
-            $stockFilter = '';
-        }
-
-        $itemsBaseQuery = Item::query()
-            ->select(['id', 'name', 'code', 'stock_on_hand', 'unit_of_measure_id', 'category_id'])
-            ->where('is_active', true)
-            ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
-                $query->where('category_id', (int) $categoryId);
-            })
-            ->when($stockFilter === 'in_stock', function ($query) {
-                $query->where('stock_on_hand', '>', 0);
-            })
-            ->when($stockFilter === 'zero_stock', function ($query) {
-                $query->where('stock_on_hand', '<=', 0);
-            });
-
-        $items = $this->smartCatalogPaginator($itemsBaseQuery, $search, 36);
+        $catalog = $this->resolveCatalogPageData($request);
 
         if ($request->expectsJson() || $request->ajax()) {
-            $transformedItems = $items->getCollection()->map(function ($item) {
-                $categoryName = $item->category?->name ?? 'Uncategorized';
-
-                return [
-                    'id' => $item->id,
-                    'name' => $item->name,
-                    'code' => $item->code,
-                    'stock_on_hand' => $item->stock_on_hand,
-                    'unit' => $item->unit?->name ?? 'PCS',
-                    'category' => $categoryName,
-                    'category_icon' => category_icon($categoryName),
-                    'category_data' => category_data_attr($categoryName),
-                ];
-            })->values();
-
-            return response()->json([
-                'data' => $transformedItems,
-                'meta' => [
-                    'current_page' => $items->currentPage(),
-                    'last_page' => $items->lastPage(),
-                    'total' => $items->total(),
-                    'per_page' => $items->perPage(),
-                ],
-            ]);
+            return $this->catalogItemsJsonResponse($catalog['items']);
         }
 
         return view('pages.prs-create', [
-            'departments' => $departments,
-            'categories' => $categories,
-            'items' => $items,
-            'search' => $search,
-            'selectedCategory' => $categoryId,
-            'selectedStockFilter' => $stockFilter,
+            'departments' => Department::all(),
+            'categories' => $this->catalogCategories(),
+            'items' => $catalog['items'],
+            'search' => $catalog['search'],
+            'selectedCategory' => $catalog['categoryId'],
+            'selectedStockFilter' => $catalog['stockFilter'],
         ]);
     }
 
@@ -200,9 +152,31 @@ class PrsController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit(Request $request, string $id)
     {
-        //
+        $prs = Prs::with(['items.item.unit', 'department', 'logs'])->findOrFail($id);
+        $this->ensureUserCanManagePrs($request, $prs);
+
+        if (! in_array($prs->status, ['REQUESTED', 'ON_HOLD', 'REVISED'], true)) {
+            abort(403, 'This PRS cannot be edited in its current status.');
+        }
+
+        $catalog = $this->resolveCatalogPageData($request);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return $this->catalogItemsJsonResponse($catalog['items']);
+        }
+
+        return view('pages.prs-edit', [
+            'prs' => $prs,
+            'departments' => Department::all(),
+            'categories' => $this->catalogCategories(),
+            'items' => $catalog['items'],
+            'search' => $catalog['search'],
+            'selectedCategory' => $catalog['categoryId'],
+            'selectedStockFilter' => $catalog['stockFilter'],
+            'holdLog' => $prs->status === 'ON_HOLD' ? $prs->latestPurchasingHoldLog() : null,
+        ]);
     }
 
     /**
@@ -640,10 +614,7 @@ class PrsController extends Controller
                 'user',
                 'items.item.unit',
                 'items.canvasser',
-                'items.canvassingItems',
-                'items.selectedCanvassingItem',
                 'items.purchaseOrder',
-                'items.purchaseOrderItem.receivingReportItems',
                 'items.purchaseOrderItem.receivingReportItems.receivingReport',
                 'items.purchaseOrderItem.purchaseOrder',
                 'logs' => function ($query) {
@@ -674,5 +645,74 @@ class PrsController extends Controller
         if ($prs->user_id !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
             abort(403);
         }
+    }
+
+    /**
+     * @return array{search: string, categoryId: string, stockFilter: string, items: LengthAwarePaginator}
+     */
+    private function resolveCatalogPageData(Request $request): array
+    {
+        $search = trim((string) $request->query('search'));
+        $categoryId = trim((string) $request->query('category'));
+        $stockFilter = trim((string) $request->query('stock'));
+        if (! in_array($stockFilter, ['in_stock', 'zero_stock'], true)) {
+            $stockFilter = '';
+        }
+
+        $itemsBaseQuery = Item::query()
+            ->select(['id', 'name', 'code', 'stock_on_hand', 'unit_of_measure_id', 'category_id'])
+            ->where('is_active', true)
+            ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
+                $query->where('category_id', (int) $categoryId);
+            })
+            ->when($stockFilter === 'in_stock', function ($query) {
+                $query->where('stock_on_hand', '>', 0);
+            })
+            ->when($stockFilter === 'zero_stock', function ($query) {
+                $query->where('stock_on_hand', '<=', 0);
+            });
+
+        return [
+            'search' => $search,
+            'categoryId' => $categoryId,
+            'stockFilter' => $stockFilter,
+            'items' => $this->smartCatalogPaginator($itemsBaseQuery, $search, 36),
+        ];
+    }
+
+    private function catalogCategories()
+    {
+        return ItemCategory::query()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function catalogItemsJsonResponse(LengthAwarePaginator $items): JsonResponse
+    {
+        $transformedItems = $items->getCollection()->map(function ($item) {
+            $categoryName = $item->category?->name ?? 'Uncategorized';
+
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'code' => $item->code,
+                'stock_on_hand' => $item->stock_on_hand,
+                'unit' => $item->unit?->name ?? 'PCS',
+                'category' => $categoryName,
+                'category_icon' => category_icon($categoryName),
+                'category_data' => category_data_attr($categoryName),
+            ];
+        })->values();
+
+        return response()->json([
+            'data' => $transformedItems,
+            'meta' => [
+                'current_page' => $items->currentPage(),
+                'last_page' => $items->lastPage(),
+                'total' => $items->total(),
+                'per_page' => $items->perPage(),
+            ],
+        ]);
     }
 }

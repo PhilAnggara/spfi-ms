@@ -152,6 +152,10 @@ function initPrsCartPopup() {
     }
 
     backdrop.addEventListener('click', () => setHidden(true));
+
+    if (cartPopup.dataset.autoOpenCart === '1') {
+        setHidden(false);
+    }
 }
 
 function initPrsCatalog() {

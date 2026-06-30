@@ -193,8 +193,12 @@
                                                 $canQuantityEdit = $canManagePrs && $item->status === 'CANVASSER_HOLD';
                                                 $canDelete = $canFullEdit;
                                             @endphp
-                                            @if ($canFullEdit || $canQuantityEdit)
-                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $canQuantityEdit ? 'Revise Quantities' : 'Edit' }}">
+                                            @if ($canFullEdit)
+                                                <a href="{{ route('prs.edit', $item) }}" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                                                    <i class="fa-light fa-edit text-primary"></i>
+                                                </a>
+                                            @elseif ($canQuantityEdit)
+                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Revise Quantities">
                                                     <i class="fa-light fa-edit text-primary"></i>
                                                 </button>
                                             @endif
@@ -231,15 +235,10 @@
 </div>
 @endsection
 
-@push('prepend-style')
-    <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
-@endpush
 @push('addon-style')
     <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
 @endpush
 @push('addon-script')
-    <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
-    <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/prs-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/prs-index.js') }}"></script>
 @endpush

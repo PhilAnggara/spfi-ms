@@ -4,18 +4,17 @@ namespace App\Livewire;
 
 use App\Models\Item;
 use Illuminate\Support\Str;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 class PrsItem extends Component
 {
     public $prsItems = [];
 
-    public $mode = 'form';
+    public $mode = 'cart';
 
     public string $contextId = '';
 
-    public function mount($existingItems = [], $mode = 'form', string $contextId = '')
+    public function mount($existingItems = [], $mode = 'cart', string $contextId = '')
     {
         $this->mode = $mode;
         $this->contextId = $contextId;
@@ -41,11 +40,7 @@ class PrsItem extends Component
             }
             $this->updateCartCount();
         } else {
-            if ($this->mode === 'form') {
-                $this->addPrsItem();
-            } else {
-                $this->updateCartCount();
-            }
+            $this->updateCartCount();
         }
     }
 
@@ -62,7 +57,6 @@ class PrsItem extends Component
             'quantity' => 1,
         ];
 
-        $this->dispatch('choices:refresh', contextId: $this->contextId);
         $this->updateCartCount();
     }
 
@@ -71,7 +65,6 @@ class PrsItem extends Component
         unset($this->prsItems[$index]);
         $this->prsItems = array_values($this->prsItems);
 
-        $this->dispatch('choices:refresh', contextId: $this->contextId);
         $this->updateCartCount();
     }
 
@@ -141,72 +134,6 @@ class PrsItem extends Component
         if (preg_match('/prsItems\.(\d+)\.quantity/', $property)) {
             $this->updateCartCount();
         }
-
-        if (preg_match('/prsItems\.(\d+)\.item_id/', $property, $matches)) {
-            $index = (int) $matches[1];
-            $itemId = $this->prsItems[$index]['item_id'] ?? null;
-
-            if (is_array($itemId)) {
-                $itemId = null;
-                $this->prsItems[$index]['item_id'] = null;
-            }
-
-            if ($itemId && is_numeric($itemId)) {
-                $item = Item::query()->find($itemId);
-                if ($item) {
-                    $this->prsItems[$index]['item_code'] = $item->code;
-                    $this->prsItems[$index]['item_name'] = $item->name;
-                    $this->prsItems[$index]['stock_on_hand'] = $item->stock_on_hand;
-                    $this->prsItems[$index]['unit'] = $item->unit?->name ?? 'PCS';
-                }
-            }
-
-            $this->dispatch('choices:refresh', contextId: $this->contextId);
-        }
-    }
-
-    #[On('updateItemSelect')]
-    public function updateItemSelect($index, $itemId)
-    {
-        if (isset($this->prsItems[$index]) && $itemId && is_numeric($itemId)) {
-            $item = Item::query()->find($itemId);
-            if ($item) {
-                $this->prsItems[$index]['item_id'] = $item->id;
-                $this->prsItems[$index]['item_code'] = $item->code;
-                $this->prsItems[$index]['item_name'] = $item->name;
-                $this->prsItems[$index]['stock_on_hand'] = $item->stock_on_hand;
-                $this->prsItems[$index]['unit'] = $item->unit?->name ?? 'PCS';
-            }
-        }
-
-        $this->dispatch('choices:refresh', contextId: $this->contextId);
-    }
-
-    public function getAvailableItems($index)
-    {
-        $selectedItemIds = [];
-
-        foreach ($this->prsItems as $key => $item) {
-            if ($key !== $index && isset($item['item_id']) && $item['item_id']) {
-                $selectedItemIds[] = (int) $item['item_id'];
-            }
-        }
-
-        $currentItemId = isset($this->prsItems[$index]['item_id']) && $this->prsItems[$index]['item_id']
-            ? (int) $this->prsItems[$index]['item_id']
-            : null;
-
-        return Item::query()
-            ->where('is_active', true)
-            ->where(function ($query) use ($selectedItemIds, $currentItemId) {
-                $query->whereNotIn('id', $selectedItemIds);
-
-                if ($currentItemId) {
-                    $query->orWhere('id', $currentItemId);
-                }
-            })
-            ->orderBy('code')
-            ->get();
     }
 
     public function render()

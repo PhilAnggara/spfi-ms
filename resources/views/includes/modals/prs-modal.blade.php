@@ -353,27 +353,16 @@
 
 @php
     $canManagePrs = auth()->id() === $item->user_id || auth()->user()->hasRole('administrator');
-    $isQuantityOnlyEdit = $item->status === 'CANVASSER_HOLD';
-    $canShowEditModal = $canManagePrs && (
-        $isQuantityOnlyEdit
-        || in_array($item->status, ['REQUESTED', 'ON_HOLD', 'REVISED'], true)
-    );
-    $holdLog = $item->latestPurchasingHoldLog();
+    $canShowQuantityEditModal = $canManagePrs && $item->status === 'CANVASSER_HOLD';
     $canvasserHoldLog = $item->latestCanvasserHoldLog();
 @endphp
-@if ($canShowEditModal)
+@if ($canShowQuantityEditModal)
 <div class="modal fade text-left modal-borderless" id="edit-modal-{{ $item->id }}" tabindex="-1"
     role="dialog" aria-labelledby="myModalLabel1" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
-                    @if ($isQuantityOnlyEdit)
-                        Revise Quantities - ({{ $item->prs_number }})
-                    @else
-                        Edit PRS - ({{ $item->prs_number }})
-                    @endif
-                </h5>
+                <h5 class="modal-title">Revise Quantities - ({{ $item->prs_number }})</h5>
                 <button type="button" class="close rounded-pill" data-bs-dismiss="modal"
                     aria-label="Close">
                     <i data-feather="x"></i>
@@ -383,93 +372,23 @@
                 @csrf
                 @method('PUT')
                 <div class="modal-body">
-
-                    @if ($isQuantityOnlyEdit && $canvasserHoldLog)
+                    @if ($canvasserHoldLog)
                         <div class="alert alert-warning" role="alert">
                             <strong>Canvasser Hold Reason:</strong> {{ $canvasserHoldLog->message }}
                         </div>
                         <p class="text-muted small">You may only adjust quantities. Items cannot be added, removed, or replaced.</p>
-                    @elseif ($item->status === 'ON_HOLD' && $holdLog)
-                        <div class="alert alert-warning" role="alert">
-                            <strong>Hold Reason:</strong> {{ $holdLog->message }}
-                        </div>
                     @endif
 
-                    @if ($isQuantityOnlyEdit)
-                        <div class="divider">
-                            <div class="divider-text">PRS Items (Quantity Only)</div>
-                        </div>
-
-                        <livewire:prs-item
-                            :existing-items="$item->items"
-                            mode="quantity-only"
-                            :context-id="(string) $item->id"
-                            wire:key="prs-item-qty-edit-{{ $item->id }}"
-                        />
-                    @else
-                    <div class="row">
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="edit-department-{{ $item->id }}">Charged to Department</label>
-                                <fieldset class="form-group">
-                                    <select class="form-select" id="edit-department-{{ $item->id }}" name="department_id" required>
-                                        <option value="" disabled>-- Select Department --</option>
-                                        @foreach ($departments as $department)
-                                            <option value="{{ $department->id }}" {{ $item->department_id == $department->id ? 'selected' : '' }}>{{ $department->code }} - {{ $department->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </fieldset>
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="edit-date-needed-{{ $item->id }}">Date Needed</label>
-                                <input type="date" id="edit-date-needed-{{ $item->id }}" class="form-control" placeholder="Date Needed" name="date_needed" value="{{ $item->date_needed }}" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                @php
-                                    $selectedCapex = (string) old('is_capex', $item->is_capex ? '1' : '0');
-                                @endphp
-                                <label class="form-label mb-1">Accounting Category</label>
-                                <div class="prs-accounting-toggle" role="radiogroup" aria-label="Accounting category">
-                                    <input type="radio" class="btn-check" name="is_capex" id="edit-is-capex-no-{{ $item->id }}" value="0" @checked($selectedCapex === '0') required>
-                                    <label class="btn btn-outline-secondary" for="edit-is-capex-no-{{ $item->id }}">
-                                        <i class="fa-regular fa-circle-check me-1"></i>
-                                        Non-CAPEX
-                                    </label>
-
-                                    <input type="radio" class="btn-check" name="is_capex" id="edit-is-capex-yes-{{ $item->id }}" value="1" @checked($selectedCapex === '1') required>
-                                    <label class="btn btn-outline-primary" for="edit-is-capex-yes-{{ $item->id }}">
-                                        <i class="fa-regular fa-building-columns me-1"></i>
-                                        CAPEX
-                                    </label>
-                                </div>
-                                <small class="text-muted d-block mt-1">Keep one PRS for one accounting treatment.</small>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="form-floating">
-                                <textarea class="form-control" placeholder="Leave a comment here"
-                                    id="edit-remarks-{{ $item->id }}" name="remarks">{{ $item->remarks }}</textarea>
-                                <label for="edit-remarks-{{ $item->id }}">Remarks</label>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="divider">
-                        <div class="divider-text">PRS Items</div>
+                        <div class="divider-text">PRS Items (Quantity Only)</div>
                     </div>
 
                     <livewire:prs-item
                         :existing-items="$item->items"
-                        mode="form"
+                        mode="quantity-only"
                         :context-id="(string) $item->id"
-                        wire:key="prs-item-edit-{{ $item->id }}"
+                        wire:key="prs-item-qty-edit-{{ $item->id }}"
                     />
-                    @endif
-
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn icon icon-left btn-light-primary" data-bs-dismiss="modal">
@@ -478,11 +397,7 @@
                     </button>
                     <button type="submit" class="btn icon icon-left btn-primary ms-1">
                         <i class="fa-thin fa-file-pen me-1"></i>
-                        @if ($isQuantityOnlyEdit)
-                            Update Quantities
-                        @else
-                            Update
-                        @endif
+                        Update Quantities
                     </button>
                 </div>
             </form>
