@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const historyRouteTemplate = table.data('historyRouteTemplate');
     const poShowRouteTemplate = table.data('poShowRouteTemplate');
     const canManage = table.data('canManage') === 1 || table.data('canManage') === '1';
+    const canCreate = table.data('canCreate') === 1 || table.data('canCreate') === '1';
     const canViewPo = table.data('canViewPo') === 1 || table.data('canViewPo') === '1';
     const openCreateModal = table.data('openCreateModal') === 1 || table.data('openCreateModal') === '1';
     const editingProductId = String(table.data('editingProductId') || '');
@@ -534,10 +535,10 @@ document.addEventListener('DOMContentLoaded', function () {
         copyToClipboard(name);
     });
 
-    if (openCreateModal && canManage) {
-        if (editingProductId && editModal) {
+    if (openCreateModal) {
+        if (editingProductId && canManage && editModal) {
             editModal.show();
-        } else if (window.bootstrap && window.bootstrap.Modal) {
+        } else if (canCreate && window.bootstrap && window.bootstrap.Modal) {
             const createModalElement = document.getElementById('create-modal');
             if (createModalElement) {
                 const createModal = new window.bootstrap.Modal(createModalElement);

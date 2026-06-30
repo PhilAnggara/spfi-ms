@@ -100,6 +100,7 @@
                             data-history-route-template="{{ route('product.purchase-history', '__ID__') }}"
                             data-po-show-route-template="{{ route('purchase-orders.show', '__ID__') }}"
                             data-can-manage="{{ $canManageProducts ? '1' : '0' }}"
+                            data-can-create="{{ $canCreateProducts ? '1' : '0' }}"
                             data-can-view-po="{{ $canViewPurchaseOrders ? '1' : '0' }}"
                             data-open-create-modal="{{ $errors->any() ? '1' : '0' }}"
                             data-editing-product-id="{{ (string) session('editing_product_id', '') }}">

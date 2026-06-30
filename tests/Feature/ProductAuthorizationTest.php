@@ -77,6 +77,23 @@ it('allows engineering manager to view and create products', function () {
     expect(Item::query()->where('code', 'NEWPRD01')->exists())->toBeTrue();
 });
 
+it('reopens create form with validation errors for engineering manager', function () {
+    $user = createProductUser('engineering-manager');
+
+    $this->actingAs($user)
+        ->from(route('product.index'))
+        ->post(route('product.store'), [])
+        ->assertRedirect(route('product.index'))
+        ->assertSessionHasErrors(['code', 'name']);
+
+    $this->actingAs($user)
+        ->get(route('product.index'))
+        ->assertSuccessful()
+        ->assertSee('id="create-modal"', false)
+        ->assertSee('data-can-create="1"', false)
+        ->assertSee('data-open-create-modal="1"', false);
+});
+
 it('forbids engineering manager from updating and deleting products', function () {
     $user = createProductUser('engineering-manager');
 
