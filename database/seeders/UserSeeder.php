@@ -543,5 +543,14 @@ class UserSeeder extends Seeder
         // wensi email : wensi.saranggi@sinarpurefoods.com
         // ames.runtukahu7033E email : james.runtukahu@sinarpurefoods.com
         // luas email : eduard.civil@spfi.com
+
+        User::create([
+            'name' => 'Engineering Manager Demo',
+            'username' => 'eng.manager',
+            'email' => 'engineering.manager@spfi.local',
+            'role' => 'Manager',
+            'password' => Hash::make('Admin123'),
+            'department_id' => $departmentIdByCode['7046'],
+        ])->assignRole('engineering-manager');
     }
 }

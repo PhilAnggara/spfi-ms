@@ -263,6 +263,24 @@
                             </li>
                         @endrole
 
+                        @role('engineering-manager')
+                            <li class="sidebar-item {{ Request::is('master/product') ? 'active' : '' }}">
+                                <a href="{{ route('product.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-boxes-stacked {{ Request::is('master/product') ? 'fa-fade' : '' }}"></i>
+                                    <span>Item Master</span>
+                                </a>
+                            </li>
+                        @endrole
+
+                        @role('im-manager|im-supervisor')
+                            <li class="sidebar-item {{ Request::is('master/product') ? 'active' : '' }}">
+                                <a href="{{ route('product.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-boxes-stacked {{ Request::is('master/product') ? 'fa-fade' : '' }}"></i>
+                                    <span>Product</span>
+                                </a>
+                            </li>
+                        @endrole
+
                         @role('administrator|purchasing-manager')
                             <li class="sidebar-item {{ Request::is('accounting/reports') ? 'active' : '' }}">
                                 <a href="{{ route('accounting.reports.index') }}" class='sidebar-link'>

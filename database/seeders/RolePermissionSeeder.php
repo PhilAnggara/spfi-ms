@@ -3,9 +3,9 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -104,6 +104,7 @@ class RolePermissionSeeder extends Seeder
             'accounting-supervisor',
             'accounting-staff',
             'production-manager',
+            'engineering-manager',
         ];
 
         foreach ($roles as $role) {
@@ -265,6 +266,17 @@ class RolePermissionSeeder extends Seeder
                 'print-document',
             ],
             'production-manager' => [
+                'create-prs',
+                'view-prs',
+                'edit-prs',
+                'approve-prs',
+                'view-transfer',
+                'view-delivery',
+                'view-po-progress',
+                'view-dashboard',
+                'print-document',
+            ],
+            'engineering-manager' => [
                 'create-prs',
                 'view-prs',
                 'edit-prs',

@@ -111,6 +111,7 @@
     </div>
 </div>
 
+@if ($canManageProducts ?? false)
 <!-- Modal edit reusable: dipakai untuk semua item agar tidak render ribuan modal -->
 <div class="modal fade text-left modal-borderless" id="edit-modal" tabindex="-1" role="dialog" aria-labelledby="editProductLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
@@ -224,3 +225,4 @@
         </div>
     </div>
 </div>
+@endif

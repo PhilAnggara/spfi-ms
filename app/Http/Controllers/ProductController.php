@@ -6,6 +6,7 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\PurchaseOrderItem;
 use App\Models\UnitOfMeasure;
+use App\Models\User;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,11 +16,27 @@ class ProductController extends Controller
 {
     use PaginatesLegacySqlServer;
 
+    /** @var list<string> */
+    private const ROLES_CREATE_PRODUCTS = [
+        'administrator',
+        'engineering-manager',
+        'im-manager',
+        'im-supervisor',
+    ];
+
+    /** @var list<string> */
+    private const ROLES_MANAGE_PRODUCTS = [
+        'administrator',
+        'im-manager',
+        'im-supervisor',
+    ];
+
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
+        $user = auth()->user();
         $itemCategories = ItemCategory::query()->orderBy('name')->get();
         $itemUnits = UnitOfMeasure::query()->orderBy('name')->get();
         $types = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
@@ -41,8 +58,9 @@ class ProductController extends Controller
                 'unit_id' => request('unit_id', ''),
                 'type' => request('type', ''),
             ],
-            'canManageProducts' => auth()->user()?->hasRole('administrator') ?? false,
-            'canViewPurchaseOrders' => auth()->user()?->hasAnyRole([
+            'canCreateProducts' => $this->userCanCreateProducts($user),
+            'canManageProducts' => $this->userCanManageProducts($user),
+            'canViewPurchaseOrders' => $user?->hasAnyRole([
                 'administrator',
                 'purchasing-staff',
                 'purchasing-manager',
@@ -300,6 +318,8 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
+        abort_unless($this->userCanCreateProducts($request->user()), 403);
+
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
         $request->validate([
@@ -342,6 +362,8 @@ class ProductController extends Controller
      */
     public function update(Request $request, string $id)
     {
+        abort_unless($this->userCanManageProducts($request->user()), 403);
+
         $item = Item::findOrFail($id);
 
         // Flag for error-handling to reopen the correct modal
@@ -371,12 +393,24 @@ class ProductController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
+        abort_unless($this->userCanManageProducts($request->user()), 403);
+
         $item = Item::findOrFail($id);
         $itemName = $item->name;
         $item->delete();
 
         return redirect()->back()->with('success', 'Product '.$itemName.' has been deleted successfully.');
+    }
+
+    private function userCanCreateProducts(?User $user): bool
+    {
+        return $user?->hasAnyRole(self::ROLES_CREATE_PRODUCTS) ?? false;
+    }
+
+    private function userCanManageProducts(?User $user): bool
+    {
+        return $user?->hasAnyRole(self::ROLES_MANAGE_PRODUCTS) ?? false;
     }
 }

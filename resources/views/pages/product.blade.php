@@ -12,7 +12,7 @@
                     <p class="text-muted mb-0">Browse products with instant search, live filters, and purchase history for canvassing.</p>
                 </div>
             </div>
-            @if ($canManageProducts)
+            @if ($canCreateProducts)
                 <div class="col-12 col-lg-5">
                     <div class="po-top-actions text-lg-end">
                         <button type="button" class="btn btn-success icon icon-left" data-bs-toggle="modal" data-bs-target="#create-modal">
@@ -125,7 +125,7 @@
 </div>
 </div>
 
-@if ($canManageProducts)
+@if ($canCreateProducts || $canManageProducts)
     @include('includes.modals.product-modal')
 @endif
 @include('includes.modals.product-purchase-history-modal')
@@ -142,7 +142,7 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
-    @if ($canManageProducts)
+    @if ($canCreateProducts || $canManageProducts)
         <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
         <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
     @endif

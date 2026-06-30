@@ -22,7 +22,7 @@ class UserController extends Controller
             'Marketing / Export' => 'production-manager',
             'Fixed Labeling' => 'production-manager',
             'Quality Assurance' => 'production-manager',
-            'Engineering' => 'production-manager',
+            'Engineering' => 'engineering-manager',
         ],
         'Supervisor' => [
             'Purchasing' => 'purchasing-staff',
@@ -61,6 +61,7 @@ class UserController extends Controller
         // $users = User::where('id', '!=', Auth::id())->get();
         $users = User::all();
         $departments = Department::all();
+
         return view('pages.user', [
             'users' => $users,
             'departments' => $departments,
@@ -205,6 +206,7 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $name = $user->name;
         $user->delete();
+
         return redirect()->back()->with('success', "User $name has been deleted successfully.");
     }
 }
