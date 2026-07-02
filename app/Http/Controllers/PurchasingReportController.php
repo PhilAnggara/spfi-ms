@@ -135,7 +135,7 @@ class PurchasingReportController extends Controller
             $currencyBuckets = $this->currencyBuckets($currencyCode, $amount);
 
             return [
-                'po_number' => $po?->po_number ?? ('#' . $po?->id),
+                'po_number' => $po?->po_number ?? ('#'.$po?->id),
                 'po_date' => $po?->created_at?->toDateString(),
                 'po_type' => $item->meta['term_of_payment_type'] ?? null,
                 'currency' => $currencyCode,
@@ -214,7 +214,7 @@ class PurchasingReportController extends Controller
                 'prs_date' => $prs?->prs_date,
                 'department_code' => $department?->code,
                 'department_name' => $department?->name,
-                'po_number' => $po?->po_number ?? ('#' . $po?->id),
+                'po_number' => $po?->po_number ?? ('#'.$po?->id),
                 'po_date' => $po?->created_at?->toDateString(),
                 'currency' => $currencyCode,
                 'supplier' => $po?->supplier?->name,
@@ -290,7 +290,7 @@ class PurchasingReportController extends Controller
                     'prs_id' => $prs?->id,
                     'prs_number' => $prs?->prs_number,
                     'prs_date' => $prs?->prs_date,
-                    'po_number' => $po?->po_number ?? ('#' . $po?->id),
+                    'po_number' => $po?->po_number ?? ('#'.$po?->id),
                     'po_date' => $po?->created_at?->toDateString(),
                     'currency' => $currencyCode,
                     'supplier' => $po?->supplier?->name,
@@ -588,6 +588,14 @@ class PurchasingReportController extends Controller
 
     private function mapPurchasingLeadTimeRow(object $row): array
     {
+        $leadTimeDays = 0;
+
+        if ($row->assigned_canvasser_at && $row->rr_date) {
+            $leadTimeDays = Carbon::parse($row->assigned_canvasser_at)
+                ->startOfDay()
+                ->diffInDays(Carbon::parse($row->rr_date)->startOfDay());
+        }
+
         return [
             'prs_id' => $row->prs_id,
             'prs_number' => $row->prs_number,
@@ -603,7 +611,7 @@ class PurchasingReportController extends Controller
             'supplier_name' => $row->supplier_name,
             'rr_number' => $row->rr_number,
             'rr_date' => $row->rr_date,
-            'lead_time_days' => (int) $row->lead_time_days,
+            'lead_time_days' => (int) $leadTimeDays,
         ];
     }
 
@@ -630,7 +638,6 @@ class PurchasingReportController extends Controller
             'suppliers.name as supplier_name',
             'rr.rr_number',
             'rr.created_at as rr_date',
-            DB::raw('DATEDIFF(DATE(rr.created_at), DATE(pi.assigned_canvasser_at)) as lead_time_days'),
         ];
 
         $rows = collect();
@@ -690,6 +697,7 @@ class PurchasingReportController extends Controller
     private function calculateLineDiscount(PurchaseOrderItem $item, ?PurchaseOrder $po): float
     {
         $rate = (float) ($po?->discount_rate ?? 0);
+
         return $item->total * ($rate / 100);
     }
 
@@ -698,6 +706,7 @@ class PurchasingReportController extends Controller
         $rate = (float) ($po?->ppn_rate ?? 0);
         $discount = $this->calculateLineDiscount($item, $po);
         $base = $item->total - $discount;
+
         return $base * ($rate / 100);
     }
 
@@ -706,6 +715,7 @@ class PurchasingReportController extends Controller
         $rate = (float) ($po?->pph_rate ?? 0);
         $discount = $this->calculateLineDiscount($item, $po);
         $base = $item->total - $discount;
+
         return $base * ($rate / 100);
     }
 
