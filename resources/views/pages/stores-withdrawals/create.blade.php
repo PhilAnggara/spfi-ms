@@ -2,7 +2,10 @@
 @section('title', ' | Create Stores Withdrawal')
 
 @section('content')
-<div class="page-heading prs-create-page">
+@php
+    $initialMode = ($withdrawalMode ?? 'normal') === 'capex' ? 'capex' : 'normal';
+@endphp
+<div class="page-heading prs-create-page" id="sws-create-page" data-initial-mode="{{ $initialMode }}">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
             <div class="col-12 col-lg-7">
@@ -32,15 +35,48 @@
                 <div class="col-12">
                     <div class="card shadow-sm border-0">
                         <div class="card-body">
-                            <div class="alert alert-info py-2 mb-3" role="alert">
+                            <div class="sws-withdrawal-mode-switch sws-withdrawal-mode-toggle mb-3" role="group" aria-label="Withdrawal mode">
+                                <button type="button"
+                                    class="sws-mode-option {{ $initialMode === 'normal' ? 'active' : '' }}"
+                                    data-withdrawal-mode="normal"
+                                    aria-pressed="{{ $initialMode === 'normal' ? 'true' : 'false' }}">
+                                    <span class="sws-mode-option-icon">
+                                        <i class="fa-light fa-boxes-stacked"></i>
+                                    </span>
+                                    <span class="sws-mode-option-body">
+                                        <span class="sws-mode-option-title">Normal Withdrawal</span>
+                                        <span class="sws-mode-option-desc">Withdraw from warehouse stock (Normal or Confirmatory).</span>
+                                    </span>
+                                </button>
+                                <button type="button"
+                                    class="sws-mode-option {{ $initialMode === 'capex' ? 'active' : '' }}"
+                                    data-withdrawal-mode="capex"
+                                    aria-pressed="{{ $initialMode === 'capex' ? 'true' : 'false' }}">
+                                    <span class="sws-mode-option-icon">
+                                        <i class="fa-light fa-building-columns"></i>
+                                    </span>
+                                    <span class="sws-mode-option-body">
+                                        <span class="sws-mode-option-title">CAPEX Withdrawal</span>
+                                        <span class="sws-mode-option-desc">Withdraw from CAPEX RR lines not yet taken.</span>
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div class="alert alert-info py-2 mb-3" id="sws-normal-mode-hint" @if($initialMode === 'capex') style="display:none" @endif role="alert">
                                 <strong>Confirmatory</strong> type allows selecting zero-stock items so withdrawal can still be recorded before RR is posted.
                             </div>
-                            <div class="prs-catalog-toolbar" id="sws-catalog-filter-form" data-base-url="{{ route('stores-withdrawals.create') }}">
+                            <div class="alert alert-warning py-2 mb-3" id="sws-capex-mode-hint" @if($initialMode !== 'capex') style="display:none" @endif role="alert">
+                                CAPEX items do not use warehouse stock. Select <strong>Charged to Department</strong> in the cart, then search RR lines below.
+                            </div>
+
+                            <div class="prs-catalog-toolbar {{ $initialMode === 'capex' ? 'sws-catalog-toolbar--capex' : '' }}" id="sws-catalog-filter-form"
+                                data-base-url="{{ route('stores-withdrawals.create') }}"
+                                data-capex-url="{{ route('stores-withdrawals.capex-lines') }}">
                                 <div class="prs-catalog-field prs-catalog-search-field">
                                     <label for="sws-item-search" class="form-label mb-1">Search Item</label>
                                     <input type="text" class="form-control" id="sws-item-search" name="search" value="{{ $search ?? '' }}" placeholder="Item name, code, category, or unit">
                                 </div>
-                                <div class="prs-catalog-field">
+                                <div class="prs-catalog-field sws-normal-only-filter">
                                     <label for="sws-category-filter" class="form-label mb-1">Category</label>
                                     <select class="form-select" id="sws-category-filter" name="category">
                                         <option value="">All categories</option>
@@ -49,7 +85,7 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="prs-catalog-field">
+                                <div class="prs-catalog-field sws-normal-only-filter">
                                     <label for="sws-stock-filter" class="form-label mb-1">Stock</label>
                                     <select class="form-select" id="sws-stock-filter" name="stock">
                                         <option value="">All stock</option>
@@ -75,43 +111,51 @@
                                 </div>
                             </div>
                             <div class="prs-item-grid" id="sws-item-grid" data-layout="grid">
-                                @forelse ($items as $item)
-                                    <div class="prs-item-card"
-                                        data-item-id="{{ $item->id }}"
-                                        data-name="{{ strtolower($item->name) }}"
-                                        data-code="{{ strtolower($item->code) }}"
-                                        data-category="{{ strtolower($item->category?->name ?? '') }}"
-                                        data-stock="{{ (float) $item->stock_on_hand }}"
-                                        data-unit="{{ $item->unit?->name ?? 'PCS' }}">
-                                        <div class="prs-item-body">
-                                            <div class="prs-item-title" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $item->name }}">{{ $item->name }}</div>
-                                            <div class="prs-item-meta">
-                                                <span class="badge bg-light-primary">{{ $item->code }}</span>
-                                                <span class="text-muted">Stock {{ $item->stock_on_hand }} {{ $item->unit?->name ?? 'PCS' }}</span>
-                                            </div>
-                                            <div class="prs-item-meta text-muted">{{ $item->category?->name ?? 'Uncategorized' }}</div>
-                                            <div class="prs-item-actions">
-                                                <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
-                                                    <i class="fa-light fa-minus"></i>
-                                                </button>
-                                                <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
-                                                <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
-                                                    <i class="fa-light fa-plus"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="{{ $item->id }}">
-                                                    <i class="fa-light fa-plus"></i>
-                                                    Add
-                                                </button>
+                                @if ($initialMode === 'normal')
+                                    @forelse ($items as $item)
+                                        <div class="prs-item-card"
+                                            data-item-id="{{ $item->id }}"
+                                            data-name="{{ strtolower($item->name) }}"
+                                            data-code="{{ strtolower($item->code) }}"
+                                            data-category="{{ strtolower($item->category?->name ?? '') }}"
+                                            data-stock="{{ (float) $item->stock_on_hand }}"
+                                            data-unit="{{ $item->unit?->name ?? 'PCS' }}">
+                                            <div class="prs-item-body">
+                                                <div class="prs-item-title" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $item->name }}">{{ $item->name }}</div>
+                                                <div class="prs-item-meta">
+                                                    <span class="badge bg-light-primary">{{ $item->code }}</span>
+                                                    <span class="text-muted">Stock {{ $item->stock_on_hand }} {{ $item->unit?->name ?? 'PCS' }}</span>
+                                                </div>
+                                                <div class="prs-item-meta text-muted">{{ $item->category?->name ?? 'Uncategorized' }}</div>
+                                                <div class="prs-item-actions">
+                                                    <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
+                                                        <i class="fa-light fa-minus"></i>
+                                                    </button>
+                                                    <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                                                    <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
+                                                        <i class="fa-light fa-plus"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="{{ $item->id }}">
+                                                        <i class="fa-light fa-plus"></i>
+                                                        Add
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                @empty
+                                    @empty
+                                        <div class="prs-catalog-empty-state">
+                                            <i class="fa-duotone fa-solid fa-box-open prs-catalog-empty-icon"></i>
+                                            <p class="mb-0 mt-2 fw-semibold">No items found.</p>
+                                            <small>Try changing your keyword or category filter to see more results.</small>
+                                        </div>
+                                    @endforelse
+                                @else
                                     <div class="prs-catalog-empty-state">
-                                        <i class="fa-duotone fa-solid fa-box-open prs-catalog-empty-icon"></i>
-                                        <p class="mb-0 mt-2 fw-semibold">No items found.</p>
-                                        <small>Try changing your keyword or category filter to see more results.</small>
+                                        <i class="fa-duotone fa-solid fa-building-columns prs-catalog-empty-icon"></i>
+                                        <p class="mb-0 mt-2 fw-semibold">Select charged department in the cart.</p>
+                                        <small>Open the cart and choose Charged to Department to load CAPEX RR lines.</small>
                                     </div>
-                                @endforelse
+                                @endif
                             </div>
                             <div class="mt-4 prs-pagination" id="sws-pagination" data-current-page="{{ $items->currentPage() }}" data-last-page="{{ $items->lastPage() }}"></div>
                         </div>
@@ -140,12 +184,12 @@
                         <div class="prs-cart-layout-header">
                             <h6 class="mb-2">Stores Withdrawal Header</h6>
                             <div class="row g-2">
-                                <div class="col-12">
+                                <div class="col-12" id="sws-cart-department-field">
                                     <label for="sws-department" class="form-label">Charged to Department</label>
                                     <select class="form-select" id="sws-department" name="department_id" required>
                                         <option value="" disabled>-- Select Department --</option>
                                         @foreach ($departments as $department)
-                                            <option value="{{ $department->id }}" {{ auth()->user()->department_id == $department->id ? 'selected' : '' }}>
+                                            <option value="{{ $department->id }}" @selected((string) ($selectedDepartmentId ?? auth()->user()->department_id) === (string) $department->id)>
                                                 {{ $department->code }} - {{ $department->name }}
                                             </option>
                                         @endforeach
@@ -155,11 +199,12 @@
                                     <label for="sws-date" class="form-label">SWS Date</label>
                                     <input type="date" id="sws-date" class="form-control" name="sws_date" value="{{ now()->format('Y-m-d') }}" required>
                                 </div>
-                                <div class="col-12 col-md-6">
+                                <div class="col-12 col-md-6" id="sws-type-field">
                                     <label for="sws-type" class="form-label">Type</label>
                                     <select class="form-select" id="sws-type" name="type" required>
-                                        <option value="NORMAL" selected>Normal</option>
+                                        <option value="NORMAL" @selected($initialMode !== 'capex')>Normal</option>
                                         <option value="CONFIRMATORY">Confirmatory</option>
+                                        <option value="CAPEX" @selected($initialMode === 'capex')>CAPEX</option>
                                     </select>
                                 </div>
                                 <div class="col-12">

@@ -43,6 +43,15 @@
                         </select>
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
+                        <label for="filter-sws-type" class="form-label mb-1">Type</label>
+                        <select id="filter-sws-type" class="form-select">
+                            <option value="">All Types</option>
+                            <option value="normal" @selected(($filters['type'] ?? '') === 'normal')>Normal</option>
+                            <option value="confirmatory" @selected(($filters['type'] ?? '') === 'confirmatory')>Confirmatory</option>
+                            <option value="capex" @selected(($filters['type'] ?? '') === 'capex')>CAPEX</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-sws-date-start" class="form-label mb-1">SWS Date (from)</label>
                         <input type="date" id="filter-sws-date-start" class="form-control" value="{{ $filters['sws_start'] ?? '' }}">
                     </div>
@@ -107,6 +116,9 @@
                                                     <i class="fa-solid fa-regular fa-clipboard"></i>
                                                     {{ $sws->sws_number }}
                                                 </button>
+                                                @if (strtolower((string) ($sws->type ?? '')) === 'capex')
+                                                    <span class="badge bg-light-warning text-dark ms-1">CAPEX</span>
+                                                @endif
                                             </td>
                                             <td>
                                                 <i class="fa-duotone fa-solid fa-calendar-days text-danger"></i>
@@ -183,6 +195,9 @@
                                         <div class="modal-body">
                                             <div class="sws-pill-row mb-3">
                                                 <span class="badge bg-light-primary">{{ strtoupper((string) ($sws->type ?? 'NORMAL')) }}</span>
+                                                @if (strtolower((string) ($sws->type ?? '')) === 'capex')
+                                                    <span class="badge bg-light-warning text-dark">CAPEX</span>
+                                                @endif
                                                 <span class="badge bg-light-secondary">{{ $detailItems->count() }} item(s)</span>
                                             </div>
 

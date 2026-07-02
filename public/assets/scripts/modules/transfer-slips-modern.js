@@ -303,7 +303,12 @@ function initTransferSlipCreateModal(swsLookupUrl) {
         if (detailFields.department) {
             detailFields.department.textContent = (payload.store_withdrawal.department_code || '-') + ' / ' + (payload.store_withdrawal.department_name || '-');
         }
-        if (detailFields.type) detailFields.type.textContent = payload.store_withdrawal.type || '-';
+        if (detailFields.type) {
+            const typeLabel = payload.store_withdrawal.is_capex
+                ? `${payload.store_withdrawal.type || '-'} (CAPEX)`
+                : (payload.store_withdrawal.type || '-');
+            detailFields.type.textContent = typeLabel;
+        }
         if (detailFields.info) detailFields.info.textContent = payload.store_withdrawal.info || '-';
 
         if (!Array.isArray(payload.items) || payload.items.length === 0) {

@@ -86,9 +86,15 @@
     @php
         $totalQuantity = (float) $items->sum('quantity');
         $totalRows = $items->count();
+        $isCapex = strtolower((string) ($sws->type ?? '')) === 'capex';
     @endphp
 
-    <div class="title">STORES WITHDRAWAL SLIP</div>
+    <div class="title">
+        STORES WITHDRAWAL SLIP
+        @if ($isCapex)
+            <span style="font-size:12px;">(CAPEX)</span>
+        @endif
+    </div>
     <div class="subtitle">PT Sinar Pure Foods International</div>
     <div class="line"></div>
 
@@ -125,9 +131,14 @@
                 <th style="width: 28px;" class="text-center">No</th>
                 <th>Item</th>
                 <th style="width: 85px;">Code</th>
+                @if ($isCapex)
+                    <th style="width: 70px;">PRS</th>
+                    <th style="width: 70px;">PO</th>
+                    <th style="width: 70px;">RR</th>
+                @endif
                 <th style="width: 70px;" class="text-right">Qty</th>
                 <th style="width: 60px;" class="text-center">UoM</th>
-                <th style="width: 90px;" class="text-right">SOH Snapshot</th>
+                <th style="width: 90px;" class="text-right">{{ $isCapex ? 'RR Qty' : 'SOH Snapshot' }}</th>
             </tr>
         </thead>
         <tbody>
@@ -141,13 +152,18 @@
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>{{ $detail->item_name ?? '(item unavailable)' }}</td>
                     <td>{{ $detail->item_code ?? $detail->product_code ?? '-' }}</td>
+                    @if ($isCapex)
+                        <td>{{ $detail->prs_number ?? '-' }}</td>
+                        <td>{{ $detail->po_number ?? '-' }}</td>
+                        <td>{{ $detail->rr_number ?? '-' }}</td>
+                    @endif
                     <td class="text-right">{{ number_format($qty, 3, '.', ',') }}</td>
                     <td class="text-center">{{ $uom }}</td>
                     <td class="text-right">{{ number_format($soh, 3, '.', ',') }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" class="text-center">No item data found.</td>
+                    <td colspan="{{ $isCapex ? 9 : 6 }}" class="text-center">No item data found.</td>
                 </tr>
             @endforelse
         </tbody>

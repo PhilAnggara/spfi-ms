@@ -179,6 +179,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:administrator|im-manager|im-supervisor|im-staff')->prefix('stores-withdrawals')->name('stores-withdrawals.')->group(function () {
         Route::get('/', [StoreWithdrawalController::class, 'index'])->name('index');
         Route::get('/create', [StoreWithdrawalController::class, 'create'])->name('create');
+        Route::get('/capex-lines', [StoreWithdrawalController::class, 'capexLines'])->name('capex-lines');
         Route::post('/', [StoreWithdrawalController::class, 'store'])->name('store');
         Route::get('/{storeWithdrawal}/print', [StoreWithdrawalController::class, 'print'])->name('print');
         Route::get('/{storeWithdrawal}', [StoreWithdrawalController::class, 'show'])->name('show');

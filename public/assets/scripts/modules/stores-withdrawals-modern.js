@@ -16,6 +16,7 @@ function initStoreWithdrawalFilters() {
     const filterElements = {
         keyword: document.getElementById('filter-sws-keyword'),
         department: document.getElementById('filter-sws-department'),
+        type: document.getElementById('filter-sws-type'),
         swsStart: document.getElementById('filter-sws-date-start'),
         swsEnd: document.getElementById('filter-sws-date-end'),
         reset: document.getElementById('reset-sws-filter'),
@@ -36,6 +37,7 @@ function initStoreWithdrawalFilters() {
 
         setQueryParam(url.searchParams, 'keyword', filterElements.keyword?.value);
         setQueryParam(url.searchParams, 'department', filterElements.department?.value);
+        setQueryParam(url.searchParams, 'type', filterElements.type?.value);
         setQueryParam(url.searchParams, 'sws_start', filterElements.swsStart?.value);
         setQueryParam(url.searchParams, 'sws_end', filterElements.swsEnd?.value);
 
@@ -74,6 +76,10 @@ function initStoreWithdrawalFilters() {
         filterElements.department.addEventListener('change', () => applyServerFilter(false));
     }
 
+    if (filterElements.type) {
+        filterElements.type.addEventListener('change', () => applyServerFilter(false));
+    }
+
     if (filterElements.swsStart) {
         filterElements.swsStart.addEventListener('change', () => applyServerFilter(false));
     }
@@ -83,12 +89,12 @@ function initStoreWithdrawalFilters() {
     }
 
     if (filterElements.reset) {
-        filterElements.reset.addEventListener('click', function () {
+        filterElements.reset.addEventListener('click', () => {
             if (filterElements.keyword) filterElements.keyword.value = '';
             if (filterElements.department) filterElements.department.value = '';
+            if (filterElements.type) filterElements.type.value = '';
             if (filterElements.swsStart) filterElements.swsStart.value = '';
             if (filterElements.swsEnd) filterElements.swsEnd.value = '';
-
             applyServerFilter(false);
         });
     }

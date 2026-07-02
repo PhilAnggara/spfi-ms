@@ -52,8 +52,10 @@ function initSwsCatalogAndCart() {
         return;
     }
 
+    const createPage = document.getElementById('sws-create-page');
     const filterBar = document.getElementById('sws-catalog-filter-form');
     const baseUrl = filterBar?.dataset.baseUrl || window.location.pathname;
+    const capexUrl = filterBar?.dataset.capexUrl || `${window.location.pathname.replace(/\/create$/, '')}/capex-lines`;
     const searchInput = document.getElementById('sws-item-search');
     const categoryFilter = document.getElementById('sws-category-filter');
     const stockFilter = document.getElementById('sws-stock-filter');
@@ -61,6 +63,7 @@ function initSwsCatalogAndCart() {
     const layoutToggle = filterBar?.querySelector('.prs-layout-toggle');
     const paginationContainer = document.getElementById('sws-pagination');
     const typeSelect = document.getElementById('sws-type');
+    const typeField = document.getElementById('sws-type-field');
     const cartItemsContainer = document.getElementById('sws-cart-list');
     const cartEmpty = document.getElementById('sws-cart-empty');
     const hiddenInputsContainer = document.getElementById('sws-cart-hidden-inputs');
@@ -69,11 +72,17 @@ function initSwsCatalogAndCart() {
     const topCartBtn = document.getElementById('toggle-sws-cart');
     const stockRuleHint = document.getElementById('sws-stock-rule-hint');
     const form = document.getElementById('sws-create-form');
+    const modeToggle = document.querySelector('.sws-withdrawal-mode-toggle');
+    const normalModeHint = document.getElementById('sws-normal-mode-hint');
+    const capexModeHint = document.getElementById('sws-capex-mode-hint');
+    const cartDepartmentSelect = document.getElementById('sws-department');
+    const normalOnlyFilters = document.querySelectorAll('.sws-normal-only-filter');
     let catalogAbortController = null;
     let catalogRequestSeq = 0;
     const LAYOUT_KEY = 'sws-create-catalog-layout';
     let catalogLayout = window.CatalogLayout?.readLayout(LAYOUT_KEY) || 'grid';
     let lastCatalogItems = [];
+    let withdrawalMode = createPage?.dataset.initialMode === 'capex' ? 'capex' : 'normal';
 
     const state = {
         page: parseInt(paginationContainer?.dataset.currentPage || '1', 10) || 1,
@@ -81,9 +90,24 @@ function initSwsCatalogAndCart() {
         cart: new Map(),
     };
 
-    const isConfirmatoryType = () => String(typeSelect?.value || 'NORMAL') === 'CONFIRMATORY';
+    const isCapexMode = () => withdrawalMode === 'capex';
+    const isConfirmatoryType = () => !isCapexMode() && String(typeSelect?.value || 'NORMAL') === 'CONFIRMATORY';
+
+    const getCartKey = (payload) => {
+        if (isCapexMode()) {
+            return `capex:${payload.receivingReportItemId || 0}`;
+        }
+
+        return `item:${payload.itemId || 0}`;
+    };
+
+    const parseCartKey = (cartKey) => String(cartKey || '');
 
     const canSelectStock = (stockValue) => {
+        if (isCapexMode()) {
+            return Number(stockValue) > 0;
+        }
+
         if (isConfirmatoryType()) {
             return true;
         }
@@ -93,8 +117,17 @@ function initSwsCatalogAndCart() {
 
     const getAllowedQuantity = (stockValue, requestedQuantity) => {
         const normalizedQuantity = Math.max(1, Number(requestedQuantity) || 1);
-        if (isConfirmatoryType()) {
-            return normalizedQuantity;
+        if (isCapexMode() || isConfirmatoryType()) {
+            const normalizedStock = Number(stockValue) || 0;
+            if (isCapexMode() && normalizedStock <= 0) {
+                return 0;
+            }
+
+            if (isConfirmatoryType()) {
+                return normalizedQuantity;
+            }
+
+            return Math.min(normalizedQuantity, normalizedStock);
         }
 
         const normalizedStock = Number(stockValue) || 0;
@@ -190,12 +223,28 @@ function initSwsCatalogAndCart() {
 
     const getCards = () => window.CatalogLayout?.getCatalogRows(grid) || [];
 
-    const getCardPayload = (row) => window.CatalogLayout?.getRowPayload(row) || {
-        itemId: 0,
-        name: '',
-        code: '',
-        unit: 'PCS',
-        stock: 0,
+    const getCardPayload = (row) => {
+        if (isCapexMode()) {
+            return {
+                receivingReportItemId: parseInt(row.dataset.receivingReportItemId || '0', 10),
+                itemId: parseInt(row.dataset.itemId || '0', 10),
+                name: row.dataset.name || '',
+                code: row.dataset.code || '',
+                unit: row.dataset.unit || 'PCS',
+                stock: Number(row.dataset.stock || 0),
+                prsNumber: row.dataset.prsNumber || '',
+                poNumber: row.dataset.poNumber || '',
+                rrNumber: row.dataset.rrNumber || '',
+            };
+        }
+
+        return window.CatalogLayout?.getRowPayload(row) || {
+            itemId: 0,
+            name: '',
+            code: '',
+            unit: 'PCS',
+            stock: 0,
+        };
     };
 
     const updateCatalogButtons = () => {
@@ -203,12 +252,13 @@ function initSwsCatalogAndCart() {
             const payload = getCardPayload(card);
             const addButton = card.querySelector('.prs-item-add');
             syncCatalogQuantityInput(card);
-            if (!addButton || !payload.itemId) {
+            if (!addButton || (!payload.itemId && !payload.receivingReportItemId)) {
                 return;
             }
 
             const blocked = !canSelectStock(payload.stock);
-            const inCart = state.cart.has(payload.itemId);
+            const cartKey = getCartKey(payload);
+            const inCart = state.cart.has(cartKey);
 
             addButton.disabled = blocked;
             addButton.classList.toggle('btn-primary', !inCart && !blocked);
@@ -216,8 +266,12 @@ function initSwsCatalogAndCart() {
             addButton.classList.toggle('btn-outline-secondary', blocked);
 
             if (blocked) {
-                addButton.innerHTML = '<i class="fa-light fa-ban"></i> Stock 0';
-                addButton.title = 'Normal type does not allow zero-stock items.';
+                addButton.innerHTML = isCapexMode()
+                    ? '<i class="fa-light fa-ban"></i> No balance'
+                    : '<i class="fa-light fa-ban"></i> Stock 0';
+                addButton.title = isCapexMode()
+                    ? 'No remaining CAPEX quantity for this RR line.'
+                    : 'Normal type does not allow zero-stock items.';
             } else if (inCart) {
                 addButton.innerHTML = '<i class="fa-light fa-cart-plus"></i> Update';
                 addButton.title = 'Update item quantity in the cart.';
@@ -270,37 +324,45 @@ function initSwsCatalogAndCart() {
         }
 
         cartItemsContainer.innerHTML = cartItems.map((item) => {
+            const cartKey = getCartKey(item);
             const stockLabelClass = Number(item.stock) <= 0 ? 'text-danger fw-semibold' : 'text-muted';
             const quantityMaxAttribute = !isConfirmatoryType() && Number(item.stock) > 0
                 ? `max="${item.stock}"`
                 : '';
+            const stockLabel = isCapexMode()
+                ? `Remaining ${item.stock}`
+                : `Stock ${item.stock}`;
+            const referenceLine = isCapexMode()
+                ? `<small class="text-muted d-block">PRS ${escapeHtml(item.prsNumber || '-')} · PO ${escapeHtml(item.poNumber || '-')} · RR ${escapeHtml(item.rrNumber || '-')}</small>`
+                : '';
 
             return `
-                <div class="prs-cart-item" data-item-id="${item.itemId}">
+                <div class="prs-cart-item" data-cart-key="${cartKey}">
                     <div class="prs-cart-item-info">
                         <div class="prs-cart-thumb">
-                            <i class="fa-duotone fa-solid fa-box"></i>
+                            <i class="fa-duotone fa-solid ${isCapexMode() ? 'fa-building-columns' : 'fa-box'}"></i>
                         </div>
                         <div class="prs-cart-text">
                             <div class="fw-semibold">${escapeHtml(item.name)}</div>
-                            <small class="text-muted">${escapeHtml(item.code)} · <span class="${stockLabelClass}">Stock ${item.stock}</span> ${escapeHtml(item.unit)}</small>
+                            <small class="text-muted">${escapeHtml(item.code)} · <span class="${stockLabelClass}">${stockLabel}</span> ${escapeHtml(item.unit)}</small>
+                            ${referenceLine}
                         </div>
                     </div>
                     <div class="prs-cart-item-actions">
                         <div class="prs-cart-item-qty">
                             <div class="input-group input-group-sm">
-                                <button type="button" class="btn btn-light-secondary sws-cart-decrement" data-item-id="${item.itemId}" aria-label="Decrease quantity">
+                                <button type="button" class="btn btn-light-secondary sws-cart-decrement" data-cart-key="${cartKey}" aria-label="Decrease quantity">
                                     <i class="fa-light fa-minus"></i>
                                 </button>
-                                <input type="number" min="1" ${quantityMaxAttribute} class="form-control sws-cart-qty" value="${item.quantity}" data-item-id="${item.itemId}">
-                                <button type="button" class="btn btn-light-secondary sws-cart-increment" data-item-id="${item.itemId}" aria-label="Increase quantity">
+                                <input type="number" min="1" ${quantityMaxAttribute} class="form-control sws-cart-qty" value="${item.quantity}" data-cart-key="${cartKey}">
+                                <button type="button" class="btn btn-light-secondary sws-cart-increment" data-cart-key="${cartKey}" aria-label="Increase quantity">
                                     <i class="fa-light fa-plus"></i>
                                 </button>
                                 <span class="input-group-text">${escapeHtml(item.unit)}</span>
                             </div>
                         </div>
                         <div class="prs-cart-item-remove">
-                            <button type="button" class="btn btn-sm btn-outline-danger sws-cart-remove" data-item-id="${item.itemId}">
+                            <button type="button" class="btn btn-sm btn-outline-danger sws-cart-remove" data-cart-key="${cartKey}">
                                 <i class="fa-regular fa-trash"></i>
                                 Remove
                             </button>
@@ -311,8 +373,13 @@ function initSwsCatalogAndCart() {
         }).join('');
 
         hiddenInputsContainer.innerHTML = cartItems.map((item, index) => {
+            const receivingReportItemInput = isCapexMode()
+                ? `<input type="hidden" name="items[${index}][receiving_report_item_id]" value="${item.receivingReportItemId}">`
+                : '';
+
             return `
                 <input type="hidden" name="items[${index}][item_id]" value="${item.itemId}">
+                ${receivingReportItemInput}
                 <input type="hidden" name="items[${index}][quantity]" value="${item.quantity}">
             `;
         }).join('');
@@ -327,9 +394,9 @@ function initSwsCatalogAndCart() {
         }
 
         let removedCount = 0;
-        Array.from(state.cart.entries()).forEach(([itemId, item]) => {
+        Array.from(state.cart.entries()).forEach(([cartKey, item]) => {
             if (Number(item.stock) <= 0) {
-                state.cart.delete(itemId);
+                state.cart.delete(cartKey);
                 removedCount += 1;
             }
         });
@@ -350,17 +417,17 @@ function initSwsCatalogAndCart() {
         let removedCount = 0;
         let adjustedCount = 0;
 
-        Array.from(state.cart.entries()).forEach(([itemId, item]) => {
+        Array.from(state.cart.entries()).forEach(([cartKey, item]) => {
             const allowedQuantity = getAllowedQuantity(item.stock, item.quantity);
 
             if (allowedQuantity <= 0) {
-                state.cart.delete(itemId);
+                state.cart.delete(cartKey);
                 removedCount += 1;
                 return;
             }
 
             if (Number(item.quantity) !== allowedQuantity) {
-                state.cart.set(itemId, {
+                state.cart.set(cartKey, {
                     ...item,
                     quantity: allowedQuantity,
                 });
@@ -387,12 +454,18 @@ function initSwsCatalogAndCart() {
     };
 
     const addToCart = (payload, quantity) => {
-        if (!payload.itemId) {
+        if (isCapexMode() && !payload.receivingReportItemId) {
+            return;
+        }
+
+        if (!isCapexMode() && !payload.itemId) {
             return;
         }
 
         if (!canSelectStock(payload.stock)) {
-            showStockRuleHint('Normal type does not allow zero-stock items. Switch to Confirmatory if needed.');
+            showStockRuleHint(isCapexMode()
+                ? 'This CAPEX line has no remaining quantity.'
+                : 'Normal type does not allow zero-stock items. Switch to Confirmatory if needed.');
             return;
         }
 
@@ -408,8 +481,8 @@ function initSwsCatalogAndCart() {
             showStockRuleHint('');
         }
 
-        const current = state.cart.get(payload.itemId);
-        state.cart.set(payload.itemId, {
+        const current = state.cart.get(getCartKey(payload));
+        state.cart.set(getCartKey(payload), {
             ...payload,
             quantity: allowedQuantity,
             quantityInputValue: current?.quantityInputValue,
@@ -418,7 +491,113 @@ function initSwsCatalogAndCart() {
         renderCart();
     };
 
+    const renderCapexCatalogView = (items) => {
+        if (!Array.isArray(items) || items.length === 0) {
+            grid.innerHTML = buildCatalogStatusMarkup(
+                'fa-duotone fa-solid fa-building-columns',
+                'No CAPEX items available.',
+                'Try another keyword or select a different department.'
+            );
+            return;
+        }
+
+        if (catalogLayout === 'list') {
+            grid.innerHTML = `
+                <div class="prs-item-list">
+                    <table class="table table-sm prs-catalog-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Name</th>
+                                <th>PRS / PO / RR</th>
+                                <th>Remaining</th>
+                                <th>Qty</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map((item) => `
+                                <tr class="prs-catalog-row"
+                                    data-receiving-report-item-id="${item.receiving_report_item_id}"
+                                    data-item-id="${item.item_id}"
+                                    data-name="${escapeHtml(item.name)}"
+                                    data-code="${escapeHtml(item.code)}"
+                                    data-unit="${escapeHtml(item.unit || 'PCS')}"
+                                    data-stock="${item.qty_remaining}"
+                                    data-prs-number="${escapeHtml(item.prs_number || '')}"
+                                    data-po-number="${escapeHtml(item.po_number || '')}"
+                                    data-rr-number="${escapeHtml(item.rr_number || '')}">
+                                    <td data-label="Code"><span class="badge bg-light-primary">${escapeHtml(item.code)}</span></td>
+                                    <td data-label="Name">${escapeHtml(item.name)}</td>
+                                    <td data-label="References" class="text-muted small">${escapeHtml(item.prs_number)} / ${escapeHtml(item.po_number)} / ${escapeHtml(item.rr_number)}</td>
+                                    <td data-label="Remaining">${escapeHtml(item.qty_remaining)} ${escapeHtml(item.unit || 'PCS')}</td>
+                                    <td data-label="Qty">
+                                        <div class="prs-catalog-list-qty">
+                                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity"><i class="fa-light fa-minus"></i></button>
+                                            <input type="number" min="1" max="${item.qty_remaining}" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                                            <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity"><i class="fa-light fa-plus"></i></button>
+                                        </div>
+                                    </td>
+                                    <td data-label="Action" class="text-end">
+                                        <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="${item.item_id}">
+                                            <i class="fa-light fa-plus"></i> Add
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            grid.dataset.layout = 'list';
+            grid.classList.remove('prs-item-grid');
+            grid.classList.add('prs-catalog-list-mode');
+            updateCatalogButtons();
+            return;
+        }
+
+        grid.dataset.layout = 'grid';
+        grid.classList.add('prs-item-grid');
+        grid.classList.remove('prs-catalog-list-mode');
+        grid.innerHTML = items.map((item) => `
+            <div class="prs-item-card"
+                data-receiving-report-item-id="${item.receiving_report_item_id}"
+                data-item-id="${item.item_id}"
+                data-name="${escapeHtml(item.name)}"
+                data-code="${escapeHtml(item.code)}"
+                data-unit="${escapeHtml(item.unit || 'PCS')}"
+                data-stock="${item.qty_remaining}"
+                data-prs-number="${escapeHtml(item.prs_number || '')}"
+                data-po-number="${escapeHtml(item.po_number || '')}"
+                data-rr-number="${escapeHtml(item.rr_number || '')}">
+                <div class="prs-item-body">
+                    <div class="prs-item-title">${escapeHtml(item.name)}</div>
+                    <div class="prs-item-meta">
+                        <span class="badge bg-light-primary">${escapeHtml(item.code)}</span>
+                        <span class="badge bg-light-warning text-dark">CAPEX</span>
+                    </div>
+                    <div class="prs-item-meta text-muted small">PRS ${escapeHtml(item.prs_number)} · PO ${escapeHtml(item.po_number)} · RR ${escapeHtml(item.rr_number)}</div>
+                    <div class="prs-item-meta text-muted">Remaining ${escapeHtml(item.qty_remaining)} ${escapeHtml(item.unit || 'PCS')}</div>
+                    <div class="prs-item-actions">
+                        <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity"><i class="fa-light fa-minus"></i></button>
+                        <input type="number" min="1" max="${item.qty_remaining}" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                        <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity"><i class="fa-light fa-plus"></i></button>
+                        <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="${item.item_id}">
+                            <i class="fa-light fa-plus"></i> Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        updateCatalogButtons();
+    };
+
     const renderCatalogView = (items) => {
+        if (isCapexMode()) {
+            renderCapexCatalogView(items);
+            return;
+        }
+
         window.CatalogLayout?.renderCatalog(
             grid,
             items,
@@ -521,15 +700,40 @@ function initSwsCatalogAndCart() {
         catalogAbortController = window.AbortController ? new AbortController() : null;
         const query = new URLSearchParams();
         const search = (searchInput?.value || '').trim();
-        const category = (categoryFilter?.value || '').trim();
-        const stock = (stockFilter?.value || '').trim();
+        let targetUrl = baseUrl;
 
-        if (search) query.set('search', search);
-        if (category) query.set('category', category);
-        if (stock) query.set('stock', stock);
-        query.set('page', String(page));
+        if (isCapexMode()) {
+            const departmentId = (cartDepartmentSelect?.value || '').trim();
+            if (!departmentId) {
+                setCatalogLoading(false);
+                grid.innerHTML = buildCatalogStatusMarkup(
+                    'fa-duotone fa-solid fa-building-columns',
+                    'Select charged department in the cart.',
+                    'Open the cart and choose Charged to Department to load available CAPEX RR lines.'
+                );
+                if (paginationContainer) {
+                    paginationContainer.innerHTML = '';
+                }
+                return;
+            }
 
-        const targetUrl = `${baseUrl}?${query.toString()}`;
+            if (search) {
+                query.set('search', search);
+            }
+            query.set('department_id', departmentId);
+            query.set('page', String(page));
+            targetUrl = `${capexUrl}?${query.toString()}`;
+        } else {
+            const category = (categoryFilter?.value || '').trim();
+            const stock = (stockFilter?.value || '').trim();
+
+            if (search) query.set('search', search);
+            if (category) query.set('category', category);
+            if (stock) query.set('stock', stock);
+            query.set('page', String(page));
+            targetUrl = `${baseUrl}?${query.toString()}`;
+        }
+
         const scrollPos = window.scrollY || window.pageYOffset;
 
         setCatalogLoading(true);
@@ -742,22 +946,22 @@ function initSwsCatalogAndCart() {
                 return;
             }
 
-            const itemId = parseInt(qtyInput.dataset.itemId || '0', 10);
-            if (!itemId || !state.cart.has(itemId)) {
+            const cartKey = parseCartKey(qtyInput.dataset.cartKey || '');
+            if (!cartKey || !state.cart.has(cartKey)) {
                 return;
             }
 
-            const current = state.cart.get(itemId);
+            const current = state.cart.get(cartKey);
             const quantity = Math.max(1, Number(qtyInput.value || '1') || 1);
             const allowedQuantity = getAllowedQuantity(current.stock, quantity);
             qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
 
-            state.cart.set(itemId, {
+            state.cart.set(cartKey, {
                 ...current,
                 quantity: allowedQuantity <= 0 ? 1 : allowedQuantity,
             });
 
-            if (!isConfirmatoryType() && quantity > allowedQuantity) {
+            if (!isConfirmatoryType() && !isCapexMode() && quantity > allowedQuantity) {
                 showStockRuleHint('Normal type quantity cannot exceed available stock.');
             }
 
@@ -767,19 +971,19 @@ function initSwsCatalogAndCart() {
         cartItemsContainer.addEventListener('click', (event) => {
             const incrementButton = event.target.closest('.sws-cart-increment');
             if (incrementButton) {
-                const itemId = parseInt(incrementButton.dataset.itemId || '0', 10);
-                if (!itemId || !state.cart.has(itemId)) {
+                const cartKey = parseCartKey(incrementButton.dataset.cartKey || '');
+                if (!cartKey || !state.cart.has(cartKey)) {
                     return;
                 }
 
-                const current = state.cart.get(itemId);
+                const current = state.cart.get(cartKey);
                 const nextQuantity = getAllowedQuantity(current.stock, Number(current.quantity || 1) + 1);
 
-                if (!isConfirmatoryType() && nextQuantity === Number(current.quantity || 1)) {
+                if (!isConfirmatoryType() && !isCapexMode() && nextQuantity === Number(current.quantity || 1)) {
                     showStockRuleHint('Normal type quantity cannot exceed available stock.');
                 }
 
-                state.cart.set(itemId, {
+                state.cart.set(cartKey, {
                     ...current,
                     quantity: nextQuantity <= 0 ? 1 : nextQuantity,
                 });
@@ -790,13 +994,13 @@ function initSwsCatalogAndCart() {
 
             const decrementButton = event.target.closest('.sws-cart-decrement');
             if (decrementButton) {
-                const itemId = parseInt(decrementButton.dataset.itemId || '0', 10);
-                if (!itemId || !state.cart.has(itemId)) {
+                const cartKey = parseCartKey(decrementButton.dataset.cartKey || '');
+                if (!cartKey || !state.cart.has(cartKey)) {
                     return;
                 }
 
-                const current = state.cart.get(itemId);
-                state.cart.set(itemId, {
+                const current = state.cart.get(cartKey);
+                state.cart.set(cartKey, {
                     ...current,
                     quantity: Math.max(1, Number(current.quantity || 1) - 1),
                 });
@@ -810,12 +1014,12 @@ function initSwsCatalogAndCart() {
                 return;
             }
 
-            const itemId = parseInt(removeButton.dataset.itemId || '0', 10);
-            if (!itemId) {
+            const cartKey = parseCartKey(removeButton.dataset.cartKey || '');
+            if (!cartKey) {
                 return;
             }
 
-            state.cart.delete(itemId);
+            state.cart.delete(cartKey);
             renderCart();
         });
     }
@@ -834,6 +1038,13 @@ function initSwsCatalogAndCart() {
             if (state.cart.size === 0) {
                 event.preventDefault();
                 showStockRuleHint('Add at least one item to the cart before submitting.');
+                return;
+            }
+
+            if (isCapexMode()) {
+                if (typeSelect) {
+                    typeSelect.value = 'CAPEX';
+                }
                 return;
             }
 
@@ -870,9 +1081,86 @@ function initSwsCatalogAndCart() {
         observer.observe(topCartBtn);
     }
 
-    setLayoutActiveState();
+    const applyWithdrawalModeUi = () => {
+        const capexActive = isCapexMode();
 
-    if (catalogLayout === 'list') {
+        modeToggle?.querySelectorAll('[data-withdrawal-mode]').forEach((button) => {
+            const active = button.dataset.withdrawalMode === withdrawalMode;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+
+        if (normalModeHint) {
+            normalModeHint.style.display = capexActive ? 'none' : '';
+        }
+        if (capexModeHint) {
+            capexModeHint.style.display = capexActive ? '' : 'none';
+        }
+        filterBar?.classList.toggle('sws-catalog-toolbar--capex', capexActive);
+        normalOnlyFilters.forEach((element) => {
+            element.classList.toggle('d-none', capexActive);
+        });
+        if (typeField) {
+            typeField.classList.toggle('d-none', capexActive);
+        }
+        if (typeSelect) {
+            typeSelect.value = capexActive ? 'CAPEX' : (typeSelect.value === 'CAPEX' ? 'NORMAL' : typeSelect.value);
+        }
+        if (searchInput) {
+            searchInput.placeholder = capexActive
+                ? 'PRS, PO, RR, item code, or item name'
+                : 'Item name, code, category, or unit';
+        }
+    };
+
+    const switchWithdrawalMode = (mode) => {
+        const nextMode = mode === 'capex' ? 'capex' : 'normal';
+        if (nextMode === withdrawalMode) {
+            return;
+        }
+
+        withdrawalMode = nextMode;
+        state.cart.clear();
+        state.page = 1;
+        state.lastPage = 1;
+        lastCatalogItems = [];
+        showStockRuleHint('');
+        applyWithdrawalModeUi();
+        renderCart();
+
+        if (isCapexMode()) {
+            fetchCatalog(1);
+            return;
+        }
+
+        fetchCatalog(1);
+    };
+
+    if (modeToggle) {
+        modeToggle.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-withdrawal-mode]');
+            if (!button) {
+                return;
+            }
+
+            switchWithdrawalMode(button.dataset.withdrawalMode);
+        });
+    }
+
+    if (cartDepartmentSelect) {
+        cartDepartmentSelect.addEventListener('change', () => {
+            if (isCapexMode()) {
+                triggerFilter(true);
+            }
+        });
+    }
+
+    setLayoutActiveState();
+    applyWithdrawalModeUi();
+
+    if (isCapexMode()) {
+        fetchCatalog(1);
+    } else if (catalogLayout === 'list') {
         fetchCatalog(state.page);
     } else {
         renderPagination();

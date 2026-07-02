@@ -83,10 +83,13 @@ class TransferSlipController extends Controller
                 'swi.product_code',
                 'swi.quantity',
                 'swi.uom',
+                'swi.meta',
                 'i.name as item_name',
                 'u.name as unit_name',
             ])
             ->get();
+
+        $isCapex = strtolower((string) ($storeWithdrawal->type ?? '')) === 'capex';
 
         $transferredMap = DB::table('transfer_slip_items as tsi')
             ->join('transfer_slips as ts', 'ts.id', '=', 'tsi.transfer_slip_id')
@@ -97,10 +100,11 @@ class TransferSlipController extends Controller
             ->groupBy('tsi.store_withdrawal_item_id')
             ->pluck('transferred_quantity', 'tsi.store_withdrawal_item_id');
 
-        $items = $sourceItems->map(function ($item) use ($transferredMap) {
+        $items = $sourceItems->map(function ($item) use ($transferredMap, $isCapex) {
             $transferred = round((float) ($transferredMap[$item->id] ?? 0), 3);
             $sourceQuantity = round((float) $item->quantity, 3);
             $remaining = max(0, round($sourceQuantity - $transferred, 3));
+            $meta = is_string($item->meta) ? json_decode($item->meta, true) : (array) ($item->meta ?? []);
 
             return [
                 'store_withdrawal_item_id' => (int) $item->id,
@@ -111,6 +115,10 @@ class TransferSlipController extends Controller
                 'quantity_transferred' => $transferred,
                 'quantity_remaining' => $remaining,
                 'uom' => $item->uom ?? $item->unit_name ?? 'PCS',
+                'is_capex' => $isCapex,
+                'prs_number' => $meta['prs_number'] ?? null,
+                'po_number' => $meta['po_number'] ?? null,
+                'rr_number' => $meta['rr_number'] ?? null,
             ];
         })->values();
 
@@ -123,6 +131,7 @@ class TransferSlipController extends Controller
                 'department_name' => $storeWithdrawal->department_name,
                 'type' => $storeWithdrawal->type,
                 'info' => $storeWithdrawal->info,
+                'is_capex' => $isCapex,
             ],
             'items' => $items,
         ]);

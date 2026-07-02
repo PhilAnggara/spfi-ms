@@ -193,6 +193,78 @@
     margin-bottom: 1.5rem;
 }
 
+.prs-catalog-toolbar.sws-catalog-toolbar--capex {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 0.5fr) 104px;
+}
+
+.sws-withdrawal-mode-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.sws-mode-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 0.95rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.85rem;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    text-align: left;
+    width: 100%;
+}
+
+.sws-mode-option:hover {
+    border-color: #94a3b8;
+}
+
+.sws-mode-option.active {
+    border-color: #1d4ed8;
+    background: #eff6ff;
+    box-shadow: 0 0 0 1px rgba(29, 78, 216, 0.12);
+}
+
+.sws-mode-option-icon {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.65rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 1.1rem;
+}
+
+.sws-mode-option.active .sws-mode-option-icon {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.sws-mode-option-body {
+    min-width: 0;
+}
+
+.sws-mode-option-title {
+    display: block;
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.92rem;
+    line-height: 1.3;
+}
+
+.sws-mode-option-desc {
+    display: block;
+    color: #64748b;
+    font-size: 0.78rem;
+    margin-top: 0.2rem;
+    line-height: 1.4;
+}
+
 .prs-catalog-field {
     min-width: 0;
 }
@@ -858,6 +930,14 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .prs-catalog-toolbar.sws-catalog-toolbar--capex {
+        grid-template-columns: minmax(0, 1fr) minmax(110px, 0.45fr) 104px;
+    }
+
+    .prs-catalog-toolbar.sws-catalog-toolbar--capex .prs-catalog-search-field {
+        grid-column: 1 / -1;
+    }
+
     .prs-catalog-layout-field {
         grid-column: span 1;
     }
@@ -916,6 +996,18 @@
     .prs-catalog-toolbar {
         grid-template-columns: 1fr;
         align-items: stretch;
+    }
+
+    .prs-catalog-toolbar.sws-catalog-toolbar--capex {
+        grid-template-columns: 1fr;
+    }
+
+    .prs-catalog-toolbar.sws-catalog-toolbar--capex .prs-catalog-search-field {
+        grid-column: auto;
+    }
+
+    .sws-withdrawal-mode-switch {
+        grid-template-columns: 1fr;
     }
 
     .prs-catalog-reset-field,
