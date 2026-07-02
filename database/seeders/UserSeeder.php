@@ -208,7 +208,9 @@ class UserSeeder extends Seeder
             'role' => 'Supervisor',
             'password' => Hash::make('Admin123'),
             'department_id' => $departmentIdByCode['7042'],
-        ]);
+        ])->assignRole(
+            'im-supervisor',
+        );
 
         User::create([
             'name' => 'Ferdie Tobangen',
@@ -315,10 +317,10 @@ class UserSeeder extends Seeder
             'name' => 'Rudy Mandagie',
             'username' => 'rudy.mandagie',
             'email' => 'rudy12mandagie@gmail.com',
-            'role' => 'Supervisor',
+            'role' => 'Manager',
             'password' => Hash::make('Admin123'),
             'department_id' => $departmentIdByCode['7046'],
-        ]);
+        ])->assignRole('engineering-manager');
 
         User::create([
             'name' => 'Eduard Luas',
@@ -408,7 +410,9 @@ class UserSeeder extends Seeder
             'role' => 'Staff',
             'password' => Hash::make('Admin123'),
             'department_id' => $departmentIdByCode['7042'],
-        ]);
+        ])->assignRole(
+            'im-staff',
+        );
 
         User::create([
             'name' => 'Rendy Patandung',
@@ -500,7 +504,9 @@ class UserSeeder extends Seeder
             'role' => 'Staff',
             'password' => Hash::make('Admin123'),
             'department_id' => $departmentIdByCode['7042'],
-        ]);
+        ])->assignRole(
+            'im-staff',
+        );
 
         User::create([
             'name' => 'Sherly Tatontos',
@@ -509,7 +515,9 @@ class UserSeeder extends Seeder
             'role' => 'Staff',
             'password' => Hash::make('Admin123'),
             'department_id' => $departmentIdByCode['7042'],
-        ]);
+        ])->assignRole(
+            'im-staff',
+        );
 
         User::create([
             'name' => 'Eduard Luas',
@@ -536,7 +544,9 @@ class UserSeeder extends Seeder
             'role' => 'Supervisor',
             'password' => Hash::make('Admin123'),
             'department_id' => $departmentIdByCode['7046'],
-        ]);
+        ])->assignRole(
+            'engineering-supervisor',
+        );
 
         // change log
         // becukai email : wasis.wiyono@ptsinarpurefoods.com
