@@ -7,6 +7,9 @@
 @endsection
 
 @section('content')
+    @php
+        $fmtTableDate = fn (mixed $value) => \App\Support\PdfFormatters::tableDate($value);
+    @endphp
     <table class="data-table">
         <thead>
             <tr>
@@ -40,17 +43,17 @@
                 <tr>
                     <td>{{ $row['prs_id'] }}</td>
                     <td>{{ $row['prs_number'] }}</td>
-                    <td class="nowrap-date">{{ $fmtDate($row['prs_date']) }}</td>
+                    <td class="nowrap-date">{{ $fmtTableDate($row['prs_date']) }}</td>
                     <td>{{ $row['item_code'] }}</td>
                     <td class="text-wrap-max">{{ $row['item_name'] }}</td>
                     <td class="right">{{ $fmtQty($row['quantity']) }} {{ $row['unit'] }}</td>
                     <td>{{ $row['canvasser'] ?? '-' }}</td>
-                    <td class="nowrap-date">{{ $fmtDate($row['assigned_canvasser_at']) }}</td>
+                    <td class="nowrap-date">{{ $fmtTableDate($row['assigned_canvasser_at']) }}</td>
                     <td>{{ $row['po_number'] ?? '-' }}</td>
-                    <td class="nowrap-date">{{ $fmtDate($row['po_date']) }}</td>
+                    <td class="nowrap-date">{{ $fmtTableDate($row['po_date']) }}</td>
                     <td class="text-wrap-max">{{ $row['supplier_name'] ?? '-' }}</td>
                     <td>{{ $row['rr_number'] ?? '-' }}</td>
-                    <td class="nowrap-date">{{ $fmtDate($row['rr_date']) }}</td>
+                    <td class="nowrap-date">{{ $fmtTableDate($row['rr_date']) }}</td>
                     <td class="right nowrap">{{ $row['lead_time_days'] }}</td>
                 </tr>
             @empty

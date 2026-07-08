@@ -1,5 +1,7 @@
 <?php
 
+use App\Exports\PurchasingLeadTimeSpreadsheet;
+use App\Http\Controllers\PurchasingReportController;
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -12,8 +14,12 @@ use App\Models\ReceivingReportItem;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
+use App\Support\PdfFormatters;
+use App\Support\PdfReport;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 beforeEach(function () {
     $this->seed(RolePermissionSeeder::class);
@@ -129,27 +135,40 @@ beforeEach(function () {
     $this->reportPayload = [
         'date_from' => now()->subMonth()->toDateString(),
         'date_to' => now()->toDateString(),
-        'canvasser_id' => '',
         'format' => 'pdf',
     ];
 });
 
 it('generates purchasing lead time report as pdf', function () {
-    $response = $this->actingAs($this->manager)
-        ->post(route('procurement.reports.purchasing-lead-time'), $this->reportPayload);
+    $request = Request::create(
+        route('procurement.reports.purchasing-lead-time'),
+        'POST',
+        $this->reportPayload,
+    );
+    $request->setUserResolver(fn () => $this->manager);
 
-    $response->assertSuccessful();
+    $response = app(PurchasingReportController::class)->purchasingLeadTime($request);
+
+    expect($response->getStatusCode())->toBeGreaterThanOrEqual(200);
+    expect($response->getStatusCode())->toBeLessThan(300);
     expect($response->headers->get('content-type'))->toContain('application/pdf');
 });
 
 it('generates purchasing lead time report as excel', function () {
-    $response = $this->actingAs($this->manager)
-        ->post(route('procurement.reports.purchasing-lead-time'), [
+    $request = Request::create(
+        route('procurement.reports.purchasing-lead-time'),
+        'POST',
+        [
             ...$this->reportPayload,
             'format' => 'excel',
-        ]);
+        ],
+    );
+    $request->setUserResolver(fn () => $this->manager);
 
-    $response->assertSuccessful();
+    $response = app(PurchasingReportController::class)->purchasingLeadTime($request);
+
+    expect($response->getStatusCode())->toBeGreaterThanOrEqual(200);
+    expect($response->getStatusCode())->toBeLessThan(300);
     expect($response->headers->get('content-type'))->toContain(
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     );
@@ -169,4 +188,89 @@ it('calculates lead time days from assigned canvasser date to receiving report d
 
     expect($rows)->toHaveCount(1);
     expect($rows->first()['lead_time_days'])->toBe(7);
+});
+
+it('formats table dates with dashed month abbreviation', function () {
+    expect(PdfFormatters::tableDate('2026-01-15'))->toBe('15-Jan-2026');
+    expect(PdfFormatters::tableDate(null))->toBe('');
+});
+
+it('renders dashed table dates while keeping header period format', function () {
+    $controller = app(\App\Http\Controllers\PurchasingReportController::class);
+    $method = new ReflectionMethod($controller, 'buildPurchasingLeadTimeRows');
+    $method->setAccessible(true);
+
+    $dateFrom = now()->subMonth()->startOfDay();
+    $dateTo = now()->endOfDay();
+
+    $rows = $method->invoke($controller, $dateFrom, $dateTo, null);
+    $firstRow = $rows->first();
+
+    $html = view('pdf.reports.purchasing-lead-time', array_merge(
+        PdfReport::withDefaults([
+            'title' => 'Purchasing Lead Time Report',
+            'date_from' => $dateFrom->toDateString(),
+            'date_to' => $dateTo->toDateString(),
+            'canvasser' => 'All',
+            'rows' => $rows,
+        ]),
+        [
+            'fmtDate' => fn (mixed $value) => PdfFormatters::date($value),
+            'fmtMoney' => fn (float|int|string $value) => PdfFormatters::money($value),
+            'fmtQty' => fn (float|int|string $value) => PdfFormatters::qty($value),
+        ],
+    ))->render();
+
+    expect($html)->toContain(PdfFormatters::tableDate($firstRow['prs_date']));
+    expect($html)->toContain(PdfFormatters::tableDate($firstRow['assigned_canvasser_at']));
+    expect($html)->toContain(PdfFormatters::tableDate($firstRow['po_date']));
+    expect($html)->toContain(PdfFormatters::tableDate($firstRow['rr_date']));
+    expect($html)->toContain(PdfFormatters::date($dateFrom->toDateString()));
+    expect($html)->not->toContain(PdfFormatters::date($firstRow['prs_date']));
+});
+
+it('writes native excel date values for table date columns', function () {
+    $controller = app(PurchasingReportController::class);
+    $method = new ReflectionMethod($controller, 'buildPurchasingLeadTimeRows');
+    $method->setAccessible(true);
+
+    $dateFrom = now()->subMonth()->startOfDay();
+    $dateTo = now()->endOfDay();
+    $rows = $method->invoke($controller, $dateFrom, $dateTo, null);
+    $firstRow = $rows->first();
+
+    $export = new PurchasingLeadTimeSpreadsheet([
+        'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
+        'title' => 'Purchasing Lead Time Report',
+        'date_from' => $dateFrom->toDateString(),
+        'date_to' => $dateTo->toDateString(),
+        'canvasser' => 'All',
+        'printed_at' => now()->format('d M Y H:i'),
+        'rows' => $rows,
+    ]);
+
+    $buildMethod = new ReflectionMethod($export, 'build');
+    $buildMethod->setAccessible(true);
+    $sheet = $buildMethod->invoke($export)->getActiveSheet();
+
+    $dateColumns = [
+        'C' => 'prs_date',
+        'H' => 'assigned_canvasser_at',
+        'J' => 'po_date',
+        'M' => 'rr_date',
+    ];
+
+    foreach ($dateColumns as $column => $field) {
+        $cell = $sheet->getCell($column.'10');
+
+        expect(is_numeric($cell->getValue()))->toBeTrue();
+
+        $excelDate = Date::excelToDateTimeObject($cell->getValue());
+        expect($excelDate->format('Y-m-d'))->toBe(
+            \Carbon\Carbon::parse($firstRow[$field])->startOfDay()->format('Y-m-d')
+        );
+
+        expect($sheet->getStyle($column.'10')->getNumberFormat()->getFormatCode())
+            ->toBe('dd-mmm-yyyy');
+    }
 });

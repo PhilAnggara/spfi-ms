@@ -4,7 +4,7 @@ namespace App\Exports;
 
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -15,6 +15,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class PurchasingLeadTimeSpreadsheet
 {
     private const LAST_COLUMN = 'N';
+
+    private const TABLE_DATE_FORMAT = 'dd-mmm-yyyy';
 
     private const COLUMN_WIDTHS = [
         'A' => 8,
@@ -49,7 +51,7 @@ class PurchasingLeadTimeSpreadsheet
 
     private function build(): Spreadsheet
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Lead Time');
 
@@ -57,8 +59,17 @@ class PurchasingLeadTimeSpreadsheet
         $fmtDate = fn ($value) => $value ? Carbon::parse($value)->format('d M Y') : '';
         $fmtQty = fn ($value) => number_format((float) $value, 2, ',', '.');
 
-        $setDateCell = function (string $coordinate, mixed $value) use ($sheet, $fmtDate): void {
-            $sheet->setCellValueExplicit($coordinate, $fmtDate($value), DataType::TYPE_STRING);
+        $setDateCell = function (string $coordinate, mixed $value) use ($sheet): void {
+            if (blank($value)) {
+                $sheet->setCellValue($coordinate, null);
+
+                return;
+            }
+
+            $sheet->setCellValue(
+                $coordinate,
+                Date::PHPToExcel(Carbon::parse($value)->startOfDay()),
+            );
         };
 
         $sheet->setCellValue('A1', $this->data['company'] ?? '');
@@ -202,6 +213,14 @@ class PurchasingLeadTimeSpreadsheet
         $sheet->getStyle("N{$dataStartRow}:N{$lastDataRow}")
             ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $sheet->getStyle('N'.$groupRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+        if ($rows->isNotEmpty()) {
+            foreach (['C', 'H', 'J', 'M'] as $column) {
+                $sheet->getStyle("{$column}{$dataStartRow}:{$column}{$lastDataRow}")
+                    ->getNumberFormat()
+                    ->setFormatCode(self::TABLE_DATE_FORMAT);
+            }
+        }
 
         foreach (self::COLUMN_WIDTHS as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);

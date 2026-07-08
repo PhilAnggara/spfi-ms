@@ -19,7 +19,7 @@
                     <h1 class="error-title">Under Maintenance</h1>
                     <p class="fs-5 text-gray-600">We are currently performing maintenance on the system. Please try again shortly.</p>
                     <p class="fs-5 text-gray-600">For urgent assistance, please contact <strong>SPFI IT Department</strong> at <strong>145</strong> or <strong>127</strong>.</p>
-                    <a href="{{ url('/') }}" class="btn btn-lg btn-outline-primary mt-3">Go Home</a>
+                    {{-- <a href="{{ url('/') }}" class="btn btn-lg btn-outline-primary mt-3">Go Home</a> --}}
                 </div>
             </div>
         </div>
