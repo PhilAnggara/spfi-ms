@@ -7,6 +7,7 @@ use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
 use App\Models\User;
+use App\Services\CurrencyExchangeRateService;
 use App\Services\DocumentNumberService;
 use App\Services\NotificationRecipientService;
 use App\Services\StockService;
@@ -470,6 +471,7 @@ class ReceivingReportController extends Controller
 
         $receivingReport->load([
             'purchaseOrder.supplier',
+            'purchaseOrder.currency',
             'purchaseOrder.items.prsItem.prs',
             'items.purchaseOrderItem.item.unit',
             'items.purchaseOrderItem.item.category',
@@ -477,6 +479,11 @@ class ReceivingReportController extends Controller
             'customsDocumentType',
             'createdBy',
         ]);
+
+        $currencyConversion = app(CurrencyExchangeRateService::class)->resolveConversionForPurchaseOrder(
+            $receivingReport->purchaseOrder?->currency?->code,
+            $receivingReport->received_date ?? $receivingReport->created_at,
+        );
 
         $imManager = User::query()
             ->whereHas('department', function ($query) {
@@ -505,6 +512,7 @@ class ReceivingReportController extends Controller
             'backgroundImageDataUri' => $backgroundImageDataUri,
             'pageWidthMm' => self::RR_PAPER_WIDTH_MM,
             'pageHeightMm' => self::RR_PAPER_HEIGHT_MM,
+            'currencyConversion' => $currencyConversion,
         ])
             ->setPaper([
                 0,

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Currency extends Model
@@ -12,11 +13,17 @@ class Currency extends Model
     use SoftDeletes;
 
     protected $table = 'currencies';
+
     protected $guarded = [
-        'id'
+        'id',
     ];
 
     protected $casts = [
         'id' => 'integer',
     ];
+
+    public function exchangeRates(): HasMany
+    {
+        return $this->hasMany(CurrencyExchangeRate::class, 'currency_id');
+    }
 }

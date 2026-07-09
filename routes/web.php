@@ -3,6 +3,7 @@
 use App\Http\Controllers\Accounting\AccountingCodeController;
 use App\Http\Controllers\Accounting\AccountingGroupCodeController;
 use App\Http\Controllers\Accounting\BsGroupingController;
+use App\Http\Controllers\Accounting\CurrencyExchangeRateController;
 use App\Http\Controllers\Accounting\GroupingController;
 use App\Http\Controllers\AccountingReportController;
 use App\Http\Controllers\BatchController;
@@ -123,6 +124,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/document-summary', [AccountingReportController::class, 'documentSummary'])->name('accounting.reports.document-summary');
         Route::post('/reports/purchase', [AccountingReportController::class, 'purchase'])->name('accounting.reports.purchase');
     });
+
+    Route::middleware('role:administrator|accounting-manager|accounting-supervisor|accounting-staff')
+        ->prefix('accounting')
+        ->name('accounting.')
+        ->group(function () {
+            Route::get('exchange-rates', [CurrencyExchangeRateController::class, 'index'])->name('exchange-rates.index');
+        });
+
+    Route::middleware('role:administrator|accounting-manager|accounting-supervisor')
+        ->prefix('accounting')
+        ->name('accounting.')
+        ->group(function () {
+            Route::post('exchange-rates', [CurrencyExchangeRateController::class, 'store'])->name('exchange-rates.store');
+        });
 
     Route::middleware('role:administrator|purchasing-staff')->group(function () {
         Route::get('/canvassing', [CanvassingController::class, 'index'])->name('canvassing.index');

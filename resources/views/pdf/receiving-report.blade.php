@@ -124,6 +124,23 @@
             $supplierDisplay .= ' | '.$supplierCode;
         }
 
+        $currencyConversion = $currencyConversion ?? [
+            'po_currency_code' => strtoupper(trim((string) ($po?->currency?->code ?? 'IDR'))),
+            'should_convert' => false,
+            'rate_found' => false,
+            'rate_to_idr' => null,
+            'effective_date' => null,
+            'multiplier' => 1.0,
+            'rate_note' => null,
+        ];
+        $convertAmount = static function (float $amount) use ($currencyConversion): float {
+            if (! ($currencyConversion['should_convert'] ?? false)) {
+                return $amount;
+            }
+
+            return round($amount * (float) ($currencyConversion['multiplier'] ?? 1), 2);
+        };
+
         $categoryAccountMap = [
             'OFFICE SUPPLIES' => '153',
             'PARTS' => '146',
@@ -188,10 +205,10 @@
 
             $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
             $lineAmounts = $resolveReceivedLineAmounts($poItem, $qtyTotal);
-            $amount = $lineAmounts['base_amount'];
-            $ppnAmount = $lineAmounts['ppn_amount'];
-            $pphAmount = $lineAmounts['pph_amount'];
-            $lineTotal = $lineAmounts['line_total'];
+            $amount = $convertAmount($lineAmounts['base_amount']);
+            $ppnAmount = $convertAmount($lineAmounts['ppn_amount']);
+            $pphAmount = $convertAmount($lineAmounts['pph_amount']);
+            $lineTotal = $convertAmount($lineAmounts['line_total']);
             $totalAmountAllItems += $amount;
             $totalPpnAmountAllItems += $ppnAmount;
             $totalPphAmountAllItems += $pphAmount;
@@ -314,7 +331,7 @@
             @endif
         @endif
 
-        <div class="field" style="left: {{ $mmX(37) }}; top: {{ $mmY(41) }}; width: {{ $mmX(88) }};">{{ $supplierDisplay }}</div>
+        <div class="field" style="left: {{ $mmX(37) }}; top: {{ $mmY(41) }}; width: {{ $mmX(100) }};">{{ $supplierDisplay }}</div>
         <div class="field po-number" style="left: {{ $mmX(161) }}; top: {{ $mmY(38) }}; width: {{ $mmX(48) }};">{{ $po?->po_number ?? '-' }}</div>
         <div class="field" style="left: {{ $mmX(160) }}; top: {{ $mmY(49) }}; width: {{ $mmX(48) }};">{{ $poDateText }}</div>
 
@@ -325,8 +342,8 @@
                 $departmentCode = $poItem?->prsItem?->prs?->department?->code ?? '-';
                 $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
                 $lineAmounts = $resolveReceivedLineAmounts($poItem, $qtyTotal);
-                $unitCost = $lineAmounts['discounted_unit_cost'];
-                $amount = $lineAmounts['base_amount'];
+                $unitCost = $convertAmount($lineAmounts['discounted_unit_cost']);
+                $amount = $convertAmount($lineAmounts['base_amount']);
                 $top = $rowStartTopMm + ($index * $rowHeightMm);
             @endphp
 
@@ -369,6 +386,16 @@
             $totalLineTop = $entryStartTop + ($entryRows->count() * $entryRowHeight) - $sy(1.2);
             $totalEntryTop = $entryStartTop + ($entryRows->count() * $entryRowHeight) - $sy(0.9);
         @endphp
+
+        @if (! empty($currencyConversion['rate_note']))
+            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmX(120) }}; font-size: {{ round(10 * $scaleY, 1) }}px; white-space: normal;">
+                {{ $currencyConversion['rate_note'] }}
+            </div>
+        @elseif (($currencyConversion['po_currency_code'] ?? 'IDR') === 'USD' && empty($currencyConversion['rate_found']))
+            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmX(120) }}; font-size: {{ round(10 * $scaleY, 1) }}px; white-space: normal;">
+                No USD exchange rate available.
+            </div>
+        @endif
 
         @foreach($entryRows as $entryIndex => $entry)
             @php $entryTop = $entryStartTop + ($entryIndex * $entryRowHeight); @endphp

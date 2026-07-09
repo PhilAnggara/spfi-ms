@@ -290,6 +290,15 @@
                             </li>
                         @endrole
 
+                        @role('administrator|accounting-manager|accounting-supervisor|accounting-staff')
+                            <li class="sidebar-item {{ Request::is('accounting/exchange-rates*') ? 'active' : '' }}">
+                                <a href="{{ route('accounting.exchange-rates.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-money-bill-transfer {{ Request::is('accounting/exchange-rates*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Exchange Rates</span>
+                                </a>
+                            </li>
+                        @endrole
+
                         <li class="sidebar-item {{ Request::is('prs') ? 'active' : '' }}">
                             <a href="{{ route('prs.index') }}" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-cart-shopping {{ Request::is('prs') ? 'fa-fade' : '' }}"></i>
