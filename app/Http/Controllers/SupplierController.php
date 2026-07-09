@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
+use App\Support\Concerns\PaginatesLegacySqlServer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class SupplierController extends Controller
 {
+    use PaginatesLegacySqlServer;
+
     /**
      * Display a listing of the resource.
      */
@@ -103,7 +105,7 @@ class SupplierController extends Controller
         $searchValue = trim((string) ($request->input('keyword') ?: $request->input('search.value', '')));
         if ($searchValue !== '') {
             $baseQuery->where(function ($query) use ($searchValue) {
-                $likeValue = '%' . $searchValue . '%';
+                $likeValue = '%'.$searchValue.'%';
                 $query->where('suppliers.code', 'like', $likeValue)
                     ->orWhere('suppliers.name', 'like', $likeValue)
                     ->orWhere('suppliers.address', 'like', $likeValue)
@@ -122,7 +124,7 @@ class SupplierController extends Controller
             });
         }
 
-        $recordsFiltered = (clone $baseQuery)->count();
+        $recordsFiltered = (clone $baseQuery)->reorder()->count();
 
         $orderColumnIndex = (int) $request->input('order.0.column', 0);
         $orderDirection = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
@@ -132,11 +134,19 @@ class SupplierController extends Controller
         $length = (int) $request->input('length', 10);
         $length = $length > 0 ? $length : 10;
 
-        $rows = $baseQuery
-            ->orderBy($orderColumn, $orderDirection)
-            ->skip($start)
-            ->take($length)
-            ->get();
+        $orderBySql = $this->buildDataTableOrderBySql($orderColumn, $orderDirection, 'suppliers.id');
+
+        if (! $this->isSqlServerConnection()) {
+            $baseQuery->orderBy($orderColumn, $orderDirection);
+        }
+
+        $rows = $this->sliceEloquentQueryForDataTables(
+            $baseQuery,
+            'suppliers.id',
+            $orderBySql,
+            $start,
+            $length
+        );
 
         $supplierIds = $rows->pluck('id');
 
@@ -234,7 +244,7 @@ class SupplierController extends Controller
 
         $searchValue = $request->input('search.value');
         if ($searchValue) {
-            $likeValue = '%' . $searchValue . '%';
+            $likeValue = '%'.$searchValue.'%';
             $baseQuery->where(function ($query) use ($likeValue) {
                 $query->where('po.po_number', 'like', $likeValue)
                     ->orWhere('items.code', 'like', $likeValue)
@@ -274,7 +284,7 @@ class SupplierController extends Controller
         $length = $length > 0 ? $length : 10;
 
         if ($orderColumn === 'canvasser') {
-            $baseQuery->orderByRaw('COALESCE(prs_canvasser.name, po_creator.name) ' . $orderDirection);
+            $baseQuery->orderByRaw('COALESCE(prs_canvasser.name, po_creator.name) '.$orderDirection);
         } else {
             $baseQuery->orderBy($orderColumn, $orderDirection);
         }
