@@ -20,11 +20,13 @@ return [
     |
     */
 
-    'default' => match (env('DB_PROFILE', '1')) {
-        '2' => 'sqlsrv',  // Office - SQL Server
-        '1' => 'mysql',   // Home - MySQL
-        default => env('DB_CONNECTION', 'sqlite'),
-    },
+    'default' => env('APP_ENV') === 'testing'
+        ? env('DB_CONNECTION', 'sqlite')
+        : match (env('DB_PROFILE', '1')) {
+            '2' => 'sqlsrv',  // Office - SQL Server
+            '1' => 'mysql',   // Home - MySQL
+            default => env('DB_CONNECTION', 'sqlite'),
+        },
 
     /*
     |--------------------------------------------------------------------------
@@ -197,6 +199,22 @@ return [
     'migrations' => [
         'table' => 'migrations',
         'update_date_on_publish' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Database Snapshot Tooling
+    |--------------------------------------------------------------------------
+    |
+    | Paths to native database CLI tools used by db:snapshot / db:restore.
+    | Leave null to auto-detect common Windows install locations.
+    |
+    */
+
+    'snapshot' => [
+        'mysql_bin_path' => env('MYSQL_BIN_PATH'),
+        'sqlserver_bin_path' => env('SQLSERVER_BIN_PATH'),
+        'sqlserver_path' => env('SQLSERVER_SNAPSHOT_PATH'),
     ],
 
     /*
