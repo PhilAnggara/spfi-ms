@@ -53,6 +53,17 @@
                         </div>
                         <button class="btn btn-primary btn-block btn-lg shadow-lg mt-5">Log in</button>
                     </form>
+
+                    <div class="text-center mt-4 pt-4 border-top">
+                        <p class="text-gray-600 mb-3">Separate module · opens in a new tab</p>
+                        <a href="{{ config('services.fish_system.url') }}"
+                           class="btn btn-outline-primary btn-block btn-lg"
+                           target="_blank"
+                           rel="noopener noreferrer">
+                            <i class="bi bi-box-arrow-up-right"></i>
+                            Fish Module
+                        </a>
+                    </div>
                 </div>
             </div>
             <div class="col-lg-7 d-none d-lg-block">

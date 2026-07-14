@@ -51,6 +51,13 @@
                             </a>
                         </li>
 
+                        <li class="sidebar-item">
+                            <a href="{{ config('services.fish_system.url') }}" class="sidebar-link" target="_blank" rel="noopener noreferrer">
+                                <i class="fa-duotone fa-solid fa-fish"></i>
+                                <span>Fish</span>
+                            </a>
+                        </li>
+
                         @role('administrator')
                             <li class="sidebar-item {{ is_active_menu(['master/*']) }} has-sub">
                                 <a href="#" class='sidebar-link'>
