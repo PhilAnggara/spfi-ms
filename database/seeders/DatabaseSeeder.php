@@ -48,6 +48,7 @@ class DatabaseSeeder extends Seeder
             FishSeeder::class,
             FishSizeSeeder::class,
             AccountingDataSeeder::class,
+            AccountingDocTransactionSeeder::class,
         ]);
 
         $elapsedSeconds = (int) round(microtime(true) - $startedAt);

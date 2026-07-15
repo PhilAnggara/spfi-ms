@@ -124,7 +124,7 @@
             $supplierDisplay .= ' | '.$supplierCode;
         }
 
-        $currencyConversion = $currencyConversion ?? [
+        $currencyConversion = $currencyConversion ?? ($rrAccountingPayload['currency_conversion'] ?? [
             'po_currency_code' => strtoupper(trim((string) ($po?->currency?->code ?? 'IDR'))),
             'should_convert' => false,
             'rate_found' => false,
@@ -132,7 +132,7 @@
             'effective_date' => null,
             'multiplier' => 1.0,
             'rate_note' => null,
-        ];
+        ]);
         $convertAmount = static function (float $amount) use ($currencyConversion): float {
             if (! ($currencyConversion['should_convert'] ?? false)) {
                 return $amount;
@@ -141,154 +141,18 @@
             return round($amount * (float) ($currencyConversion['multiplier'] ?? 1), 2);
         };
 
-        $categoryAccountMap = [
-            'OFFICE SUPPLIES' => '153',
-            'PARTS' => '146',
-            'SL/C' => '3047',
-            'FACTORY SUPPLIES' => '145',
-            'CHEM' => '4000',
-            'FUEL' => '743',
-            'LABEL' => '143',
-            'CARTON' => '142',
-            'INGREDIENTS' => '138',
-            'CAN' => '140',
-            'SPICES' => '138',
-            'OTHERS' => '998',
-            'RAW MATERIALS' => '137',
-            'ZEBRA STOCK POT 80X80 CM' => '',
-            'SPICES AND INGREDIENTS' => '138',
-            'FISH' => '2003',
-            'BC' => '',
-            'FISHMEAL' => '257',
-            'COAL' => '744',
-            'SLUDGE OIL' => '745',
-            'LABELING SUPPLIES' => '143',
-            'CAPITAL GOODS' => '',
-            'SCRAPS' => '',
-            'FINISHED GOODS' => '129',
-        ];
-
-        $debitRows = [];
-        $totalAmountAllItems = 0.0;
-        $totalPpnAmountAllItems = 0.0;
-        $totalPphAmountAllItems = 0.0;
-        $creditAmountAllItems = 0.0;
-
-        $resolveReceivedLineAmounts = function ($poItem, float $qtyTotal): array {
-            $orderedQty = (float) ($poItem?->quantity ?? 0);
-            $receivedRatio = $orderedQty > 0 ? min(1, max(0, $qtyTotal / $orderedQty)) : 0;
-            $lineSubtotal = (float) ($poItem?->line_subtotal ?? ($orderedQty * (float) ($poItem?->unit_price ?? 0)));
-            $discountAmount = (float) ($poItem?->discount_amount ?? 0);
-            $netLineAmount = max(0, $lineSubtotal - $discountAmount);
-            $baseAmount = $netLineAmount * $receivedRatio;
-            $discountedUnitCost = $orderedQty > 0
-                ? $netLineAmount / $orderedQty
-                : (float) ($poItem?->unit_price ?? 0);
-            $ppnAmount = (float) ($poItem?->ppn_amount ?? 0) * $receivedRatio;
-            $pphAmount = (float) ($poItem?->pph_amount ?? 0) * $receivedRatio;
-
-            return [
-                'ordered_qty' => $orderedQty,
-                'discounted_unit_cost' => $discountedUnitCost,
-                'base_amount' => $baseAmount,
-                'ppn_amount' => $ppnAmount,
-                'pph_amount' => $pphAmount,
-                'line_total' => $baseAmount + $ppnAmount - $pphAmount,
-            ];
+        $entryGenerator = app(\App\Services\Accounting\ReceivingReportEntryGenerator::class);
+        $rrAccountingPayload = $rrAccountingPayload ?? $entryGenerator->generate($receivingReport, $currencyConversion);
+        $resolveReceivedLineAmounts = static function ($poItem, float $qtyTotal) use ($entryGenerator): array {
+            return $entryGenerator->resolveReceivedLineAmounts($poItem, $qtyTotal);
         };
 
-        $isCapex = (bool) ($po?->items?->first()?->prsItem?->prs?->is_capex ?? false);
+        $accountingEntries = $entryGenerator->formatEntriesForPdf($rrAccountingPayload['lines'] ?? []);
+        $accountingCodeTotal = (int) ($rrAccountingPayload['totals']['acct_code_total'] ?? 0);
+        $displaySubTotal = (float) ($rrAccountingPayload['display']['sub_total'] ?? 0);
+        $displayPpnTotal = (float) ($rrAccountingPayload['display']['ppn_total'] ?? 0);
+        $displayPphTotal = (float) ($rrAccountingPayload['display']['pph_total'] ?? 0);
 
-        foreach ($allItems as $rrItem) {
-            $poItem = $rrItem->purchaseOrderItem;
-            $item = $poItem?->item;
-
-            $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
-            $lineAmounts = $resolveReceivedLineAmounts($poItem, $qtyTotal);
-            $amount = $convertAmount($lineAmounts['base_amount']);
-            $ppnAmount = $convertAmount($lineAmounts['ppn_amount']);
-            $pphAmount = $convertAmount($lineAmounts['pph_amount']);
-            $lineTotal = $convertAmount($lineAmounts['line_total']);
-            $totalAmountAllItems += $amount;
-            $totalPpnAmountAllItems += $ppnAmount;
-            $totalPphAmountAllItems += $pphAmount;
-            $creditAmountAllItems += $lineTotal;
-
-            $categoryName = strtoupper(trim((string) ($item?->category?->name ?? 'OTHERS')));
-            $costCenterCategories = ['CHEM', 'SL/C'];
-            $costCenter = in_array($categoryName, $costCenterCategories, true)
-                ? trim((string) ($poItem?->prsItem?->prs?->department?->code ?? ''))
-                : '';
-            $debitAccount = $isCapex
-                ? '169'
-                : ($categoryAccountMap[$categoryName] ?? ($categoryAccountMap['OTHERS'] ?? ''));
-
-            $groupKey = $costCenter.'|'.$debitAccount;
-            if (! isset($debitRows[$groupKey])) {
-                $debitRows[$groupKey] = [
-                    'cost_center' => $costCenter,
-                    'account' => $debitAccount,
-                    'debit' => 0.0,
-                    'credit' => null,
-                ];
-            }
-
-            $debitRows[$groupKey]['debit'] += $amount;
-        }
-
-        $termOfPaymentType = collect($allItems)
-            ->map(fn ($rrItem) => strtolower(trim((string) data_get($rrItem, 'purchaseOrderItem.meta.term_of_payment_type', ''))))
-            ->first(fn ($value) => $value !== '');
-
-        $creditAccount = match ($termOfPaymentType) {
-            'credit' => '201',
-            'cash' => '148',
-            default => '',
-        };
-
-        $accountingEntries = collect($debitRows)
-            ->values()
-            ->sortBy(function (array $row) {
-                return sprintf('%s|%s', (string) ($row['cost_center'] ?? ''), (string) ($row['account'] ?? ''));
-            })
-            ->values()
-            ->all();
-
-        if ($totalPpnAmountAllItems > 0) {
-            $accountingEntries[] = [
-                'cost_center' => '',
-                'account' => '551',
-                'debit' => $totalPpnAmountAllItems,
-                'credit' => null,
-            ];
-        }
-
-        if ($totalPphAmountAllItems > 0) {
-            $accountingEntries[] = [
-                'cost_center' => '',
-                'account' => '206',
-                'debit' => null,
-                'credit' => $totalPphAmountAllItems,
-            ];
-        }
-
-        $accountingEntries[] = [
-            'cost_center' => '',
-            'account' => $creditAccount,
-            'debit' => null,
-            'credit' => $creditAmountAllItems,
-        ];
-
-        $accountingCodeTotal = collect($accountingEntries)
-            ->sum(function (array $entry) {
-                $accountCode = trim((string) ($entry['account'] ?? ''));
-
-                return is_numeric($accountCode) ? (int) $accountCode : 0;
-            });
-
-        $displaySubTotal = $totalAmountAllItems;
-        $displayPpnTotal = $totalPpnAmountAllItems;
-        $displayPphTotal = $totalPphAmountAllItems;
         $displayPpnRate = (float) collect($allItems)
             ->map(fn ($rrItem) => (float) ($rrItem->purchaseOrderItem?->ppn_rate ?? 0))
             ->first(fn ($rate) => $rate > 0);
@@ -303,7 +167,7 @@
         $showSubTotal = $rowCount > 1;
         $showFinalTotal = $hasPpn || $hasPph;
         $subTotalPlusPpn = $displaySubTotal + $displayPpnTotal;
-        $displayGrandTotal = $subTotalPlusPpn - $displayPphTotal;
+        $displayGrandTotal = (float) ($rrAccountingPayload['display']['grand_total'] ?? ($subTotalPlusPpn - $displayPphTotal));
         $summaryBaseTop = $rowCount > 0 ? $rowStartTopMm + ($rowCount * $rowHeightMm) + $sy(0.8) : 0;
         $subTotalTop = $summaryBaseTop + $sy(1.2);
         $ppnTop = $subTotalTop + $sy(5);
@@ -313,6 +177,7 @@
         $summaryTotalTop = $summaryTotalLineTop + $sy(1.2);
         $poDateText = $po?->created_at ? $po->created_at->locale('id')->translatedFormat('d M Y') : '-';
         $rrDateText = $receivingReport->created_at ? $receivingReport->created_at->locale('id')->translatedFormat('d M Y') : '-';
+        $isCapex = (bool) ($po?->items?->first()?->prsItem?->prs?->is_capex ?? false);
     @endphp
 
     <div class="rr-form-page">

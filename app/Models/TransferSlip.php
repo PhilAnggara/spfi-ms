@@ -51,4 +51,10 @@ class TransferSlip extends Model
     {
         return $this->hasMany(TransferSlipItem::class, 'transfer_slip_id');
     }
+
+    public function accountingDocTransaction()
+    {
+        return $this->morphOne(AccountingDocTransaction::class, 'source')
+            ->where('doc_type', 'TS');
+    }
 }

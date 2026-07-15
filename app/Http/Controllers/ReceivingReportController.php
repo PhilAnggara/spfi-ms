@@ -7,6 +7,7 @@ use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
 use App\Models\User;
+use App\Services\Accounting\ReceivingReportEntryGenerator;
 use App\Services\CurrencyExchangeRateService;
 use App\Services\DocumentNumberService;
 use App\Services\NotificationRecipientService;
@@ -485,6 +486,11 @@ class ReceivingReportController extends Controller
             $receivingReport->received_date ?? $receivingReport->created_at,
         );
 
+        $rrAccountingPayload = app(ReceivingReportEntryGenerator::class)->generate(
+            $receivingReport,
+            $currencyConversion,
+        );
+
         $imManager = User::query()
             ->whereHas('department', function ($query) {
                 $query->where('name', 'Inventory Management');
@@ -513,6 +519,7 @@ class ReceivingReportController extends Controller
             'pageWidthMm' => self::RR_PAPER_WIDTH_MM,
             'pageHeightMm' => self::RR_PAPER_HEIGHT_MM,
             'currencyConversion' => $currencyConversion,
+            'rrAccountingPayload' => $rrAccountingPayload,
         ])
             ->setPaper([
                 0,

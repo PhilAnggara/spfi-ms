@@ -2,8 +2,8 @@
 
 namespace Database\Seeders\Concerns;
 
+use App\Services\Legacy\LegacyImportDatasetRegistry;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 use Throwable;
 
 trait ResolvesLegacyImport
@@ -26,28 +26,23 @@ trait ResolvesLegacyImport
         return $this->shouldFallbackToLocal();
     }
 
+    protected function legacyImportRegistry(): LegacyImportDatasetRegistry
+    {
+        return app(LegacyImportDatasetRegistry::class);
+    }
+
     // Mengambil path CSV per dataset dari konfigurasi.
     protected function csvPathFor(string $dataset): string
     {
-        $relativePath = (string) config("legacy_import.datasets.{$dataset}.csv_path", '');
-
-        if ($relativePath === '') {
-            throw new RuntimeException("CSV path for dataset [{$dataset}] is not configured.");
-        }
-
-        return public_path($relativePath);
+        return $this->legacyImportRegistry()->resolveCsvAbsolutePath($dataset);
     }
 
     // Mengambil seluruh baris dari legacy DB sesuai mapping dataset.
     protected function getLegacyRows(string $dataset): array
     {
-        $connection = (string) (config("legacy_import.datasets.{$dataset}.connection")
-            ?: config('legacy_import.default_connection', 'legacy_sqlsrv_1'));
-        $table = (string) config("legacy_import.datasets.{$dataset}.table", '');
-
-        if ($table === '') {
-            throw new RuntimeException("Legacy table for dataset [{$dataset}] is not configured.");
-        }
+        $registry = $this->legacyImportRegistry();
+        $connection = $registry->resolveConnection($dataset);
+        $table = $registry->resolveTable($dataset);
 
         $rows = DB::connection($connection)->table($table)->get();
 
@@ -57,17 +52,14 @@ trait ResolvesLegacyImport
     // Mengambil baris dari legacy DB dengan chunking untuk dataset besar.
     protected function getLegacyRowsChunked(string $dataset, int $chunkSize = 500, ?callable $callback = null): void
     {
-        $connection = (string) (config("legacy_import.datasets.{$dataset}.connection")
-            ?: config('legacy_import.default_connection', 'legacy_sqlsrv_1'));
-        $table = (string) config("legacy_import.datasets.{$dataset}.table", '');
+        $registry = $this->legacyImportRegistry();
+        $connection = $registry->resolveConnection($dataset);
+        $table = $registry->resolveTable($dataset);
+        $orderBy = $registry->resolveOrderBy($dataset);
 
-        if ($table === '') {
-            throw new RuntimeException("Legacy table for dataset [{$dataset}] is not configured.");
-        }
-
-        DB::connection($connection)->table($table)->orderBy('id')->chunk($chunkSize, function ($rows) use ($callback) {
+        DB::connection($connection)->table($table)->orderBy($orderBy)->chunkById($chunkSize, function ($rows) use ($callback) {
             $callback?->__invoke($rows->map(static fn ($row) => (array) $row)->all());
-        });
+        }, $orderBy);
     }
 
     // Menampilkan sumber import yang dipakai untuk dataset saat ini.
@@ -78,14 +70,14 @@ trait ResolvesLegacyImport
 
     protected function resolveRows(string $dataset, ?callable $onWarning = null): array
     {
-        if (!$this->isLegacySource()) {
+        if (! $this->isLegacySource()) {
             return [];
         }
 
         try {
             return $this->getLegacyRows($dataset);
         } catch (Throwable $e) {
-            if (!$this->shouldFallbackToLocal()) {
+            if (! $this->shouldFallbackToLocal()) {
                 throw $e;
             }
 

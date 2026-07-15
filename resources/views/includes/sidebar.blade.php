@@ -291,6 +291,15 @@
                         @endrole
 
                         @role('administrator|accounting-manager|accounting-supervisor|accounting-staff')
+                            <li class="sidebar-item {{ Request::is('accounting/doc-entries*') ? 'active' : '' }}">
+                                <a href="{{ route('accounting.doc-entries.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-file-pen {{ Request::is('accounting/doc-entries*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Doc Entry</span>
+                                </a>
+                            </li>
+                        @endrole
+
+                        @role('administrator|accounting-manager|accounting-supervisor|accounting-staff')
                             <li class="sidebar-item {{ Request::is('accounting/exchange-rates*') ? 'active' : '' }}">
                                 <a href="{{ route('accounting.exchange-rates.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-money-bill-transfer {{ Request::is('accounting/exchange-rates*') ? 'fa-fade' : '' }}"></i>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Accounting\AccountingCodeController;
+use App\Http\Controllers\Accounting\AccountingDocEntryController;
 use App\Http\Controllers\Accounting\AccountingGroupCodeController;
 use App\Http\Controllers\Accounting\BsGroupingController;
 use App\Http\Controllers\Accounting\CurrencyExchangeRateController;
@@ -130,6 +131,14 @@ Route::middleware('auth')->group(function () {
         ->name('accounting.')
         ->group(function () {
             Route::get('exchange-rates', [CurrencyExchangeRateController::class, 'index'])->name('exchange-rates.index');
+            Route::get('doc-entries', [AccountingDocEntryController::class, 'index'])->name('doc-entries.index');
+            Route::get('doc-entries/account-lookup', [AccountingDocEntryController::class, 'lookupAccount'])->name('doc-entries.account-lookup');
+            Route::get('doc-entries/transaction/{transaction}', [AccountingDocEntryController::class, 'showTransaction'])
+                ->name('doc-entries.transaction');
+            Route::get('doc-entries/{docType}/{id}', [AccountingDocEntryController::class, 'show'])
+                ->where(['docType' => 'rr|dr', 'id' => '[0-9]+'])
+                ->name('doc-entries.show');
+            Route::put('doc-entries/{transaction}', [AccountingDocEntryController::class, 'update'])->name('doc-entries.update');
         });
 
     Route::middleware('role:administrator|accounting-manager|accounting-supervisor')

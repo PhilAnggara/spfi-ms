@@ -199,6 +199,34 @@ php artisan db:snapshots
 2. `php artisan config:clear`
 3. `migrate:fresh --seed` → `db:snapshot`
 
+### Refresh CSV fallback (kantor, sebelum pulang ke rumah)
+
+Gunakan saat ingin memperbarui file CSV offline di `public/csv/` agar `SEED_SOURCE=local` di rumah memakai data terbaru.
+
+```bash
+# Pastikan legacy SQL Server reachable (Skenario 2 atau 3)
+php artisan config:clear
+php artisan legacy:export-csv
+
+# Verifikasi CSV masih valid untuk seeding
+php artisan migrate:fresh --seed
+
+# Opsional: snapshot dev DB (lebih praktis untuk restore di rumah)
+php artisan db:snapshot
+```
+
+Export dataset tertentu saja:
+
+```bash
+php artisan legacy:export-csv --only=supplier,po,po_detail,rr,rr_detail
+php artisan legacy:export-csv --list
+php artisan legacy:export-csv --dry-run
+```
+
+Menambah tabel legacy baru: tambah entry di `config/legacy_import.php` → buat seeder → `legacy:export-csv --only=nama_dataset`.
+
+**Git:** file GL (`tbl_DocTran*.csv`) sangat besar — hindari commit ke repository.
+
 ---
 
 ## Verifikasi Keamanan

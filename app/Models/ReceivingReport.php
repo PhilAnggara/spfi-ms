@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\CustomsDocumentType;
-use App\Models\ReceivingReportItem;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -72,5 +70,11 @@ class ReceivingReport extends Model
     public function customsDocumentType()
     {
         return $this->belongsTo(CustomsDocumentType::class, 'customs_document_type_id');
+    }
+
+    public function accountingDocTransaction()
+    {
+        return $this->morphOne(AccountingDocTransaction::class, 'source')
+            ->where('doc_type', 'RR');
     }
 }
