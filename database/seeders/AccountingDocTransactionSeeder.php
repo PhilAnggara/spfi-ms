@@ -321,7 +321,13 @@ class AccountingDocTransactionSeeder extends Seeder
             return;
         }
 
-        foreach (array_chunk($payload, 500) as $chunk) {
+        // SQL Server caps bound parameters at 2100 per query.
+        $columns = count($payload[0]);
+        $chunkSize = DB::connection()->getDriverName() === 'sqlsrv'
+            ? max(1, intdiv(2000, max(1, $columns)))
+            : 500;
+
+        foreach (array_chunk($payload, $chunkSize) as $chunk) {
             AccountingDocTransactionLine::query()->insert($chunk);
         }
     }

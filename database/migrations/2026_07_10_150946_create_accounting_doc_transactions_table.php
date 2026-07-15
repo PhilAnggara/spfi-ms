@@ -25,10 +25,10 @@ return new class extends Migration
             $table->decimal('variance', 18, 4)->default(0);
             $table->string('status', 20)->default('draft');
             $table->unsignedBigInteger('legacy_tran_id')->nullable();
-            $table->foreignId('encoded_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('encoded_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->timestamp('encoded_at')->nullable();
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
+            $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete(fk_on_delete('set null'));
             $table->timestamps();
 
             $table->unique(['doc_type', 'doc_number'], 'acct_doc_txn_doc_unique');
@@ -52,7 +52,7 @@ return new class extends Migration
             $table->foreign('accounting_doc_transaction_id', 'acct_doc_txn_lines_txn_fk')
                 ->references('id')
                 ->on('accounting_doc_transactions')
-                ->cascadeOnDelete();
+                ->onDelete(fk_on_delete('cascade'));
             $table->index(['accounting_doc_transaction_id', 'line_no'], 'acct_doc_txn_lines_order_idx');
             $table->index('account_code', 'acct_doc_txn_lines_code_idx');
         });
