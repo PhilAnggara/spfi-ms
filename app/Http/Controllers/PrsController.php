@@ -330,13 +330,11 @@ class PrsController extends Controller
     }
 
     /**
-     * Print PRS document untuk diajukan ke GM untuk approval (tanda tangan)
-     * Menghasilkan PDF yang siap dicetak dan ditandatangani
+     * Print PRS document for physical approval signatures.
      */
     public function print(string $id)
     {
-        // Ambil data PRS beserta relasi yang diperlukan
-        $prs = Prs::with(['user', 'department', 'items.item'])->findOrFail($id);
+        $prs = Prs::with(['user.department', 'department', 'items.item.unit'])->findOrFail($id);
 
         // Ubah status kembali ke tahap pengajuan setelah perbaikan dari hold.
         if ($prs->status === 'ON_HOLD') {
@@ -354,26 +352,28 @@ class PrsController extends Controller
             ]);
         }
 
-        // Generate QR code sebagai SVG (tidak memerlukan Imagick)
-        $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(100)->generate($prs->prs_number);
-        $qrCodeBase64 = 'data:image/svg+xml;base64,'.base64_encode($qrCode);
+        $departmentPrefix = substr((string) ($prs->department?->code ?? ''), 0, 4);
+        $usesOperationsApproval = in_array(
+            $departmentPrefix,
+            config('prs.operations_approval_department_prefixes', []),
+            true
+        );
 
-        // Data yang dikirim ke view PDF
-        $data = [
-            'prs' => $prs,
-            'qrCodeBase64' => $qrCodeBase64,
-        ];
+        $approvers = $usesOperationsApproval
+            ? config('prs.operations_approvers')
+            : [config('prs.general_manager_approver')];
 
-        // Generate nama file dengan format: PRS-NOMOR-TANGGAL.pdf
-        // Contoh: PRS-PRD-250125-001-2025-01-25.pdf
         $filename = sprintf(
             'PRS-%s-%s.pdf',
             $prs->prs_number,
             now()->format('Y-m-d')
         );
 
-        // Generate dan stream PDF untuk dicetak
-        return Pdf::loadView('pdf.prs-for-approval', $data)
+        return Pdf::loadView('pdf.prs-for-approval', [
+            'prs' => $prs,
+            'approvers' => $approvers,
+            'usesOperationsApproval' => $usesOperationsApproval,
+        ])
             ->setPaper('a4', 'portrait')
             ->stream($filename);
     }

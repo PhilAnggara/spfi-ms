@@ -343,7 +343,7 @@
             <div class="modal-footer d-flex justify-content-center">
                 <a href="{{ route('prs.print', $item->id) }}" target="_blank" class="btn icon icon-left btn-outline-primary">
                     <i class="fa-duotone fa-solid fa-print"></i>
-                    Print for GM Approval
+                    Print for Approval
                 </a>
             </div>
         </div>

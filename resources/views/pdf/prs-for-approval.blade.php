@@ -1,349 +1,352 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>PRS for GM Approval - {{ $prs->prs_number }}</title>
-    @include('pdf.partials.header-style')
+    <title>PRS for Approval - {{ $prs->prs_number }}</title>
     <style>
-        /* Document Info */
-        .doc-info {
-            margin: 15px 0;
-            padding: 10px;
-            background: #f9fafb;
-            border-left: 4px solid #3b82f6;
+        @page {
+            margin: 22px 28px;
         }
 
-        .doc-info--capex {
-            background: #fffef8;
-            border-left-color: #c99700;
-        }
-
-        .capex-notice {
-            margin: 12px 0 14px;
-            border: 1px solid #e3cc7a;
-            border-radius: 4px;
-            background: #fffdf5;
-            overflow: hidden;
-        }
-
-        .capex-notice-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .capex-notice-accent {
-            width: 7px;
-            background: #c99700;
-        }
-
-        .capex-notice-body {
-            padding: 11px 16px 10px;
-        }
-
-        .capex-notice-eyebrow {
-            font-size: 8px;
-            font-weight: 700;
-            letter-spacing: 1.4px;
-            text-transform: uppercase;
-            color: #92710a;
-            margin-bottom: 3px;
-        }
-
-        .capex-notice-title {
-            font-size: 17px;
-            font-weight: 700;
-            letter-spacing: 4px;
-            color: #1f4e79;
-            line-height: 1.1;
-        }
-
-        .capex-notice-desc {
-            font-size: 9px;
-            color: #6b5a1e;
-            margin-top: 4px;
-        }
-
-        .info-grid {
-            display: table;
-            width: 100%;
-            margin-bottom: 10px;
-        }
-
-        .info-row {
-            display: table-row;
-        }
-
-        .info-label {
-            display: table-cell;
-            width: 25%;
-            font-weight: 600;
-            padding: 4px 8px;
-            vertical-align: top;
-        }
-
-        .info-value {
-            display: table-cell;
-            width: 75%;
-            padding: 4px 8px;
-            vertical-align: top;
-        }
-
-        /* Items Table */
-        .items-section {
-            margin: 20px 0;
-        }
-
-        .section-title {
-            font-size: 12px;
-            font-weight: 700;
-            background: #e5e7eb;
-            padding: 8px 10px;
-            margin: 15px 0 10px 0;
-            border-radius: 3px;
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 10px;
+            color: #111827;
+            line-height: 1.35;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
         }
 
-        th, td {
-            border: 1px solid #d1d5db;
-            padding: 8px;
-            vertical-align: middle;
+        .header-table td {
+            border: none;
+            vertical-align: bottom;
+            padding: 0;
         }
 
-        th {
-            background: #f3f4f6;
-            font-weight: 700;
-            text-align: left;
+        .doc-title {
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+        }
+
+        .doc-company {
+            font-size: 9px;
+            color: #4b5563;
+            margin-top: 2px;
+        }
+
+        .doc-number {
+            text-align: right;
             font-size: 10px;
         }
 
-        tr:nth-child(even) {
-            background: #f9fafb;
+        .doc-number strong {
+            font-size: 11px;
         }
 
-        .text-center {
-            text-align: center;
+        .header-rule {
+            border-top: 1px solid #111827;
+            border-bottom: 2px solid #111827;
+            margin: 8px 0 12px;
+            height: 0;
         }
 
-        .text-right {
-            text-align: right;
+        .meta td {
+            border: none;
+            padding: 2px 0;
+            vertical-align: top;
         }
 
-        /* Signature Section */
+        .meta .label {
+            width: 95px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .meta .sep {
+            width: 8px;
+        }
+
+        .meta .right-label {
+            width: 95px;
+            font-weight: bold;
+            white-space: nowrap;
+            padding-left: 20px;
+        }
+
+        .capex-tag {
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+
+        .section-gap {
+            margin-top: 12px;
+        }
+
+        .items th,
+        .items td {
+            border: 1px solid #111827;
+            padding: 4px 5px;
+            vertical-align: top;
+        }
+
+        .items th {
+            background: #f3f4f6;
+            font-size: 8.5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+        }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .muted { color: #6b7280; }
+
+        .remarks {
+            margin-top: 10px;
+        }
+
+        .remarks-label {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .remarks-body {
+            border-top: 1px solid #111827;
+            padding-top: 4px;
+            min-height: 18px;
+        }
+
         .signature-section {
-            margin-top: 40px;
+            margin-top: 28px;
             page-break-inside: avoid;
         }
 
-        .signature-grid {
-            display: table;
-            width: 100%;
-            margin-top: 40px;
+        .signature-note {
+            font-size: 9px;
+            color: #4b5563;
+            margin-bottom: 14px;
         }
 
-        .sig-column {
-            display: table-cell;
-            width: 33.33%;
+        .signatures {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .signatures td {
+            border: none;
             text-align: center;
-            padding: 10px;
+            vertical-align: top;
+            padding: 0 8px;
+        }
+
+        .sig-roles td {
+            font-size: 9px;
+            font-weight: bold;
+            padding-bottom: 4px;
+        }
+
+        .sig-space td {
+            height: 48px;
+            line-height: 48px;
+            font-size: 1px;
+        }
+
+        .sig-names td {
+            font-size: 10px;
+            font-weight: bold;
+            padding-top: 5px;
+            vertical-align: top;
         }
 
         .sig-line {
-            border-top: 1px solid #1f2937;
-            margin-top: 60px;
+            width: 78%;
+            margin: 0 auto 5px;
+            border-top: 1px solid #111827;
+            height: 0;
+        }
+
+        .sig-titles td {
+            font-size: 8.5px;
+            color: #4b5563;
+            padding-top: 2px;
+        }
+
+        .sig-dates td {
+            font-size: 8.5px;
+            color: #6b7280;
             padding-top: 5px;
-            font-weight: 600;
-            font-size: 10px;
         }
 
-        .sig-title {
-            font-size: 10px;
-            color: #6b7280;
-            margin-top: 5px;
-        }
-
-        .sig-date {
-            font-size: 10px;
-            color: #6b7280;
-            margin-top: 3px;
-        }
-
-        /* Footer */
         .footer {
-            font-size: 9px;
-            text-align: center;
-            color: #9ca3af;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 10px;
             margin-top: 20px;
-        }
-
-        /* Utilities */
-        .badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            background: #dbeafe;
-            font-size: 9px;
-            font-weight: 600;
-        }
-
-        .remarks-box {
-            background: #fffbeb;
-            border: 1px solid #fbbf24;
-            padding: 10px;
-            border-radius: 3px;
-            margin: 10px 0;
-            font-size: 10px;
+            padding-top: 6px;
+            border-top: 1px solid #d1d5db;
+            font-size: 8px;
+            color: #9ca3af;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    @include('pdf.partials.header', ['documentTitle' => 'Purchase Requisition Slip (PRS) - for General Manager Approval'])
+    @php
+        $manager = get_manager($prs->user);
+        $approverCount = count($approvers);
+        $hasSharedApprovers = $approverCount > 1;
+        $columnCount = $hasSharedApprovers ? (2 + $approverCount) : 3;
+        $columnWidth = number_format(100 / $columnCount, 2, '.', '').'%';
+        $departmentLabel = trim(
+            ($prs->department->code ? '['.$prs->department->code.'] ' : '').
+            ($prs->department->name ?? '')
+        );
+        $capexLabel = $prs->is_capex ? 'CAPEX' : null;
+    @endphp
 
-    @if ($prs->is_capex)
-        <table class="capex-notice" role="presentation" cellpadding="0" cellspacing="0">
-            <tr>
-                <td class="capex-notice-accent"></td>
-                <td class="capex-notice-body">
-                    <div class="capex-notice-eyebrow">Transaction Classification</div>
-                    <div class="capex-notice-title">CAPEX</div>
-                    <div class="capex-notice-desc">Capital Expenditure Request</div>
-                </td>
-            </tr>
-        </table>
-    @endif
+    <table class="header-table">
+        <tr>
+            <td>
+                <div class="doc-title">
+                    Purchase Requisition Slip
+                    @if ($capexLabel)
+                        <span class="capex-tag">({{ $capexLabel }})</span>
+                    @endif
+                </div>
+                <div class="doc-company">PT. SINAR PURE FOODS INTERNATIONAL</div>
+            </td>
+            <td class="doc-number">
+                <div class="muted">PRS Number</div>
+                <strong>{{ $prs->prs_number }}</strong>
+            </td>
+        </tr>
+    </table>
+    <div class="header-rule"></div>
 
-    <!-- Informasi Dokumen -->
-    <div class="doc-info{{ $prs->is_capex ? ' doc-info--capex' : '' }}">
-        <div class="info-grid">
-            <div class="info-row">
-                <div class="info-label">PRS Number :</div>
-                <div class="info-value"><strong>{{ $prs->prs_number }}</strong></div>
-            </div>
-            {{-- <div class="info-row">
-                <div class="info-label">Status :</div>
-                <div class="info-value"><span class="badge">{{ $prs->status }}</span></div>
-            </div> --}}
-            <div class="info-row">
-                <div class="info-label">Requested By :</div>
-                <div class="info-value">{{ $prs->user->name }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Department :</div>
-                <div class="info-value">{{ $prs->department->name }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">PRS Date :</div>
-                <div class="info-value">{{ \Carbon\Carbon::parse($prs->prs_date)->format('d F Y') }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Date Needed :</div>
-                <div class="info-value">{{ \Carbon\Carbon::parse($prs->date_needed)->format('d F Y') }}</div>
-            </div>
-        </div>
-    </div>
+    <table class="meta">
+        <tr>
+            <td class="label">Requested By</td>
+            <td class="sep">:</td>
+            <td>{{ $prs->user->name }}</td>
+            <td class="right-label">PRS Date</td>
+            <td class="sep">:</td>
+            <td>{{ \Carbon\Carbon::parse($prs->prs_date)->format('d M Y') }}</td>
+        </tr>
+        <tr>
+            <td class="label">Department</td>
+            <td class="sep">:</td>
+            <td>{{ $departmentLabel !== '' ? $departmentLabel : '-' }}</td>
+            <td class="right-label">Date Needed</td>
+            <td class="sep">:</td>
+            <td>{{ \Carbon\Carbon::parse($prs->date_needed)->format('d M Y') }}</td>
+        </tr>
+    </table>
 
-    <!-- Detail Item PRS -->
-    <div class="items-section">
-        <div class="section-title">REQUESTED ITEMS DETAIL</div>
-
-        <table>
+    <div class="section-gap">
+        <table class="items">
             <thead>
                 <tr>
-                    <th style="width: 5%; text-align: center;">No</th>
-                    <th style="width: 15%;">Item Code</th>
-                    <th style="width: 50%;">Item Description</th>
-                    <th style="width: 15%; text-align: right;">Qty Needed</th>
-                    <th style="width: 15%; text-align: center;">Unit</th>
+                    <th style="width: 6%;" class="text-center">No</th>
+                    <th style="width: 16%;">Item Code</th>
+                    <th style="width: 48%;">Item Description</th>
+                    <th style="width: 15%;" class="text-right">Qty Needed</th>
+                    <th style="width: 15%;" class="text-center">Unit</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($prs->items as $idx => $item)
                     <tr>
                         <td class="text-center">{{ $idx + 1 }}</td>
-                        <td><strong>{{ $item->item->code ?? '-' }}</strong></td>
+                        <td>{{ $item->item->code ?? '-' }}</td>
                         <td>{{ $item->item->name ?? '-' }}</td>
-                        <td class="text-right">{{ $item->quantity }}</td>
+                        <td class="text-right">{{ number_format((float) $item->quantity, 0, ',', '.') }}</td>
                         <td class="text-center">{{ $item->item->unit?->name ?? 'PCS' }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center" style="padding: 20px; color: #9ca3af;">
-                            No items found in this PRS
-                        </td>
+                        <td colspan="5" class="text-center muted">No items found in this PRS</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <!-- Remarks -->
     @if ($prs->remarks)
-        <div class="remarks-box">
-            <strong>Special Remarks / Notes:</strong><br>
-            {{ $prs->remarks }}
+        <div class="remarks">
+            <div class="remarks-label">Remarks</div>
+            <div class="remarks-body">{{ $prs->remarks }}</div>
         </div>
     @endif
 
-    <!-- QR Code -->
-    <div style="text-align: center; margin: 20px 0;">
-        <img src="{{ $qrCodeBase64 }}" alt="QR Code" style="width: 100px; height: 100px; display: inline-block; border: 1px solid #d1d5db; padding: 5px; background: #ffffff;">
-        <p style="font-size: 8px; font-weight: 300; margin-top: 10px; color: #1f2937;">PRS QR Code</p>
-    </div>
-
-    <!-- Bagian Tanda Tangan -->
     <div class="signature-section">
-        @php
-            $manager = get_manager($prs->user);
-        @endphp
-
-        <p style="font-size: 11px; font-weight: 600; margin-bottom: 30px;">
-            This document requires General Manager approval before processing by the Purchasing Department.
-        </p>
-
-        <div class="signature-grid">
-            <div class="sig-column">
-                <div style="text-align: left;">
-                    <p style="font-size: 10px; margin-bottom: 5px;"><strong>Requested By:</strong></p>
-                    <div class="sig-line"></div>
-                    <div class="sig-name" style="font-size:11px; font-weight:600; color:#1f2937; margin-top:5px;">{{ $prs->user->name }}</div>
-                    <div class="sig-title">Requester</div>
-                    <div class="sig-date">{{ \Carbon\Carbon::parse($prs->prs_date)->format('d F Y') }}</div>
-                </div>
-            </div>
-            <div class="sig-column">
-                <div style="text-align: left;">
-                    <p style="font-size: 10px; margin-bottom: 5px;"><strong>Reviewed By:</strong></p>
-                    <div class="sig-line"></div>
-                    <div class="sig-name" style="font-size:11px; font-weight:600; color:#1f2937; margin-top:5px;">{{ $manager?->name ?? 'N/A' }}</div>
-                    <div class="sig-title">{{ $manager ? get_job_title($manager) : 'Manager' }}</div>
-                    <div class="sig-date">Date: _____________</div>
-                </div>
-            </div>
-            <div class="sig-column">
-                <div style="text-align: left;">
-                    <p style="font-size: 10px; margin-bottom: 5px;"><strong>Approved By:</strong></p>
-                    <div class="sig-line"></div>
-                    <div class="sig-name" style="font-size:11px; font-weight:600; color:#1f2937; margin-top:5px;">{{ get_gm_name() }}</div>
-                    <div class="sig-title">General Manager</div>
-                    <div class="sig-date">Date: _____________</div>
-                </div>
-            </div>
+        <div class="signature-note">
+            This document requires approval before processing by the Purchasing Department.
         </div>
+
+        <table class="signatures">
+            {{-- Role labels --}}
+            <tr class="sig-roles">
+                <td style="width: {{ $columnWidth }};">Requested By</td>
+                <td style="width: {{ $columnWidth }};">Reviewed By</td>
+                @if ($hasSharedApprovers)
+                    <td colspan="{{ $approverCount }}">Approved By</td>
+                @else
+                    <td style="width: {{ $columnWidth }};">Approved By</td>
+                @endif
+            </tr>
+
+            {{-- Empty signing space (same height = aligned lines) --}}
+            <tr class="sig-space">
+                @for ($i = 0; $i < $columnCount; $i++)
+                    <td style="width: {{ $columnWidth }};">&nbsp;</td>
+                @endfor
+            </tr>
+
+            {{-- Names sit on the shared baseline --}}
+            <tr class="sig-names">
+                <td style="width: {{ $columnWidth }};">
+                    <div class="sig-line"></div>
+                    {{ $prs->user->name }}
+                </td>
+                <td style="width: {{ $columnWidth }};">
+                    <div class="sig-line"></div>
+                    {{ $manager?->name ?? '____________________' }}
+                </td>
+                @foreach ($approvers as $approver)
+                    <td style="width: {{ $columnWidth }};">
+                        <div class="sig-line"></div>
+                        {{ $approver['name'] }}
+                    </td>
+                @endforeach
+            </tr>
+
+            <tr class="sig-titles">
+                <td style="width: {{ $columnWidth }};">Requester</td>
+                <td style="width: {{ $columnWidth }};">{{ $manager ? get_job_title($manager) : 'Manager' }}</td>
+                @foreach ($approvers as $approver)
+                    <td style="width: {{ $columnWidth }};">{{ $approver['title'] }}</td>
+                @endforeach
+            </tr>
+
+            <tr class="sig-dates">
+                <td style="width: {{ $columnWidth }};">{{ \Carbon\Carbon::parse($prs->prs_date)->format('d M Y') }}</td>
+                <td style="width: {{ $columnWidth }};">Date: __________</td>
+                @foreach ($approvers as $approver)
+                    <td style="width: {{ $columnWidth }};">Date: __________</td>
+                @endforeach
+            </tr>
+        </table>
     </div>
 
-    <!-- Footer -->
     <div class="footer">
-        <p>
-            Generated on {{ \Carbon\Carbon::now()->format('d F Y H:i') }} |
-            This is a system-generated document and requires official signature for approval.
-        </p>
+        Generated on {{ \Carbon\Carbon::now()->format('d M Y H:i') }}
+        &nbsp;|&nbsp;
+        System-generated document — official signature required for approval
     </div>
-
 </body>
 </html>
