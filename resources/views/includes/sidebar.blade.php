@@ -372,14 +372,12 @@
                             </li>
                         @endcan
 
-                        @role('administrator|im-manager|im-supervisor|im-staff')
-                            <li class="sidebar-item {{ Request::is('stores-withdrawals*') ? 'active' : '' }}">
-                                <a href="{{ route('stores-withdrawals.index') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-boxes-packing {{ Request::is('stores-withdrawals*') ? 'fa-fade' : '' }}"></i>
-                                    <span>Stores Withdrawal</span>
-                                </a>
-                            </li>
-                        @endrole
+                        <li class="sidebar-item {{ Request::is('stores-withdrawals*') ? 'active' : '' }}">
+                            <a href="{{ route('stores-withdrawals.index') }}" class='sidebar-link'>
+                                <i class="fa-duotone fa-solid fa-boxes-packing {{ Request::is('stores-withdrawals*') ? 'fa-fade' : '' }}"></i>
+                                <span>Stores Withdrawal</span>
+                            </a>
+                        </li>
 
                         @can('view-transfer')
                             <li class="sidebar-item {{ Request::is('transfer-slips*') ? 'active' : '' }}">

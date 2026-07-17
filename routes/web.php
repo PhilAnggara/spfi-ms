@@ -200,7 +200,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{receivingReport}', [ReceivingReportController::class, 'destroy'])->name('destroy');
     });
 
-    Route::middleware('role:administrator|im-manager|im-supervisor|im-staff')->prefix('stores-withdrawals')->name('stores-withdrawals.')->group(function () {
+    Route::prefix('stores-withdrawals')->name('stores-withdrawals.')->group(function () {
         Route::get('/', [StoreWithdrawalController::class, 'index'])->name('index');
         Route::get('/create', [StoreWithdrawalController::class, 'create'])->name('create');
         Route::get('/capex-lines', [StoreWithdrawalController::class, 'capexLines'])->name('capex-lines');

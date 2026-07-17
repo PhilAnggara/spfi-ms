@@ -27,21 +27,23 @@
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
                 <div class="row g-3 align-items-end po-filter-grid" id="sws-filter-form">
-                    <div class="col-12 col-md-6 col-xl-4">
+                    <div class="col-12 col-md-6 col-xl-{{ $canFilterDepartment ? 4 : 5 }}">
                         <label for="filter-sws-keyword" class="form-label mb-1">Search Stores Withdrawal</label>
                         <input type="text" id="filter-sws-keyword" class="form-control" value="{{ $filters['keyword'] ?? '' }}" placeholder="SWS number / dept / info / creator">
                     </div>
-                    <div class="col-6 col-md-3 col-xl-3">
-                        <label for="filter-sws-department" class="form-label mb-1">Department</label>
-                        <select id="filter-sws-department" class="form-select">
-                            <option value="">All Department</option>
-                            @foreach ($departmentOptions as $department)
-                                <option value="{{ $department->code }}" @selected(($filters['department'] ?? '') === $department->code)>
-                                    {{ $department->code }} - {{ $department->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @if ($canFilterDepartment)
+                        <div class="col-6 col-md-3 col-xl-3">
+                            <label for="filter-sws-department" class="form-label mb-1">Department</label>
+                            <select id="filter-sws-department" class="form-select">
+                                <option value="">All Department</option>
+                                @foreach ($departmentOptions as $department)
+                                    <option value="{{ $department->code }}" @selected(($filters['department'] ?? '') === $department->code)>
+                                        {{ $department->code }} - {{ $department->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-sws-type" class="form-label mb-1">Type</label>
                         <select id="filter-sws-type" class="form-select">
@@ -109,6 +111,8 @@
                                             $detailItems = collect($storeWithdrawalItems[$sws->id] ?? []);
                                             $canRemoveItem = $detailItems->count() > 1;
                                             $isLocked = (bool) ($lockedStoreWithdrawalLookup[$sws->id] ?? false);
+                                            $canManageSws = auth()->user()->hasAnyRole(['administrator', 'im-manager', 'im-supervisor', 'im-staff'])
+                                                || auth()->id() === (int) ($sws->created_by ?? 0);
                                         @endphp
                                         <tr>
                                             <td>
@@ -145,7 +149,7 @@
                                                         <button type="button" class="btn icon" disabled data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Locked: transfer slip already created">
                                                             <i class="fa-light fa-lock text-secondary"></i>
                                                         </button>
-                                                    @else
+                                                    @elseif ($canManageSws)
                                                         <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $sws->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                             <i class="fa-light fa-edit text-primary"></i>
                                                         </button>
@@ -159,10 +163,12 @@
                                                             <i class="fa-light fa-trash text-secondary"></i>
                                                         </button>
                                                     @endif
+                                                    @if ($canManageSws)
                                                     <form action="{{ route('stores-withdrawals.destroy', $sws->id) }}" id="hapus-{{ $sws->id }}" method="POST">
                                                         @csrf
                                                         @method('DELETE')
                                                     </form>
+                                                    @endif
                                                 </div>
                                             </td>
                                         </tr>
@@ -180,6 +186,8 @@
                                 $detailItems = collect($storeWithdrawalItems[$sws->id] ?? []);
                                 $canRemoveItem = $detailItems->count() > 1;
                                 $isLocked = (bool) ($lockedStoreWithdrawalLookup[$sws->id] ?? false);
+                                $canManageSws = auth()->user()->hasAnyRole(['administrator', 'im-manager', 'im-supervisor', 'im-staff'])
+                                    || auth()->id() === (int) ($sws->created_by ?? 0);
                             @endphp
 
                             <div class="modal fade" id="detail-modal-{{ $sws->id }}" tabindex="-1" aria-hidden="true">
@@ -270,6 +278,7 @@
                                 </div>
                             </div>
 
+                            @if ($canManageSws)
                             <div class="modal fade" id="edit-modal-{{ $sws->id }}" tabindex="-1" aria-hidden="true">
                                 <div class="modal-dialog modal-lg modal-dialog-scrollable">
                                     <div class="modal-content">
@@ -362,6 +371,7 @@
                                     </div>
                                 </div>
                             </div>
+                            @endif
                         @endforeach
                     @endif
                 </div>

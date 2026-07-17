@@ -27,6 +27,14 @@ class StoreWithdrawalController extends Controller
      */
     public function index(Request $request)
     {
+        $user = Auth::user();
+        $canViewAll = $user && $user->hasAnyRole([
+            'administrator',
+            'im-manager',
+            'im-supervisor',
+            'im-staff',
+        ]);
+
         $filters = [
             'keyword' => trim((string) $request->query('keyword', '')),
             'department' => trim((string) $request->query('department', '')),
@@ -35,7 +43,12 @@ class StoreWithdrawalController extends Controller
             'type' => trim((string) $request->query('type', '')),
         ];
 
-        $storeWithdrawals = $this->paginateStoreWithdrawals($filters, 10);
+        $storeWithdrawals = $this->paginateStoreWithdrawals(
+            canViewAll: $canViewAll,
+            userId: $user?->id,
+            filters: $filters,
+            perPage: 10,
+        );
         $storeWithdrawalIds = $storeWithdrawals->getCollection()
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
@@ -54,7 +67,8 @@ class StoreWithdrawalController extends Controller
             'storeWithdrawals' => $storeWithdrawals,
             'storeWithdrawalItems' => $storeWithdrawalItems,
             'lockedStoreWithdrawalLookup' => $lockedStoreWithdrawalLookup,
-            'departmentOptions' => $departmentOptions,
+            'departmentOptions' => $canViewAll ? $departmentOptions : collect(),
+            'canFilterDepartment' => $canViewAll,
             'filters' => $filters,
         ]);
     }
@@ -514,9 +528,11 @@ class StoreWithdrawalController extends Controller
             ->with('info', 'Stores Withdrawal detail page is not implemented yet (scaffold stage).');
     }
 
-    public function print(string $storeWithdrawal)
+    public function print(Request $request, string $storeWithdrawal)
     {
         $storeWithdrawalId = (int) $storeWithdrawal;
+
+        $this->ensureUserCanManageStoreWithdrawal($request, $storeWithdrawalId);
 
         $sws = DB::table('store_withdrawals as sw')
             ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
@@ -594,6 +610,8 @@ class StoreWithdrawalController extends Controller
     public function update(Request $request, string $storeWithdrawal)
     {
         $storeWithdrawalId = (int) $storeWithdrawal;
+
+        $this->ensureUserCanManageStoreWithdrawal($request, $storeWithdrawalId);
 
         $exists = DB::table('store_withdrawals')
             ->where('id', $storeWithdrawalId)
@@ -778,9 +796,11 @@ class StoreWithdrawalController extends Controller
         return redirect()->back()->with('success', 'Stores withdrawal updated successfully.');
     }
 
-    public function destroy(string $storeWithdrawal)
+    public function destroy(Request $request, string $storeWithdrawal)
     {
         $storeWithdrawalId = (int) $storeWithdrawal;
+
+        $this->ensureUserCanManageStoreWithdrawal($request, $storeWithdrawalId);
 
         if ($this->hasActiveTransferSlip($storeWithdrawalId)) {
             return redirect()->back()->with('error', 'Stores withdrawal cannot be deleted because a transfer slip has already been created.');
@@ -843,7 +863,7 @@ class StoreWithdrawalController extends Controller
     /**
      * SQL Server-compatible pagination for stores withdrawals.
      */
-    private function paginateStoreWithdrawals(array $filters = [], int $perPage = 10): LengthAwarePaginator
+    private function paginateStoreWithdrawals(bool $canViewAll, ?int $userId, array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
         $currentPage = max(1, (int) $currentPage);
@@ -861,12 +881,16 @@ class StoreWithdrawalController extends Controller
             ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
             ->leftJoin('users as u', 'u.id', '=', 'sw.created_by')
             ->whereNull('sw.deleted_at')
+            ->when(! $canViewAll, function ($subQuery) use ($userId) {
+                $subQuery->where('sw.created_by', $userId);
+            })
             ->select([
                 'sw.id',
                 'sw.sws_number',
                 'sw.sws_date',
                 'sw.department_code',
                 'sw.type',
+                'sw.created_by',
                 'd.name as department_name',
                 'sw.info',
                 'u.name as created_by_name',
@@ -932,6 +956,7 @@ class StoreWithdrawalController extends Controller
                     'sw.sws_date',
                     'sw.department_code',
                     'sw.type',
+                    'sw.created_by',
                     'd.name as department_name',
                     'sw.info',
                     'u.name as created_by_name',
@@ -987,6 +1012,30 @@ class StoreWithdrawalController extends Controller
             ->where('store_withdrawal_id', $storeWithdrawalId)
             ->whereNull('deleted_at')
             ->exists();
+    }
+
+    private function ensureUserCanManageStoreWithdrawal(Request $request, int $storeWithdrawalId): void
+    {
+        $sws = DB::table('store_withdrawals')
+            ->where('id', $storeWithdrawalId)
+            ->whereNull('deleted_at')
+            ->first(['created_by']);
+
+        if (! $sws) {
+            abort(404);
+        }
+
+        $user = $request->user();
+        $canViewAll = $user?->hasAnyRole([
+            'administrator',
+            'im-manager',
+            'im-supervisor',
+            'im-staff',
+        ]);
+
+        if (! $canViewAll && (int) $sws->created_by !== (int) $user?->id) {
+            abort(403);
+        }
     }
 
     /**
