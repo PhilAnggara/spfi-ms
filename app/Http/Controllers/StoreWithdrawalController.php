@@ -300,7 +300,7 @@ class StoreWithdrawalController extends Controller
         $authUserId = Auth::id();
         $now = now();
 
-        $createdStoreWithdrawal = DB::transaction(function () use ($department, $departmentCode, $swsDate, $validated, $requestedItems, $itemRows, $authUserId, $now): array {
+        $createdStoreWithdrawal = $this->transactionSerializable(function () use ($department, $departmentCode, $swsDate, $validated, $requestedItems, $itemRows, $authUserId, $now): array {
             $swsNumber = $this->generateSwsNumber($departmentCode);
 
             $storeWithdrawalId = DB::table('store_withdrawals')->insertGetId([
@@ -434,7 +434,7 @@ class StoreWithdrawalController extends Controller
         $authUserId = Auth::id();
         $now = now();
 
-        $createdStoreWithdrawal = DB::transaction(function () use ($department, $departmentCode, $swsDate, $validated, $requestedLines, $lineRows, $authUserId, $now): array {
+        $createdStoreWithdrawal = $this->transactionSerializable(function () use ($department, $departmentCode, $swsDate, $validated, $requestedLines, $lineRows, $authUserId, $now): array {
             $swsNumber = $this->generateSwsNumber($departmentCode);
 
             $storeWithdrawalId = DB::table('store_withdrawals')->insertGetId([
@@ -1091,25 +1091,42 @@ class StoreWithdrawalController extends Controller
     {
         $normalizedDepartmentCode = strtoupper(trim($departmentCode));
 
-        $lastSwsNumber = DB::table('store_withdrawals')
+        $start = strlen($normalizedDepartmentCode) + 1;
+
+        $lastSequence = DB::table('store_withdrawals')
             ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
-            ->orderByDesc('id')
-            ->value('sws_number');
+            ->where('sws_number', 'like', $normalizedDepartmentCode.'%')
+            ->selectRaw(
+                "MAX(CASE WHEN LEN(SUBSTRING(sws_number, ?, 100)) > 0 "
+                ."AND SUBSTRING(sws_number, ?, 100) NOT LIKE '%[^0-9]%' "
+                ."THEN CAST(SUBSTRING(sws_number, ?, 100) AS INT) ELSE NULL END) as last_sequence",
+                [$start, $start, $start]
+            )
+            ->value('last_sequence');
 
-        $lastNumber = 0;
-        if (is_string($lastSwsNumber)) {
-            $upperLastSwsNumber = strtoupper($lastSwsNumber);
-            $exactPattern = '/^'.preg_quote($normalizedDepartmentCode, '/').'(\d+)$/';
-
-            if (preg_match($exactPattern, $upperLastSwsNumber, $matches) === 1) {
-                $lastNumber = (int) $matches[1];
-            }
-        }
+        $lastNumber = (int) ($lastSequence ?? 0);
 
         // Sequence selalu 7 digit agar konsisten: 0000001, 0000002, dst.
         $newNumber = str_pad((string) ($lastNumber + 1), 7, '0', STR_PAD_LEFT);
 
         return $normalizedDepartmentCode.$newNumber;
+    }
+
+    private function transactionSerializable(callable $callback): mixed
+    {
+        $connection = DB::connection();
+
+        if ($this->isSqlServer()) {
+            $connection->statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+
+            try {
+                return $connection->transaction($callback);
+            } finally {
+                $connection->statement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+            }
+        }
+
+        return $connection->transaction($callback);
     }
 
     private function normalizeWithdrawalMode(string $mode): string

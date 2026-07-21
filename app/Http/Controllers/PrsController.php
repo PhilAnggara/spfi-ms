@@ -510,21 +510,20 @@ class PrsController extends Controller
     private function generatePrsNumber($departmentID)
     {
         $departmentCode = strtoupper(trim((string) Department::findOrFail($departmentID)->code));
+        $startPosition = strlen($departmentCode) + 1;
 
-        $lastPrsNumber = Prs::withTrashed()
+        $lastSequence = Prs::withTrashed()
             ->where('department_id', $departmentID)
-            ->orderByDesc('id')
-            ->value('prs_number');
+            ->where('prs_number', 'like', $departmentCode.'%')
+            ->selectRaw(
+                "MAX(CASE WHEN LEN(SUBSTRING(prs_number, ?, 100)) > 0 "
+                ."AND SUBSTRING(prs_number, ?, 100) NOT LIKE '%[^0-9]%' "
+                ."THEN CAST(SUBSTRING(prs_number, ?, 100) AS INT) ELSE NULL END) as last_sequence",
+                [$startPosition, $startPosition, $startPosition]
+            )
+            ->value('last_sequence');
 
-        $lastNumber = 0;
-        if (is_string($lastPrsNumber)) {
-            $upperLastPrsNumber = strtoupper($lastPrsNumber);
-            $exactPattern = '/^'.preg_quote($departmentCode, '/').'(\d+)$/';
-
-            if (preg_match($exactPattern, $upperLastPrsNumber, $matches) === 1) {
-                $lastNumber = (int) $matches[1];
-            }
-        }
+        $lastNumber = (int) ($lastSequence ?? 0);
 
         // Sequence selalu 7 digit agar konsisten: 0000001, 0000002, dst.
         $nextNumber = str_pad((string) ($lastNumber + 1), 7, '0', STR_PAD_LEFT);
