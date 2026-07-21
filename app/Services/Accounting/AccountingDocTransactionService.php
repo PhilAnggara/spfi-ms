@@ -250,7 +250,7 @@ class AccountingDocTransactionService
 
         return AccountingCode::query()
             ->where(function (Builder $query) use ($like): void {
-                $query->whereRaw('TRIM(code) LIKE ?', [$like])
+                $query->whereRaw('LTRIM(RTRIM(code)) LIKE ?', [$like])
                     ->orWhereRaw('LOWER(desc) LIKE ?', [mb_strtolower($like)]);
             })
             ->orderBy('code')

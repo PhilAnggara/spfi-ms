@@ -239,7 +239,7 @@ class ReceivingReportEntryGenerator
         }
 
         $account = AccountingCode::query()
-            ->whereRaw('TRIM(code) = ?', [$normalizedCode])
+            ->whereRaw('LTRIM(RTRIM(code)) = ?', [$normalizedCode])
             ->first();
 
         $cache[$normalizedCode] = $account?->desc ? trim((string) $account->desc) : null;

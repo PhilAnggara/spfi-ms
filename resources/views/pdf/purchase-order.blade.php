@@ -4,19 +4,23 @@
     <meta charset="UTF-8">
     <title>Purchase Order</title>
     <style>
+        @page { margin: 8px; }
         body {
+            margin: 4px;
             font-family: DejaVu Sans, sans-serif;
-            font-size: 10px;
+            font-size: 8px;
             color: #111827;
         }
         .header {
             display: block;
             margin-bottom: 8px;
+            margin-top: 84px;
         }
         .title {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             letter-spacing: 0.5px;
+            display: none;
         }
         .line {
             border-top: 1px solid #111827;
@@ -44,10 +48,10 @@
         th {
             background: #f3f4f6;
             font-weight: bold;
-            font-size: 9px;
+            font-size: 8px;
         }
         .po-items {
-            font-size: 9px;
+            font-size: 8px;
         }
         .table-clean th,
         .table-clean td {
@@ -93,8 +97,8 @@
             font-weight: bold;
         }
         .note {
-            font-size: 9px;
-            line-height: 1.4;
+            font-size: 7px;
+            line-height: 1;
         }
     </style>
 </head>
@@ -125,8 +129,8 @@
         <tr>
             <td class="label">Supplier Name</td>
             <td>: {{ $supplier?->name ?? '-' }}{{ $supplier?->code ? ' | ' . $supplier->code : '' }}</td>
-            <td class="label text-right">PO Date</td>
-            <td class="text-right">: {{ format_date($purchaseOrder->created_at) }}</td>
+            <td class="label text-right"></td>
+            <td class="text-right">&nbsp;</td>
         </tr>
         <tr>
             <td class="label">Address</td>
@@ -134,9 +138,20 @@
         </tr>
         <tr>
             <td class="label">Term Payment</td>
-            <td>: {{ $termPayment }}</td>
-            <td class="label text-right">Transaction Type</td>
-            <td class="text-right">: <strong>{{ $isCapex ? 'CAPEX' : 'Non-CAPEX' }}</strong></td>
+            <td colspan="3">: @if($termValue || $termType)
+                    @if($termValue){{ $termValue }}@endif
+                    @if($termValue && $termType) &bull; @endif
+                    @if($termType){{ $termType }}@endif
+                @else
+                    -
+                @endif
+            </td>
+        </tr>
+        <tr>
+            <td class="label">Transaction Type</td>
+            <td>: <strong>{{ $isCapex ? 'CAPEX' : 'Non-CAPEX' }}</strong></td>
+            <td class="label text-right">PO Date</td>
+            <td class="text-right">: {{ format_date($purchaseOrder->created_at) }}</td>
         </tr>
     </table>
 
@@ -147,8 +162,8 @@
             <tr>
                 <th style="width: 60px;">PRS ID</th>
                 <th>Item Name</th>
-                <th style="width: 55px;">Item Code</th>
-                <th style="width: 55px;">Dept</th>
+                <th style="width: 50px;">Item Code</th>
+                <th style="width: 20px;" class="text-center">Dept</th>
                 <th style="width: 40px;" class="text-center">Qty</th>
                 <th style="width: 40px;" class="text-center">Unit</th>
                 <th style="width: 70px;" class="text-right">Unit/price</th>
@@ -160,10 +175,10 @@
         </thead>
         <tbody>
             @foreach ($purchaseOrder->items as $item)
-                @php
+                    @php
                     $meta = $item->meta ?? [];
                     $prsNumber = $meta['prs_number'] ?? $item->prsItem?->prs?->prs_number ?? '-';
-                    $dept = $item->prsItem?->prs?->department?->name ?? '-';
+                    $dept = $item->prsItem?->prs?->department?->code ?? '-';
                     $itemCode = $item->item?->code ?? '-';
                     $unitName = $item->item?->unit?->name ?? 'PCS';
                 @endphp
@@ -190,12 +205,21 @@
                 <div class="note">
                     Untuk menciptakan kode etik bisnis yang adil, jujur dan produktif, PT. Sinar Pure Foods International menerapkan kebijakan antikorupsi dan anti-siap dalam setiap transaksi bisnis.
                 </div>
-                <div class="note" style="margin-top: 4px;">
-                    Delivery to PT Sinar Pure Foods International
+                <ol style="margin:4px 0 0 16px; padding:0; font-size:7px; line-height:1;">
+                    <li>PT. Sinar Pure Foods International, manajemen dan seluruh karyawan tidak menerima, gratifikasi, pungutan liar dan sejenisnya untuk memperlancar transaksi</li>
+                    <li>PT. Sinar Pure Foods International, manajemen dan seluruh karyawan tidak melakukan mark-up harga dan sejenisnya.</li>
+                </ol>
+                <div class="note" style="margin-top:4px;">
+                    Hal ini berlaku untuk seluruh supplier, pembeli, kontraktor, karyawan, maupun pemerintah dan pihak luar yang berhubungan dengan PT. Sinar Pure Foods International. Terima kasih untuk usaha anda membantu kami.
                 </div>
-                <div style="margin-top: 6px;">
-                    <strong>PO Number</strong> : {{ $purchaseOrder->po_number }}
+                <div class="note" style="margin-top: 6px; font-size:8px; font-weight:bold;">
+                    Delivery to PT Sinar Pure Foods International | (<strong>PO Number</strong> : {{ $purchaseOrder->po_number }})
                 </div>
+                @if(trim((string)($purchaseOrder->remark_text ?? '')) !== '')
+                    <div style="margin-top:4px; font-size:7px;">
+                        <strong>Remark:</strong> {{ $purchaseOrder->remark_text }}
+                    </div>
+                @endif
             </td>
             <td style="width: 40%;">
                 <div class="summary-box">
@@ -263,9 +287,11 @@
             </tr>
             <tr>
                 <td class="signature-line">{{ $certified['name'] ?? $purchaseOrder->certifiedBy?->name ?? '-' }}</td>
-                <td>{{ $purchaseOrder->submitted_at ? format_date($purchaseOrder->submitted_at) : '-' }}</td>
+                {{-- <td>{{ $purchaseOrder->submitted_at ? format_date($purchaseOrder->submitted_at) : '-' }}</td> --}}
+                <td></td>
                 <td class="signature-line">{{ $approved['name'] ?? $purchaseOrder->approvedBy?->name ?? '-' }}</td>
-                <td>{{ $purchaseOrder->approved_at ? format_date($purchaseOrder->approved_at) : '-' }}</td>
+                {{-- <td>{{ $purchaseOrder->approved_at ? format_date($purchaseOrder->approved_at) : '-' }}</td> --}}
+                <td></td>
             </tr>
             <tr>
                 <td colspan="4" style="padding-top: 18px;">Supplier's Signature : ____________________________</td>

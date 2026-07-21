@@ -315,7 +315,7 @@
                             </li>
                         @endrole
 
-                        <li class="sidebar-item {{ Request::is('prs') ? 'active' : '' }}">
+                        <li class="sidebar-item {{ Request::is('prs*') ? 'active' : '' }}">
                             <a href="{{ route('prs.index') }}" class='sidebar-link'>
                                 <i class="fa-duotone fa-solid fa-cart-shopping {{ Request::is('prs') ? 'fa-fade' : '' }}"></i>
                                 <span>Purchase Requisition</span>
