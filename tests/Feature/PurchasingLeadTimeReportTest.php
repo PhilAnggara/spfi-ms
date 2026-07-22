@@ -69,6 +69,7 @@ beforeEach(function () {
         'stock_on_hand' => 10,
         'is_active' => true,
     ]);
+    $this->item = $item;
 
     $supplier = Supplier::query()->create([
         'code' => 'SUP-LT-001',
@@ -273,4 +274,122 @@ it('writes native excel date values for table date columns', function () {
         expect($sheet->getStyle($column.'10')->getNumberFormat()->getFormatCode())
             ->toBe('dd-mmm-yyyy');
     }
+});
+
+it('filters the po not yet delivered report by purchase order payment type without JSON queries', function () {
+    $supplier = Supplier::query()->create([
+        'code' => 'SUP-PO-RPT-001',
+        'name' => 'PO Report Supplier',
+        'created_by' => $this->manager->id,
+    ]);
+
+    $cashOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'created_by' => $this->manager->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-CASH-001',
+        'term_of_payment_type' => 'cash',
+        'created_at' => now()->subDays(2),
+    ]);
+
+    $creditOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'created_by' => $this->manager->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-CREDIT-001',
+        'term_of_payment_type' => 'credit',
+        'created_at' => now()->subDay(),
+    ]);
+
+    PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $cashOrder->id,
+        'item_id' => $this->item->id,
+        'quantity' => 2,
+        'unit_price' => 100,
+        'total' => 200,
+        'meta' => ['term_of_payment_type' => 'cash'],
+    ]);
+
+    PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $creditOrder->id,
+        'item_id' => $this->item->id,
+        'quantity' => 3,
+        'unit_price' => 150,
+        'total' => 450,
+        'meta' => ['term_of_payment_type' => 'credit'],
+    ]);
+
+    $request = Request::create(
+        route('procurement.reports.po-not-yet-delivered'),
+        'POST',
+        [
+            'date_to' => now()->toDateString(),
+            'po_type' => 'cash',
+            'format' => 'excel',
+        ],
+    );
+    $request->setUserResolver(fn () => $this->manager);
+
+    $response = app(PurchasingReportController::class)->poNotYetDelivered($request);
+
+    ob_start();
+    $response->sendContent();
+    $content = ob_get_clean();
+
+    expect($response->getStatusCode())->toBeGreaterThanOrEqual(200);
+    expect($response->getStatusCode())->toBeLessThan(300);
+    expect($response->headers->get('content-type'))->toContain('application/vnd.ms-excel');
+    expect($content)->toContain('PO-CASH-001');
+    expect($content)->not->toContain('PO-CREDIT-001');
+    expect($content)->toContain('CASH');
+});
+
+it('renders the po not yet delivered pdf with compact table sizing', function () {
+    $html = view('pdf.reports.po-not-yet-delivered', array_merge(
+        PdfReport::withDefaults([
+            'title' => 'Purchase Order (PO) Not Yet Delivered',
+            'as_of' => now()->toDateString(),
+            'canvasser' => 'All',
+            'po_type' => 'cash',
+            'rows' => collect([
+                [
+                    'po_number' => 'PO-CASH-001',
+                    'po_date' => now()->toDateString(),
+                    'po_type' => 'cash',
+                    'currency' => 'IDR',
+                    'supplier_code' => 'SUP-001',
+                    'supplier_name' => 'Supplier Name That Should Wrap Cleanly',
+                    'item_code' => 'ITEM-001',
+                    'item_name' => 'Item Description That Should Also Wrap Cleanly',
+                    'quantity' => 2,
+                    'unit' => 'PCS',
+                    'unit_price' => 100,
+                    'discount' => 0,
+                    'pph' => 0,
+                    'ppn' => 0,
+                    'amount' => 200,
+                    'currency_buckets' => [
+                        'IDR' => 200,
+                        'PHP' => 0,
+                        'EUR' => 0,
+                        'GBP' => 0,
+                        'USD' => 0,
+                        'YEN' => 0,
+                    ],
+                    'canvasser' => 'Lead Time Canvasser',
+                    'remarks' => 'Long remarks should wrap and stay inside printable area.',
+                ],
+            ]),
+        ]),
+        [
+            'fmtDate' => fn (mixed $value) => PdfFormatters::date($value),
+            'fmtMoney' => fn (float|int|string $value) => PdfFormatters::money($value),
+            'fmtQty' => fn (float|int|string $value) => PdfFormatters::qty($value),
+        ],
+    ))->render();
+
+    expect($html)->toContain('po-not-delivered-table');
+    expect($html)->toContain('table-layout: fixed');
+    expect($html)->toContain('compact-wrap');
+    expect($html)->toContain('<colgroup>');
 });

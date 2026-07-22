@@ -54,6 +54,7 @@ class PrsController extends Controller
         $items = $this->paginatePrsForSqlServer(
             canViewAll: $canViewAll,
             userId: $user?->id,
+            departmentId: $user?->department_id,
             filters: $filters,
             perPage: 10,
         );
@@ -376,12 +377,14 @@ class PrsController extends Controller
     /**
      * Print PRS document for physical approval signatures.
      */
-    public function print(string $id)
+    public function print(Request $request, string $id)
     {
         $prs = Prs::with(['user.department', 'department', 'items.item.unit'])->findOrFail($id);
+        $this->ensureUserCanViewPrs($request, $prs);
 
         // Ubah status kembali ke tahap pengajuan setelah perbaikan dari hold.
-        if ($prs->status === 'ON_HOLD') {
+        // Only the owner/admin may trigger this side-effect; department peers are view-only.
+        if ($prs->status === 'ON_HOLD' && $this->userCanManagePrs($request, $prs)) {
             $previousStatus = $prs->status;
             $prs->status = 'REQUESTED';
             $prs->save();
@@ -634,14 +637,21 @@ class PrsController extends Controller
     /**
      * SQL Server-compatible pagination without OFFSET/FETCH.
      */
-    private function paginatePrsForSqlServer(bool $canViewAll, ?int $userId, array $filters = [], int $perPage = 50): LengthAwarePaginator
+    private function paginatePrsForSqlServer(bool $canViewAll, ?int $userId, ?int $departmentId = null, array $filters = [], int $perPage = 50): LengthAwarePaginator
     {
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
         $currentPage = max(1, (int) $currentPage);
 
         $baseQuery = Prs::query();
         if (! $canViewAll) {
-            $baseQuery->where('user_id', $userId);
+            if ($departmentId) {
+                // Visibility follows the creator's department, not the charged-to department.
+                $baseQuery->whereHas('user', function ($query) use ($departmentId) {
+                    $query->where('department_id', $departmentId);
+                });
+            } else {
+                $baseQuery->where('user_id', $userId);
+            }
         }
 
         $keyword = trim((string) ($filters['keyword'] ?? ''));
@@ -741,9 +751,51 @@ class PrsController extends Controller
 
     private function ensureUserCanManagePrs(Request $request, Prs $prs): void
     {
-        if ($prs->user_id !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
+        if (! $this->userCanManagePrs($request, $prs)) {
             abort(403);
         }
+    }
+
+    private function userCanManagePrs(Request $request, Prs $prs): bool
+    {
+        $user = $request->user();
+
+        return $user
+            && ($prs->user_id === $user->id || $user->hasRole('administrator'));
+    }
+
+    private function ensureUserCanViewPrs(Request $request, Prs $prs): void
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            abort(403);
+        }
+
+        if ($user->hasAnyRole([
+            'administrator',
+            'general-manager',
+            'purchasing-manager',
+            'purchasing-staff',
+        ])) {
+            return;
+        }
+
+        if ($prs->user_id === $user->id) {
+            return;
+        }
+
+        $prs->loadMissing('user');
+
+        if (
+            $user->department_id
+            && $prs->user?->department_id
+            && (int) $user->department_id === (int) $prs->user->department_id
+        ) {
+            return;
+        }
+
+        abort(403);
     }
 
     /**

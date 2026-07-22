@@ -6,8 +6,55 @@
     PO Type: {{ strtoupper($po_type) }}
 @endsection
 
+@push('styles')
+    <style>
+        .po-not-delivered-table {
+            table-layout: fixed;
+        }
+        .po-not-delivered-table th,
+        .po-not-delivered-table td {
+            padding: 1.5px 2px;
+            font-size: 6px;
+            line-height: 1.15;
+        }
+        .po-not-delivered-table thead th {
+            font-size: 6px;
+        }
+        .po-not-delivered-table .compact-wrap {
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+        }
+    </style>
+@endpush
+
 @section('content')
-    <table class="data-table">
+    <table class="data-table po-not-delivered-table">
+        <colgroup>
+            <col style="width: 8%">
+            <col style="width: 5%">
+            <col style="width: 3.5%">
+            <col style="width: 3.5%">
+            <col style="width: 4%">
+            <col style="width: 8%">
+            <col style="width: 4.5%">
+            <col style="width: 11%">
+            <col style="width: 3.5%">
+            <col style="width: 3.5%">
+            <col style="width: 5.5%">
+            <col style="width: 4.5%">
+            <col style="width: 4.5%">
+            <col style="width: 4.5%">
+            <col style="width: 5.5%">
+            <col style="width: 4%">
+            <col style="width: 4%">
+            <col style="width: 4%">
+            <col style="width: 4%">
+            <col style="width: 4%">
+            <col style="width: 4%">
+            <col style="width: 7%">
+            <col style="width: 10%">
+        </colgroup>
         <thead>
             <tr>
                 <th colspan="4" class="center section-head section-sep">Purchase Order</th>
@@ -56,9 +103,9 @@
                     <td>{{ strtoupper($row['po_type'] ?? '') }}</td>
                     <td>{{ $row['currency'] }}</td>
                     <td>{{ $row['supplier_code'] }}</td>
-                    <td class="text-wrap-max">{{ $row['supplier_name'] }}</td>
+                    <td class="compact-wrap">{{ $row['supplier_name'] }}</td>
                     <td>{{ $row['item_code'] }}</td>
-                    <td class="text-wrap-max">{{ $row['item_name'] }}</td>
+                    <td class="compact-wrap">{{ $row['item_name'] }}</td>
                     <td class="right">{{ $fmtQty($row['quantity']) }}</td>
                     <td>{{ $row['unit'] }}</td>
                     <td class="right">{{ $fmtMoney($row['unit_price']) }}</td>
@@ -72,8 +119,8 @@
                     <td class="right">{{ $fmtMoney($row['currency_buckets']['GBP']) }}</td>
                     <td class="right">{{ $fmtMoney($row['currency_buckets']['USD']) }}</td>
                     <td class="right">{{ $fmtMoney($row['currency_buckets']['YEN']) }}</td>
-                    <td>{{ $row['canvasser'] }}</td>
-                    <td class="text-wrap-max">{{ $row['remarks'] }}</td>
+                    <td class="compact-wrap">{{ $row['canvasser'] }}</td>
+                    <td class="compact-wrap">{{ $row['remarks'] }}</td>
                 </tr>
             @empty
                 <tr>

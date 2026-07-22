@@ -118,9 +118,9 @@ class PurchasingReportController extends Controller
         ])
             ->whereHas('purchaseOrder', function ($query) use ($validated, $dateFrom) {
                 $query->whereDate('created_at', '>=', $dateFrom)
-                    ->whereDate('created_at', '<=', $validated['date_to']);
-            })
-            ->where('meta->term_of_payment_type', $validated['po_type']);
+                    ->whereDate('created_at', '<=', $validated['date_to'])
+                    ->where('term_of_payment_type', $validated['po_type']);
+            });
 
         if (! empty($validated['canvasser_id'])) {
             $itemsQuery->whereHas('purchaseOrder', function ($query) use ($validated) {
@@ -137,7 +137,7 @@ class PurchasingReportController extends Controller
             return [
                 'po_number' => $po?->po_number ?? ('#'.$po?->id),
                 'po_date' => $po?->created_at?->toDateString(),
-                'po_type' => $item->meta['term_of_payment_type'] ?? null,
+                'po_type' => $po?->term_of_payment_type ?? ($item->meta['term_of_payment_type'] ?? null),
                 'currency' => $currencyCode,
                 'supplier_code' => $po?->supplier?->code,
                 'supplier_name' => $po?->supplier?->name,

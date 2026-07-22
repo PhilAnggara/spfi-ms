@@ -29,7 +29,7 @@
         .header {
             display: block;
             margin-bottom: 8px;
-            margin-top: 84px;
+            margin-top: 90px;
         }
         .title {
             font-size: 14px;

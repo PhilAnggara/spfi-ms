@@ -340,12 +340,17 @@
                 </div>
 
             </div>
-            <div class="modal-footer d-flex justify-content-center">
-                <a href="{{ route('prs.print', $item->id) }}" target="_blank" class="btn icon icon-left btn-outline-primary">
-                    <i class="fa-duotone fa-solid fa-print"></i>
-                    Print for Approval
-                </a>
-            </div>
+            @php
+                $canManagePrs = auth()->id() === $item->user_id || auth()->user()->hasRole('administrator');
+            @endphp
+            @if ($canManagePrs)
+                <div class="modal-footer d-flex justify-content-center">
+                    <a href="{{ route('prs.print', $item->id) }}" target="_blank" class="btn icon icon-left btn-outline-primary">
+                        <i class="fa-duotone fa-solid fa-print"></i>
+                        Print for Approval
+                    </a>
+                </div>
+            @endif
         </div>
     </div>
 </div>

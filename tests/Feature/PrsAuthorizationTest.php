@@ -19,6 +19,12 @@ beforeEach(function () {
         'alias' => 'IT',
     ]);
 
+    $this->chargedDepartment = Department::query()->create([
+        'name' => 'Finance',
+        'code' => '1005',
+        'alias' => 'FIN',
+    ]);
+
     $this->creator = User::query()->create([
         'name' => 'PRS Creator',
         'username' => 'prs-creator',
@@ -34,6 +40,15 @@ beforeEach(function () {
         'email' => 'prs-other@example.test',
         'password' => Hash::make('password'),
         'department_id' => $this->department->id,
+        'role' => 'Staff',
+    ]);
+
+    $this->chargedDepartmentUser = User::query()->create([
+        'name' => 'Finance User',
+        'username' => 'prs-finance',
+        'email' => 'prs-finance@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $this->chargedDepartment->id,
         'role' => 'Staff',
     ]);
 
@@ -152,4 +167,57 @@ it('forbids other users from deleting a prs', function () {
 
     $response->assertForbidden();
     expect(Prs::query()->find($this->prs->id))->not->toBeNull();
+});
+
+it('lets department peers view a prs charged to another department on the index', function () {
+    $this->prs->update([
+        'department_id' => $this->chargedDepartment->id,
+        'prs_number' => 'PRS-FIN-2026-0001',
+    ]);
+
+    $this->actingAs($this->otherUser)
+        ->get(route('prs.index'))
+        ->assertSuccessful()
+        ->assertSee('PRS-FIN-2026-0001', false)
+        ->assertDontSee(route('prs.edit', $this->prs), false);
+});
+
+it('hides a prs from users who only share the charged-to department', function () {
+    $this->prs->update([
+        'department_id' => $this->chargedDepartment->id,
+        'prs_number' => 'PRS-FIN-2026-0002',
+    ]);
+
+    $this->actingAs($this->chargedDepartmentUser)
+        ->get(route('prs.index'))
+        ->assertSuccessful()
+        ->assertDontSee('PRS-FIN-2026-0002', false);
+});
+
+it('lets a department peer stream the print pdf without changing on-hold status', function () {
+    $response = $this->actingAs($this->otherUser)
+        ->get(route('prs.print', $this->prs->id));
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+
+    $this->prs->refresh();
+    expect($this->prs->status)->toBe('ON_HOLD');
+});
+
+it('forbids print access for users outside the creator department', function () {
+    $this->actingAs($this->chargedDepartmentUser)
+        ->get(route('prs.print', $this->prs->id))
+        ->assertForbidden();
+});
+
+it('lets the creator print and move an on-hold prs back to requested', function () {
+    $response = $this->actingAs($this->creator)
+        ->get(route('prs.print', $this->prs->id));
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+
+    $this->prs->refresh();
+    expect($this->prs->status)->toBe('REQUESTED');
 });
