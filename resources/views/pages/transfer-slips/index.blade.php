@@ -160,7 +160,7 @@
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#ts-detail-modal-{{ $transferSlip->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="View detail">
                                                     <i class="fa-light fa-eye text-primary"></i>
                                                 </button>
-                                                <a href="####" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
+                                                <a href="{{ route('transfer-slips.print', ['transferSlip' => $transferSlip->id, 'mode' => 'print']) }}" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
                                                     <i class="fa-light fa-print text-primary"></i>
                                                 </a>
                                                 @can('delete-transfer')
@@ -265,7 +265,7 @@
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <a href="###" target="_blank" rel="noopener" class="btn btn-outline-primary">
+                                        <a href="{{ route('transfer-slips.print', ['transferSlip' => $transferSlip->id, 'mode' => 'preview']) }}" target="_blank" rel="noopener" class="btn btn-outline-primary">
                                             <i class="fa-duotone fa-solid fa-file-pdf"></i>
                                             Preview Form
                                         </a>

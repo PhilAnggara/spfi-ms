@@ -12,13 +12,19 @@ use App\Notifications\PoSubmittedNotification;
 use App\Services\DocumentNumberService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderController extends Controller
 {
     private const MAX_ITEMS_PER_PO = 11;
+
+    private const PO_PAPER_WIDTH_MM = 215;
+
+    private const PO_PAPER_HEIGHT_MM = 160;
+
+    private const MM_TO_PT = 2.834645669;
 
     /**
      * Normalize fee item payload and calculate fee total.
@@ -144,7 +150,13 @@ class PurchaseOrderController extends Controller
         $collection = collect();
 
         if (! empty($ids)) {
-            $itemsById = PurchaseOrder::with(['supplier', 'createdBy'])
+            $itemsById = PurchaseOrder::with([
+                'supplier',
+                'createdBy',
+                'currency',
+                'items.item.unit',
+                'items.prsItem.prs.department',
+            ])
                 ->withCount('items')
                 ->whereIn('id', $ids)
                 ->get()
@@ -167,6 +179,7 @@ class PurchaseOrderController extends Controller
             ],
         );
     }
+
     /**
      * Draft PO list grouped by supplier for canvasser.
      */
@@ -242,7 +255,7 @@ class PurchaseOrderController extends Controller
         }
 
         if (count($checkedItems) > self::MAX_ITEMS_PER_PO) {
-            return redirect()->back()->withErrors(['items' => 'A purchase order can contain a maximum of ' . self::MAX_ITEMS_PER_PO . ' items.']);
+            return redirect()->back()->withErrors(['items' => 'A purchase order can contain a maximum of '.self::MAX_ITEMS_PER_PO.' items.']);
         }
 
         $userId = $request->user()->id;
@@ -339,7 +352,7 @@ class PurchaseOrderController extends Controller
             'term_of_payment_type' => ['required', 'in:cash,credit'],
             'term_of_payment' => ['nullable', 'string', 'max:255'],
             'term_of_delivery' => ['nullable', 'string', 'max:255'],
-            'items' => ['required', 'array', 'min:1', 'max:' . self::MAX_ITEMS_PER_PO],
+            'items' => ['required', 'array', 'min:1', 'max:'.self::MAX_ITEMS_PER_PO],
             'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
@@ -415,89 +428,89 @@ class PurchaseOrderController extends Controller
                         'submitted_at' => $validated['action'] === 'submit' ? now() : null,
                     ]);
 
-            $subtotal = 0;
-            $discountTotal = 0;
-            $ppnTotal = 0;
-            $pphTotal = 0;
-            $itemsTotal = 0;
+                    $subtotal = 0;
+                    $discountTotal = 0;
+                    $ppnTotal = 0;
+                    $pphTotal = 0;
+                    $itemsTotal = 0;
 
-            foreach ($validated['items'] as $row) {
-                $prsItem = $itemsById->get($row['prs_item_id']);
-                $lineSubtotal = $row['quantity'] * $row['unit_price'];
-                $discountRate = (float) ($row['discount_rate'] ?? 0);
-                $ppnRate = (float) ($row['ppn_rate'] ?? 0);
-                $pphRate = (float) ($row['pph_rate'] ?? 0);
-                $discountAmount = $lineSubtotal * ($discountRate / 100);
-                $baseAmount = $lineSubtotal - $discountAmount;
-                $ppnAmount = $baseAmount * ($ppnRate / 100);
-                $pphAmount = $baseAmount * ($pphRate / 100);
-                $lineTotal = $baseAmount + $ppnAmount - $pphAmount;
+                    foreach ($validated['items'] as $row) {
+                        $prsItem = $itemsById->get($row['prs_item_id']);
+                        $lineSubtotal = $row['quantity'] * $row['unit_price'];
+                        $discountRate = (float) ($row['discount_rate'] ?? 0);
+                        $ppnRate = (float) ($row['ppn_rate'] ?? 0);
+                        $pphRate = (float) ($row['pph_rate'] ?? 0);
+                        $discountAmount = $lineSubtotal * ($discountRate / 100);
+                        $baseAmount = $lineSubtotal - $discountAmount;
+                        $ppnAmount = $baseAmount * ($ppnRate / 100);
+                        $pphAmount = $baseAmount * ($pphRate / 100);
+                        $lineTotal = $baseAmount + $ppnAmount - $pphAmount;
 
-                $subtotal += $lineSubtotal;
-                $discountTotal += $discountAmount;
-                $ppnTotal += $ppnAmount;
-                $pphTotal += $pphAmount;
-                $itemsTotal += $lineTotal;
+                        $subtotal += $lineSubtotal;
+                        $discountTotal += $discountAmount;
+                        $ppnTotal += $ppnAmount;
+                        $pphTotal += $pphAmount;
+                        $itemsTotal += $lineTotal;
 
-                $canvassing = $prsItem->selectedCanvassingItem;
+                        $canvassing = $prsItem->selectedCanvassingItem;
 
-                PurchaseOrderItem::create([
-                    'purchase_order_id' => $purchaseOrder->id,
-                    'prs_item_id' => $prsItem->id,
-                    'item_id' => $prsItem->item_id,
-                    'quantity' => $row['quantity'],
-                    'unit_price' => $row['unit_price'],
-                    'line_subtotal' => $lineSubtotal,
-                    'discount_rate' => $discountRate,
-                    'discount_amount' => $discountAmount,
-                    'ppn_rate' => $ppnRate,
-                    'ppn_amount' => $ppnAmount,
-                    'pph_rate' => $pphRate,
-                    'pph_amount' => $pphAmount,
-                    'total' => $lineTotal,
-                    'notes' => $row['notes'] ?? null,
-                    'meta' => [
-                        'prs_id' => $prsItem->prs_id,
-                        'prs_number' => $prsItem->prs?->prs_number,
-                        'is_capex' => $this->isCapexPrsItem($prsItem),
-                        'lead_time_days' => $canvassing?->lead_time_days,
-                        'term_of_payment_type' => $validated['term_of_payment_type'],
-                        'term_of_payment' => $validated['term_of_payment'],
-                        'term_of_delivery' => $validated['term_of_delivery'] ?? $canvassing?->term_of_delivery,
-                    ],
-                ]);
-            }
+                        PurchaseOrderItem::create([
+                            'purchase_order_id' => $purchaseOrder->id,
+                            'prs_item_id' => $prsItem->id,
+                            'item_id' => $prsItem->item_id,
+                            'quantity' => $row['quantity'],
+                            'unit_price' => $row['unit_price'],
+                            'line_subtotal' => $lineSubtotal,
+                            'discount_rate' => $discountRate,
+                            'discount_amount' => $discountAmount,
+                            'ppn_rate' => $ppnRate,
+                            'ppn_amount' => $ppnAmount,
+                            'pph_rate' => $pphRate,
+                            'pph_amount' => $pphAmount,
+                            'total' => $lineTotal,
+                            'notes' => $row['notes'] ?? null,
+                            'meta' => [
+                                'prs_id' => $prsItem->prs_id,
+                                'prs_number' => $prsItem->prs?->prs_number,
+                                'is_capex' => $this->isCapexPrsItem($prsItem),
+                                'lead_time_days' => $canvassing?->lead_time_days,
+                                'term_of_payment_type' => $validated['term_of_payment_type'],
+                                'term_of_payment' => $validated['term_of_payment'],
+                                'term_of_delivery' => $validated['term_of_delivery'] ?? $canvassing?->term_of_delivery,
+                            ],
+                        ]);
+                    }
 
-            $total = $itemsTotal + $fees;
+                    $total = $itemsTotal + $fees;
 
-            $purchaseOrder->update([
-                'subtotal' => $subtotal,
-                'tax_amount' => 0,
-                'discount_amount' => $discountTotal,
-                'ppn_amount' => $ppnTotal,
-                'pph_amount' => $pphTotal,
-                'total' => $total,
-            ]);
-
-            // Mark PR items so they won't reappear in draft list.
-            PrsItem::whereIn('id', $itemsById->keys()->all())
-                ->update(['purchase_order_id' => $purchaseOrder->id]);
-
-            $affectedPrsIds = $itemsById
-                ->pluck('prs_id')
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
-
-            if (! empty($affectedPrsIds)) {
-                DB::table('prs')
-                    ->whereIn('id', $affectedPrsIds)
-                    ->update([
-                        'status' => 'PO_CREATED',
-                        'updated_at' => now(),
+                    $purchaseOrder->update([
+                        'subtotal' => $subtotal,
+                        'tax_amount' => 0,
+                        'discount_amount' => $discountTotal,
+                        'ppn_amount' => $ppnTotal,
+                        'pph_amount' => $pphTotal,
+                        'total' => $total,
                     ]);
-            }
+
+                    // Mark PR items so they won't reappear in draft list.
+                    PrsItem::whereIn('id', $itemsById->keys()->all())
+                        ->update(['purchase_order_id' => $purchaseOrder->id]);
+
+                    $affectedPrsIds = $itemsById
+                        ->pluck('prs_id')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    if (! empty($affectedPrsIds)) {
+                        DB::table('prs')
+                            ->whereIn('id', $affectedPrsIds)
+                            ->update([
+                                'status' => 'PO_CREATED',
+                                'updated_at' => now(),
+                            ]);
+                    }
 
                     return $purchaseOrder;
                 });
@@ -737,11 +750,18 @@ class PurchaseOrderController extends Controller
 
         $data = [
             'purchaseOrder' => $purchaseOrder,
+            'pageWidthMm' => self::PO_PAPER_WIDTH_MM,
+            'pageHeightMm' => self::PO_PAPER_HEIGHT_MM,
         ];
 
         return Pdf::loadView('pdf.purchase-order', $data)
-            ->setPaper('a4', 'portrait')
-            ->stream('PO-' . $purchaseOrder->po_number . '.pdf');
+            ->setPaper([
+                0,
+                0,
+                self::PO_PAPER_WIDTH_MM * self::MM_TO_PT,
+                self::PO_PAPER_HEIGHT_MM * self::MM_TO_PT,
+            ])
+            ->stream('PO-'.$purchaseOrder->po_number.'.pdf');
     }
 
     private function savePoNumberFromRequest(Request $request, PurchaseOrder $purchaseOrder): void

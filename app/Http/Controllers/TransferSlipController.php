@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Services\DocumentNumberService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -12,6 +13,12 @@ use Illuminate\Support\Facades\DB;
 
 class TransferSlipController extends Controller
 {
+    private const TS_PAPER_WIDTH_MM = 215;
+
+    private const TS_PAPER_HEIGHT_MM = 105;
+
+    private const MM_TO_PT = 2.834645669;
+
     public function index(Request $request)
     {
         $filters = [
@@ -302,6 +309,145 @@ class TransferSlipController extends Controller
         return redirect()
             ->route('transfer-slips.index')
             ->with('success', "Transfer slip {$createdTsNumber} has been created successfully.");
+    }
+
+    public function print(Request $request, string $transferSlip)
+    {
+        $transferSlipId = (int) $transferSlip;
+        $mode = $request->query('mode', 'print');
+        $isPreview = $mode !== 'print';
+
+        $transferSlipRow = DB::table('transfer_slips as ts')
+            ->leftJoin('store_withdrawals as sw', 'sw.id', '=', 'ts.store_withdrawal_id')
+            ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
+            ->leftJoin('users as creator', 'creator.id', '=', 'ts.created_by')
+            ->leftJoin('users as noted', 'noted.id', '=', 'ts.noted_by')
+            ->leftJoin('users as approver', 'approver.id', '=', 'ts.approved_by')
+            ->leftJoin('users as receiver', 'receiver.id', '=', 'ts.received_by')
+            ->where('ts.id', $transferSlipId)
+            ->whereNull('ts.deleted_at')
+            ->select([
+                'ts.id',
+                'ts.ts_number',
+                'ts.ts_date',
+                'ts.for_production',
+                'ts.remarks',
+                'ts.transfer_to',
+                'ts.meta',
+                'ts.noted_at',
+                'ts.approved_at',
+                'ts.received_at',
+                'ts.created_at',
+                'sw.sws_number',
+                'sw.department_code',
+                'd.name as department_name',
+                'creator.name as created_by_name',
+                'noted.name as noted_by_name',
+                'approver.name as approved_by_name',
+                'receiver.name as received_by_name',
+            ])
+            ->first();
+
+        if (! $transferSlipRow) {
+            abort(404);
+        }
+
+        $items = DB::table('transfer_slip_items as tsi')
+            ->leftJoin('items as i', 'i.id', '=', 'tsi.item_id')
+            ->leftJoin('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->leftJoin('store_withdrawal_items as swi', 'swi.id', '=', 'tsi.store_withdrawal_item_id')
+            ->where('tsi.transfer_slip_id', $transferSlipId)
+            ->whereNull('tsi.deleted_at')
+            ->orderBy('tsi.id')
+            ->select([
+                'tsi.id',
+                'tsi.product_code',
+                'tsi.quantity',
+                'i.name as item_name',
+                'i.code as item_code',
+                'i.type as item_type',
+                'ic.name as category_name',
+                'u.name as item_uom_name',
+                'swi.uom as sws_uom',
+            ])
+            ->get();
+
+        $backgroundImageSrc = null;
+        $backgroundWidthPt = self::TS_PAPER_WIDTH_MM * self::MM_TO_PT;
+        $backgroundHeightPt = self::TS_PAPER_HEIGHT_MM * self::MM_TO_PT;
+
+        if ($isPreview) {
+            $backgroundImageSrc = $this->resolveTransferSlipBackgroundImageSrc();
+        }
+
+        $filename = sprintf(
+            'TS-%s-%s.pdf',
+            str_replace(['/', '\\', ' '], '-', (string) $transferSlipRow->ts_number),
+            now()->format('YmdHis')
+        );
+
+        return Pdf::loadView('pdf.transfer-slip', [
+            'transferSlip' => $transferSlipRow,
+            'items' => $items,
+            'isPreview' => $isPreview,
+            'backgroundImageSrc' => $backgroundImageSrc,
+            'backgroundWidthPt' => $backgroundWidthPt,
+            'backgroundHeightPt' => $backgroundHeightPt,
+            'pageWidthMm' => self::TS_PAPER_WIDTH_MM,
+            'pageHeightMm' => self::TS_PAPER_HEIGHT_MM,
+        ])
+            ->setOption('isRemoteEnabled', true)
+            ->setOption('isHtml5ParserEnabled', true)
+            ->setOption('chroot', [
+                base_path(),
+                public_path(),
+                storage_path('app'),
+            ])
+            ->setPaper([
+                0,
+                0,
+                $backgroundWidthPt,
+                $backgroundHeightPt,
+            ])
+            ->stream($filename);
+    }
+
+    /**
+     * Prepare a DomPDF-friendly background source for the blank TS form.
+     */
+    private function resolveTransferSlipBackgroundImageSrc(): ?string
+    {
+        $sourcePath = public_path('assets/images/Blank TS.jpg');
+        if (! is_readable($sourcePath)) {
+            return null;
+        }
+
+        $cacheDir = storage_path('app/dompdf');
+        if (! is_dir($cacheDir) && ! mkdir($cacheDir, 0755, true) && ! is_dir($cacheDir)) {
+            return 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($sourcePath));
+        }
+
+        $cachedPath = $cacheDir.DIRECTORY_SEPARATOR.'blank-ts.jpg';
+        $sourceMtime = (int) filemtime($sourcePath);
+        $needsRefresh = ! is_readable($cachedPath) || (int) filemtime($cachedPath) < $sourceMtime;
+
+        if ($needsRefresh) {
+            $image = @imagecreatefromjpeg($sourcePath);
+            if ($image === false) {
+                @copy($sourcePath, $cachedPath);
+            } else {
+                imagejpeg($image, $cachedPath, 92);
+                imagedestroy($image);
+            }
+        }
+
+        if (! is_readable($cachedPath)) {
+            return 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($sourcePath));
+        }
+
+        // Data URI is the most reliable DomPDF source on Windows paths.
+        return 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($cachedPath));
     }
 
     public function destroy(string $transferSlip)

@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\PurchaseOrder;
 use App\Models\User;
 use App\Services\NotificationRecipientService;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderApprovalController extends Controller
@@ -138,9 +138,14 @@ class PurchaseOrderApprovalController extends Controller
 
         $manager = $request->user();
         $gm = User::where('role', 'General Manager')->first();
+        $approvalThreshold = (float) config('purchase-order.signature.approval_threshold', 4000000);
+        $certifiedName = (string) config('purchase-order.signature.certified_by_name', 'Denny Tuhatelu');
+        $approvedName = (float) $purchaseOrder->total >= $approvalThreshold
+            ? (string) config('purchase-order.signature.approved_by_at_or_above_threshold_name', 'Sam Calamba')
+            : (string) config('purchase-order.signature.approved_by_below_threshold_name', 'Denny Tuhatelu');
 
         // Approval routing follows total threshold rule.
-        $approvedBy = $purchaseOrder->total > 4000000 && $gm ? $gm : $manager;
+        $approvedBy = (float) $purchaseOrder->total >= $approvalThreshold && $gm ? $gm : $manager;
         $certifiedBy = $manager;
 
         $purchaseOrder->update([
@@ -152,17 +157,17 @@ class PurchaseOrderApprovalController extends Controller
             'signature_meta' => [
                 'certified_by' => [
                     'user_id' => $certifiedBy->id,
-                    'name' => $certifiedBy->name,
+                    'name' => $certifiedName,
                     'title' => get_job_title($certifiedBy),
                 ],
                 'approved_by' => [
                     'user_id' => $approvedBy->id,
-                    'name' => $approvedBy->name,
+                    'name' => $approvedName,
                     'title' => get_job_title($approvedBy),
                 ],
                 'rules' => [
-                    'threshold' => 4000000,
-                    'currency' => 'IDR',
+                    'threshold' => $approvalThreshold,
+                    'currency' => config('purchase-order.signature.threshold_currency', 'IDR'),
                 ],
             ],
         ]);

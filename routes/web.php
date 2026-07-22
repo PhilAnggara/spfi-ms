@@ -95,7 +95,7 @@ Route::middleware('auth')->group(function () {
             Route::resource('balance-sheet', BsGroupingController::class)->except(['create', 'show', 'edit']);
         });
     });
-    Route::middleware('role:administrator|purchasing-manager')->prefix('procurement')->group(function () {
+    Route::middleware('role:administrator|purchasing-manager|purchasing-staff')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');
         Route::get('/approval/{prs}', [PrsApprovalController::class, 'show'])->name('prs.approval.show');
         Route::post('/approval/{prs}/approve', [PrsApprovalController::class, 'approve'])->name('prs.approve');
