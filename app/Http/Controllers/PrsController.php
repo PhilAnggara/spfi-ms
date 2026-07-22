@@ -9,11 +9,13 @@ use App\Models\Prs;
 use App\Models\PrsItem;
 use App\Models\User;
 use App\Notifications\PrsSubmittedNotification;
+use App\Services\DocumentNumberService;
 use App\Services\NotificationRecipientService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\UsesSmartCatalogSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -102,26 +104,48 @@ class PrsController extends Controller
             'prsItems.*.quantity' => ['required', 'numeric', 'min:1'],
         ]);
 
-        $data = [
-            'department_id' => $validated['department_id'],
-            'date_needed' => $validated['date_needed'],
-            'is_capex' => (bool) $validated['is_capex'],
-            'remarks' => $validated['remarks'] ?? null,
-            'prs_number' => $this->generatePrsNumber($validated['department_id']),
-            'user_id' => Auth::id(),
-            'prs_date' => date('Y-m-d'),
-            'status' => 'REQUESTED',
-        ];
+        $authUserId = Auth::id();
+        $numberService = app(DocumentNumberService::class);
+        $newPrs = null;
+        $maxAttempts = 5;
 
-        // dd($data);
-        $newPrs = Prs::create($data);
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $newPrs = $this->transactionSerializable(function () use ($validated, $authUserId) {
+                    $prs = Prs::create([
+                        'department_id' => $validated['department_id'],
+                        'date_needed' => $validated['date_needed'],
+                        'is_capex' => (bool) $validated['is_capex'],
+                        'remarks' => $validated['remarks'] ?? null,
+                        'prs_number' => $this->generatePrsNumber($validated['department_id']),
+                        'user_id' => $authUserId,
+                        'prs_date' => date('Y-m-d'),
+                        'status' => 'REQUESTED',
+                    ]);
 
-        foreach ($validated['prsItems'] as $prsItem) {
-            PrsItem::create([
-                'prs_id' => $newPrs->id,
-                'item_id' => $prsItem['item_id'],
-                'quantity' => $prsItem['quantity'],
-            ]);
+                    foreach ($validated['prsItems'] as $prsItem) {
+                        PrsItem::create([
+                            'prs_id' => $prs->id,
+                            'item_id' => $prsItem['item_id'],
+                            'quantity' => $prsItem['quantity'],
+                        ]);
+                    }
+
+                    return $prs;
+                });
+                break;
+            } catch (QueryException $exception) {
+                if ($attempt < $maxAttempts && $numberService->isDuplicateNumberException($exception)) {
+                    continue;
+                }
+
+                throw $exception;
+            }
+        }
+
+        if (! $newPrs) {
+            return redirect()->back()->withInput()
+                ->withErrors(['department_id' => 'Unable to generate PRS number. Please try again.']);
         }
 
         // ===== KIRIM NOTIFIKASI =====
@@ -206,42 +230,62 @@ class PrsController extends Controller
         ]);
 
         $shouldRegenerate = $prs->department_id != $validated['department_id'];
-
-        $prs->department_id = $validated['department_id'];
-        $prs->date_needed = $validated['date_needed'];
-        $prs->is_capex = (bool) $validated['is_capex'];
-        $prs->remarks = $validated['remarks'] ?? null;
-
-        if ($shouldRegenerate) {
-            $prs->prs_number = $this->generatePrsNumber($validated['department_id']);
-        }
-
         $previousStatus = $prs->status;
-        if ($prs->status === 'ON_HOLD') {
-            $prs->status = 'REVISED';
-        }
+        $numberService = app(DocumentNumberService::class);
+        $maxAttempts = $shouldRegenerate ? 5 : 1;
 
-        $prs->save();
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $this->transactionSerializable(function () use ($prs, $validated, $shouldRegenerate, $previousStatus, $request) {
+                    $prs->department_id = $validated['department_id'];
+                    $prs->date_needed = $validated['date_needed'];
+                    $prs->is_capex = (bool) $validated['is_capex'];
+                    $prs->remarks = $validated['remarks'] ?? null;
 
-        PrsItem::where('prs_id', $prs->id)->delete();
+                    if ($shouldRegenerate) {
+                        $prs->prs_number = $this->generatePrsNumber($validated['department_id']);
+                    }
 
-        foreach ($validated['prsItems'] as $itemRow) {
-            PrsItem::create([
-                'prs_id' => $prs->id,
-                'item_id' => $itemRow['item_id'],
-                'quantity' => $itemRow['quantity'],
-            ]);
-        }
+                    if ($previousStatus === 'ON_HOLD') {
+                        $prs->status = 'REVISED';
+                    }
 
-        if ($previousStatus === 'ON_HOLD') {
-            $prs->logs()->create([
-                'user_id' => $request->user()?->id,
-                'action' => 'RESUBMIT',
-                'message' => 'PRS updated after hold.',
-                'meta' => [
-                    'previous_status' => $previousStatus,
-                ],
-            ]);
+                    $prs->save();
+
+                    PrsItem::where('prs_id', $prs->id)->delete();
+
+                    foreach ($validated['prsItems'] as $itemRow) {
+                        PrsItem::create([
+                            'prs_id' => $prs->id,
+                            'item_id' => $itemRow['item_id'],
+                            'quantity' => $itemRow['quantity'],
+                        ]);
+                    }
+
+                    if ($previousStatus === 'ON_HOLD') {
+                        $prs->logs()->create([
+                            'user_id' => $request->user()?->id,
+                            'action' => 'RESUBMIT',
+                            'message' => 'PRS updated after hold.',
+                            'meta' => [
+                                'previous_status' => $previousStatus,
+                            ],
+                        ]);
+                    }
+                });
+                break;
+            } catch (QueryException $exception) {
+                if ($shouldRegenerate
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception)
+                ) {
+                    $prs->refresh();
+
+                    continue;
+                }
+
+                throw $exception;
+            }
         }
 
         return redirect()->back()->with('success', 'PRS has been updated successfully.');
@@ -506,29 +550,85 @@ class PrsController extends Controller
         ]);
     }
 
-    // Sinkron dengan sistem lama: {DEPTCODE}{#######}, urutan naik per department.
-    private function generatePrsNumber($departmentID)
+    // Sinkron dengan sistem lama: {DEPTCODE}{#######}, urutan naik per department code.
+    // Unique di prs_number bersifat global, jadi MAX harus melihat semua nomor dengan prefix kode
+    // (termasuk legacy dengan department_id berbeda), bukan hanya baris department saat ini.
+    private function generatePrsNumber($departmentID): string
     {
         $departmentCode = strtoupper(trim((string) Department::findOrFail($departmentID)->code));
-        $startPosition = strlen($departmentCode) + 1;
+        $lastNumber = $this->lastPrsSequenceForDepartmentCode($departmentCode);
 
-        $lastSequence = Prs::withTrashed()
-            ->where('department_id', $departmentID)
+        $attempts = 0;
+        do {
+            $lastNumber++;
+            $candidate = $departmentCode.str_pad((string) $lastNumber, 7, '0', STR_PAD_LEFT);
+            $attempts++;
+        } while ($attempts < 1000 && $this->prsNumberExists($candidate));
+
+        return $candidate;
+    }
+
+    private function lastPrsSequenceForDepartmentCode(string $departmentCode): int
+    {
+        $codeLength = strlen($departmentCode);
+        $startPosition = $codeLength + 1;
+
+        if ($this->isSqlServer()) {
+            $lastSequence = Prs::withTrashed()
+                ->where('prs_number', 'like', $departmentCode.'%')
+                ->selectRaw(
+                    'MAX(CASE WHEN LEN(SUBSTRING(prs_number, ?, 100)) > 0 '
+                    ."AND SUBSTRING(prs_number, ?, 100) NOT LIKE '%[^0-9]%' "
+                    .'THEN CAST(SUBSTRING(prs_number, ?, 100) AS INT) ELSE NULL END) as last_sequence',
+                    [$startPosition, $startPosition, $startPosition]
+                )
+                ->value('last_sequence');
+
+            return (int) ($lastSequence ?? 0);
+        }
+
+        $lastNumber = 0;
+
+        Prs::withTrashed()
             ->where('prs_number', 'like', $departmentCode.'%')
-            ->selectRaw(
-                "MAX(CASE WHEN LEN(SUBSTRING(prs_number, ?, 100)) > 0 "
-                ."AND SUBSTRING(prs_number, ?, 100) NOT LIKE '%[^0-9]%' "
-                ."THEN CAST(SUBSTRING(prs_number, ?, 100) AS INT) ELSE NULL END) as last_sequence",
-                [$startPosition, $startPosition, $startPosition]
-            )
-            ->value('last_sequence');
+            ->pluck('prs_number')
+            ->each(function (mixed $prsNumber) use (&$lastNumber, $codeLength): void {
+                $suffix = substr((string) $prsNumber, $codeLength);
+                if ($suffix !== '' && ctype_digit($suffix)) {
+                    $lastNumber = max($lastNumber, (int) $suffix);
+                }
+            });
 
-        $lastNumber = (int) ($lastSequence ?? 0);
+        return $lastNumber;
+    }
 
-        // Sequence selalu 7 digit agar konsisten: 0000001, 0000002, dst.
-        $nextNumber = str_pad((string) ($lastNumber + 1), 7, '0', STR_PAD_LEFT);
+    private function prsNumberExists(string $prsNumber): bool
+    {
+        return Prs::withTrashed()
+            ->where('prs_number', $prsNumber)
+            ->exists();
+    }
 
-        return $departmentCode.$nextNumber;
+    private function transactionSerializable(callable $callback): mixed
+    {
+        $connection = DB::connection();
+
+        if ($this->isSqlServer()) {
+            $connection->statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+
+            try {
+                return $connection->transaction($callback);
+            } finally {
+                $connection->statement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+            }
+        }
+
+        return $connection->transaction($callback);
+    }
+
+    private function isSqlServer(): bool
+    {
+        return DB::connection()->getDriverName() === 'sqlsrv';
     }
 
     /**
