@@ -16,6 +16,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FishController;
 use App\Http\Controllers\FishSizeController;
 use App\Http\Controllers\FishSupplierController;
+use App\Http\Controllers\ImReportController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\MainController;
 use App\Http\Controllers\NotificationController;
@@ -124,6 +125,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/stock-card-count', [AccountingReportController::class, 'stockCardCount'])->name('accounting.reports.stock-card-count');
         Route::post('/reports/document-summary', [AccountingReportController::class, 'documentSummary'])->name('accounting.reports.document-summary');
         Route::post('/reports/purchase', [AccountingReportController::class, 'purchase'])->name('accounting.reports.purchase');
+    });
+
+    Route::middleware('role:administrator|im-manager|im-supervisor|im-staff')->prefix('im')->group(function () {
+        Route::get('/reports', [ImReportController::class, 'index'])->name('im.reports.index');
+        Route::post('/reports/stock-inventory', [ImReportController::class, 'stockInventory'])->name('im.reports.stock-inventory');
+        Route::post('/reports/transaction', [ImReportController::class, 'transaction'])->name('im.reports.transaction');
+        Route::post('/reports/receiving-register', [ImReportController::class, 'receivingRegister'])->name('im.reports.receiving-register');
+        Route::post('/reports/sws-register', [ImReportController::class, 'swsRegister'])->name('im.reports.sws-register');
+        Route::post('/reports/transfer-register', [ImReportController::class, 'transferRegister'])->name('im.reports.transfer-register');
+        Route::post('/reports/delivery-register', [ImReportController::class, 'deliveryRegister'])->name('im.reports.delivery-register');
     });
 
     Route::middleware('role:administrator|accounting-manager|accounting-supervisor|accounting-staff')

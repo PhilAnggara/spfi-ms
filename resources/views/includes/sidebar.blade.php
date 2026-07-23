@@ -246,15 +246,6 @@
                             @endrole
                         @endrole
 
-                        @role('administrator|purchasing-manager|general-manager|finance-manager|purchasing-staff')
-                            <li class="sidebar-item {{ Request::is('procurement/reports') ? 'active' : '' }}">
-                                <a href="{{ route('procurement.reports.index') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-file-chart-column {{ Request::is('procurement/reports') ? 'fa-fade' : '' }}"></i>
-                                    <span>Purchasing Reports</span>
-                                </a>
-                            </li>
-                        @endrole
-
                         @role('purchasing-staff|purchasing-manager')
                             <li class="sidebar-item {{ Request::is('master/product') ? 'active' : '' }}">
                                 <a href="{{ route('product.index') }}" class='sidebar-link'>
@@ -284,6 +275,24 @@
                                 <a href="{{ route('product.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-boxes-stacked {{ Request::is('master/product') ? 'fa-fade' : '' }}"></i>
                                     <span>Product</span>
+                                </a>
+                            </li>
+                        @endrole
+
+                        @role('administrator|purchasing-manager|general-manager|finance-manager|purchasing-staff')
+                            <li class="sidebar-item {{ Request::is('procurement/reports') ? 'active' : '' }}">
+                                <a href="{{ route('procurement.reports.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-file-chart-column {{ Request::is('procurement/reports') ? 'fa-fade' : '' }}"></i>
+                                    <span>Purchasing Reports</span>
+                                </a>
+                            </li>
+                        @endrole
+
+                        @role('administrator|im-manager|im-supervisor|im-staff')
+                            <li class="sidebar-item {{ Request::is('im/reports') ? 'active' : '' }}">
+                                <a href="{{ route('im.reports.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-file-chart-column {{ Request::is('im/reports') ? 'fa-fade' : '' }}"></i>
+                                    <span>IM Reports</span>
                                 </a>
                             </li>
                         @endrole
