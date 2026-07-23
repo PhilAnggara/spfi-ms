@@ -48,7 +48,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/', [MainController::class, 'dashboard'])->name('dashboard');
 
-    Route::middleware('role:administrator|purchasing-staff|purchasing-manager|engineering-manager|im-manager|im-supervisor')->prefix('master')->group(function () {
+    Route::middleware('role:administrator|purchasing-staff|purchasing-manager|engineering-managersss|im-manager|im-supervisor')->prefix('master')->group(function () {
         Route::get('product', [ProductController::class, 'index'])->name('product.index');
         Route::get('product/datatables', [ProductController::class, 'datatable'])->name('product.datatables');
         Route::get('product/{item}/purchase-history', [ProductController::class, 'purchaseHistory'])->name('product.purchase-history');

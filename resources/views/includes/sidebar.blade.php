@@ -270,14 +270,14 @@
                             </li>
                         @endrole
 
-                        @role('engineering-manager')
+                        {{-- @role('engineering-manager')
                             <li class="sidebar-item {{ Request::is('master/product') ? 'active' : '' }}">
                                 <a href="{{ route('product.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-boxes-stacked {{ Request::is('master/product') ? 'fa-fade' : '' }}"></i>
                                     <span>Item Master</span>
                                 </a>
                             </li>
-                        @endrole
+                        @endrole --}}
 
                         @role('im-manager|im-supervisor')
                             <li class="sidebar-item {{ Request::is('master/product') ? 'active' : '' }}">

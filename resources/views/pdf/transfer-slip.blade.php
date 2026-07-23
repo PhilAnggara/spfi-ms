@@ -6,11 +6,11 @@
     @php
         $pageWidthMm = $pageWidthMm ?? 215;
         $pageHeightMm = $pageHeightMm ?? 105;
-        $fieldFontSize = 7;
+        $fieldFontSize = 8;
         $numberFontSize = 9;
-        $cellFontSize = 6.5;
+        $cellFontSize = 8;
         $checkFontSize = 7;
-        $remarksFontSize = 6.5;
+        $remarksFontSize = 8;
         $itemCellMaxHeight = 2.6;
     @endphp
     <style>
@@ -74,6 +74,7 @@
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
+            font-weight: bold;
         }
 
         .item-cell {
@@ -100,7 +101,7 @@
             width: 34mm;
             height: 10mm;
             font-size: {{ $remarksFontSize }}pt;
-            font-weight: normal;
+            font-weight: bold;
             line-height: 1.15;
             white-space: normal;
             overflow: hidden;
