@@ -198,6 +198,60 @@
         }
     }
 
+    function syncBulkSelectFromRows(modal) {
+        const bulkSelect = modal.querySelector('.assign-canvasser-bulk');
+        if (!bulkSelect) {
+            return;
+        }
+
+        const rowValues = Array.from(modal.querySelectorAll('.assign-canvasser-row')).map((rowSelect) => {
+            return String(rowSelect.value || '').trim();
+        });
+
+        if (rowValues.length === 0) {
+            bulkSelect.value = '';
+            return;
+        }
+
+        const firstValue = rowValues[0];
+        const allSame = firstValue !== '' && rowValues.every((value) => value === firstValue);
+
+        bulkSelect.value = allSame ? firstValue : '';
+    }
+
+    document.addEventListener('change', function (event) {
+        const bulkSelect = event.target.closest('.assign-canvasser-bulk');
+        if (bulkSelect) {
+            const modal = bulkSelect.closest('.modal');
+            if (!modal) {
+                return;
+            }
+
+            const canvasserId = String(bulkSelect.value || '').trim();
+            if (!canvasserId) {
+                return;
+            }
+
+            modal.querySelectorAll('.assign-canvasser-row').forEach((rowSelect) => {
+                rowSelect.value = canvasserId;
+            });
+
+            return;
+        }
+
+        const rowSelect = event.target.closest('.assign-canvasser-row');
+        if (!rowSelect) {
+            return;
+        }
+
+        const modal = rowSelect.closest('.modal');
+        if (!modal) {
+            return;
+        }
+
+        syncBulkSelectFromRows(modal);
+    });
+
     document.addEventListener('click', function (event) {
         const link = event.target.closest('#prs-approval-page-container a[href*="page="]');
         if (!link) return;

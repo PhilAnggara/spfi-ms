@@ -147,36 +147,51 @@
     </section>
 
 @foreach ($items as $item)
-    <div class="modal fade text-left modal-borderless" id="approve-modal-{{ $item->id }}" tabindex="-1"
+    <div class="modal fade text-left modal-borderless assign-canvasser-modal" id="approve-modal-{{ $item->id }}" tabindex="-1"
         role="dialog" aria-labelledby="approveModalLabel-{{ $item->id }}" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="approveModalLabel-{{ $item->id }}">Assign Canvasser</h5>
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title mb-1" id="approveModalLabel-{{ $item->id }}">Assign Canvasser</h5>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="badge bg-light-primary text-primary px-3 py-2">{{ $item->prs_number }}</span>
+                            <span class="text-muted small">{{ $item->items->count() }} {{ Str::plural('item', $item->items->count()) }}</span>
+                        </div>
+                    </div>
                     <button type="button" class="close rounded-pill" data-bs-dismiss="modal" aria-label="Close">
                         <i data-feather="x"></i>
                     </button>
                 </div>
                 <form action="{{ route('prs.approve', $item->id) }}" method="post" class="form">
                     @csrf
-                    <div class="modal-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle">
+                    <div class="modal-body pt-3">
+                        <p class="text-muted small mb-3">Choose a canvasser for each item. You can still set one canvasser for every item from the last dropdown.</p>
+                        <div class="table-responsive assign-canvasser-table-wrap">
+                            <table class="table align-middle mb-0 assign-canvasser-table">
                                 <thead>
                                     <tr>
                                         <th>Item</th>
-                                        <th>Quantity</th>
-                                        <th>Assign Canvasser</th>
+                                        <th class="text-center" style="width: 7rem;">Qty</th>
+                                        <th style="width: 14rem;">Assign Canvasser</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach ($item->items as $index => $itemInfo)
                                         <tr>
-                                            <td>{{ $itemInfo->item->code }} - {{ $itemInfo->item->name }}</td>
-                                            <td>{{ $itemInfo->quantity }} {{ $itemInfo->item->unit?->name ?? 'PCS' }}</td>
+                                            <td>
+                                                <div class="assign-canvasser-item-code">{{ $itemInfo->item->code }}</div>
+                                                <div class="assign-canvasser-item-name">{{ $itemInfo->item->name }}</div>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="assign-canvasser-qty">
+                                                    {{ $itemInfo->quantity }}
+                                                    <span class="text-muted">{{ $itemInfo->item->unit?->name ?? 'PCS' }}</span>
+                                                </span>
+                                            </td>
                                             <td>
                                                 <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $itemInfo->id }}">
-                                                <select name="items[{{ $index }}][canvasser_id]" class="form-select" required>
+                                                <select name="items[{{ $index }}][canvasser_id]" class="form-select assign-canvasser-row" required>
                                                     <option value="" disabled {{ $itemInfo->canvasser_id ? '' : 'selected' }}>-- Select Canvasser --</option>
                                                     @foreach ($canvassers as $canvasser)
                                                         <option value="{{ $canvasser->id }}" @selected($itemInfo->canvasser_id == $canvasser->id)>{{ $canvasser->name }}</option>
@@ -185,12 +200,30 @@
                                             </td>
                                         </tr>
                                     @endforeach
+                                    @if ($item->items->count() > 1)
+                                        <tr class="assign-canvasser-bulk-row">
+                                            <td colspan="2" class="text-end align-middle">
+                                                <span class="assign-canvasser-bulk-label">Set all items to</span>
+                                            </td>
+                                            <td>
+                                                <select
+                                                    id="assign-canvasser-bulk-{{ $item->id }}"
+                                                    class="form-select assign-canvasser-bulk"
+                                                    aria-label="Set all items to one canvasser">
+                                                    <option value="" selected>-- Select Canvasser --</option>
+                                                    @foreach ($canvassers as $canvasser)
+                                                        <option value="{{ $canvasser->id }}">{{ $canvasser->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    @endif
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn icon icon-left btn-light-primary" data-bs-dismiss="modal">
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn icon icon-left btn-light-secondary" data-bs-dismiss="modal">
                             <i class="fa-thin fa-xmark"></i>
                             Cancel
                         </button>
