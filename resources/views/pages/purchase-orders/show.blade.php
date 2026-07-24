@@ -35,6 +35,10 @@
                     $canEdit = $user
                         && in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED'], true)
                         && ($user->hasRole('administrator') || $purchaseOrder->created_by === $user->id);
+                    $canWithdraw = $user
+                        && $purchaseOrder->status === 'PENDING_APPROVAL'
+                        && ($user->hasRole('administrator') || $purchaseOrder->created_by === $user->id);
+                    $canRemoveItems = $canEdit && $purchaseOrder->items->count() > 1;
                     $feeItemsForForm = old('fee_items', $purchaseOrder->fees_breakdown ?? []);
 
                     if (empty($feeItemsForForm)) {
@@ -146,6 +150,9 @@
                                         <th class="text-end">Withholding Tax (PPh) %</th>
                                         <th class="text-end">Amount</th>
                                         <th>Notes</th>
+                                        @if ($canEdit)
+                                            <th class="text-center" style="width: 56px;"></th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -184,6 +191,27 @@
                                             <td>
                                                 <input type="text" name="items[{{ $index }}][notes]" class="form-control form-control-sm" value="{{ $item->notes }}">
                                             </td>
+                                            @if ($canEdit)
+                                                <td class="text-center">
+                                                    @if ($canRemoveItems)
+                                                        <button
+                                                            type="submit"
+                                                            form="remove-po-item-{{ $item->id }}"
+                                                            class="btn btn-sm btn-outline-danger"
+                                                            title="Remove item"
+                                                            data-bstooltip-toggle="tooltip"
+                                                            data-bs-placement="top"
+                                                            onclick="return confirm('Remove this item from the PO? It will return to the Draft PO queue.');"
+                                                        >
+                                                            <i class="fa-duotone fa-solid fa-trash"></i>
+                                                        </button>
+                                                    @else
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="A purchase order must keep at least one item">
+                                                            <i class="fa-duotone fa-solid fa-trash"></i>
+                                                        </button>
+                                                    @endif
+                                                </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -270,6 +298,19 @@
                             <button type="submit" class="btn btn-primary">Save Changes</button>
                         </div>
                     </form>
+                    @if ($canRemoveItems)
+                        @foreach ($purchaseOrder->items as $item)
+                            <form
+                                id="remove-po-item-{{ $item->id }}"
+                                method="post"
+                                action="{{ route('purchase-orders.items.destroy', [$purchaseOrder, $item]) }}"
+                                class="d-none"
+                            >
+                                @csrf
+                                @method('DELETE')
+                            </form>
+                        @endforeach
+                    @endif
                 @else
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-4">
@@ -418,6 +459,15 @@
                     </div>
                     <div class="col-12 col-md-6 text-md-end">
                         @role('administrator|purchasing-staff')
+                            @if ($canWithdraw)
+                                <form method="post" action="{{ route('purchase-orders.withdraw', $purchaseOrder) }}" class="d-inline" onsubmit="return confirm('Withdraw this PO back to draft so you can edit it?');">
+                                    @csrf
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="fa-duotone fa-solid fa-rotate-left"></i>
+                                        Withdraw to Draft
+                                    </button>
+                                </form>
+                            @endif
                             @if (in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED']))
                                 <form method="post" action="{{ route('purchase-orders.submit', $purchaseOrder) }}" class="d-inline">
                                     @csrf

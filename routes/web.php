@@ -173,6 +173,9 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [PurchaseOrderController::class, 'store'])->name('store');
             Route::put('/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('update');
             Route::post('/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit'])->name('submit');
+            Route::post('/{purchaseOrder}/withdraw', [PurchaseOrderController::class, 'withdraw'])->name('withdraw');
+            Route::delete('/{purchaseOrder}/items/{purchaseOrderItem}', [PurchaseOrderController::class, 'destroyItem'])
+                ->name('items.destroy');
         });
     });
 

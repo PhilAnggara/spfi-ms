@@ -585,6 +585,88 @@ class PurchaseOrderController extends Controller
     }
 
     /**
+     * Withdraw a pending PO back to draft so the creator can edit it again.
+     */
+    public function withdraw(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        if ($purchaseOrder->status !== 'PENDING_APPROVAL') {
+            return redirect()->back()->withErrors(['message' => 'Only pending approval PO can be withdrawn.']);
+        }
+
+        if ($purchaseOrder->created_by !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
+            abort(403);
+        }
+
+        $purchaseOrder->update([
+            'status' => 'DRAFT',
+            'submitted_at' => null,
+        ]);
+
+        return redirect()->route('purchase-orders.show', $purchaseOrder)
+            ->with('success', 'Purchase order withdrawn to draft.');
+    }
+
+    /**
+     * Remove a PO line item and return its PRS item to the draft PO queue.
+     */
+    public function destroyItem(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderItem $purchaseOrderItem)
+    {
+        if (! in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED'], true)) {
+            return redirect()->back()->withErrors(['message' => 'Items can only be removed from a draft PO.']);
+        }
+
+        if ($purchaseOrder->created_by !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
+            abort(403);
+        }
+
+        if ((int) $purchaseOrderItem->purchase_order_id !== (int) $purchaseOrder->id) {
+            return redirect()->back()->withErrors(['items' => 'Invalid PO item.']);
+        }
+
+        if ($purchaseOrder->items()->count() <= 1) {
+            return redirect()->back()->withErrors(['items' => 'A purchase order must keep at least one item.']);
+        }
+
+        DB::transaction(function () use ($purchaseOrder, $purchaseOrderItem) {
+            $prsItemId = $purchaseOrderItem->prs_item_id;
+            $purchaseOrderItem->delete();
+
+            if ($prsItemId) {
+                PrsItem::query()->whereKey($prsItemId)->update([
+                    'purchase_order_id' => null,
+                ]);
+            }
+
+            $this->recalculatePurchaseOrderTotals($purchaseOrder->fresh(['items']));
+        });
+
+        return redirect()->route('purchase-orders.show', $purchaseOrder)
+            ->with('success', 'Item removed and returned to draft PO queue.');
+    }
+
+    /**
+     * Recalculate PO header totals from remaining line items.
+     */
+    private function recalculatePurchaseOrderTotals(PurchaseOrder $purchaseOrder): void
+    {
+        $items = $purchaseOrder->items;
+        $subtotal = (float) $items->sum('line_subtotal');
+        $discountTotal = (float) $items->sum('discount_amount');
+        $ppnTotal = (float) $items->sum('ppn_amount');
+        $pphTotal = (float) $items->sum('pph_amount');
+        $itemsTotal = (float) $items->sum('total');
+        $fees = (float) ($purchaseOrder->fees ?? 0);
+
+        $purchaseOrder->update([
+            'subtotal' => $subtotal,
+            'discount_amount' => $discountTotal,
+            'ppn_amount' => $ppnTotal,
+            'pph_amount' => $pphTotal,
+            'total' => $itemsTotal + $fees,
+        ]);
+    }
+
+    /**
      * Show PO detail.
      */
     public function show(PurchaseOrder $purchaseOrder)
