@@ -43,7 +43,7 @@ beforeEach(function () {
     ]);
 });
 
-it('shows po detail in a modal and opens print in a new tab', function () {
+it('shows po detail in a modal and opens print confirm before printing', function () {
     $response = $this->actingAs($this->user)
         ->get(route('purchase-orders.index'));
 
@@ -55,7 +55,18 @@ it('shows po detail in a modal and opens print in a new tab', function () {
     $response->assertSee('data-bs-target="#poDetail-'.$this->purchaseOrder->id.'"', false);
     $response->assertSee('id="poDetail-'.$this->purchaseOrder->id.'"', false);
     $response->assertSee('Purchase Order Detail');
+    $response->assertSee('po-detail-body', false);
+    $response->assertSee('po-detail-modal', false);
+    $response->assertSee('data-bs-target="#poPrintConfirm-'.$this->purchaseOrder->id.'"', false);
+    $response->assertSee('id="poPrintConfirm-'.$this->purchaseOrder->id.'"', false);
+    $response->assertSee('Confirm PO Number');
     $response->assertSee(
+        'action="'.route('purchase-orders.print', $this->purchaseOrder).'"',
+        false
+    );
+    $response->assertSee('name="po_number"', false);
+    $response->assertSee('value="PO-MODAL-001"', false);
+    $response->assertDontSee(
         'href="'.route('purchase-orders.print', $this->purchaseOrder).'" target="_blank"',
         false
     );

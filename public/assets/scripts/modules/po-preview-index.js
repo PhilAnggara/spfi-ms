@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const currencySelect = document.getElementById('currency-id');
     const feeItemsContainer = document.getElementById('fee-items-container');
     const addFeeBtn = document.getElementById('add-fee-btn');
+    const DECIMAL_PLACES = 5;
 
     const getCurrencySymbol = () => {
         if (!currencySelect) {
@@ -28,9 +29,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const formatCurrency = (value) => {
         const symbol = getCurrencySymbol();
         const number = Number(value || 0);
+
         return symbol + ' ' + number.toLocaleString('id-ID', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
+            minimumFractionDigits: DECIMAL_PLACES,
+            maximumFractionDigits: DECIMAL_PLACES,
         });
     };
 
@@ -38,8 +40,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const symbol = getCurrencySymbol();
         const number = Math.abs(Number(value || 0));
         const formatted = number.toLocaleString('id-ID', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
+            minimumFractionDigits: DECIMAL_PLACES,
+            maximumFractionDigits: DECIMAL_PLACES,
         });
 
         return (value < 0 ? '- ' : '') + symbol + ' ' + formatted;
@@ -78,36 +80,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const createFeeRow = (index) => {
         const row = document.createElement('div');
-        row.className = 'fee-item-row border rounded-2 p-2 bg-white';
+        row.className = 'fee-item-row po-preview-fee-row';
         row.setAttribute('data-fee-index', String(index));
 
         row.innerHTML = `
-            <div class="row g-2 align-items-end">
-                <div class="col-12 col-md-6">
-                    <label class="form-label form-label-sm mb-1">Charge Type</label>
+            <div class="po-preview-fee-grid">
+                <div class="po-preview-field">
+                    <label class="form-label">Charge Type</label>
                     <input
                         type="text"
                         name="fee_items[${index}][type]"
-                        class="form-control form-control-sm"
-                        placeholder="e.g. Freight, Insurance, Handling"
+                        class="form-control"
+                        placeholder="Freight, insurance, handling"
                     >
                 </div>
-                <div class="col-10 col-md-4">
-                    <label class="form-label form-label-sm mb-1">Amount</label>
-                    <div class="input-group input-group-sm">
+                <div class="po-preview-field">
+                    <label class="form-label">Amount</label>
+                    <div class="input-group">
                         <span class="input-group-text currency-symbol">${getCurrencySymbol()}</span>
                         <input
                             type="number"
                             name="fee_items[${index}][amount]"
                             class="form-control text-end fee-amount-input"
                             min="0"
-                            step="0.01"
-                            placeholder="0"
+                            step="0.00001"
+                            placeholder="0.00000"
                         >
                     </div>
                 </div>
-                <div class="col-2 col-md-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger w-100 remove-fee-btn" aria-label="Remove charge">
+                <div class="po-preview-fee-action">
+                    <button type="button" class="btn btn-outline-danger remove-fee-btn" aria-label="Remove charge">
                         <i class="fa-duotone fa-solid fa-trash"></i>
                     </button>
                 </div>
@@ -126,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         updateCurrencySymbols();
 
-        document.querySelectorAll('#po-preview-table tbody tr').forEach((row) => {
+        document.querySelectorAll('#po-preview-table .po-preview-line').forEach((row) => {
             const rowId = row.getAttribute('data-row');
             const qtyInput = row.querySelector(`.qty-input[data-row="${rowId}"]`);
             const priceInput = row.querySelector(`.price-input[data-row="${rowId}"]`);
@@ -134,6 +136,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const ppnInput = row.querySelector(`.ppn-input[data-row="${rowId}"]`);
             const pphInput = row.querySelector(`.pph-input[data-row="${rowId}"]`);
             const lineTotalEl = row.querySelector(`.line-total[data-row="${rowId}"]`);
+
+            if (!qtyInput || !priceInput || !lineTotalEl) {
+                return;
+            }
 
             const qty = parseFloat(qtyInput.value || 0);
             const price = parseFloat(priceInput.value || 0);

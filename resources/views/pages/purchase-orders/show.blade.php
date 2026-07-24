@@ -64,6 +64,7 @@
                     $termPaymentDisplay = trim(($termOfPayment ? $termOfPayment . ' ' : '') . ($termOfPaymentType ? ucfirst($termOfPaymentType) : ''));
                     $termPaymentDisplay = $termPaymentDisplay !== '' ? $termPaymentDisplay : '-';
                 @endphp
+                @if ($canEdit)
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-4">
                         <div class="border rounded p-3 h-100">
@@ -85,7 +86,6 @@
                     </div>
                 </div>
 
-                @if ($canEdit)
                     <form method="post" action="{{ route('purchase-orders.update', $purchaseOrder) }}" class="mb-4">
                         @csrf
                         @method('PUT')
@@ -172,22 +172,22 @@
                                             <td>{{ $item->prsItem?->prs?->department?->name ?? '-' }}</td>
                                             <td>
                                                 <input type="hidden" name="items[{{ $index }}][id]" value="{{ $item->id }}">
-                                                <input type="number" name="items[{{ $index }}][quantity]" class="form-control form-control-sm" min="1" value="{{ $item->quantity }}" required>
+                                                <input type="number" name="items[{{ $index }}][quantity]" class="form-control form-control-sm text-end" min="1" step="1" value="{{ $item->quantity }}" required style="min-width: 6.5rem;">
                                             </td>
                                             <td>{{ $item->item?->unit?->name ?? 'PCS' }}</td>
                                             <td class="text-end">
-                                                <input type="number" name="items[{{ $index }}][unit_price]" class="form-control form-control-sm text-end" min="0" step="0.01" value="{{ $item->unit_price }}" required>
+                                                <input type="number" name="items[{{ $index }}][unit_price]" class="form-control form-control-sm text-end" min="0" step="0.00001" value="{{ format_po_decimal($item->unit_price, true) }}" required style="min-width: 9rem;">
                                             </td>
                                             <td class="text-end">
-                                                <input type="number" name="items[{{ $index }}][discount_rate]" class="form-control form-control-sm text-end" min="0" step="0.01" value="{{ $item->discount_rate ?? 0 }}">
+                                                <input type="number" name="items[{{ $index }}][discount_rate]" class="form-control form-control-sm text-end" min="0" step="0.00001" value="{{ format_po_decimal($item->discount_rate ?? 0, true) }}" style="min-width: 7rem;">
                                             </td>
                                             <td class="text-end">
-                                                <input type="number" name="items[{{ $index }}][ppn_rate]" class="form-control form-control-sm text-end" min="0" step="0.01" value="{{ $item->ppn_rate ?? 0 }}">
+                                                <input type="number" name="items[{{ $index }}][ppn_rate]" class="form-control form-control-sm text-end" min="0" step="0.00001" value="{{ format_po_decimal($item->ppn_rate ?? 0, true) }}" style="min-width: 7rem;">
                                             </td>
                                             <td class="text-end">
-                                                <input type="number" name="items[{{ $index }}][pph_rate]" class="form-control form-control-sm text-end" min="0" step="0.01" value="{{ $item->pph_rate ?? 0 }}">
+                                                <input type="number" name="items[{{ $index }}][pph_rate]" class="form-control form-control-sm text-end" min="0" step="0.00001" value="{{ format_po_decimal($item->pph_rate ?? 0, true) }}" style="min-width: 7rem;">
                                             </td>
-                                            <td class="text-end">{{ $currencyCode }} {{ number_format($item->total, 2, ',', '.') }}</td>
+                                            <td class="text-end text-nowrap">{{ $currencyCode }} {{ format_po_decimal($item->total) }}</td>
                                             <td>
                                                 <input type="text" name="items[{{ $index }}][notes]" class="form-control form-control-sm" value="{{ $item->notes }}">
                                             </td>
@@ -312,134 +312,10 @@
                         @endforeach
                     @endif
                 @else
-                    <div class="row g-3 mb-4">
-                        <div class="col-12 col-md-4">
-                            <div class="border rounded p-3 h-100">
-                                <div class="text-muted small">Currency</div>
-                                <div class="fw-semibold">{{ $currencyCode }}</div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-8">
-                            <div class="border rounded p-3 h-100">
-                                <div class="text-muted small">Remark</div>
-                                <div class="fw-semibold">{{ $purchaseOrder->remark_type ?? '-' }}</div>
-                                <div class="text-muted small">{{ $purchaseOrder->remark_text ?? '-' }}</div>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="border rounded p-3 h-100">
-                                <div class="text-muted small">Term of Payment</div>
-                                <div class="fw-semibold">{{ $termPaymentDisplay }}</div>
-                                @if ($termOfDelivery)
-                                    <div class="text-muted small mt-1">Term of Delivery: {{ $termOfDelivery }}</div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-
-                    @if ($purchaseOrder->approval_notes)
-                        <div class="alert alert-warning">
-                            <strong>Changes Requested:</strong> {{ $purchaseOrder->approval_notes }}
-                        </div>
-                    @endif
-
-                    <div class="table-responsive">
-                        <table class="table table-striped align-middle">
-                            <thead>
-                                <tr>
-                                    <th>PRS ID</th>
-                                    <th>Item</th>
-                                    <th>Item Code</th>
-                                    <th>Dept</th>
-                                    <th>Qty</th>
-                                    <th>Unit</th>
-                                    <th class="text-end">Unit/Price</th>
-                                    <th class="text-end">Disc %</th>
-                                    <th class="text-end">VAT (PPN) %</th>
-                                    <th class="text-end">Withholding Tax (PPh) %</th>
-                                    <th class="text-end">Amount</th>
-                                    <th>Notes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($purchaseOrder->items as $item)
-                                    @php
-                                        $isCapex = (bool) ($item->prsItem?->prs?->is_capex ?? ($item->meta['is_capex'] ?? false));
-                                    @endphp
-                                    <tr>
-                                        <td>
-                                            {{ $item->meta['prs_number'] ?? $item->prsItem?->prs?->prs_number ?? '-' }}
-                                        </td>
-                                        <td>
-                                            {{ $item->item?->name }}
-                                            @if ($isCapex)
-                                                <div class="mt-1"><span class="badge bg-light-primary">CAPEX</span></div>
-                                            @endif
-                                        </td>
-                                        <td>{{ $item->item?->code ?? '-' }}</td>
-                                        <td>{{ $item->prsItem?->prs?->department?->name ?? '-' }}</td>
-                                        <td>{{ number_format($item->quantity, 0, ',', '.') }}</td>
-                                        <td>{{ $item->item?->unit?->name ?? 'PCS' }}</td>
-                                        <td class="text-end">{{ $currencyCode }} {{ number_format($item->unit_price, 2, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($item->discount_rate ?? 0, 2, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($item->ppn_rate ?? 0, 2, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($item->pph_rate ?? 0, 2, ',', '.') }}</td>
-                                        <td class="text-end">{{ $currencyCode }} {{ number_format($item->total, 2, ',', '.') }}</td>
-                                        <td>{{ $item->notes ?? '-' }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="row mt-4">
-                        <div class="col-12 col-md-6"></div>
-                        <div class="col-12 col-md-6">
-                            <div class="border rounded p-3">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span>Subtotal</span>
-                                    <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->subtotal, 2, ',', '.') }}</span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span>Discount</span>
-                                    <span class="fw-semibold">- {{ $currencyCode }} {{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span>VAT (PPN)</span>
-                                    <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span>Withholding Tax (PPh)</span>
-                                    <span class="fw-semibold">- {{ $currencyCode }} {{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</span>
-                                </div>
-                                @if ($feeItemsReadOnly->isNotEmpty())
-                                    <div class="border rounded-3 p-3 my-3 bg-light-subtle">
-                                        <div class="fw-semibold mb-2">Additional Charges</div>
-                                        @foreach ($feeItemsReadOnly as $feeItem)
-                                            <div class="d-flex justify-content-between mb-1">
-                                                <span class="text-muted">{{ $feeItem['type'] !== '' ? $feeItem['type'] : 'Additional charge' }}</span>
-                                                <span>{{ $currencyCode }} {{ number_format($feeItem['amount'], 2, ',', '.') }}</span>
-                                            </div>
-                                        @endforeach
-                                        <hr class="my-2">
-                                        <div class="d-flex justify-content-between">
-                                            <span class="text-muted">Total Additional Charges</span>
-                                            <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->fees, 2, ',', '.') }}</span>
-                                        </div>
-                                    </div>
-                                @elseif ((float) $purchaseOrder->fees > 0)
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Additional Charges</span>
-                                        <span class="fw-semibold">{{ $currencyCode }} {{ number_format($purchaseOrder->fees, 2, ',', '.') }}</span>
-                                    </div>
-                                @endif
-                                <div class="d-flex justify-content-between">
-                                    <span class="fw-bold">Grand Total</span>
-                                    <span class="fw-bold">{{ $currencyCode }} {{ number_format($purchaseOrder->total, 2, ',', '.') }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    @include('pages.purchase-orders.partials.detail-body', [
+                        'purchaseOrder' => $purchaseOrder,
+                        'showHeaderMeta' => true,
+                    ])
                 @endif
             </div>
 
@@ -450,7 +326,7 @@
                             @csrf
                             <label class="form-label">PO Number</label>
                             <div class="input-group">
-                                <input type="text" name="po_number" class="form-control" value="{{ old('po_number', $purchaseOrder->po_number ?: ($nextPoNumber ?? '')) }}">
+                                <input id="po-number-input" type="text" name="po_number" class="form-control" value="{{ old('po_number', $purchaseOrder->po_number ?: ($nextPoNumber ?? '')) }}">
                                 <input type="hidden" name="po_number_suggested" value="{{ $nextPoNumber ?? '' }}">
                                 <button type="submit" class="btn btn-outline-primary">Save Number</button>
                             </div>
@@ -478,11 +354,16 @@
                                 </form>
                             @endif
                         @endrole
-                        <button type="submit" form="po-number-form" formaction="{{ route('purchase-orders.print', $purchaseOrder) }}" formmethod="post" class="btn btn-primary {{ $purchaseOrder->status !== 'APPROVED' ? 'disabled' : '' }}">
-                            <i class="fa-duotone fa-solid fa-print"></i>
-                            Print PO
-                        </button>
-                        @if ($purchaseOrder->status !== 'APPROVED')
+                        @if ($purchaseOrder->status === 'APPROVED')
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#poPrintConfirm-{{ $purchaseOrder->id }}">
+                                <i class="fa-duotone fa-solid fa-print"></i>
+                                Print PO
+                            </button>
+                        @else
+                            <button type="button" class="btn btn-primary disabled" disabled>
+                                <i class="fa-duotone fa-solid fa-print"></i>
+                                Print PO
+                            </button>
                             <div class="text-muted small mt-2">PO must be approved before printing.</div>
                         @endif
                     </div>
@@ -491,9 +372,22 @@
         </div>
     </section>
 </div>
+
+@if ($purchaseOrder->status === 'APPROVED')
+    @include('pages.purchase-orders.partials.print-confirm-modal', [
+        'purchaseOrder' => $purchaseOrder,
+        'nextPoNumber' => $nextPoNumber ?? '',
+        'syncFromInputId' => 'po-number-input',
+    ])
+@endif
 @endsection
 
+@push('addon-style')
+    <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
+@endpush
+
 @push('addon-script')
+    <script src="{{ url('assets/scripts/modules/po-print-confirm.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const container = document.getElementById('po-fee-items-container');

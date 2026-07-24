@@ -43,6 +43,22 @@ if (! function_exists('itemOrItems')) {
     }
 }
 
+if (! function_exists('format_po_decimal')) {
+    /**
+     * Format numeric values for PO forms/display with fixed 5 decimal places.
+     */
+    function format_po_decimal(mixed $value, bool $forInput = false): string
+    {
+        $number = (float) ($value ?? 0);
+
+        if ($forInput) {
+            return number_format($number, 5, '.', '');
+        }
+
+        return number_format($number, 5, ',', '.');
+    }
+}
+
 if (! function_exists('tgl')) {
     function tgl($date)
     {

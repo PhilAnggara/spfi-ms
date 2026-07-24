@@ -58,7 +58,7 @@
                     <span class="po-draft-metric-icon text-warning"><i class="fa-duotone fa-solid fa-money-bill-wave"></i></span>
                     <div>
                         <div class="text-muted small">Estimated Total</div>
-                        <div class="po-draft-metric-value">Rp {{ number_format($totalAmount, 2) }}</div>
+                        <div class="po-draft-metric-value">Rp {{ format_po_decimal($totalAmount) }}</div>
                     </div>
                 </div>
             </div>
@@ -138,7 +138,7 @@
                                                 @if ($capexCount > 0)
                                                     <span class="badge bg-light-primary">CAPEX {{ $capexCount }}</span>
                                                 @endif
-                                                <span class="badge bg-light-success text-success">Rp {{ number_format($supplierTotal, 2) }}</span>
+                                                <span class="badge bg-light-success text-success">Rp {{ format_po_decimal($supplierTotal) }}</span>
                                             </div>
                                         </div>
                                     </button>
@@ -209,7 +209,7 @@
                                                                 </td>
                                                                 <td class="fw-semibold">{{ $prsItem->quantity }}</td>
                                                                 <td>{{ $item?->unit?->name ?? 'PCS' }}</td>
-                                                                <td class="fw-semibold">{{ number_format($canvassing?->unit_price ?? 0, 2) }}</td>
+                                                                <td class="fw-semibold">{{ format_po_decimal($canvassing?->unit_price ?? 0) }}</td>
                                                                 <td>{{ $canvassing?->notes ?? '-' }}</td>
                                                             </tr>
                                                         @endforeach

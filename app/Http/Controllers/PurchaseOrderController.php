@@ -84,6 +84,7 @@ class PurchaseOrderController extends Controller
             'purchaseOrders' => $purchaseOrders,
             'status' => $filters['status'],
             'filters' => $filters,
+            'nextPoNumber' => app(DocumentNumberService::class)->previewNext('PO'),
         ]);
     }
 

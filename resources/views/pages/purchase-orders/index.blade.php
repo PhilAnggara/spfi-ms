@@ -163,7 +163,7 @@
                                             </div>
                                         </td>
                                         <td>{{ itemOrItems($po->items_count) }}</td>
-                                        <td class="fw-semibold">{{ number_format((float) $po->total, 2) }}</td>
+                                        <td class="fw-semibold">{{ format_po_decimal($po->total) }}</td>
                                         <td class="d-none d-md-table-cell">
                                             <i class="fa-duotone fa-solid fa-calendar-days text-danger"></i>
                                             {{ tgl($po->created_at) }}
@@ -179,9 +179,15 @@
                                                 <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#poDetail-{{ $po->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
                                                     <i class="fa-light fa-eye"></i>
                                                 </button>
-                                                <a href="{{ route('purchase-orders.print', $po) }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary {{ $po->status !== 'APPROVED' ? 'disabled' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
-                                                    <i class="fa-light fa-print"></i>
-                                                </a>
+                                                @if ($po->status === 'APPROVED')
+                                                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#poPrintConfirm-{{ $po->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
+                                                        <i class="fa-light fa-print"></i>
+                                                    </button>
+                                                @else
+                                                    <button type="button" class="btn btn-primary disabled" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print" disabled>
+                                                        <i class="fa-light fa-print"></i>
+                                                    </button>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -196,27 +202,12 @@
 
                     @foreach ($purchaseOrders as $po)
                         @php
-                            $currencyCode = $po->currency?->code ?? 'Rp';
-                            $firstItemMeta = $po->items->first()?->meta ?? [];
-                            $termOfPaymentType = $po->term_of_payment_type ?? ($firstItemMeta['term_of_payment_type'] ?? null);
-                            $termOfPayment = $po->term_of_payment ?? ($firstItemMeta['term_of_payment'] ?? null);
-                            $termOfDelivery = $po->term_of_delivery ?? ($firstItemMeta['term_of_delivery'] ?? null);
-                            $termPaymentDisplay = trim(($termOfPayment ? $termOfPayment . ' ' : '') . ($termOfPaymentType ? ucfirst($termOfPaymentType) : ''));
-                            $termPaymentDisplay = $termPaymentDisplay !== '' ? $termPaymentDisplay : '-';
-                            $feeItems = collect($po->fees_breakdown ?? [])
-                                ->filter(fn ($row) => is_array($row))
-                                ->map(fn (array $row) => [
-                                    'type' => trim((string) ($row['type'] ?? '')),
-                                    'amount' => (float) ($row['amount'] ?? 0),
-                                ])
-                                ->filter(fn (array $row) => $row['type'] !== '' || $row['amount'] > 0)
-                                ->values();
                             $canEdit = in_array($po->status, ['DRAFT', 'CHANGES_REQUESTED'], true);
                         @endphp
                         <div class="modal fade" id="poDetail-{{ $po->id }}" tabindex="-1" aria-labelledby="poDetailLabel-{{ $po->id }}" aria-hidden="true">
                             <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                                <div class="modal-content">
-                                    <div class="modal-header">
+                                <div class="modal-content po-detail-modal">
+                                    <div class="modal-header po-detail-modal-header">
                                         <div>
                                             <h5 class="modal-title" id="poDetailLabel-{{ $po->id }}">
                                                 {{ $po->po_number ?: 'PO-' . str_pad((string) $po->id, 5, '0', STR_PAD_LEFT) }}
@@ -226,145 +217,12 @@
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <div class="row g-3 mb-4">
-                                            <div class="col-12 col-md-4">
-                                                <div class="border rounded p-3 h-100">
-                                                    <div class="text-muted small">Supplier</div>
-                                                    <div class="fw-semibold">{{ $po->supplier?->name ?? '-' }}</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-md-4">
-                                                <div class="border rounded p-3 h-100">
-                                                    <div class="text-muted small">Requester</div>
-                                                    <div class="fw-semibold">{{ $po->createdBy?->name ?? '-' }}</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-md-4">
-                                                <div class="border rounded p-3 h-100">
-                                                    <div class="text-muted small">Status</div>
-                                                    <div class="fw-semibold">{{ $po->status }}</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-md-4">
-                                                <div class="border rounded p-3 h-100">
-                                                    <div class="text-muted small">Currency</div>
-                                                    <div class="fw-semibold">{{ $currencyCode }}</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-md-8">
-                                                <div class="border rounded p-3 h-100">
-                                                    <div class="text-muted small">Remark</div>
-                                                    <div class="fw-semibold">{{ $po->remark_type ?? '-' }}</div>
-                                                    <div class="text-muted small">{{ $po->remark_text ?? '-' }}</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12">
-                                                <div class="border rounded p-3 h-100">
-                                                    <div class="text-muted small">Term of Payment</div>
-                                                    <div class="fw-semibold">{{ $termPaymentDisplay }}</div>
-                                                    @if ($termOfDelivery)
-                                                        <div class="text-muted small mt-1">Term of Delivery: {{ $termOfDelivery }}</div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        @if ($po->approval_notes)
-                                            <div class="alert alert-warning">
-                                                <strong>Changes Requested:</strong> {{ $po->approval_notes }}
-                                            </div>
-                                        @endif
-
-                                        <div class="table-responsive">
-                                            <table class="table table-striped align-middle">
-                                                <thead>
-                                                    <tr>
-                                                        <th>PRS</th>
-                                                        <th>Item</th>
-                                                        <th class="text-end">Qty</th>
-                                                        <th>Unit</th>
-                                                        <th class="text-end">Unit Price</th>
-                                                        <th class="text-end">Disc %</th>
-                                                        <th class="text-end">PPN %</th>
-                                                        <th class="text-end">PPh %</th>
-                                                        <th class="text-end">Amount</th>
-                                                        <th>Notes</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach ($po->items as $item)
-                                                        @php
-                                                            $isCapex = (bool) ($item->prsItem?->prs?->is_capex ?? ($item->meta['is_capex'] ?? false));
-                                                        @endphp
-                                                        <tr>
-                                                            <td>{{ $item->meta['prs_number'] ?? $item->prsItem?->prs?->prs_number ?? '-' }}</td>
-                                                            <td>
-                                                                <div class="fw-semibold">{{ $item->item?->name ?? '-' }}</div>
-                                                                <small class="text-muted">{{ $item->item?->code ?? '-' }}</small>
-                                                                @if ($isCapex)
-                                                                    <div class="mt-1"><span class="badge bg-light-primary">CAPEX</span></div>
-                                                                @endif
-                                                            </td>
-                                                            <td class="text-end">{{ number_format((float) $item->quantity, 2, ',', '.') }}</td>
-                                                            <td>{{ $item->item?->unit?->name ?? 'PCS' }}</td>
-                                                            <td class="text-end">{{ $currencyCode }} {{ number_format((float) $item->unit_price, 2, ',', '.') }}</td>
-                                                            <td class="text-end">{{ number_format((float) ($item->discount_rate ?? 0), 2, ',', '.') }}</td>
-                                                            <td class="text-end">{{ number_format((float) ($item->ppn_rate ?? 0), 2, ',', '.') }}</td>
-                                                            <td class="text-end">{{ number_format((float) ($item->pph_rate ?? 0), 2, ',', '.') }}</td>
-                                                            <td class="text-end fw-semibold">{{ $currencyCode }} {{ number_format((float) $item->total, 2, ',', '.') }}</td>
-                                                            <td>{{ $item->notes ?: '-' }}</td>
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-
-                                        <div class="row mt-4">
-                                            <div class="col-12 col-lg-6">
-                                                <div class="border rounded p-3 h-100">
-                                                    <div class="fw-semibold mb-2">Additional Charges</div>
-                                                    @forelse ($feeItems as $feeItem)
-                                                        <div class="d-flex justify-content-between gap-3 mb-2">
-                                                            <span class="text-muted">{{ $feeItem['type'] ?: 'Charge' }}</span>
-                                                            <span class="fw-semibold">{{ $currencyCode }} {{ number_format($feeItem['amount'], 2, ',', '.') }}</span>
-                                                        </div>
-                                                    @empty
-                                                        <div class="text-muted small">No additional charges.</div>
-                                                    @endforelse
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-lg-6">
-                                                <div class="border rounded p-3 h-100">
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>Subtotal</span>
-                                                        <span class="fw-semibold">{{ $currencyCode }} {{ number_format((float) $po->subtotal, 2, ',', '.') }}</span>
-                                                    </div>
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>Discount</span>
-                                                        <span class="fw-semibold">- {{ $currencyCode }} {{ number_format((float) ($po->discount_amount ?? 0), 2, ',', '.') }}</span>
-                                                    </div>
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>VAT (PPN)</span>
-                                                        <span class="fw-semibold">{{ $currencyCode }} {{ number_format((float) ($po->ppn_amount ?? 0), 2, ',', '.') }}</span>
-                                                    </div>
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>Withholding Tax (PPh)</span>
-                                                        <span class="fw-semibold">- {{ $currencyCode }} {{ number_format((float) ($po->pph_amount ?? 0), 2, ',', '.') }}</span>
-                                                    </div>
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>Additional Charges</span>
-                                                        <span class="fw-semibold">{{ $currencyCode }} {{ number_format((float) ($po->fees ?? 0), 2, ',', '.') }}</span>
-                                                    </div>
-                                                    <hr>
-                                                    <div class="d-flex justify-content-between">
-                                                        <span class="fw-bold">Grand Total</span>
-                                                        <span class="fw-bold">{{ $currencyCode }} {{ number_format((float) $po->total, 2, ',', '.') }}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        @include('pages.purchase-orders.partials.detail-body', [
+                                            'purchaseOrder' => $po,
+                                            'showHeaderMeta' => true,
+                                        ])
                                     </div>
-                                    <div class="modal-footer">
+                                    <div class="modal-footer po-detail-modal-footer">
                                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
                                         @if ($canEdit)
                                             <a href="{{ route('purchase-orders.show', $po) }}" class="btn btn-primary">
@@ -373,15 +231,22 @@
                                             </a>
                                         @endif
                                         @if ($po->status === 'APPROVED')
-                                            <a href="{{ route('purchase-orders.print', $po) }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+                                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#poPrintConfirm-{{ $po->id }}">
                                                 <i class="fa-light fa-print me-1"></i>
                                                 Print
-                                            </a>
+                                            </button>
                                         @endif
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        @if ($po->status === 'APPROVED')
+                            @include('pages.purchase-orders.partials.print-confirm-modal', [
+                                'purchaseOrder' => $po,
+                                'nextPoNumber' => $nextPoNumber ?? '',
+                            ])
+                        @endif
                     @endforeach
                 @endif
             </div>
@@ -399,4 +264,5 @@
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/purchase-orders-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/purchase-orders-index.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/po-print-confirm.js') }}"></script>
 @endpush
