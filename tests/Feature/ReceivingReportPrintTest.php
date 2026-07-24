@@ -69,6 +69,37 @@ it('renders receiving report pdf print with custom paper size', function () {
 
     $response->assertSuccessful();
     expect($response->headers->get('content-type'))->toContain('application/pdf');
+    expect($response->getContent())->toContain('/PrintScaling /None');
+});
+
+it('shows print confirm modal and preview link on the receiving reports index', function () {
+    $response = $this->actingAs($this->user)
+        ->get(route('receiving-reports.index'));
+
+    $response->assertSuccessful();
+    $response->assertSee('data-bs-target="#rrPrintConfirm-'.$this->receivingReport->id.'"', false);
+    $response->assertSee('id="rrPrintConfirm-'.$this->receivingReport->id.'"', false);
+    $response->assertSee('Confirm RR Number');
+    $response->assertSee(config('receiving-report.paper.label'));
+    $response->assertSee('Actual size / 100%');
+    $response->assertSee(route('receiving-reports.print', ['receivingReport' => $this->receivingReport, 'mode' => 'preview']), false);
+    $response->assertDontSee(
+        'href="'.route('receiving-reports.print', ['receivingReport' => $this->receivingReport, 'mode' => 'print']).'"',
+        false
+    );
+});
+
+it('saves an edited rr number when printing from the confirmation modal', function () {
+    $response = $this->actingAs($this->user)
+        ->post(route('receiving-reports.print', ['receivingReport' => $this->receivingReport, 'mode' => 'print']), [
+            'rr_number' => 'RR-PAPER-777',
+            'rr_number_suggested' => 'RR-SUGGESTED',
+        ]);
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+    expect($response->getContent())->toContain('/PrintScaling /None');
+    expect($this->receivingReport->fresh()->rr_number)->toBe('RR-PAPER-777');
 });
 
 it('uses 215mm by 160mm page dimensions in receiving report view', function () {

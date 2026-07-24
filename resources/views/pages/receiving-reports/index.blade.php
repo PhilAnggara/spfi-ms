@@ -172,9 +172,9 @@
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-view-modal-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
                                                     <i class="fa-light fa-eye text-primary"></i>
                                                 </button>
-                                                <a href="{{ route('receiving-reports.print', ['receivingReport' => $rr, 'mode' => 'print']) }}" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
+                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rrPrintConfirm-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
                                                     <i class="fa-light fa-print text-primary"></i>
-                                                </a>
+                                                </button>
                                                 @role('administrator|im-manager|im-supervisor|im-staff')
                                                     <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-edit-modal-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                         <i class="fa-light fa-edit text-primary"></i>
@@ -415,11 +415,20 @@
                                 <i class="fa-duotone fa-solid fa-file-pdf"></i>
                                 Preview Form
                             </a>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#rrPrintConfirm-{{ $rr->id }}">
+                                <i class="fa-duotone fa-solid fa-print"></i>
+                                Print
+                            </button>
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
                 </div>
             </div>
+
+            @include('pages.receiving-reports.partials.print-confirm-modal', [
+                'receivingReport' => $rr,
+                'nextRrNumber' => $nextRrNumber ?? '',
+            ])
 
             @role('administrator|im-manager|im-supervisor|im-staff')
                 <div class="modal fade" id="rr-edit-modal-{{ $rr->id }}" tabindex="-1" aria-hidden="true">
@@ -587,4 +596,5 @@
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/rr-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/receiving-reports-index.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/document-print-confirm.js') }}"></script>
 @endpush

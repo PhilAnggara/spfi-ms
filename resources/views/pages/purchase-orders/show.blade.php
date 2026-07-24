@@ -387,7 +387,7 @@
 @endpush
 
 @push('addon-script')
-    <script src="{{ url('assets/scripts/modules/po-print-confirm.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/document-print-confirm.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const container = document.getElementById('po-fee-items-container');

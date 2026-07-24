@@ -15,10 +15,6 @@ use Illuminate\Validation\ValidationException;
 
 class TransferSlipController extends Controller
 {
-    private const TS_PAPER_WIDTH_MM = 215;
-
-    private const TS_PAPER_HEIGHT_MM = 105;
-
     private const MM_TO_PT = 2.834645669;
 
     public function index(Request $request)
@@ -338,8 +334,12 @@ class TransferSlipController extends Controller
     public function print(Request $request, string $transferSlip)
     {
         $transferSlipId = (int) $transferSlip;
-        $mode = $request->query('mode', 'print');
+        $mode = $request->input('mode', $request->query('mode', 'print'));
         $isPreview = $mode !== 'print';
+
+        if ($request->isMethod('post') || $request->filled('ts_number')) {
+            $this->saveTsNumberFromRequest($request, $transferSlipId);
+        }
 
         $transferSlipRow = DB::table('transfer_slips as ts')
             ->leftJoin('store_withdrawals as sw', 'sw.id', '=', 'ts.store_withdrawal_id')
@@ -376,6 +376,10 @@ class TransferSlipController extends Controller
             abort(404);
         }
 
+        if (! $isPreview && trim((string) ($transferSlipRow->ts_number ?? '')) === '') {
+            return redirect()->back()->withErrors(['message' => 'TS number is required before printing.']);
+        }
+
         $items = DB::table('transfer_slip_items as tsi')
             ->leftJoin('items as i', 'i.id', '=', 'tsi.item_id')
             ->leftJoin('item_categories as ic', 'ic.id', '=', 'i.category_id')
@@ -397,9 +401,11 @@ class TransferSlipController extends Controller
             ])
             ->get();
 
+        $pageWidthMm = (float) config('transfer-slip.paper.width_mm', 215);
+        $pageHeightMm = (float) config('transfer-slip.paper.height_mm', 105);
         $backgroundImageSrc = null;
-        $backgroundWidthPt = self::TS_PAPER_WIDTH_MM * self::MM_TO_PT;
-        $backgroundHeightPt = self::TS_PAPER_HEIGHT_MM * self::MM_TO_PT;
+        $backgroundWidthPt = $pageWidthMm * self::MM_TO_PT;
+        $backgroundHeightPt = $pageHeightMm * self::MM_TO_PT;
 
         if ($isPreview) {
             $backgroundImageSrc = $this->resolveTransferSlipBackgroundImageSrc();
@@ -407,19 +413,19 @@ class TransferSlipController extends Controller
 
         $filename = sprintf(
             'TS-%s-%s.pdf',
-            str_replace(['/', '\\', ' '], '-', (string) $transferSlipRow->ts_number),
+            str_replace(['/', '\\', ' '], '-', (string) ($transferSlipRow->ts_number ?: $transferSlipRow->id)),
             now()->format('YmdHis')
         );
 
-        return Pdf::loadView('pdf.transfer-slip', [
+        $pdf = Pdf::loadView('pdf.transfer-slip', [
             'transferSlip' => $transferSlipRow,
             'items' => $items,
             'isPreview' => $isPreview,
             'backgroundImageSrc' => $backgroundImageSrc,
             'backgroundWidthPt' => $backgroundWidthPt,
             'backgroundHeightPt' => $backgroundHeightPt,
-            'pageWidthMm' => self::TS_PAPER_WIDTH_MM,
-            'pageHeightMm' => self::TS_PAPER_HEIGHT_MM,
+            'pageWidthMm' => $pageWidthMm,
+            'pageHeightMm' => $pageHeightMm,
         ])
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true)
@@ -433,8 +439,53 @@ class TransferSlipController extends Controller
                 0,
                 $backgroundWidthPt,
                 $backgroundHeightPt,
-            ])
-            ->stream($filename);
+            ]);
+
+        $pdf->render();
+
+        $canvas = $pdf->getDomPDF()->getCanvas();
+        if ($canvas instanceof \Dompdf\Adapter\CPDF) {
+            $canvas->get_cpdf()->setPreferences('PrintScaling', 'None');
+        }
+
+        return $pdf->stream($filename);
+    }
+
+    private function saveTsNumberFromRequest(Request $request, int $transferSlipId): void
+    {
+        $validated = $request->validate([
+            'ts_number' => ['nullable', 'string', 'max:50'],
+            'ts_number_suggested' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $numberService = app(DocumentNumberService::class);
+        $maxAttempts = 2;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $resolvedNumber = $numberService->resolve('TS', $validated['ts_number'] ?? null, $validated['ts_number_suggested'] ?? null);
+            $numberService->assertUnique('TS', $resolvedNumber['number'], $transferSlipId);
+
+            try {
+                DB::table('transfer_slips')
+                    ->where('id', $transferSlipId)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'ts_number' => $resolvedNumber['number'],
+                        'updated_at' => now(),
+                    ]);
+                break;
+            } catch (QueryException $exception) {
+                $canRetry = $resolvedNumber['source'] === 'auto'
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception);
+
+                if ($canRetry) {
+                    continue;
+                }
+
+                throw $exception;
+            }
+        }
     }
 
     /**

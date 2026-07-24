@@ -97,13 +97,36 @@ beforeEach(function () {
     ]);
 });
 
-it('shows print and preview links on the transfer slips index', function () {
+it('shows print confirm modal and preview link on the transfer slips index', function () {
     $response = $this->actingAs($this->user)
         ->get(route('transfer-slips.index'));
 
     $response->assertSuccessful();
-    $response->assertSee(route('transfer-slips.print', ['transferSlip' => $this->transferSlipId, 'mode' => 'print']), false);
+    $response->assertSee('data-bs-target="#tsPrintConfirm-'.$this->transferSlipId.'"', false);
+    $response->assertSee('id="tsPrintConfirm-'.$this->transferSlipId.'"', false);
+    $response->assertSee('Confirm TS Number');
+    $response->assertSee(config('transfer-slip.paper.label'));
+    $response->assertSee('Actual size / 100%');
     $response->assertSee(route('transfer-slips.print', ['transferSlip' => $this->transferSlipId, 'mode' => 'preview']), false);
+    $response->assertDontSee(
+        'href="'.route('transfer-slips.print', ['transferSlip' => $this->transferSlipId, 'mode' => 'print']).'"',
+        false
+    );
+});
+
+it('saves an edited ts number when printing from the confirmation modal', function () {
+    $response = $this->actingAs($this->user)
+        ->post(route('transfer-slips.print', ['transferSlip' => $this->transferSlipId, 'mode' => 'print']), [
+            'ts_number' => 'TS-PAPER-777',
+            'ts_number_suggested' => 'TS-SUGGESTED',
+        ]);
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+    expect($response->getContent())->toContain('/PrintScaling /None');
+
+    $tsNumber = DB::table('transfer_slips')->where('id', $this->transferSlipId)->value('ts_number');
+    expect($tsNumber)->toBe('TS-PAPER-777');
 });
 
 it('omits blank form background and ts number in print mode', function () {
@@ -214,9 +237,9 @@ it('uses 215mm by 105mm page dimensions in transfer slip view', function () {
         ->toContain('height: 105mm')
         ->toContain('class="ts-bg"')
         ->toContain('data:image/jpeg;base64,')
-        ->toContain('left: 30mm; top: 26.2mm')
+        ->toContain('left: 25mm; top: 25.2mm')
         ->toContain('class="remarks"')
-        ->toContain('Stores')
+        ->toContain('Inventory Management')
         ->toContain('Production Floor')
         ->toContain('Transfer Print Item');
 });

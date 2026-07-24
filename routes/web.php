@@ -205,7 +205,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view-rr')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
         Route::get('/', [ReceivingReportController::class, 'index'])->name('index');
-        Route::get('/{receivingReport}/print', [ReceivingReportController::class, 'print'])->name('print');
+        Route::match(['get', 'post'], '/{receivingReport}/print', [ReceivingReportController::class, 'print'])->name('print');
     });
 
     Route::middleware('role:administrator|im-manager|im-supervisor|im-staff')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
@@ -229,7 +229,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {
         Route::get('/', [TransferSlipController::class, 'index'])->name('index');
-        Route::get('/{transferSlip}/print', [TransferSlipController::class, 'print'])->name('print');
+        Route::match(['get', 'post'], '/{transferSlip}/print', [TransferSlipController::class, 'print'])->name('print');
     });
 
     Route::middleware('permission:create-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {

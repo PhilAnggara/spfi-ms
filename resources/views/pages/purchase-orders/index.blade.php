@@ -264,5 +264,5 @@
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/purchase-orders-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/purchase-orders-index.js') }}"></script>
-    <script src="{{ url('assets/scripts/modules/po-print-confirm.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/document-print-confirm.js') }}"></script>
 @endpush

@@ -21,10 +21,6 @@ use Illuminate\Support\Facades\DB;
 
 class ReceivingReportController extends Controller
 {
-    private const RR_PAPER_WIDTH_MM = 215;
-
-    private const RR_PAPER_HEIGHT_MM = 160;
-
     private const MM_TO_PT = 2.834645669;
 
     public function index(Request $request)
@@ -467,8 +463,17 @@ class ReceivingReportController extends Controller
 
     public function print(Request $request, ReceivingReport $receivingReport)
     {
-        $mode = $request->query('mode', 'print');
+        $mode = $request->input('mode', $request->query('mode', 'print'));
         $isPreview = $mode !== 'print';
+
+        if ($request->isMethod('post') || $request->filled('rr_number')) {
+            $this->saveRrNumberFromRequest($request, $receivingReport);
+            $receivingReport->refresh();
+        }
+
+        if (! $isPreview && trim((string) ($receivingReport->rr_number ?? '')) === '') {
+            return redirect()->back()->withErrors(['message' => 'RR number is required before printing.']);
+        }
 
         $receivingReport->load([
             'purchaseOrder.supplier',
@@ -505,29 +510,73 @@ class ReceivingReportController extends Controller
             $backgroundImageDataUri = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($backgroundImagePath));
         }
 
+        $pageWidthMm = (float) config('receiving-report.paper.width_mm', 215);
+        $pageHeightMm = (float) config('receiving-report.paper.height_mm', 160);
+
         $filename = sprintf(
             'RR-%s-%s.pdf',
             $receivingReport->rr_number ?? $receivingReport->id,
             now()->format('YmdHis')
         );
 
-        return Pdf::loadView('pdf.receiving-report', [
+        $pdf = Pdf::loadView('pdf.receiving-report', [
             'receivingReport' => $receivingReport,
             'isPreview' => $isPreview,
             'approvedByName' => $imManager?->name,
             'backgroundImageDataUri' => $backgroundImageDataUri,
-            'pageWidthMm' => self::RR_PAPER_WIDTH_MM,
-            'pageHeightMm' => self::RR_PAPER_HEIGHT_MM,
+            'pageWidthMm' => $pageWidthMm,
+            'pageHeightMm' => $pageHeightMm,
             'currencyConversion' => $currencyConversion,
             'rrAccountingPayload' => $rrAccountingPayload,
         ])
             ->setPaper([
                 0,
                 0,
-                self::RR_PAPER_WIDTH_MM * self::MM_TO_PT,
-                self::RR_PAPER_HEIGHT_MM * self::MM_TO_PT,
-            ])
-            ->stream($filename);
+                $pageWidthMm * self::MM_TO_PT,
+                $pageHeightMm * self::MM_TO_PT,
+            ]);
+
+        $pdf->render();
+
+        $canvas = $pdf->getDomPDF()->getCanvas();
+        if ($canvas instanceof \Dompdf\Adapter\CPDF) {
+            $canvas->get_cpdf()->setPreferences('PrintScaling', 'None');
+        }
+
+        return $pdf->stream($filename);
+    }
+
+    private function saveRrNumberFromRequest(Request $request, ReceivingReport $receivingReport): void
+    {
+        $validated = $request->validate([
+            'rr_number' => ['nullable', 'string', 'max:50'],
+            'rr_number_suggested' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $numberService = app(DocumentNumberService::class);
+        $maxAttempts = 2;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $resolvedNumber = $numberService->resolve('RR', $validated['rr_number'] ?? null, $validated['rr_number_suggested'] ?? null);
+            $numberService->assertUnique('RR', $resolvedNumber['number'], $receivingReport->id);
+
+            try {
+                $receivingReport->update([
+                    'rr_number' => $resolvedNumber['number'],
+                ]);
+                break;
+            } catch (QueryException $exception) {
+                $canRetry = $resolvedNumber['source'] === 'auto'
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception);
+
+                if ($canRetry) {
+                    continue;
+                }
+
+                throw $exception;
+            }
+        }
     }
 
     /**

@@ -160,9 +160,9 @@
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#ts-detail-modal-{{ $transferSlip->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="View detail">
                                                     <i class="fa-light fa-eye text-primary"></i>
                                                 </button>
-                                                <a href="{{ route('transfer-slips.print', ['transferSlip' => $transferSlip->id, 'mode' => 'print']) }}" target="_blank" rel="noopener" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
+                                                <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#tsPrintConfirm-{{ $transferSlip->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
                                                     <i class="fa-light fa-print text-primary"></i>
-                                                </a>
+                                                </button>
                                                 @can('delete-transfer')
                                                     <button type="button" class="btn icon" onclick="confirmDeleteTransferSlip({{ $transferSlip->id }}, '{{ $transferSlip->ts_number }}')" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
                                                         <i class="fa-light fa-trash text-secondary"></i>
@@ -269,11 +269,20 @@
                                             <i class="fa-duotone fa-solid fa-file-pdf"></i>
                                             Preview Form
                                         </a>
+                                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#tsPrintConfirm-{{ $transferSlip->id }}">
+                                            <i class="fa-duotone fa-solid fa-print"></i>
+                                            Print
+                                        </button>
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        @include('pages.transfer-slips.partials.print-confirm-modal', [
+                            'transferSlip' => $transferSlip,
+                            'nextTsNumber' => $nextTsNumber ?? '',
+                        ])
                     @endforeach
                 @endif
             </div>
@@ -466,4 +475,5 @@
     <script src="{{ url('assets/scripts/modules/transfer-slips-prefill.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/transfer-slips-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/transfer-slips-index.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/document-print-confirm.js') }}"></script>
 @endpush
