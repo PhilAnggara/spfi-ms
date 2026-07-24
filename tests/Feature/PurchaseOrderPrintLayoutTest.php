@@ -119,6 +119,8 @@ it('renders compact item table, three column summary, and aligned supplier signa
         ->toContain('class="po-main"')
         ->toContain('class="po-footer"')
         ->toContain('position: fixed')
+        ->toContain('po-supplier')
+        ->toContain('background: none')
         ->toContain('class="po-items"')
         ->toContain('class="item-name"')
         ->toContain('class="item-meta"')
@@ -131,6 +133,7 @@ it('renders compact item table, three column summary, and aligned supplier signa
         ->toContain('class="signature-blank"')
         ->toContain("Supplier's Signature")
         ->toContain('Denny Tuhatelu')
+        ->not->toContain('background: #f3f4f6')
         ->not->toContain('class="po-sheet"')
         ->not->toContain('Certifier Name')
         ->not->toContain('Approver Name')
@@ -168,6 +171,10 @@ it('streams purchase order pdf on rr paper size as a single page', function () {
 
     $response->assertSuccessful();
     expect($response->headers->get('content-type'))->toContain('application/pdf');
+    expect($response->getContent())->toContain('/PrintScaling /None');
+
+    $pageWidthMm = (float) config('purchase-order.paper.width_mm');
+    $pageHeightMm = (float) config('purchase-order.paper.height_mm');
 
     $pdf = Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.purchase-order', [
         'purchaseOrder' => $this->purchaseOrder->load([
@@ -178,12 +185,38 @@ it('streams purchase order pdf on rr paper size as a single page', function () {
             'certifiedBy',
             'approvedBy',
         ]),
-        'pageWidthMm' => 215,
-        'pageHeightMm' => 160,
-    ])->setPaper([0, 0, 215 * 2.834645669, 160 * 2.834645669]);
+        'pageWidthMm' => $pageWidthMm,
+        'pageHeightMm' => $pageHeightMm,
+    ])->setPaper([0, 0, $pageWidthMm * 2.834645669, $pageHeightMm * 2.834645669]);
 
     $dompdf = $pdf->getDomPDF();
     $dompdf->render();
 
     expect($dompdf->getCanvas()->get_page_count())->toBe(1);
+});
+
+it('shows paper form size and print checklist in confirm print modal', function () {
+    $modal = view('pages.purchase-orders.partials.print-confirm-modal', [
+        'purchaseOrder' => $this->purchaseOrder,
+        'nextPoNumber' => 'PO-NEXT-001',
+    ])->render();
+
+    $paperLabel = config('purchase-order.paper.label');
+    $paperWidthMm = (string) config('purchase-order.paper.width_mm');
+    $paperHeightMm = (string) config('purchase-order.paper.height_mm');
+
+    expect($modal)
+        ->toContain($paperLabel)
+        ->toContain($paperWidthMm)
+        ->toContain($paperHeightMm)
+        ->toContain('Actual size / 100%')
+        ->toContain('Fit to page')
+        ->toContain('Portrait');
+
+    $response = $this->actingAs($this->user)
+        ->get(route('purchase-orders.index'));
+
+    $response->assertSuccessful();
+    $response->assertSee($paperLabel, false);
+    $response->assertSee('Actual size / 100%', false);
 });

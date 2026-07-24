@@ -61,12 +61,26 @@
             vertical-align: top;
         }
         th {
-            background: #f3f4f6;
+            background: none;
             font-weight: bold;
-            font-size: 8px;
+            font-size: 9px;
+        }
+        .po-supplier {
+            font-size: 9.5px;
+            font-weight: normal;
+            line-height: 1.1;
+        }
+        .po-supplier td {
+            padding: 0;
+            line-height: 1.1;
+        }
+        .po-supplier .label {
+            font-weight: bold;
         }
         .po-items {
-            font-size: 8px;
+            font-size: 9px;
+            font-weight: normal;
+            margin-top: 6px;
         }
         .po-items th,
         .po-items td {
@@ -74,15 +88,18 @@
             vertical-align: middle;
         }
         .po-items th {
-            font-size: 7px;
+            font-size: 9px;
+            font-weight: bold;
         }
         .po-items .item-name {
-            font-weight: bold;
+            font-weight: normal;
+            font-size: 9px;
             line-height: 1.15;
         }
         .po-items .item-meta {
-            color: #4b5563;
-            font-size: 6.5px;
+            color: #111827;
+            font-size: 8px;
+            font-weight: normal;
             line-height: 1.1;
         }
         .table-clean th,
@@ -232,7 +249,7 @@
             <div class="title">PURCHASE ORDER</div>
         </div>
 
-        <table class="table-clean">
+        <table class="table-clean po-supplier">
             <tr>
                 <td class="label">Supplier Name</td>
                 <td>: {{ $supplier?->name ?? '-' }}{{ $supplier?->code ? ' | ' . $supplier->code : '' }}</td>
@@ -261,8 +278,6 @@
                 <td class="text-right">: {{ format_date($purchaseOrder->created_at) }}</td>
             </tr>
         </table>
-
-        <div class="line"></div>
 
         <table class="po-items">
             <thead>

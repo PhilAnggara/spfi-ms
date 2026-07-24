@@ -216,7 +216,7 @@
             @endphp
             <div class="cell item-cell" style="left: 12.5mm; top: {{ $top }}mm; width: 73mm;">{{ $detail->item_name ?? '(item unavailable)' }}</div>
             <div class="cell center" style="left: 89mm; top: {{ $top }}mm; width: 34mm;">{{ $detail->item_code ?? $detail->product_code ?? '-' }}</div>
-            <div class="cell right" style="left: 126mm; top: {{ $top }}mm; width: 35mm;">{{ number_format($qty, 3, '.', ',') }}</div>
+            <div class="cell right" style="left: 126mm; top: {{ $top }}mm; width: 35mm;">{{ number_format($qty, 2, '.', ',') }}</div>
             <div class="cell center" style="left: 165mm; top: {{ $top }}mm; width: 32mm;">{{ $uom }}</div>
         @endforeach
 

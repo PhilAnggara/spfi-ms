@@ -20,4 +20,20 @@ return [
         'threshold_currency' => 'IDR',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Purchase Order Paper Form
+    |--------------------------------------------------------------------------
+    |
+    | Physical pre-printed PO form size (same family as RR form paper).
+    | Used by PDF generation and the Confirm Print modal checklist.
+    |
+    */
+
+    'paper' => [
+        'width_mm' => 215,
+        'height_mm' => 160,
+        'label' => 'PO Form 215 x 160 mm',
+    ],
+
 ];

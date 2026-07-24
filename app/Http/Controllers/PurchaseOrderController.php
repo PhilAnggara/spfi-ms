@@ -20,10 +20,6 @@ class PurchaseOrderController extends Controller
 {
     private const MAX_ITEMS_PER_PO = 11;
 
-    private const PO_PAPER_WIDTH_MM = 215;
-
-    private const PO_PAPER_HEIGHT_MM = 160;
-
     private const MM_TO_PT = 2.834645669;
 
     /**
@@ -831,20 +827,31 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['message' => 'PO number is required before printing.']);
         }
 
+        $pageWidthMm = (float) config('purchase-order.paper.width_mm', 215);
+        $pageHeightMm = (float) config('purchase-order.paper.height_mm', 160);
+
         $data = [
             'purchaseOrder' => $purchaseOrder,
-            'pageWidthMm' => self::PO_PAPER_WIDTH_MM,
-            'pageHeightMm' => self::PO_PAPER_HEIGHT_MM,
+            'pageWidthMm' => $pageWidthMm,
+            'pageHeightMm' => $pageHeightMm,
         ];
 
-        return Pdf::loadView('pdf.purchase-order', $data)
+        $pdf = Pdf::loadView('pdf.purchase-order', $data)
             ->setPaper([
                 0,
                 0,
-                self::PO_PAPER_WIDTH_MM * self::MM_TO_PT,
-                self::PO_PAPER_HEIGHT_MM * self::MM_TO_PT,
-            ])
-            ->stream('PO-'.$purchaseOrder->po_number.'.pdf');
+                $pageWidthMm * self::MM_TO_PT,
+                $pageHeightMm * self::MM_TO_PT,
+            ]);
+
+        $pdf->render();
+
+        $canvas = $pdf->getDomPDF()->getCanvas();
+        if ($canvas instanceof \Dompdf\Adapter\CPDF) {
+            $canvas->get_cpdf()->setPreferences('PrintScaling', 'None');
+        }
+
+        return $pdf->stream('PO-'.$purchaseOrder->po_number.'.pdf');
     }
 
     private function savePoNumberFromRequest(Request $request, PurchaseOrder $purchaseOrder): void
