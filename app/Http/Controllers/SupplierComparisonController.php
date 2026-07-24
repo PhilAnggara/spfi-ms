@@ -134,6 +134,81 @@ class SupplierComparisonController extends Controller
     }
 
     /**
+     * Reject canvassing for a PRS item and send it back for revision.
+     */
+    public function reject(Request $request, PrsItem $prsItem)
+    {
+        if (! $request->user()?->hasAnyRole(['administrator', 'purchasing-manager'])) {
+            abort(403);
+        }
+
+        if ($prsItem->purchase_order_id) {
+            return redirect()->back()->withErrors(['message' => 'Canvassing rejection is locked because a PO has been created.']);
+        }
+
+        if ($prsItem->canvassingItems()->doesntExist()) {
+            return redirect()->back()->withErrors(['message' => 'No canvassing quotes available to reject.']);
+        }
+
+        $validated = $request->validate([
+            'rejection_reason' => ['nullable', 'string'],
+        ]);
+
+        $previousSelectedId = $prsItem->selected_canvassing_item_id;
+        $previousSupplierId = $prsItem->selectedCanvassingItem?->supplier_id;
+        $rejectionReason = trim((string) ($validated['rejection_reason'] ?? ''));
+        $rejectionReason = $rejectionReason !== '' ? $rejectionReason : null;
+
+        $prsItem->update([
+            'selected_canvassing_item_id' => null,
+            'selection_reason' => null,
+        ]);
+
+        $prsItem->prs?->logs()->create([
+            'user_id' => $request->user()?->id,
+            'action' => 'REJECT_SUPPLIER',
+            'message' => 'Canvassing rejected for PRS item. Returned for revision.',
+            'meta' => [
+                'prs_item_id' => $prsItem->id,
+                'previous_canvassing_item_id' => $previousSelectedId,
+                'previous_supplier_id' => $previousSupplierId,
+                'rejection_reason' => $rejectionReason,
+            ],
+        ]);
+
+        $prsItem->load(['prs', 'item', 'canvasser']);
+
+        if ($prsItem->canvasser) {
+            $prsNumber = (string) ($prsItem->prs?->prs_number ?? $prsItem->prs_id);
+
+            app(NotificationRecipientService::class)->notify(
+                collect([$prsItem->canvasser]),
+                [
+                    'type' => 'supplier_rejected',
+                    'title' => 'Canvassing Rejected',
+                    'message' => sprintf(
+                        'PRS #%s item %s — canvassing rejected%s. Please revise supplier quotes.',
+                        $prsNumber,
+                        $prsItem->item?->code ?? $prsItem->id,
+                        $rejectionReason ? ': '.$rejectionReason : ''
+                    ),
+                    'action_url' => route('canvassing.show', $prsItem, false),
+                    'icon' => 'fa-light fa-rotate-left',
+                    'icon_color' => 'bg-warning',
+                    'meta' => [
+                        'prs_id' => $prsItem->prs_id,
+                        'prs_item_id' => $prsItem->id,
+                        'canvasser_id' => $prsItem->canvasser_id,
+                        'rejection_reason' => $rejectionReason,
+                    ],
+                ]
+            );
+        }
+
+        return redirect()->back()->with('success', 'Canvassing rejected. Item returned for revision.');
+    }
+
+    /**
      * Generate supplier selection report PDF.
      */
     public function report(PrsItem $prsItem, Request $request)
@@ -156,7 +231,7 @@ class SupplierComparisonController extends Controller
                 ->withErrors(['message' => 'Selection report cannot be generated because no supplier data is available.']);
         }
 
-        if (!$prsItem->selected_canvassing_item_id) {
+        if (! $prsItem->selected_canvassing_item_id) {
             return redirect()
                 ->back()
                 ->withErrors(['message' => 'Selection report cannot be generated because no supplier has been selected yet.']);
@@ -164,7 +239,7 @@ class SupplierComparisonController extends Controller
 
         $filename = sprintf(
             'supplier-selection-report-%s-%s.pdf',
-            $prsItem->item?->code ?? ('item-' . $prsItem->item_id),
+            $prsItem->item?->code ?? ('item-'.$prsItem->item_id),
             now()->format('YmdHis')
         );
 

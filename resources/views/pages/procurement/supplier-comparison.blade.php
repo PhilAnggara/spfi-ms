@@ -175,6 +175,12 @@
                                                     Export PDF
                                                 </a>
                                             @endif
+                                            @role('administrator|purchasing-manager')
+                                                <button type="button" class="btn btn-outline-warning icon icon-left sc-action-btn" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $prsItem->id }}" @disabled($isLocked)>
+                                                    <i class="fa-duotone fa-solid fa-rotate-left"></i>
+                                                    Reject Canvassing
+                                                </button>
+                                            @endrole
                                             <button type="button" class="btn btn-primary icon icon-left sc-action-btn" data-bs-toggle="modal" data-bs-target="#reasonModal-{{ $prsItem->id }}" data-save-selection-button @disabled($isLocked || ! $hasSelectedSupplier)>
                                                 <i class="fa-duotone fa-solid fa-floppy-disk"></i>
                                                 Save Selection
@@ -205,6 +211,34 @@
                                     </div>
                                 </div>
                             </div>
+
+                            @role('administrator|purchasing-manager')
+                                <div class="modal fade sc-modal" id="rejectModal-{{ $prsItem->id }}" tabindex="-1" aria-labelledby="rejectModalLabel-{{ $prsItem->id }}" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <form method="post" action="{{ route('procurement.supplier-comparison.reject', $prsItem) }}" class="modal-content" id="reject-form-{{ $prsItem->id }}">
+                                            @csrf
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="rejectModalLabel-{{ $prsItem->id }}">Reject Canvassing (Optional Reason)</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="text-muted mb-3">
+                                                    Quotes will be kept. The selected supplier will be cleared and the canvasser will be asked to revise.
+                                                </p>
+                                                <label for="rejectReasonText-{{ $prsItem->id }}" class="form-label">Reason</label>
+                                                <textarea class="form-control" id="rejectReasonText-{{ $prsItem->id }}" name="rejection_reason" rows="4" placeholder="Enter reason for rejecting this canvassing (optional)"></textarea>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-warning icon icon-left" @disabled($isLocked)>
+                                                    <i class="fa-duotone fa-solid fa-rotate-left"></i>
+                                                    Reject Canvassing
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            @endrole
                         @endforeach
                     </div>
 

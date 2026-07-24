@@ -105,6 +105,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/supplier-comparison', [SupplierComparisonController::class, 'index'])->name('procurement.supplier-comparison.index');
         Route::post('/supplier-comparison/{prsItem}', [SupplierComparisonController::class, 'select'])->name('procurement.supplier-comparison.select');
+        Route::post('/supplier-comparison/{prsItem}/reject', [SupplierComparisonController::class, 'reject'])->name('procurement.supplier-comparison.reject');
         Route::get('/supplier-comparison/{prsItem}/report', [SupplierComparisonController::class, 'report'])->name('procurement.supplier-comparison.report');
 
         Route::get('/reports', [PurchasingReportController::class, 'index'])->name('procurement.reports.index');
