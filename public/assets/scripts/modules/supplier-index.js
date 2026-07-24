@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const historyRouteTemplate = table.data('historyRouteTemplate');
     const poShowRouteTemplate = table.data('poShowRouteTemplate');
     const canManage = table.data('canManage') === 1 || table.data('canManage') === '1';
+    const canDelete = table.data('canDelete') === 1 || table.data('canDelete') === '1';
     const canViewPo = table.data('canViewPo') === 1 || table.data('canViewPo') === '1';
     const openCreateModal = table.data('openCreateModal') === 1 || table.data('openCreateModal') === '1';
     const editingSupplierId = String(table.data('editingSupplierId') || '');
@@ -468,10 +469,15 @@ document.addEventListener('DOMContentLoaded', function () {
                             data-contact-person="${escapeAttr(row.contact_person)}"
                             data-remarks="${escapeAttr(row.remarks)}"
                         `;
-                        manageButtons = `
+                        manageButtons += `
                             <button type="button" class="btn icon edit-supplier" ${editAttrs} data-bs-toggle="modal" data-bs-target="#edit-modal" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                 <i class="fa-light fa-edit text-primary"></i>
                             </button>
+                        `;
+                    }
+
+                    if (canDelete) {
+                        manageButtons += `
                             <button type="button" class="btn icon delete-supplier" data-id="${row.id}" data-name="${escapeAttr(row.name)}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
                                 <i class="fa-light fa-trash text-secondary"></i>
                             </button>
@@ -603,7 +609,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 editModal.show();
             }
         });
+    }
 
+    if (canDelete) {
         $('#supplier-table tbody').on('click', '.delete-supplier', function () {
             const supplierId = $(this).data('id');
             const name = $(this).attr('data-name');

@@ -77,6 +77,7 @@
                             data-history-route-template="{{ route('supplier.purchase-history', '__ID__') }}"
                             data-po-show-route-template="{{ route('purchase-orders.show', '__ID__') }}"
                             data-can-manage="{{ $canManageSuppliers ? '1' : '0' }}"
+                            data-can-delete="{{ $canDeleteSuppliers ? '1' : '0' }}"
                             data-can-view-po="{{ $canViewPurchaseOrders ? '1' : '0' }}"
                             data-open-create-modal="{{ $errors->any() && !session('editing_supplier_id') ? '1' : '0' }}"
                             data-editing-supplier-id="{{ (string) session('editing_supplier_id', '') }}">

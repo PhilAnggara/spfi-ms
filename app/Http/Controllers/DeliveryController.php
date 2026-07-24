@@ -6,6 +6,7 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Supplier;
 use App\Services\DocumentNumberService;
+use App\Services\StockService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\UsesSmartCatalogSearch;
 use Illuminate\Database\QueryException;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class DeliveryController extends Controller
 {
@@ -175,6 +177,7 @@ class DeliveryController extends Controller
         $zeroStockIds = $requestedItems
             ->filter(function (array $row) use ($itemRows): bool {
                 $stock = round((float) ($itemRows[$row['item_id']]->stock_on_hand ?? 0), 3);
+
                 return $stock <= 0;
             })
             ->pluck('item_id')
@@ -189,6 +192,7 @@ class DeliveryController extends Controller
         $overStockIds = $requestedItems
             ->filter(function (array $row) use ($itemRows): bool {
                 $stock = round((float) ($itemRows[$row['item_id']]->stock_on_hand ?? 0), 3);
+
                 return $row['quantity'] > $stock;
             })
             ->pluck('item_id')
@@ -254,9 +258,31 @@ class DeliveryController extends Controller
                     })->values()->all();
 
                     DB::table('delivery_items')->insert($detailRows);
+
+                    $stockLines = DB::table('delivery_items')
+                        ->where('delivery_id', $deliveryId)
+                        ->whereNull('deleted_at')
+                        ->get(['id', 'item_id', 'product_code', 'quantity'])
+                        ->map(fn ($row): array => [
+                            'item_id' => (int) $row->item_id,
+                            'product_code' => (string) $row->product_code,
+                            'quantity' => (float) $row->quantity,
+                            'reference_line_id' => (int) $row->id,
+                        ])
+                        ->all();
+
+                    app(StockService::class)->applyDeliveryIssue(
+                        deliveryId: (int) $deliveryId,
+                        movementDate: $validated['dr_date'],
+                        lines: $stockLines,
+                        userId: $authUserId,
+                    );
+
                     $createdDrNumber = $resolvedNumber['number'];
                 });
                 break;
+            } catch (ValidationException $exception) {
+                return redirect()->back()->withInput()->withErrors($exception->errors());
             } catch (QueryException $exception) {
                 $canRetry = $resolvedNumber['source'] === 'auto'
                     && $attempt < $maxAttempts
@@ -282,6 +308,34 @@ class DeliveryController extends Controller
         $authUserId = Auth::id();
 
         $deleted = DB::transaction(function () use ($deliveryId, $now, $authUserId): int {
+            $delivery = DB::table('deliveries')
+                ->where('id', $deliveryId)
+                ->whereNull('deleted_at')
+                ->first(['id', 'dr_date']);
+
+            if (! $delivery) {
+                return 0;
+            }
+
+            $stockLines = DB::table('delivery_items')
+                ->where('delivery_id', $deliveryId)
+                ->whereNull('deleted_at')
+                ->get(['id', 'item_id', 'product_code', 'quantity'])
+                ->map(fn ($row): array => [
+                    'item_id' => (int) $row->item_id,
+                    'product_code' => (string) $row->product_code,
+                    'quantity' => (float) $row->quantity,
+                    'reference_line_id' => (int) $row->id,
+                ])
+                ->all();
+
+            app(StockService::class)->reverseDeliveryIssue(
+                deliveryId: $deliveryId,
+                movementDate: (string) $delivery->dr_date,
+                lines: $stockLines,
+                userId: $authUserId,
+            );
+
             DB::table('delivery_items')
                 ->where('delivery_id', $deliveryId)
                 ->whereNull('deleted_at')

@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Services\DocumentNumberService;
+use App\Services\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class TransferSlipController extends Controller
 {
@@ -290,9 +292,31 @@ class TransferSlipController extends Controller
                     })->values()->all();
 
                     DB::table('transfer_slip_items')->insert($detailRows);
+
+                    $stockLines = DB::table('transfer_slip_items')
+                        ->where('transfer_slip_id', $transferSlipId)
+                        ->whereNull('deleted_at')
+                        ->get(['id', 'item_id', 'product_code', 'quantity'])
+                        ->map(fn ($row): array => [
+                            'item_id' => (int) $row->item_id,
+                            'product_code' => (string) $row->product_code,
+                            'quantity' => (float) $row->quantity,
+                            'reference_line_id' => (int) $row->id,
+                        ])
+                        ->all();
+
+                    app(StockService::class)->applyTransferSlipIssue(
+                        transferSlipId: (int) $transferSlipId,
+                        movementDate: $validated['ts_date'],
+                        lines: $stockLines,
+                        userId: $authUserId,
+                    );
+
                     $createdTsNumber = $resolvedNumber['number'];
                 });
                 break;
+            } catch (ValidationException $exception) {
+                return redirect()->back()->withInput()->withErrors($exception->errors());
             } catch (QueryException $exception) {
                 $canRetry = $resolvedNumber['source'] === 'auto'
                     && $attempt < $maxAttempts
@@ -457,6 +481,34 @@ class TransferSlipController extends Controller
         $authUserId = Auth::id();
 
         $deleted = DB::transaction(function () use ($transferSlipId, $now, $authUserId): int {
+            $transferSlip = DB::table('transfer_slips')
+                ->where('id', $transferSlipId)
+                ->whereNull('deleted_at')
+                ->first(['id', 'ts_date']);
+
+            if (! $transferSlip) {
+                return 0;
+            }
+
+            $stockLines = DB::table('transfer_slip_items')
+                ->where('transfer_slip_id', $transferSlipId)
+                ->whereNull('deleted_at')
+                ->get(['id', 'item_id', 'product_code', 'quantity'])
+                ->map(fn ($row): array => [
+                    'item_id' => (int) $row->item_id,
+                    'product_code' => (string) $row->product_code,
+                    'quantity' => (float) $row->quantity,
+                    'reference_line_id' => (int) $row->id,
+                ])
+                ->all();
+
+            app(StockService::class)->reverseTransferSlipIssue(
+                transferSlipId: $transferSlipId,
+                movementDate: (string) $transferSlip->ts_date,
+                lines: $stockLines,
+                userId: $authUserId,
+            );
+
             DB::table('transfer_slip_items')
                 ->where('transfer_slip_id', $transferSlipId)
                 ->whereNull('deleted_at')

@@ -68,14 +68,14 @@ Route::middleware('auth')->group(function () {
         Route::get('supplier', [SupplierController::class, 'index'])->name('supplier.index');
         Route::get('supplier/datatables', [SupplierController::class, 'datatable'])->name('supplier.datatables');
         Route::get('supplier/{supplier}/purchase-history', [SupplierController::class, 'purchaseHistory'])->name('supplier.purchase-history');
+        Route::post('supplier', [SupplierController::class, 'store'])->name('supplier.store');
+        Route::put('supplier/{supplier}', [SupplierController::class, 'update'])->name('supplier.update');
     });
 
     Route::middleware('role:administrator')->prefix('master')->group(function () {
         Route::resource('user', UserController::class);
         Route::get('employees/id-cards/print', [EmployeeController::class, 'printIdCards'])->name('employees.id-cards.print');
         Route::resource('employees', EmployeeController::class)->except(['create', 'show', 'edit']);
-        Route::post('supplier', [SupplierController::class, 'store'])->name('supplier.store');
-        Route::put('supplier/{supplier}', [SupplierController::class, 'update'])->name('supplier.update');
         Route::delete('supplier/{supplier}', [SupplierController::class, 'destroy'])->name('supplier.destroy');
         Route::resource('product-category', ItemCategoryController::class);
         Route::resource('unit-of-measurement', UnitOfMeasureController::class);

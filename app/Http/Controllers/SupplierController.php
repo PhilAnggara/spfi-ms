@@ -32,7 +32,12 @@ class SupplierController extends Controller
                 'keyword' => request('keyword', ''),
                 'has_po' => request('has_po', ''),
             ],
-            'canManageSuppliers' => auth()->user()?->hasRole('administrator') ?? false,
+            'canManageSuppliers' => auth()->user()?->hasAnyRole([
+                'administrator',
+                'purchasing-staff',
+                'purchasing-manager',
+            ]) ?? false,
+            'canDeleteSuppliers' => auth()->user()?->hasRole('administrator') ?? false,
             'canViewPurchaseOrders' => auth()->user()?->hasAnyRole([
                 'administrator',
                 'purchasing-staff',
