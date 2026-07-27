@@ -1,84 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Stores Withdrawal Slip</title>
+    <meta charset="utf-8">
+    <title>Stores Withdrawal Slip - {{ $sws->sws_number }}</title>
     <style>
+        @page {
+            margin: 22px 28px;
+        }
+
         body {
             font-family: DejaVu Sans, sans-serif;
             font-size: 10px;
-            color: #0f172a;
+            color: #111827;
+            line-height: 1.35;
         }
-        .title {
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: 0.4px;
-            margin-bottom: 2px;
-        }
-        .subtitle {
-            color: #64748b;
-            margin-bottom: 10px;
-        }
-        .line {
-            border-top: 1px solid #0f172a;
-            margin: 8px 0 10px;
-        }
+
         table {
             width: 100%;
             border-collapse: collapse;
         }
+
+        .header-table td {
+            border: none;
+            vertical-align: bottom;
+            padding: 0;
+        }
+
+        .doc-title {
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+        }
+
+        .doc-company {
+            font-size: 9px;
+            color: #4b5563;
+            margin-top: 2px;
+        }
+
+        .doc-number {
+            text-align: right;
+            font-size: 10px;
+        }
+
+        .doc-number strong {
+            font-size: 11px;
+        }
+
+        .header-rule {
+            border-top: 1px solid #111827;
+            border-bottom: 2px solid #111827;
+            margin: 8px 0 12px;
+            height: 0;
+        }
+
         .meta td {
             border: none;
             padding: 2px 0;
             vertical-align: top;
         }
-        .label {
-            width: 120px;
-            font-weight: 700;
+
+        .meta .label {
+            width: 95px;
+            font-weight: bold;
             white-space: nowrap;
         }
+
+        .meta .sep {
+            width: 8px;
+        }
+
+        .meta .right-label {
+            width: 95px;
+            font-weight: bold;
+            white-space: nowrap;
+            padding-left: 20px;
+        }
+
+        .capex-tag {
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+
+        .section-gap {
+            margin-top: 12px;
+        }
+
         .items th,
         .items td {
-            border: 1px solid #0f172a;
+            border: 1px solid #111827;
             padding: 4px 5px;
             vertical-align: top;
         }
+
         .items th {
-            background: #f1f5f9;
-            font-size: 9px;
+            background: #f3f4f6;
+            font-size: 8.5px;
+            font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.2px;
         }
-        .text-right {
-            text-align: right;
-        }
-        .text-center {
-            text-align: center;
-        }
-        .summary {
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .muted { color: #6b7280; }
+
+        .remarks {
             margin-top: 10px;
-            border: 1px solid #0f172a;
-            padding: 6px 8px;
         }
-        .summary-row {
-            width: 100%;
+
+        .remarks-label {
+            font-weight: bold;
+            margin-bottom: 2px;
         }
-        .summary-row td {
+
+        .remarks-body {
+            border-top: 1px solid #111827;
+            padding-top: 4px;
+            min-height: 18px;
+        }
+
+        .totals {
+            margin-top: 10px;
+            width: 40%;
+            margin-left: auto;
+            border: 1px solid #111827;
+        }
+
+        .totals td {
             border: none;
-            padding: 1px 0;
+            padding: 2px 6px;
         }
+
+        .totals tr + tr td {
+            border-top: 1px solid #d1d5db;
+        }
+
+        .totals .totals-label {
+            font-weight: bold;
+        }
+
+        .signature-section {
+            margin-top: 28px;
+            page-break-inside: avoid;
+        }
+
+        .signature-note {
+            font-size: 9px;
+            color: #4b5563;
+            margin-bottom: 14px;
+        }
+
         .signatures {
-            margin-top: 20px;
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
         }
+
         .signatures td {
             border: none;
-            padding: 4px 0;
-            width: 33%;
             text-align: center;
+            vertical-align: top;
+            padding: 0 8px;
         }
-        .sign-line {
-            margin-top: 24px;
-            font-weight: 700;
+
+        .sig-roles td {
+            font-size: 9px;
+            font-weight: bold;
+            padding-bottom: 4px;
+        }
+
+        .sig-space td {
+            height: 48px;
+            line-height: 48px;
+            font-size: 1px;
+        }
+
+        .sig-names td {
+            font-size: 10px;
+            font-weight: bold;
+            padding-top: 5px;
+            vertical-align: top;
+        }
+
+        .sig-line {
+            width: 55%;
+            margin: 0 auto 5px;
+            border-top: 1px solid #111827;
+            height: 0;
+        }
+
+        .sig-titles td {
+            font-size: 8.5px;
+            color: #4b5563;
+            padding-top: 2px;
+        }
+
+        .sig-dates td {
+            font-size: 8.5px;
+            color: #6b7280;
+            padding-top: 5px;
+        }
+
+        .footer {
+            margin-top: 20px;
+            padding-top: 6px;
+            border-top: 1px solid #d1d5db;
+            font-size: 8px;
+            color: #9ca3af;
+            text-align: center;
         }
     </style>
 </head>
@@ -87,117 +220,167 @@
         $totalQuantity = (float) $items->sum('quantity');
         $totalRows = $items->count();
         $isCapex = strtolower((string) ($sws->type ?? '')) === 'capex';
+        $departmentLabel = trim(
+            ($sws->department_code ? '['.$sws->department_code.'] ' : '').
+            ($sws->department_name ?? '')
+        );
+        $capexLabel = $isCapex ? 'CAPEX' : null;
+        $columnWidth = '50%';
+        $fmtQty = function (float $n): string {
+            $decimals = ($n != floor($n)) ? 3 : 0;
+            return number_format($n, $decimals, '.', ',');
+        };
     @endphp
 
-    <div class="title">
-        STORES WITHDRAWAL SLIP
-        @if ($isCapex)
-            <span style="font-size:12px;">(CAPEX)</span>
-        @endif
-    </div>
-    <div class="subtitle">PT Sinar Pure Foods International</div>
-    <div class="line"></div>
+    <table class="header-table">
+        <tr>
+            <td>
+                <div class="doc-title">
+                    Stores Withdrawal Slip
+                    @if ($capexLabel)
+                        <span class="capex-tag">({{ $capexLabel }})</span>
+                    @endif
+                </div>
+                <div class="doc-company">PT. SINAR PURE FOODS INTERNATIONAL</div>
+            </td>
+            <td class="doc-number">
+                <div class="muted">SWS Number</div>
+                <strong>{{ $sws->sws_number ?? '-' }}</strong>
+            </td>
+        </tr>
+    </table>
+    <div class="header-rule"></div>
 
     <table class="meta">
         <tr>
-            <td class="label">SWS Number</td>
-            <td>: {{ $sws->sws_number ?? '-' }}</td>
-            <td class="label text-right">SWS Date</td>
-            <td class="text-right">: {{ $sws->sws_date ? \Carbon\Carbon::parse($sws->sws_date)->format('d M Y') : '-' }}</td>
+            <td class="label">Requested By</td>
+            <td class="sep">:</td>
+            <td>{{ $sws->created_by_name ?? '-' }}</td>
+            <td class="right-label">SWS Date</td>
+            <td class="sep">:</td>
+            <td>{{ $sws->sws_date ? \Carbon\Carbon::parse($sws->sws_date)->format('d M Y') : '-' }}</td>
         </tr>
         <tr>
             <td class="label">Department</td>
-            <td>: {{ $sws->department_code ?? '-' }}{{ $sws->department_name ? ' - ' . $sws->department_name : '' }}</td>
-            <td class="label text-right">Type</td>
-            <td class="text-right">: {{ strtoupper((string) ($sws->type ?? '-')) }}</td>
-        </tr>
-        <tr>
-            <td class="label">Created By</td>
-            <td>: {{ $sws->created_by_name ?? '-' }}</td>
-            <td class="label text-right">Approved By</td>
-            <td class="text-right">: {{ $sws->approved_by_name ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td class="label">Info</td>
-            <td colspan="3">: {{ $sws->info ?? '-' }}</td>
+            <td class="sep">:</td>
+            <td>{{ $departmentLabel !== '' ? $departmentLabel : '-' }}</td>
+            <td class="right-label">Type</td>
+            <td class="sep">:</td>
+            <td>{{ strtoupper((string) ($sws->type ?? '-')) }}</td>
         </tr>
     </table>
 
-    <div class="line"></div>
-
-    <table class="items">
-        <thead>
-            <tr>
-                <th style="width: 28px;" class="text-center">No</th>
-                <th>Item</th>
-                <th style="width: 85px;">Code</th>
-                @if ($isCapex)
-                    <th style="width: 70px;">PRS</th>
-                    <th style="width: 70px;">PO</th>
-                    <th style="width: 70px;">RR</th>
-                @endif
-                <th style="width: 70px;" class="text-right">Qty</th>
-                <th style="width: 60px;" class="text-center">UoM</th>
-                <th style="width: 90px;" class="text-right">{{ $isCapex ? 'RR Qty' : 'SOH Snapshot' }}</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse ($items as $index => $detail)
-                @php
-                    $qty = (float) ($detail->quantity ?? 0);
-                    $soh = (float) ($detail->stock_on_hand_snapshot ?? 0);
-                    $uom = $detail->uom ?? $detail->item_uom_name ?? 'PCS';
-                @endphp
+    <div class="section-gap">
+        <table class="items">
+            <thead>
                 <tr>
-                    <td class="text-center">{{ $index + 1 }}</td>
-                    <td>{{ $detail->item_name ?? '(item unavailable)' }}</td>
-                    <td>{{ $detail->item_code ?? $detail->product_code ?? '-' }}</td>
+                    <th style="width: 6%;" class="text-center">No</th>
+                    <th style="width: {{ $isCapex ? '16%' : '18%' }};">Item Code</th>
+                    <th style="width: {{ $isCapex ? '28%' : '46%' }};">Item Description</th>
                     @if ($isCapex)
-                        <td>{{ $detail->prs_number ?? '-' }}</td>
-                        <td>{{ $detail->po_number ?? '-' }}</td>
-                        <td>{{ $detail->rr_number ?? '-' }}</td>
+                        <th style="width: 10%;">PRS</th>
+                        <th style="width: 10%;">PO</th>
+                        <th style="width: 10%;">RR</th>
                     @endif
-                    <td class="text-right">{{ number_format($qty, 3, '.', ',') }}</td>
-                    <td class="text-center">{{ $uom }}</td>
-                    <td class="text-right">{{ number_format($soh, 3, '.', ',') }}</td>
+                    <th style="width: 12%;" class="text-right">Qty</th>
+                    <th style="width: 10%;" class="text-center">UOM</th>
+                    <th style="width: {{ $isCapex ? '8%' : '14%' }};" class="text-right">{{ $isCapex ? 'RR Qty' : 'SOH' }}</th>
                 </tr>
-            @empty
-                <tr>
-                    <td colspan="{{ $isCapex ? 9 : 6 }}" class="text-center">No item data found.</td>
-                </tr>
-            @endforelse
-        </tbody>
+            </thead>
+            <tbody>
+                @forelse ($items as $index => $detail)
+                    @php
+                        $qty = (float) ($detail->quantity ?? 0);
+                        $soh = (float) ($detail->stock_on_hand_snapshot ?? 0);
+                        $uom = $detail->uom ?? $detail->item_uom_name ?? 'PCS';
+                    @endphp
+                    <tr>
+                        <td class="text-center">{{ $index + 1 }}</td>
+                        <td>{{ $detail->item_code ?? $detail->product_code ?? '-' }}</td>
+                        <td>{{ $detail->item_name ?? '(item unavailable)' }}</td>
+                        @if ($isCapex)
+                            <td>{{ $detail->prs_number ?? '-' }}</td>
+                            <td>{{ $detail->po_number ?? '-' }}</td>
+                            <td>{{ $detail->rr_number ?? '-' }}</td>
+                        @endif
+                        <td class="text-right">{{ $fmtQty($qty) }}</td>
+                        <td class="text-center">{{ $uom }}</td>
+                        <td class="text-right">{{ $fmtQty($soh) }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="{{ $isCapex ? 9 : 6 }}" class="text-center muted">No items found in this SWS</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <table class="totals">
+        <tr>
+            <td class="totals-label">Total Item Rows</td>
+            <td class="text-right">{{ $totalRows }}</td>
+        </tr>
+        <tr>
+            <td class="totals-label">Total Quantity</td>
+            <td class="text-right">{{ $fmtQty($totalQuantity) }}</td>
+        </tr>
     </table>
 
-    <div class="summary">
-        <table class="summary-row">
-            <tr>
-                <td>Total Item Rows</td>
-                <td class="text-right">{{ $totalRows }}</td>
+    @if (! empty($sws->info))
+        <div class="remarks">
+            <div class="remarks-label">Remarks</div>
+            <div class="remarks-body">{{ $sws->info }}</div>
+        </div>
+    @endif
+
+    <div class="signature-section">
+        <div class="signature-note">
+            This document requires approval before stock withdrawal from the store.
+        </div>
+
+        <table class="signatures">
+            <tr class="sig-roles">
+                <td style="width: {{ $columnWidth }};">Requested By</td>
+                <td style="width: {{ $columnWidth }};">Approved By</td>
             </tr>
-            <tr>
-                <td><strong>Total Quantity</strong></td>
-                <td class="text-right"><strong>{{ number_format($totalQuantity, 3, '.', ',') }}</strong></td>
+
+            <tr class="sig-space">
+                <td style="width: {{ $columnWidth }};">&nbsp;</td>
+                <td style="width: {{ $columnWidth }};">&nbsp;</td>
+            </tr>
+
+            <tr class="sig-names">
+                <td style="width: {{ $columnWidth }};">
+                    <div class="sig-line"></div>
+                    {{ $sws->created_by_name ?? '____________________' }}
+                </td>
+                <td style="width: {{ $columnWidth }};">
+                    <div class="sig-line"></div>
+                    {{ $sws->approved_by_name ?? '____________________' }}
+                </td>
+            </tr>
+
+            <tr class="sig-titles">
+                <td style="width: {{ $columnWidth }};">Requester</td>
+                <td style="width: {{ $columnWidth }};">Approver</td>
+            </tr>
+
+            <tr class="sig-dates">
+                <td style="width: {{ $columnWidth }};">
+                    {{ $sws->created_at ? \Carbon\Carbon::parse($sws->created_at)->format('d M Y') : 'Date: __________' }}
+                </td>
+                <td style="width: {{ $columnWidth }};">
+                    {{ $sws->approved_at ? \Carbon\Carbon::parse($sws->approved_at)->format('d M Y') : 'Date: __________' }}
+                </td>
             </tr>
         </table>
     </div>
 
-    <table class="signatures">
-        <tr>
-            <td>Requested by</td>
-            <td>Checked by</td>
-            <td>Approved by</td>
-        </tr>
-        <tr>
-            <td class="sign-line">{{ $sws->created_by_name ?? '____________________' }}</td>
-            <td class="sign-line">____________________</td>
-            <td class="sign-line">{{ $sws->approved_by_name ?? '____________________' }}</td>
-        </tr>
-        <tr>
-            <td>Date: {{ $sws->created_at ? \Carbon\Carbon::parse($sws->created_at)->format('d M Y') : '__________' }}</td>
-            <td>Date: __________</td>
-            <td>Date: {{ $sws->approved_at ? \Carbon\Carbon::parse($sws->approved_at)->format('d M Y') : '__________' }}</td>
-        </tr>
-    </table>
+    <div class="footer">
+        Generated on {{ \Carbon\Carbon::now()->format('d M Y H:i') }}
+        &nbsp;|&nbsp;
+        System-generated document — official signature required for approval
+    </div>
 </body>
 </html>

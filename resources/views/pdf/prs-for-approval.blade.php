@@ -255,7 +255,7 @@
                     <th style="width: 16%;">Item Code</th>
                     <th style="width: 48%;">Item Description</th>
                     <th style="width: 15%;" class="text-right">Qty Needed</th>
-                    <th style="width: 15%;" class="text-center">Unit</th>
+                    <th style="width: 15%;" class="text-center">UOM</th>
                 </tr>
             </thead>
             <tbody>
