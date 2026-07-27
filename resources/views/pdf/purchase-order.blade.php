@@ -10,8 +10,8 @@
         }
         body {
             margin: 4px;
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 8px;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
             color: #111827;
         }
         .po-main {
@@ -63,44 +63,61 @@
         th {
             background: none;
             font-weight: bold;
-            font-size: 9px;
+            font-size: 10px;
         }
         .po-supplier {
-            font-size: 9.5px;
+            font-size: 11px;
             font-weight: normal;
-            line-height: 1.1;
+            line-height: 1.15;
         }
         .po-supplier td {
             padding: 0;
-            line-height: 1.1;
+            line-height: 1.15;
         }
         .po-supplier .label {
             font-weight: bold;
         }
         .po-items {
-            font-size: 9px;
+            font-size: 11px;
             font-weight: normal;
             margin-top: 6px;
+            table-layout: auto;
         }
         .po-items th,
         .po-items td {
-            padding: 2px 3px;
+            padding: 3px 4px;
             vertical-align: middle;
         }
         .po-items th {
-            font-size: 9px;
+            font-size: 10px;
             font-weight: bold;
         }
         .po-items .item-name {
             font-weight: normal;
-            font-size: 9px;
-            line-height: 1.15;
+            font-size: 11px;
+            line-height: 1.2;
         }
         .po-items .item-meta {
             color: #111827;
-            font-size: 8px;
+            font-size: 9px;
             font-weight: normal;
-            line-height: 1.1;
+            line-height: 1.15;
+        }
+        .po-items .col-qty {
+            /* Size to content; stay on one line by default */
+            width: 1%;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .po-items .col-qty-wrap {
+            /* Only very long qty/unit values may wrap */
+            white-space: normal;
+            max-width: 40mm;
+            word-break: break-word;
+        }
+        .po-items .col-price,
+        .po-items .col-amount {
+            white-space: nowrap;
         }
         .table-clean th,
         .table-clean td {
@@ -168,7 +185,7 @@
             padding-right: 0;
         }
         .signature-label {
-            font-size: 8px;
+            font-size: 9px;
         }
         .signature-pad {
             height: 16px;
@@ -177,6 +194,7 @@
             font-weight: bold;
             min-height: 12px;
             line-height: 1.2;
+            font-size: 10px;
         }
         .signature-blank {
             border-bottom: 1px solid #111827;
@@ -185,8 +203,8 @@
             margin: 0 auto;
         }
         .note {
-            font-size: 7px;
-            line-height: 1;
+            font-size: 8px;
+            line-height: 1.15;
         }
     </style>
 </head>
@@ -204,12 +222,11 @@
         $firstPoItem = $purchaseOrder->items->first();
         $firstPoMeta = $firstPoItem?->meta ?? [];
         $isCapex = (bool) ($firstPoItem?->prsItem?->prs?->is_capex ?? ($firstPoMeta['is_capex'] ?? false));
+        $decimalPlaces = (int) ($decimalPlaces ?? config('purchase-order.print.decimal_places.default', 2));
+        $formatMoney = fn ($amount) => number_format((float) $amount, $decimalPlaces, ',', '.');
 
-        $approvalThreshold = (float) config('purchase-order.signature.approval_threshold', 4000000);
-        $certifiedName = (string) config('purchase-order.signature.certified_by_name', 'Denny Tuhatelu');
-        $approvedName = (float) $purchaseOrder->total >= $approvalThreshold
-            ? (string) config('purchase-order.signature.approved_by_at_or_above_threshold_name', 'Sam Calamba')
-            : (string) config('purchase-order.signature.approved_by_below_threshold_name', 'Denny Tuhatelu');
+        $certifiedName = $purchaseOrder->printCertifiedByName();
+        $approvedName = $purchaseOrder->printApprovedByName();
 
         $uniqueRate = function (string $field) use ($purchaseOrder): ?float {
             $rates = $purchaseOrder->items
@@ -282,15 +299,12 @@
         <table class="po-items">
             <thead>
                 <tr>
-                    <th style="width: 52px;">PRS</th>
+                    <th style="width: 58px;">PRS</th>
                     <th>Item</th>
-                    <th style="width: 28px;" class="text-center">Dept</th>
-                    <th style="width: 48px;" class="text-center">Qty</th>
-                    <th style="width: 58px;" class="text-right">Price</th>
-                    <th style="width: 32px;" class="text-right">Disc</th>
-                    <th style="width: 32px;" class="text-right">PPN</th>
-                    <th style="width: 32px;" class="text-right">PPh</th>
-                    <th style="width: 62px;" class="text-right">Amount</th>
+                    <th style="width: 36px;" class="text-center">Dept</th>
+                    <th class="col-qty">Qty</th>
+                    <th style="width: 78px;" class="text-right col-price">Price</th>
+                    <th style="width: 86px;" class="text-right col-amount">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -301,6 +315,8 @@
                         $dept = $item->prsItem?->prs?->department?->code ?? '-';
                         $itemCode = $item->item?->code ?? '-';
                         $unitName = $item->item?->unit?->code ?? $item->item?->unit?->name ?? 'PCS';
+                        $qtyDisplay = number_format($item->quantity, 0, ',', '.') . ' ' . $unitName;
+                        $qtyIsVeryLong = mb_strlen($qtyDisplay) > 18;
                     @endphp
                     <tr>
                         <td>{{ $prsNumber }}</td>
@@ -309,12 +325,9 @@
                             <div class="item-meta">{{ $itemCode }}</div>
                         </td>
                         <td class="text-center">{{ $dept }}</td>
-                        <td class="text-center">{{ number_format($item->quantity, 0, ',', '.') }} {{ $unitName }}</td>
-                        <td class="text-right">{{ number_format($item->unit_price, 2, ',', '.') }}</td>
-                        <td class="text-right">{{ number_format($item->discount_rate ?? 0, 1, ',', '.') }}%</td>
-                        <td class="text-right">{{ number_format($item->ppn_rate ?? 0, 1, ',', '.') }}%</td>
-                        <td class="text-right">{{ number_format($item->pph_rate ?? 0, 1, ',', '.') }}%</td>
-                        <td class="text-right">{{ number_format($item->total, 2, ',', '.') }}</td>
+                        <td class="col-qty{{ $qtyIsVeryLong ? ' col-qty-wrap' : '' }}">{{ $qtyDisplay }}</td>
+                        <td class="text-right col-price">{{ $formatMoney($item->unit_price) }}</td>
+                        <td class="text-right col-amount">{{ $formatMoney($item->total) }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -328,18 +341,18 @@
                     <div class="note">
                         Untuk menciptakan kode etik bisnis yang adil, jujur dan produktif, PT. Sinar Pure Foods International menerapkan kebijakan antikorupsi dan anti-siap dalam setiap transaksi bisnis.
                     </div>
-                    <ol style="margin:4px 0 0 16px; padding:0; font-size:7px; line-height:1;">
+                    <ol style="margin:4px 0 0 16px; padding:0; font-size:8px; line-height:1.15;">
                         <li>PT. Sinar Pure Foods International, manajemen dan seluruh karyawan tidak menerima, gratifikasi, pungutan liar dan sejenisnya untuk memperlancar transaksi</li>
                         <li>PT. Sinar Pure Foods International, manajemen dan seluruh karyawan tidak melakukan mark-up harga dan sejenisnya.</li>
                     </ol>
                     <div class="note" style="margin-top:4px;">
                         Hal ini berlaku untuk seluruh supplier, pembeli, kontraktor, karyawan, maupun pemerintah dan pihak luar yang berhubungan dengan PT. Sinar Pure Foods International. Terima kasih untuk usaha anda membantu kami.
                     </div>
-                    <div class="note" style="margin-top: 6px; font-size:8px; font-weight:bold;">
+                    <div class="note" style="margin-top: 6px; font-size:9px; font-weight:bold;">
                         Delivery to PT Sinar Pure Foods International | (<strong>PO Number</strong> : {{ $purchaseOrder->po_number }})
                     </div>
                     @if(trim((string)($purchaseOrder->remark_text ?? '')) !== '')
-                        <div style="margin-top:4px; font-size:7px;">
+                        <div style="margin-top:4px; font-size:8px;">
                             <strong>Remark:</strong> {{ $purchaseOrder->remark_text }}
                         </div>
                     @endif
@@ -350,47 +363,47 @@
                             <tr>
                                 <td class="summary-label">Amount</td>
                                 <td class="summary-middle">{{ $currencyCode }}</td>
-                                <td class="summary-amount">{{ number_format($purchaseOrder->subtotal, 2, ',', '.') }}</td>
+                                <td class="summary-amount">{{ $formatMoney($purchaseOrder->subtotal) }}</td>
                             </tr>
                             <tr>
                                 <td class="summary-label">Disc</td>
                                 <td class="summary-middle">{{ $discRateDisplay }}</td>
-                                <td class="summary-amount">{{ number_format($purchaseOrder->discount_amount ?? 0, 2, ',', '.') }}</td>
+                                <td class="summary-amount">{{ $formatMoney($purchaseOrder->discount_amount ?? 0) }}</td>
                             </tr>
                             <tr>
                                 <td class="summary-label">Withholding Tax (PPh)</td>
                                 <td class="summary-middle">{{ $pphRateDisplay }}</td>
-                                <td class="summary-amount">{{ number_format($purchaseOrder->pph_amount ?? 0, 2, ',', '.') }}</td>
+                                <td class="summary-amount">{{ $formatMoney($purchaseOrder->pph_amount ?? 0) }}</td>
                             </tr>
                             <tr>
                                 <td class="summary-label">VAT (PPN)</td>
                                 <td class="summary-middle">{{ $ppnRateDisplay }}</td>
-                                <td class="summary-amount">{{ number_format($purchaseOrder->ppn_amount ?? 0, 2, ',', '.') }}</td>
+                                <td class="summary-amount">{{ $formatMoney($purchaseOrder->ppn_amount ?? 0) }}</td>
                             </tr>
                             @if ($feeItems->isNotEmpty())
                                 @foreach ($feeItems as $feeItem)
                                     <tr>
                                         <td class="summary-label">{{ $feeItem['type'] !== '' ? $feeItem['type'] : 'Additional charge' }}</td>
                                         <td class="summary-middle">{{ $currencyCode }}</td>
-                                        <td class="summary-amount">{{ number_format($feeItem['amount'], 2, ',', '.') }}</td>
+                                        <td class="summary-amount">{{ $formatMoney($feeItem['amount']) }}</td>
                                     </tr>
                                 @endforeach
                                 <tr>
                                     <td class="summary-label">Total Additional Charges</td>
                                     <td class="summary-middle">{{ $currencyCode }}</td>
-                                    <td class="summary-amount">{{ number_format($purchaseOrder->fees ?? 0, 2, ',', '.') }}</td>
+                                    <td class="summary-amount">{{ $formatMoney($purchaseOrder->fees ?? 0) }}</td>
                                 </tr>
                             @elseif ((float) $purchaseOrder->fees > 0)
                                 <tr>
                                     <td class="summary-label">Additional Charges</td>
                                     <td class="summary-middle">{{ $currencyCode }}</td>
-                                    <td class="summary-amount">{{ number_format($purchaseOrder->fees ?? 0, 2, ',', '.') }}</td>
+                                    <td class="summary-amount">{{ $formatMoney($purchaseOrder->fees ?? 0) }}</td>
                                 </tr>
                             @endif
                             <tr class="summary-total">
                                 <td class="summary-label">TOTAL</td>
                                 <td class="summary-middle">{{ $currencyCode }}</td>
-                                <td class="summary-amount">{{ number_format($purchaseOrder->total, 2, ',', '.') }}</td>
+                                <td class="summary-amount">{{ $formatMoney($purchaseOrder->total) }}</td>
                             </tr>
                         </table>
                     </div>

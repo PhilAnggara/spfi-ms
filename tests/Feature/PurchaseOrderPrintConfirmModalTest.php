@@ -101,6 +101,11 @@ it('shows a print confirmation modal with editable po number on the show page', 
     $response->assertSee('id="poPrintConfirm-'.$this->purchaseOrder->id.'"', false);
     $response->assertSee('Confirm PO Number');
     $response->assertSee('Edit if the paper form number is different');
+    $response->assertSee('Decimal places');
+    $response->assertSee('name="decimal_places"', false);
+    $response->assertSee('value="2"', false);
+    $response->assertSee('value="10"', false);
+    $response->assertSee('2 (default)', false);
     $response->assertSee(
         'action="'.route('purchase-orders.print', $this->purchaseOrder).'"',
         false
@@ -114,10 +119,70 @@ it('saves an edited po number when printing from the confirmation modal', functi
         ->post(route('purchase-orders.print', $this->purchaseOrder), [
             'po_number' => 'PO-PAPER-777',
             'po_number_suggested' => 'PO-SUGGESTED',
+            'decimal_places' => 2,
         ]);
 
     $response->assertSuccessful();
     $response->assertHeader('content-type', 'application/pdf');
 
     expect($this->purchaseOrder->fresh()->po_number)->toBe('PO-PAPER-777');
+});
+
+it('prints money amounts using the selected decimal places', function () {
+    $this->purchaseOrder->update([
+        'subtotal' => 1000.5,
+        'total' => 1000.5,
+    ]);
+    $this->purchaseOrder->items()->first()->update([
+        'unit_price' => 1000.5,
+        'total' => 1000.5,
+    ]);
+
+    $html = view('pdf.purchase-order', [
+        'purchaseOrder' => $this->purchaseOrder->fresh()->load([
+            'supplier',
+            'currency',
+            'items.item.unit',
+            'items.prsItem.prs.department',
+            'certifiedBy',
+            'approvedBy',
+        ]),
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+        'decimalPlaces' => 4,
+    ])->render();
+
+    expect($html)
+        ->toContain('1.000,5000')
+        ->not->toContain('1.000,50</td>');
+});
+
+it('defaults printed money amounts to two decimal places', function () {
+    $html = view('pdf.purchase-order', [
+        'purchaseOrder' => $this->purchaseOrder->load([
+            'supplier',
+            'currency',
+            'items.item.unit',
+            'items.prsItem.prs.department',
+            'certifiedBy',
+            'approvedBy',
+        ]),
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    expect($html)->toContain('1.000,00');
+});
+
+it('rejects invalid decimal places when printing', function () {
+    $response = $this->actingAs($this->user)
+        ->from(route('purchase-orders.show', $this->purchaseOrder))
+        ->post(route('purchase-orders.print', $this->purchaseOrder), [
+            'po_number' => 'PO-PAPER-777',
+            'decimal_places' => 11,
+        ]);
+
+    $response->assertRedirect(route('purchase-orders.show', $this->purchaseOrder));
+    $response->assertSessionHasErrors('decimal_places');
+    expect($this->purchaseOrder->fresh()->po_number)->toBe('PO-OLD-001');
 });

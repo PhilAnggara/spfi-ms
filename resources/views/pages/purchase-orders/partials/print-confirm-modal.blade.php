@@ -5,6 +5,9 @@
     $paperWidthMm = (int) config('purchase-order.paper.width_mm', 215);
     $paperHeightMm = (int) config('purchase-order.paper.height_mm', 160);
     $paperLabel = (string) config('purchase-order.paper.label', "PO Form {$paperWidthMm} x {$paperHeightMm} mm");
+    $decimalPlacesDefault = (int) config('purchase-order.print.decimal_places.default', 2);
+    $decimalPlacesOptions = config('purchase-order.print.decimal_places.options', range(0, 10));
+    $decimalPlacesValue = (int) old('decimal_places', $decimalPlacesDefault);
 @endphp
 
 <div
@@ -44,6 +47,27 @@
                 <input type="hidden" name="po_number_suggested" value="{{ $suggestedNumber }}">
                 <div class="form-text">
                     This number will be saved before the PDF opens in a new tab.
+                </div>
+
+                <div class="mt-3">
+                    <label class="form-label" for="{{ $modalId }}-decimal-places">Decimal places</label>
+                    <select
+                        id="{{ $modalId }}-decimal-places"
+                        name="decimal_places"
+                        class="form-select"
+                    >
+                        @foreach ($decimalPlacesOptions as $option)
+                            <option
+                                value="{{ $option }}"
+                                @selected((int) $option === $decimalPlacesValue)
+                            >
+                                {{ $option }}@if ((int) $option === $decimalPlacesDefault) (default)@endif
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="form-text">
+                        Number of digits after the decimal separator for prices and amounts on the printed PO.
+                    </div>
                 </div>
 
                 <div class="alert alert-light border mt-3 mb-0">

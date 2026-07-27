@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\Currency;
 
 class PurchaseOrder extends Model
 {
@@ -92,5 +91,43 @@ class PurchaseOrder extends Model
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');
+    }
+
+    /**
+     * High-level approval is required for non-threshold currencies, or when the
+     * IDR total meets/exceeds the configured threshold.
+     */
+    public function requiresHighLevelApproval(): bool
+    {
+        $thresholdCurrency = strtoupper((string) config('purchase-order.signature.threshold_currency', 'IDR'));
+        $currencyCode = strtoupper((string) ($this->currency?->code ?? $thresholdCurrency));
+
+        if ($currencyCode !== $thresholdCurrency) {
+            return true;
+        }
+
+        $approvalThreshold = (float) config('purchase-order.signature.approval_threshold', 4000000);
+
+        return (float) $this->total >= $approvalThreshold;
+    }
+
+    public function printCertifiedByName(): string
+    {
+        return (string) config('purchase-order.signature.certified_by_name', 'Denny Tuhatelu');
+    }
+
+    public function printApprovedByName(): string
+    {
+        if ($this->requiresHighLevelApproval()) {
+            return (string) config(
+                'purchase-order.signature.approved_by_at_or_above_threshold_name',
+                'S.C. Calamba, Jr'
+            );
+        }
+
+        return (string) config(
+            'purchase-order.signature.approved_by_below_threshold_name',
+            'Denny Tuhatelu'
+        );
     }
 }

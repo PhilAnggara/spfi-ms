@@ -116,6 +116,8 @@ it('renders compact item table, three column summary, and aligned supplier signa
 
     expect($html)
         ->toContain('size: 215mm 160mm')
+        ->toContain('font-family: Arial, sans-serif')
+        ->toContain('font-size: 11px')
         ->toContain('class="po-main"')
         ->toContain('class="po-footer"')
         ->toContain('position: fixed')
@@ -125,6 +127,10 @@ it('renders compact item table, three column summary, and aligned supplier signa
         ->toContain('class="item-name"')
         ->toContain('class="item-meta"')
         ->toContain('10 PCS')
+        ->toContain('class="col-qty"')
+        ->toContain('white-space: nowrap')
+        ->toContain('>Price</th>')
+        ->toContain('>Amount</th>')
         ->toContain('class="summary-table"')
         ->toContain('class="summary-middle"')
         ->toContain('5 %')
@@ -133,11 +139,50 @@ it('renders compact item table, three column summary, and aligned supplier signa
         ->toContain('class="signature-blank"')
         ->toContain("Supplier's Signature")
         ->toContain('Denny Tuhatelu')
+        ->not->toContain('width: 64px')
+        ->not->toContain('col-qty col-qty-wrap')
+        ->not->toContain('>Disc</th>')
+        ->not->toContain('>PPN</th>')
+        ->not->toContain('>PPh</th>')
+        ->not->toContain('5,0%')
+        ->not->toContain('11,0%')
+        ->not->toContain('font-family: DejaVu Sans')
         ->not->toContain('background: #f3f4f6')
         ->not->toContain('class="po-sheet"')
         ->not->toContain('Certifier Name')
         ->not->toContain('Approver Name')
         ->not->toContain('Supplier\'s Signature : ____________________________');
+});
+
+it('allows qty column to wrap only when qty display is very long', function () {
+    $longUnit = UnitOfMeasure::query()->create([
+        'name' => 'Extra Long Unit Name',
+        'code' => 'VERYLONGUNIT',
+    ]);
+
+    $this->purchaseOrder->items->first()->item->update([
+        'unit_of_measure_id' => $longUnit->id,
+    ]);
+    $this->purchaseOrder->items()->first()->update([
+        'quantity' => 1250000,
+    ]);
+
+    $html = view('pdf.purchase-order', [
+        'purchaseOrder' => $this->purchaseOrder->fresh()->load([
+            'supplier',
+            'currency',
+            'items.item.unit',
+            'items.prsItem.prs.department',
+            'certifiedBy',
+            'approvedBy',
+        ]),
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    expect($html)
+        ->toContain('col-qty-wrap')
+        ->toContain('1.250.000 VERYLONGUNIT');
 });
 
 it('prints approved by based on purchase order total threshold', function (float $total, string $approvedName) {
@@ -161,9 +206,41 @@ it('prints approved by based on purchase order total threshold', function (float
         ->toContain($approvedName);
 })->with([
     'below threshold' => [3_999_999.99, 'Denny Tuhatelu'],
-    'at threshold' => [4_000_000.00, 'Sam Calamba'],
-    'above threshold' => [4_000_000.01, 'Sam Calamba'],
+    'at threshold' => [4_000_000.00, 'S.C. Calamba, Jr'],
+    'above threshold' => [4_000_000.01, 'S.C. Calamba, Jr'],
 ]);
+
+it('prints approved by S.C. Calamba, Jr for non-IDR currencies regardless of total', function () {
+    $usd = Currency::query()->create([
+        'name' => 'US Dollar',
+        'code' => 'USD',
+        'symbol' => '$',
+        'created_by' => $this->user->id,
+    ]);
+
+    $this->purchaseOrder->update([
+        'currency_id' => $usd->id,
+        'total' => 100,
+    ]);
+
+    $html = view('pdf.purchase-order', [
+        'purchaseOrder' => $this->purchaseOrder->fresh()->load([
+            'supplier',
+            'currency',
+            'items.item.unit',
+            'items.prsItem.prs.department',
+            'certifiedBy',
+            'approvedBy',
+        ]),
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    expect($html)
+        ->toContain('Denny Tuhatelu')
+        ->toContain('S.C. Calamba, Jr')
+        ->toContain('USD');
+});
 
 it('streams purchase order pdf on rr paper size as a single page', function () {
     $response = $this->actingAs($this->user)
@@ -209,6 +286,9 @@ it('shows paper form size and print checklist in confirm print modal', function 
         ->toContain($paperLabel)
         ->toContain($paperWidthMm)
         ->toContain($paperHeightMm)
+        ->toContain('Decimal places')
+        ->toContain('name="decimal_places"')
+        ->toContain('2 (default)')
         ->toContain('Actual size / 100%')
         ->toContain('Fit to page')
         ->toContain('Portrait');
@@ -218,5 +298,6 @@ it('shows paper form size and print checklist in confirm print modal', function 
 
     $response->assertSuccessful();
     $response->assertSee($paperLabel, false);
+    $response->assertSee('Decimal places', false);
     $response->assertSee('Actual size / 100%', false);
 });

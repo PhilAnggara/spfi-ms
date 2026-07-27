@@ -16,6 +16,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class PurchaseOrderController extends Controller
 {
@@ -884,6 +885,17 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['message' => 'PO must be approved before printing.']);
         }
 
+        $decimalPlacesOptions = config('purchase-order.print.decimal_places.options', range(0, 10));
+        $decimalPlacesDefault = (int) config('purchase-order.print.decimal_places.default', 2);
+
+        $validated = $request->validate([
+            'decimal_places' => ['nullable', 'integer', Rule::in($decimalPlacesOptions)],
+        ]);
+
+        $decimalPlaces = array_key_exists('decimal_places', $validated) && $validated['decimal_places'] !== null
+            ? (int) $validated['decimal_places']
+            : $decimalPlacesDefault;
+
         if ($request->isMethod('post') || $request->filled('po_number')) {
             $this->savePoNumberFromRequest($request, $purchaseOrder);
             $purchaseOrder->refresh();
@@ -900,6 +912,7 @@ class PurchaseOrderController extends Controller
             'purchaseOrder' => $purchaseOrder,
             'pageWidthMm' => $pageWidthMm,
             'pageHeightMm' => $pageHeightMm,
+            'decimalPlaces' => $decimalPlaces,
         ];
 
         $pdf = Pdf::loadView('pdf.purchase-order', $data)

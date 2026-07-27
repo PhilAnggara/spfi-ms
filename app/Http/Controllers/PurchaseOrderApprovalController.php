@@ -139,13 +139,12 @@ class PurchaseOrderApprovalController extends Controller
         $manager = $request->user();
         $gm = User::where('role', 'General Manager')->first();
         $approvalThreshold = (float) config('purchase-order.signature.approval_threshold', 4000000);
-        $certifiedName = (string) config('purchase-order.signature.certified_by_name', 'Denny Tuhatelu');
-        $approvedName = (float) $purchaseOrder->total >= $approvalThreshold
-            ? (string) config('purchase-order.signature.approved_by_at_or_above_threshold_name', 'Sam Calamba')
-            : (string) config('purchase-order.signature.approved_by_below_threshold_name', 'Denny Tuhatelu');
+        $certifiedName = $purchaseOrder->printCertifiedByName();
+        $requiresHighLevelApproval = $purchaseOrder->loadMissing('currency')->requiresHighLevelApproval();
+        $approvedName = $purchaseOrder->printApprovedByName();
 
-        // Approval routing follows total threshold rule.
-        $approvedBy = (float) $purchaseOrder->total >= $approvalThreshold && $gm ? $gm : $manager;
+        // Approval routing: non-IDR currencies and IDR totals at/above threshold go to GM.
+        $approvedBy = $requiresHighLevelApproval && $gm ? $gm : $manager;
         $certifiedBy = $manager;
 
         $purchaseOrder->update([
