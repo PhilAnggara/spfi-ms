@@ -125,6 +125,12 @@
                                                         <i class="fa-duotone fa-solid fa-circle-pause text-warning"></i>
                                                     </button>
                                                 </div>
+                                            @elseif (in_array($item->status, ['CANVASSING', 'CANVASSER_HOLD'], true))
+                                                <div class="btn-group btn-group-sm">
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#reassign-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit Canvasser">
+                                                        <i class="fa-duotone fa-solid fa-user-pen text-primary"></i>
+                                                    </button>
+                                                </div>
                                             @else
                                                 <span class="badge {{ status_badge_color($item->status) }}">
                                                     <i class="{{ status_badge_icon($item->status) }}"></i>
@@ -236,6 +242,134 @@
             </div>
         </div>
     </div>
+
+    @if (in_array($item->status, ['CANVASSING', 'CANVASSER_HOLD'], true))
+        @php
+            $reassignableItems = $item->items->filter(fn ($prsItem) => $prsItem->purchase_order_id === null)->values();
+            $lockedItems = $item->items->filter(fn ($prsItem) => $prsItem->purchase_order_id !== null)->values();
+        @endphp
+        <div class="modal fade text-left modal-borderless assign-canvasser-modal" id="reassign-modal-{{ $item->id }}" tabindex="-1"
+            role="dialog" aria-labelledby="reassignModalLabel-{{ $item->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+                <div class="modal-content">
+                    <div class="modal-header border-0 pb-0">
+                        <div>
+                            <h5 class="modal-title mb-1" id="reassignModalLabel-{{ $item->id }}">Edit Canvasser</h5>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="badge bg-light-primary text-primary px-3 py-2">{{ $item->prs_number }}</span>
+                                <span class="text-muted small">{{ $item->items->count() }} {{ Str::plural('item', $item->items->count()) }}</span>
+                            </div>
+                        </div>
+                        <button type="button" class="close rounded-pill" data-bs-dismiss="modal" aria-label="Close">
+                            <i data-feather="x"></i>
+                        </button>
+                    </div>
+                    <form action="{{ route('prs.reassign', $item->id) }}" method="post" class="form">
+                        @csrf
+                        <div class="modal-body pt-3">
+                            <p class="text-muted small mb-3">
+                                Change the assigned canvasser for items without a PO. Existing quotes and supplier selection are kept.
+                            </p>
+                            <div class="table-responsive assign-canvasser-table-wrap">
+                                <table class="table align-middle mb-0 assign-canvasser-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th class="text-center" style="width: 7rem;">Qty</th>
+                                            <th style="width: 14rem;">Assign Canvasser</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($reassignableItems as $index => $itemInfo)
+                                            <tr>
+                                                <td>
+                                                    <div class="assign-canvasser-item-code">{{ $itemInfo->item->code }}</div>
+                                                    <div class="assign-canvasser-item-name">{{ $itemInfo->item->name }}</div>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="assign-canvasser-qty">
+                                                        {{ $itemInfo->quantity }}
+                                                        <span class="text-muted">{{ $itemInfo->item->unit?->name ?? 'PCS' }}</span>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $itemInfo->id }}">
+                                                    <select name="items[{{ $index }}][canvasser_id]" class="form-select assign-canvasser-row" required>
+                                                        <option value="" disabled {{ $itemInfo->canvasser_id ? '' : 'selected' }}>-- Select Canvasser --</option>
+                                                        @foreach ($canvassers as $canvasser)
+                                                            <option value="{{ $canvasser->id }}" @selected($itemInfo->canvasser_id == $canvasser->id)>{{ $canvasser->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                        @foreach ($lockedItems as $itemInfo)
+                                            <tr class="table-light">
+                                                <td>
+                                                    <div class="assign-canvasser-item-code">{{ $itemInfo->item->code }}</div>
+                                                    <div class="assign-canvasser-item-name">{{ $itemInfo->item->name }}</div>
+                                                    <div class="small text-muted mt-1">
+                                                        Locked
+                                                        @if ($itemInfo->purchaseOrder?->po_number)
+                                                            — PO {{ $itemInfo->purchaseOrder->po_number }}
+                                                        @endif
+                                                    </div>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="assign-canvasser-qty">
+                                                        {{ $itemInfo->quantity }}
+                                                        <span class="text-muted">{{ $itemInfo->item->unit?->name ?? 'PCS' }}</span>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <select class="form-select" disabled>
+                                                        <option selected>{{ $itemInfo->canvasser?->name ?? 'Not assigned' }}</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                        @if ($reassignableItems->count() > 1)
+                                            <tr class="assign-canvasser-bulk-row">
+                                                <td colspan="2" class="text-end align-middle">
+                                                    <span class="assign-canvasser-bulk-label">Set editable items to</span>
+                                                </td>
+                                                <td>
+                                                    <select
+                                                        id="reassign-canvasser-bulk-{{ $item->id }}"
+                                                        class="form-select assign-canvasser-bulk"
+                                                        aria-label="Set editable items to one canvasser">
+                                                        <option value="" selected>-- Select Canvasser --</option>
+                                                        @foreach ($canvassers as $canvasser)
+                                                            <option value="{{ $canvasser->id }}">{{ $canvasser->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        @endif
+                                    </tbody>
+                                </table>
+                            </div>
+                            @if ($reassignableItems->isEmpty())
+                                <div class="alert alert-light border mt-3 mb-0">
+                                    All items on this PRS already have a purchase order, so the canvasser cannot be changed.
+                                </div>
+                            @endif
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn icon icon-left btn-light-secondary" data-bs-dismiss="modal">
+                                <i class="fa-thin fa-xmark"></i>
+                                Cancel
+                            </button>
+                            <button type="submit" class="btn icon icon-left btn-primary ms-1" @disabled($reassignableItems->isEmpty())>
+                                <i class="fa-thin fa-floppy-disk me-1"></i>
+                                Save Assignment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div class="modal fade text-left modal-borderless" id="hold-modal-{{ $item->id }}" tabindex="-1"
         role="dialog" aria-labelledby="holdModalLabel-{{ $item->id }}" aria-hidden="true">

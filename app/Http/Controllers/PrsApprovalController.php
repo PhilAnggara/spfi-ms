@@ -71,6 +71,12 @@ class PrsApprovalController extends Controller
      */
     public function approve(Request $request, Prs $prs)
     {
+        if (! in_array($prs->status, ['REQUESTED', 'REVISED'], true)) {
+            return redirect()->back()->withErrors([
+                'message' => 'Only REQUESTED or REVISED PRS can be assigned for the first time. Use Edit Canvasser to reassign.',
+            ]);
+        }
+
         $data = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
@@ -179,6 +185,143 @@ class PrsApprovalController extends Controller
         }
 
         return redirect()->back()->with('success', 'PRS has been assigned and moved to canvassing.');
+    }
+
+    /**
+     * Reassign canvassers on items that do not yet have a purchase order.
+     * Existing quotes and selections are preserved.
+     */
+    public function reassign(Request $request, Prs $prs)
+    {
+        if (! in_array($prs->status, ['CANVASSING', 'CANVASSER_HOLD'], true)) {
+            return redirect()->back()->withErrors([
+                'message' => 'Canvassers can only be reassigned while the PRS is CANVASSING or CANVASSER_HOLD.',
+            ]);
+        }
+
+        $data = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.prs_item_id' => ['required', 'distinct', 'exists:prs_items,id'],
+            'items.*.canvasser_id' => ['required', 'exists:users,id'],
+        ]);
+
+        $assignments = collect($data['items'])->keyBy('prs_item_id');
+        $prsItems = $prs->items()
+            ->with(['item', 'canvasser'])
+            ->whereIn('id', $assignments->keys()->all())
+            ->get()
+            ->keyBy('id');
+
+        if ($assignments->keys()->diff($prsItems->keys())->isNotEmpty()) {
+            return redirect()->back()->withErrors(['items' => 'One or more PRS items are invalid for this PRS.']);
+        }
+
+        $lockedItems = $prsItems->filter(fn ($item) => $item->purchase_order_id !== null);
+        if ($lockedItems->isNotEmpty()) {
+            return redirect()->back()->withErrors([
+                'items' => 'One or more items already have a purchase order and cannot be reassigned.',
+            ]);
+        }
+
+        $canvasserIds = $assignments->pluck('canvasser_id')->unique()->values();
+        $validCanvasserIds = User::role('purchasing-staff')->whereIn('id', $canvasserIds)->pluck('id');
+        $invalidCanvassers = $canvasserIds->diff($validCanvasserIds);
+        if ($invalidCanvassers->isNotEmpty()) {
+            return redirect()->back()->withErrors(['items' => 'One or more selected users are not canvassers.']);
+        }
+
+        $changes = [];
+
+        DB::transaction(function () use ($prs, $assignments, $prsItems, $request, &$changes) {
+            foreach ($assignments as $prsItemId => $row) {
+                $prsItem = $prsItems->get($prsItemId);
+                $previousCanvasserId = $prsItem?->canvasser_id !== null ? (int) $prsItem->canvasser_id : null;
+                $newCanvasserId = (int) $row['canvasser_id'];
+
+                if ($previousCanvasserId === $newCanvasserId) {
+                    continue;
+                }
+
+                $prs->items()->whereKey($prsItemId)->update([
+                    'canvasser_id' => $newCanvasserId,
+                    'assigned_canvasser_at' => now(),
+                ]);
+
+                $changes[] = [
+                    'prs_item_id' => (int) $prsItemId,
+                    'previous_canvasser_id' => $previousCanvasserId,
+                    'new_canvasser_id' => $newCanvasserId,
+                    'item_code' => $prsItem?->item?->code,
+                ];
+            }
+
+            if ($changes === []) {
+                return;
+            }
+
+            $prs->logs()->create([
+                'user_id' => $request->user()?->id,
+                'action' => 'REASSIGN_CANVASSER',
+                'message' => 'Reassigned canvassers for one or more PRS items. Existing quotes and selections were kept.',
+                'meta' => [
+                    'prs_status' => $prs->status,
+                    'changes' => $changes,
+                ],
+            ]);
+        });
+
+        if ($changes === []) {
+            return redirect()->back()->with('success', 'No canvasser changes were made.');
+        }
+
+        $recipientService = app(NotificationRecipientService::class);
+        $usersById = User::query()
+            ->whereIn('id', collect($changes)->flatMap(fn (array $change) => [
+                $change['previous_canvasser_id'],
+                $change['new_canvasser_id'],
+            ])->filter()->unique()->values())
+            ->get()
+            ->keyBy('id');
+
+        foreach ($changes as $change) {
+            $itemLabel = $change['item_code'] ?? $change['prs_item_id'];
+            $previousCanvasser = $usersById->get($change['previous_canvasser_id']);
+            $newCanvasser = $usersById->get($change['new_canvasser_id']);
+
+            if ($previousCanvasser) {
+                $recipientService->notify(collect([$previousCanvasser]), [
+                    'type' => 'prs_canvasser_unassigned',
+                    'title' => 'Canvassing Reassigned',
+                    'message' => 'PRS #'.$prs->prs_number.' item '.$itemLabel.' is no longer assigned to you.',
+                    'action_url' => '/canvassing',
+                    'icon' => 'fa-light fa-user-xmark',
+                    'icon_color' => 'bg-warning',
+                    'meta' => [
+                        'prs_id' => $prs->id,
+                        'prs_item_id' => $change['prs_item_id'],
+                        'new_canvasser_id' => $change['new_canvasser_id'],
+                    ],
+                ]);
+            }
+
+            if ($newCanvasser) {
+                $recipientService->notify(collect([$newCanvasser]), [
+                    'type' => 'prs_canvasser_reassigned',
+                    'title' => 'PRS Reassigned',
+                    'message' => 'PRS #'.$prs->prs_number.' item '.$itemLabel.' has been reassigned to you for canvassing.',
+                    'action_url' => '/canvassing/'.$change['prs_item_id'],
+                    'icon' => 'fa-light fa-user-check',
+                    'icon_color' => 'bg-info',
+                    'meta' => [
+                        'prs_id' => $prs->id,
+                        'prs_item_id' => $change['prs_item_id'],
+                        'previous_canvasser_id' => $change['previous_canvasser_id'],
+                    ],
+                ]);
+            }
+        }
+
+        return redirect()->back()->with('success', 'Canvasser assignment has been updated. Existing quotes were kept.');
     }
 
     /**

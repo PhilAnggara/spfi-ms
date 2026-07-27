@@ -204,7 +204,7 @@
             return;
         }
 
-        const rowValues = Array.from(modal.querySelectorAll('.assign-canvasser-row')).map((rowSelect) => {
+        const rowValues = Array.from(modal.querySelectorAll('.assign-canvasser-row:not(:disabled)')).map((rowSelect) => {
             return String(rowSelect.value || '').trim();
         });
 
@@ -232,7 +232,7 @@
                 return;
             }
 
-            modal.querySelectorAll('.assign-canvasser-row').forEach((rowSelect) => {
+            modal.querySelectorAll('.assign-canvasser-row:not(:disabled)').forEach((rowSelect) => {
                 rowSelect.value = canvasserId;
             });
 

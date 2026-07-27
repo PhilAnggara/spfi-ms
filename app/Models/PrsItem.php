@@ -12,8 +12,9 @@ class PrsItem extends Model
     use SoftDeletes;
 
     protected $table = 'prs_items';
+
     protected $guarded = [
-        'id'
+        'id',
     ];
 
     protected $casts = [
@@ -26,6 +27,7 @@ class PrsItem extends Model
         'purchase_order_id' => 'integer',
         'is_direct_purchase' => 'boolean',
     ];
+
     protected $hidden = [
 
     ];
@@ -66,12 +68,29 @@ class PrsItem extends Model
     }
 
     /**
+     * Whether a purchasing manager may change the assigned canvasser.
+     * Quotes and selection are kept; blocked once a PO is linked.
+     */
+    public function canReassignCanvasser(): bool
+    {
+        if ($this->purchase_order_id !== null) {
+            return false;
+        }
+
+        $status = $this->relationLoaded('prs')
+            ? $this->prs?->status
+            : $this->prs()->value('status');
+
+        return in_array($status, ['CANVASSING', 'CANVASSER_HOLD'], true);
+    }
+
+    /**
      * Get total delivered quantity from all associated receiving reports
      */
     public function getDeliveredQuantityAttribute()
     {
         $poItem = $this->purchaseOrderItem;
-        if (!$poItem) {
+        if (! $poItem) {
             return 0;
         }
 
@@ -108,6 +127,6 @@ class PrsItem extends Model
             return 0;
         }
 
-        return min(100, (int)(($delivered / $ordered) * 100));
+        return min(100, (int) (($delivered / $ordered) * 100));
     }
 }
