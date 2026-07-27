@@ -112,6 +112,37 @@ class Prs extends Model
         return $this->isDeliveryComplete();
     }
 
+    /**
+     * Keep CANVASSING / PO_CREATED in sync with open PRS items.
+     *
+     * An item is open when it still needs a purchase order
+     * (no purchase_order_id and not marked as direct purchase).
+     */
+    public function syncCanvassingPurchaseOrderStatus(): void
+    {
+        if (! in_array($this->status, ['CANVASSING', 'PO_CREATED'], true)) {
+            return;
+        }
+
+        $hasOpenItems = $this->items()
+            ->whereNull('purchase_order_id')
+            ->where('is_direct_purchase', false)
+            ->exists();
+
+        $newStatus = $hasOpenItems ? 'CANVASSING' : 'PO_CREATED';
+
+        if ($this->status === $newStatus) {
+            return;
+        }
+
+        $this->update(['status' => $newStatus]);
+    }
+
+    public function isAvailableForCanvassing(): bool
+    {
+        return in_array($this->status, ['CANVASSING', 'PO_CREATED'], true);
+    }
+
     public function isCanvasserHold(): bool
     {
         return $this->status === 'CANVASSER_HOLD';

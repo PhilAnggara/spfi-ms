@@ -44,7 +44,7 @@
                             <i class="fa-duotone fa-solid fa-arrow-left"></i>
                             Back to list
                         </a>
-                        @if (!$prsItem->purchase_order_id && $prsItem->prs?->status === 'CANVASSING')
+                        @if (!$prsItem->purchase_order_id && $prsItem->prs?->isAvailableForCanvassing())
                             <button type="button" class="btn btn-sm icon icon-left btn-outline-warning" data-bs-toggle="modal" data-bs-target="#canvasser-hold-modal-{{ $prsItem->id }}">
                                 <i class="fa-light fa-circle-pause"></i>
                                 Request Quantity Revision
@@ -265,7 +265,7 @@
         </div>
     </div>
 
-    @if (!$prsItem->purchase_order_id && $prsItem->prs?->status === 'CANVASSING')
+    @if (!$prsItem->purchase_order_id && $prsItem->prs?->isAvailableForCanvassing())
         <div class="modal fade" id="canvasser-hold-modal-{{ $prsItem->id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">

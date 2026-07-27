@@ -164,6 +164,9 @@ class SupplierComparisonController extends Controller
             'selection_reason' => null,
         ]);
 
+        $prsItem->loadMissing('prs');
+        $prsItem->prs?->syncCanvassingPurchaseOrderStatus();
+
         $prsItem->prs?->logs()->create([
             'user_id' => $request->user()?->id,
             'action' => 'REJECT_SUPPLIER',

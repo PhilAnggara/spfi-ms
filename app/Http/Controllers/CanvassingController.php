@@ -40,8 +40,9 @@ class CanvassingController extends Controller
             'selectedCanvassingItem.supplier',
         ])
             ->where('canvasser_id', $userId)
+            ->whereNull('purchase_order_id')
             ->whereHas('prs', function ($prsQuery) {
-                $prsQuery->where('status', 'CANVASSING');
+                $prsQuery->whereIn('status', ['CANVASSING', 'PO_CREATED']);
             })
             ->when($filters['keyword'] !== '', function ($query) use ($filters) {
                 $keyword = $filters['keyword'];
@@ -97,7 +98,7 @@ class CanvassingController extends Controller
      */
     public function show(PrsItem $prsItem, Request $request)
     {
-        if ($prsItem->canvasser_id !== $request->user()->id) {
+        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
             abort(403);
         }
 
@@ -109,7 +110,7 @@ class CanvassingController extends Controller
             'selectedCanvassingItem.supplier',
         ]);
 
-        if ($prsItem->prs?->status !== 'CANVASSING') {
+        if (! $this->isPrsItemOpenForCanvassing($prsItem)) {
             return redirect()
                 ->route('canvassing.index')
                 ->withErrors(['message' => 'This PRS item is not available for canvassing.']);
@@ -128,11 +129,11 @@ class CanvassingController extends Controller
      */
     public function store(Request $request, PrsItem $prsItem)
     {
-        if ($prsItem->canvasser_id !== $request->user()->id) {
+        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
             abort(403);
         }
 
-        if ($prsItem->prs?->status !== 'CANVASSING') {
+        if (! $this->isPrsItemOpenForCanvassing($prsItem)) {
             return redirect()->back()->withErrors(['message' => 'This PRS item is not available for canvassing.']);
         }
 
@@ -261,8 +262,14 @@ class CanvassingController extends Controller
      */
     public function report(PrsItem $prsItem, Request $request)
     {
-        if ($prsItem->canvasser_id !== $request->user()->id) {
+        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
             abort(403);
+        }
+
+        if (! $this->isPrsItemOpenForCanvassing($prsItem)) {
+            return redirect()
+                ->route('canvassing.index')
+                ->withErrors(['message' => 'This PRS item is not available for canvassing.']);
         }
 
         $prsItem->load([
@@ -304,12 +311,16 @@ class CanvassingController extends Controller
      */
     public function toggleDirectPurchase(Request $request, PrsItem $prsItem)
     {
-        if ($prsItem->canvasser_id !== $request->user()->id) {
+        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
             abort(403);
         }
 
         if ($prsItem->purchase_order_id) {
             return redirect()->back()->withErrors(['message' => 'Cannot change status because a PO has already been created for this item.']);
+        }
+
+        if (! $prsItem->prs?->isAvailableForCanvassing()) {
+            return redirect()->back()->withErrors(['message' => 'This PRS item is not available for canvassing.']);
         }
 
         $validated = $request->validate([
@@ -322,6 +333,9 @@ class CanvassingController extends Controller
         $prsItem->update([
             'is_direct_purchase' => $validated['is_direct_purchase'],
         ]);
+
+        $prsItem->loadMissing('prs');
+        $prsItem->prs?->syncCanvassingPurchaseOrderStatus();
 
         $prsItem->prs?->logs()->create([
             'user_id' => $request->user()?->id,
@@ -344,11 +358,15 @@ class CanvassingController extends Controller
      */
     public function hold(Request $request, PrsItem $prsItem, PrsHoldService $prsHoldService)
     {
-        if ($prsItem->canvasser_id !== $request->user()->id) {
+        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
             abort(403);
         }
 
         $prsItem->loadMissing('prs');
+
+        if (! $this->isPrsItemOpenForCanvassing($prsItem)) {
+            return redirect()->back()->withErrors(['message' => 'This PRS item is not available for canvassing.']);
+        }
 
         $data = $request->validate([
             'message' => ['required', 'string'],
@@ -361,6 +379,19 @@ class CanvassingController extends Controller
         }
 
         return redirect()->back()->with('success', 'PRS has been held for quantity revision.');
+    }
+
+    private function canAccessCanvassingItem(PrsItem $prsItem, Request $request): bool
+    {
+        return (int) $prsItem->canvasser_id === (int) $request->user()->id;
+    }
+
+    private function isPrsItemOpenForCanvassing(PrsItem $prsItem): bool
+    {
+        $prsItem->loadMissing('prs');
+
+        return $prsItem->purchase_order_id === null
+            && ($prsItem->prs?->isAvailableForCanvassing() ?? false);
     }
 
     private function sanitizeTermValue(?string $value): ?string

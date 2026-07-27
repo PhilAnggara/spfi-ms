@@ -70,12 +70,8 @@ class PrsHoldService
             throw ValidationException::withMessages(['message' => 'Cannot hold PRS because a PO has already been created for this item.']);
         }
 
-        if ($prs->status !== 'CANVASSING') {
+        if (! $prs->isAvailableForCanvassing()) {
             throw ValidationException::withMessages(['message' => 'Only PRS in canvassing can be held by canvasser.']);
-        }
-
-        if ($prs->status === 'CANVASSER_HOLD') {
-            throw ValidationException::withMessages(['message' => 'PRS is already awaiting quantity revision.']);
         }
 
         $previousStatus = $prs->status;

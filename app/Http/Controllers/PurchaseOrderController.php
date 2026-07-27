@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Currency;
+use App\Models\Prs;
 use App\Models\PrsItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -501,12 +502,10 @@ class PurchaseOrderController extends Controller
                         ->all();
 
                     if (! empty($affectedPrsIds)) {
-                        DB::table('prs')
+                        Prs::query()
                             ->whereIn('id', $affectedPrsIds)
-                            ->update([
-                                'status' => 'PO_CREATED',
-                                'updated_at' => now(),
-                            ]);
+                            ->get()
+                            ->each(fn (Prs $prs) => $prs->syncCanvassingPurchaseOrderStatus());
                     }
 
                     return $purchaseOrder;
@@ -629,9 +628,13 @@ class PurchaseOrderController extends Controller
             $purchaseOrderItem->delete();
 
             if ($prsItemId) {
-                PrsItem::query()->whereKey($prsItemId)->update([
-                    'purchase_order_id' => null,
-                ]);
+                $prsItem = PrsItem::query()->with('prs')->find($prsItemId);
+                if ($prsItem) {
+                    $prsItem->update([
+                        'purchase_order_id' => null,
+                    ]);
+                    $prsItem->prs?->syncCanvassingPurchaseOrderStatus();
+                }
             }
 
             $this->recalculatePurchaseOrderTotals($purchaseOrder->fresh(['items']));

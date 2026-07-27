@@ -177,6 +177,70 @@ it('allows rejecting without a reason', function () {
         ->and($log?->meta['rejection_reason'])->toBeNull();
 });
 
+it('restores canvassing status and list visibility after reject on partially po-created prs', function () {
+    $siblingItem = Item::query()->create([
+        'name' => 'Reject Sibling Item',
+        'code' => 'REJ-SIBLING-001',
+        'unit_of_measure_id' => UnitOfMeasure::query()->first()->id,
+        'category_id' => ItemCategory::query()->first()->id,
+        'type' => 'Consumable',
+        'stock_on_hand' => 5,
+        'is_active' => true,
+    ]);
+
+    $siblingPrsItem = PrsItem::query()->create([
+        'prs_id' => $this->prs->id,
+        'item_id' => $siblingItem->id,
+        'quantity' => 2,
+        'canvasser_id' => $this->canvasser->id,
+        'assigned_canvasser_at' => now(),
+        'is_direct_purchase' => false,
+    ]);
+
+    $siblingQuote = PrsCanvassingItem::query()->create([
+        'prs_id' => $this->prs->id,
+        'prs_item_id' => $siblingPrsItem->id,
+        'supplier_id' => $this->supplier->id,
+        'unit_price' => 2500,
+        'lead_time_days' => 5,
+        'term_of_payment_type' => 'cash',
+        'canvased_by' => $this->canvasser->id,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $this->supplier->id,
+        'created_by' => $this->canvasser->id,
+        'status' => 'DRAFT',
+        'subtotal' => 5000,
+        'total' => 5000,
+    ]);
+
+    $siblingPrsItem->update([
+        'selected_canvassing_item_id' => $siblingQuote->id,
+        'purchase_order_id' => $purchaseOrder->id,
+    ]);
+
+    $this->prs->update(['status' => 'PO_CREATED']);
+
+    $response = $this->actingAs($this->manager)
+        ->from(route('procurement.supplier-comparison.index'))
+        ->post(route('procurement.supplier-comparison.reject', $this->prsItem), [
+            'rejection_reason' => 'Need better price',
+        ]);
+
+    $response->assertRedirect(route('procurement.supplier-comparison.index'));
+    $response->assertSessionHas('success');
+
+    expect($this->prs->fresh()->status)->toBe('CANVASSING')
+        ->and($this->prsItem->fresh()->selected_canvassing_item_id)->toBeNull();
+
+    $this->actingAs($this->canvasser)
+        ->get(route('canvassing.index'))
+        ->assertSuccessful()
+        ->assertSee('REJ-ITEM-001')
+        ->assertDontSee('REJ-SIBLING-001');
+});
+
 it('blocks reject when a purchase order is already linked', function () {
     $purchaseOrder = PurchaseOrder::query()->create([
         'supplier_id' => $this->supplier->id,
