@@ -180,7 +180,7 @@
                             <div class="lowest-label">LOWEST PRICE</div>
                         @endif
                     </td>
-                    <td class="text-right">{{ number_format((float) $canvassing->unit_price, 2, ',', '.') }}</td>
+                    <td class="text-right">{{ format_po_decimal($canvassing->unit_price) }}</td>
                     <td class="text-center">{{ $canvassing->term_of_payment_type ? ucfirst($canvassing->term_of_payment_type) : '-' }}</td>
                     <td class="text-wrap">{{ $canvassing->term_of_payment ?? '-' }}</td>
                     <td class="text-center">{{ $canvassing->lead_time_days ?? '-' }} {{ $canvassing->lead_time_days ? 'days' : '' }}</td>
@@ -206,7 +206,7 @@
             @endphp
             <div class="visual-row">
                 <div class="visual-label">
-                    {{ $canvassing->supplier->name ?? '-' }} - {{ number_format((float) $canvassing->unit_price, 2, ',', '.') }}
+                    {{ $canvassing->supplier->name ?? '-' }} - {{ format_po_decimal($canvassing->unit_price) }}
                     @if ($differenceAmount > 0)
                         ({{ number_format($cheaperPercent, 2, ',', '.') }}% cheaper; difference {{ number_format($differenceAmount, 2, ',', '.') }} from highest)
                     @else

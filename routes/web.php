@@ -194,6 +194,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
                 ->whereNumber('purchaseOrder')
                 ->name('show');
+            Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])
+                ->whereNumber('purchaseOrder')
+                ->name('cancel');
             Route::post('/{purchaseOrder}/number', [PurchaseOrderController::class, 'updateNumber'])
                 ->whereNumber('purchaseOrder')
                 ->name('number');

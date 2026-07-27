@@ -25,7 +25,7 @@ class DocumentNumberService
         $attempts = 0;
 
         do {
-            $number = $last['prefix'] . str_pad((string) $nextRunningNumber, $padding, '0', STR_PAD_LEFT);
+            $number = $last['prefix'].str_pad((string) $nextRunningNumber, $padding, '0', STR_PAD_LEFT);
             $nextRunningNumber++;
             $attempts++;
         } while ($attempts < 1000 && $this->numberExists($type, $number));
@@ -58,14 +58,17 @@ class DocumentNumberService
     {
         $config = $this->config($type);
 
-        $exists = DB::table($config['table'])
+        $query = DB::table($config['table'])
             ->where($config['column'], $number)
             ->when($ignoreId !== null, function ($query) use ($ignoreId) {
                 $query->where('id', '<>', $ignoreId);
-            })
-            ->exists();
+            });
 
-        if ($exists) {
+        if ($this->hasSoftDeleteColumn($config['table'])) {
+            $query->whereNull('deleted_at');
+        }
+
+        if ($query->exists()) {
             throw ValidationException::withMessages([
                 $config['field'] => "The {$config['field']} has already been used.",
             ]);
@@ -142,9 +145,14 @@ class DocumentNumberService
     {
         $config = $this->config($type);
 
-        return DB::table($config['table'])
-            ->where($config['column'], $number)
-            ->exists();
+        $query = DB::table($config['table'])
+            ->where($config['column'], $number);
+
+        if ($this->hasSoftDeleteColumn($config['table'])) {
+            $query->whereNull('deleted_at');
+        }
+
+        return $query->exists();
     }
 
     private function hasSoftDeleteColumn(string $table): bool

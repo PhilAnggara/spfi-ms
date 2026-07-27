@@ -141,7 +141,7 @@ class CanvassingController extends Controller
             'suppliers' => ['required', 'array', 'min:1'],
             'suppliers.*.id' => ['nullable', 'integer', 'exists:prs_canvassing_items,id'],
             'suppliers.*.supplier_id' => ['required', 'distinct', 'exists:suppliers,id'],
-            'suppliers.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'suppliers.*.unit_price' => ['required', 'numeric', 'min:0', 'decimal:0,5'],
             'suppliers.*.lead_time_days' => ['nullable', 'integer', 'min:0'],
             'suppliers.*.term_of_payment_type' => ['nullable', 'in:cash,credit'],
             'suppliers.*.term_of_payment' => ['nullable', 'string', 'max:255'],

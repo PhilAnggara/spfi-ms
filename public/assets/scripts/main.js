@@ -28,6 +28,38 @@ function keluar() {
   })
 }
 
+function confirmCancelPo(formId) {
+  Swal.fire({
+    title: 'Cancel Purchase Order?',
+    text: 'Items will return to Draft PO, and the PO number will be released so the paper form can be reused.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    confirmButtonText: 'Yes, cancel PO',
+    cancelButtonText: 'Keep PO'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      document.getElementById(formId).submit();
+    }
+  })
+}
+
+function confirmWithdrawPo(formId) {
+  Swal.fire({
+    title: 'Withdraw to Draft?',
+    text: 'This purchase order will return to draft so you can edit it again.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#ffc107',
+    confirmButtonText: 'Yes, withdraw',
+    cancelButtonText: 'Cancel'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      document.getElementById(formId).submit();
+    }
+  })
+}
+
 function hapusData(id, title, text) {
   Swal.fire({
     title: title,

@@ -33,6 +33,7 @@ class PrsCanvassingItem extends Model
         'prs_item_id' => 'integer',
         'supplier_id' => 'integer',
         'is_selected' => 'boolean',
+        'unit_price' => 'decimal:5',
         'lead_time_days' => 'integer',
         'canvased_by' => 'integer',
         'meta' => 'array',

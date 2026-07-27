@@ -155,7 +155,7 @@ class PurchaseOrderController extends Controller
                 'items.item.unit',
                 'items.prsItem.prs.department',
             ])
-                ->withCount('items')
+                ->withCount(['items', 'receivingReports'])
                 ->whereIn('id', $ids)
                 ->get()
                 ->keyBy('id');
@@ -603,6 +603,68 @@ class PurchaseOrderController extends Controller
     }
 
     /**
+     * Cancel an approved PO, release its number, and return items to the draft queue.
+     */
+    public function cancel(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        $user = $request->user();
+        $canCancel = $user->hasAnyRole(['administrator', 'purchasing-manager'])
+            || (int) $purchaseOrder->created_by === (int) $user->id;
+
+        if (! $canCancel) {
+            abort(403);
+        }
+
+        if ($purchaseOrder->status !== 'APPROVED') {
+            return redirect()->back()->withErrors(['message' => 'Only approved purchase orders can be cancelled.']);
+        }
+
+        if ($purchaseOrder->receivingReports()->exists()) {
+            return redirect()->back()->withErrors(['message' => 'Cannot cancel this PO because a receiving report already exists.']);
+        }
+
+        $validated = $request->validate([
+            'cancel_reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $releasedNumber = $purchaseOrder->po_number;
+        $reason = trim((string) ($validated['cancel_reason'] ?? ''));
+        $notes = 'Cancelled. Released PO number: '.($releasedNumber ?: '-').'.';
+        if ($reason !== '') {
+            $notes .= ' Reason: '.$reason;
+        }
+
+        DB::transaction(function () use ($purchaseOrder, $notes) {
+            $prsItems = PrsItem::query()
+                ->with('prs')
+                ->where('purchase_order_id', $purchaseOrder->id)
+                ->get();
+
+            PrsItem::query()
+                ->where('purchase_order_id', $purchaseOrder->id)
+                ->update(['purchase_order_id' => null]);
+
+            $prsItems
+                ->pluck('prs')
+                ->filter()
+                ->unique('id')
+                ->each(fn (Prs $prs) => $prs->syncCanvassingPurchaseOrderStatus());
+
+            $purchaseOrder->update([
+                'status' => 'CANCELLED',
+                'approval_notes' => $notes,
+                'po_number' => 'CANCELLED-'.$purchaseOrder->id,
+            ]);
+
+            $purchaseOrder->delete();
+        });
+
+        return redirect()
+            ->route('purchase-orders.index')
+            ->with('success', 'Purchase order cancelled. Items returned to draft PO and the PO number was released for reuse.');
+    }
+
+    /**
      * Remove a PO line item and return its PRS item to the draft PO queue.
      */
     public function destroyItem(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderItem $purchaseOrderItem)
@@ -677,6 +739,7 @@ class PurchaseOrderController extends Controller
             'items.item.unit',
             'items.prsItem.prs.department',
             'createdBy',
+            'receivingReports',
         ]);
 
         return view('pages.purchase-orders.show', [

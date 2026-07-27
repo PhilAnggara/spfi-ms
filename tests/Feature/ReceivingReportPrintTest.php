@@ -1,9 +1,14 @@
 <?php
 
 use App\Models\Department;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\ReceivingReport;
+use App\Models\ReceivingReportItem;
 use App\Models\Supplier;
+use App\Models\UnitOfMeasure;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Support\Facades\Hash;
@@ -124,4 +129,109 @@ it('uses 215mm by 160mm page dimensions in receiving report view', function () {
         ->toContain('size: 215mm 160mm')
         ->toContain('width: 215mm')
         ->toContain('height: 160mm');
+});
+
+it('keeps long item names to two full lines without truncating the second line', function () {
+    $unit = UnitOfMeasure::query()->create(['name' => 'Pieces', 'code' => 'PCS']);
+    $category = ItemCategory::query()->create(['name' => 'Spare Parts', 'code' => 'SPR']);
+    $longName = 'HEAVY DUTY INDUSTRIAL GRADE STAINLESS STEEL BEARING HOUSING ASSEMBLY WITH EXTENDED SHAFT AND SEALED LUBRICATION PORT FOR HIGH SPEED APPLICATIONS';
+    $shortName = 'SHORT BOLT';
+
+    $longItem = Item::query()->create([
+        'name' => $longName,
+        'code' => 'LONG-ITEM',
+        'unit_of_measure_id' => $unit->id,
+        'category_id' => $category->id,
+        'type' => 'Raw Material',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+    $shortItem = Item::query()->create([
+        'name' => $shortName,
+        'code' => 'SHORT-ITEM',
+        'unit_of_measure_id' => $unit->id,
+        'category_id' => $category->id,
+        'type' => 'Raw Material',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    $purchaseOrder = $this->receivingReport->purchaseOrder;
+
+    $longPoItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $longItem->id,
+        'quantity' => 1,
+        'unit_price' => 10,
+        'total' => 10,
+        'line_subtotal' => 10,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+    ]);
+    $shortPoItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $shortItem->id,
+        'quantity' => 1,
+        'unit_price' => 5,
+        'total' => 5,
+        'line_subtotal' => 5,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $this->receivingReport->id,
+        'purchase_order_item_id' => $longPoItem->id,
+        'qty_good' => 1,
+        'qty_bad' => 0,
+    ]);
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $this->receivingReport->id,
+        'purchase_order_item_id' => $shortPoItem->id,
+        'qty_good' => 1,
+        'qty_bad' => 0,
+    ]);
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $this->receivingReport->fresh()->load([
+            'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
+            'createdBy',
+        ]),
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    expect($html)
+        ->toContain("line-height: 1.2;\n            height: 8.98mm;\n            max-height: 8.98mm;")
+        ->toContain('white-space: pre-line')
+        ->toContain($shortName)
+        ->not->toContain($longName)
+        ->not->toContain('…');
+
+    preg_match_all('/class="cell item-cell"[^>]*>(.*?)<\/div>/s', $html, $matches);
+    $itemCells = $matches[1] ?? [];
+
+    expect($itemCells)->toHaveCount(2);
+    expect(substr_count($itemCells[0], "\n"))->toBe(1);
+
+    $longLines = explode("\n", html_entity_decode($itemCells[0]));
+    expect($longLines)->toHaveCount(2);
+    expect($longLines[0])->not->toEndWith('…');
+    expect($longLines[1])->not->toEndWith('…');
+    expect($longLines[1])->not->toBeEmpty();
+    expect($itemCells[1])->toBe($shortName);
 });

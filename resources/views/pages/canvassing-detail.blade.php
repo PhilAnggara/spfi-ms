@@ -149,7 +149,7 @@
                                         <div class="row g-3">
                                             <div class="col-12 col-lg-3">
                                                 <label class="form-label" for="unit-price-{{ $prsItem->id }}-{{ $index }}">Unit Price</label>
-                                                <input type="number" id="unit-price-{{ $prsItem->id }}-{{ $index }}" name="suppliers[{{ $index }}][unit_price]" class="form-control" min="0" step="0.01" value="{{ $canvassing->unit_price ?? '' }}" required>
+                                                <input type="number" id="unit-price-{{ $prsItem->id }}-{{ $index }}" name="suppliers[{{ $index }}][unit_price]" class="form-control" min="0" step="0.00001" value="{{ $canvassing?->unit_price !== null ? format_po_decimal($canvassing->unit_price, true) : '' }}" required>
                                             </div>
                                             <div class="col-12 col-lg-3">
                                                 <label class="form-label" for="lead-time-{{ $prsItem->id }}-{{ $index }}">Lead Time (days)</label>
@@ -213,7 +213,7 @@
                                 <div class="row g-3">
                                     <div class="col-12 col-lg-3">
                                         <label class="form-label" for="unit-price-{{ $prsItem->id }}-__INDEX__">Unit Price</label>
-                                        <input type="number" id="unit-price-{{ $prsItem->id }}-__INDEX__" name="suppliers[__INDEX__][unit_price]" class="form-control" min="0" step="0.01" required>
+                                        <input type="number" id="unit-price-{{ $prsItem->id }}-__INDEX__" name="suppliers[__INDEX__][unit_price]" class="form-control" min="0" step="0.00001" required>
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <label class="form-label" for="lead-time-{{ $prsItem->id }}-__INDEX__">Lead Time (days)</label>

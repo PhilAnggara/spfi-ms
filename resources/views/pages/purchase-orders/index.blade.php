@@ -202,7 +202,15 @@
 
                     @foreach ($purchaseOrders as $po)
                         @php
+                            $authUser = auth()->user();
                             $canEdit = in_array($po->status, ['DRAFT', 'CHANGES_REQUESTED'], true);
+                            $canCancel = $authUser
+                                && $po->status === 'APPROVED'
+                                && (int) ($po->receiving_reports_count ?? 0) === 0
+                                && (
+                                    $authUser->hasAnyRole(['administrator', 'purchasing-manager'])
+                                    || (int) $po->created_by === (int) $authUser->id
+                                );
                         @endphp
                         <div class="modal fade" id="poDetail-{{ $po->id }}" tabindex="-1" aria-labelledby="poDetailLabel-{{ $po->id }}" aria-hidden="true">
                             <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -224,11 +232,24 @@
                                     </div>
                                     <div class="modal-footer po-detail-modal-footer">
                                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                                        <a href="{{ route('purchase-orders.show', $po) }}" class="btn btn-outline-primary">
+                                            <i class="fa-light fa-arrow-up-right-from-square me-1"></i>
+                                            Open
+                                        </a>
                                         @if ($canEdit)
                                             <a href="{{ route('purchase-orders.show', $po) }}" class="btn btn-primary">
                                                 <i class="fa-light fa-pen-to-square me-1"></i>
                                                 Edit
                                             </a>
+                                        @endif
+                                        @if ($canCancel)
+                                            <form id="cancel-po-{{ $po->id }}" method="post" action="{{ route('purchase-orders.cancel', $po) }}" class="d-inline">
+                                                @csrf
+                                            </form>
+                                            <button type="button" class="btn btn-outline-danger" onclick="confirmCancelPo('cancel-po-{{ $po->id }}')">
+                                                <i class="fa-duotone fa-solid fa-ban me-1"></i>
+                                                Cancel PO
+                                            </button>
                                         @endif
                                         @if ($po->status === 'APPROVED')
                                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#poPrintConfirm-{{ $po->id }}">

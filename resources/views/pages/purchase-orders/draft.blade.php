@@ -66,24 +66,18 @@
 
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
-                <form method="get" class="row g-3 align-items-end po-filter-grid" id="po-filter-form">
-                    <div class="col-12 col-md-8 col-xl-9">
+                <div class="row g-3 align-items-end po-filter-grid" id="po-filter-form">
+                    <div class="col-12 col-md-10 col-xl-11">
                         <label for="filter-po-keyword" class="form-label mb-1">Search Draft PO</label>
                         <input type="text" id="filter-po-keyword" name="keyword" class="form-control" value="{{ $keyword ?? request('keyword') }}" placeholder="Supplier / item name / item code / PRS number">
                     </div>
-                    <div class="col-6 col-md-2 col-xl-2">
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="fa-light fa-magnifying-glass me-1"></i>
-                            Search
-                        </button>
-                    </div>
-                    <div class="col-6 col-md-2 col-xl-1">
+                    <div class="col-12 col-md-2 col-xl-1">
                         <button type="button" id="reset-po-filter" class="btn btn-light-secondary w-100">
                             <i class="fa-regular fa-rotate-left me-1"></i>
                             Reset
                         </button>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
 
@@ -193,7 +187,7 @@
                                                                     <input type="checkbox" class="form-check-input item-checkbox" data-accounting-category="{{ $accountingCategory }}" @checked($isInitiallySelected)>
                                                                     <input type="hidden" name="items[{{ $index }}][prs_item_id]" value="{{ $prsItem->id }}">
                                                                     <input type="hidden" name="items[{{ $index }}][quantity]" value="{{ $prsItem->quantity }}">
-                                                                    <input type="hidden" name="items[{{ $index }}][unit_price]" value="{{ $canvassing?->unit_price ?? 0 }}">
+                                                                    <input type="hidden" name="items[{{ $index }}][unit_price]" value="{{ format_po_decimal($canvassing?->unit_price ?? 0, true) }}">
                                                                     <input type="hidden" name="items[{{ $index }}][notes]" value="{{ $canvassing?->notes }}">
                                                                     <input type="hidden" name="items[{{ $index }}][checked]" class="item-checked" value="{{ $isInitiallySelected ? '1' : '0' }}">
                                                                 </td>

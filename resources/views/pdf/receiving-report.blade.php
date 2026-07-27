@@ -17,9 +17,69 @@
         $fieldFontSize = round(13 * $scaleY, 1);
         $poNumberFontSize = round(22 * $scaleY, 1);
         $capexFontSize = round(20 * $scaleY, 1);
-        $cellFontSize = round(12 * $scaleY, 1);
-        $acctCellFontSize = round(11 * $scaleY, 1);
-        $itemCellMaxHeight = round(8.8 * $scaleY, 2);
+        $cellFontSize = round(13 * $scaleY, 1);
+        $acctCellFontSize = round(13 * $scaleY, 1);
+        // DomPDF treats CSS px roughly as pt (1/72"), so size the row for 2 full text lines.
+        $itemLineHeight = 1.2;
+        $twoLineTextHeightMm = round(($cellFontSize * $itemLineHeight * 2) * (25.4 / 72), 2);
+        $rowHeightMm = max($sy(11), $twoLineTextHeightMm + 0.8);
+        $itemCellHeightMm = $rowHeightMm - 0.2;
+        $itemNameWidthMm = $sx(65);
+        // Slightly conservative char width so the 2nd line stays fully readable.
+        $itemNameCharsPerLine = max(18, (int) floor(($itemNameWidthMm * (96 / 25.4)) / max(1.0, $cellFontSize * 0.62)));
+        $fitItemNameToRows = static function (string $text, int $charsPerLine, int $maxLines = 2): string {
+            $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+            if ($text === '') {
+                return '-';
+            }
+
+            $words = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $lines = [];
+            $current = '';
+
+            $pushLine = static function (string $line) use (&$lines, $maxLines): bool {
+                if ($line === '' || count($lines) >= $maxLines) {
+                    return count($lines) >= $maxLines;
+                }
+                $lines[] = $line;
+
+                return count($lines) >= $maxLines;
+            };
+
+            foreach ($words as $word) {
+                while (mb_strlen($word) > $charsPerLine) {
+                    if ($current !== '' && $pushLine($current)) {
+                        return implode("\n", $lines);
+                    }
+                    $current = '';
+                    if ($pushLine(mb_substr($word, 0, $charsPerLine))) {
+                        return implode("\n", $lines);
+                    }
+                    $word = mb_substr($word, $charsPerLine);
+                }
+
+                if ($word === '') {
+                    continue;
+                }
+
+                $candidate = $current === '' ? $word : $current.' '.$word;
+                if (mb_strlen($candidate) <= $charsPerLine) {
+                    $current = $candidate;
+                    continue;
+                }
+
+                if ($pushLine($current)) {
+                    return implode("\n", $lines);
+                }
+                $current = $word;
+            }
+
+            if ($current !== '') {
+                $pushLine($current);
+            }
+
+            return implode("\n", $lines);
+        };
     @endphp
     <style>
         @page {
@@ -78,15 +138,18 @@
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
+            font-weight: bold;
         }
 
         .item-cell {
-            white-space: normal;
+            white-space: pre-line;
             text-overflow: clip;
-            line-height: 1;
-            max-height: {{ $itemCellMaxHeight }}mm;
-            overflow-wrap: anywhere;
-            word-break: break-word;
+            line-height: {{ $itemLineHeight }};
+            height: {{ $itemCellHeightMm }}mm;
+            max-height: {{ $itemCellHeightMm }}mm;
+            overflow: hidden;
+            overflow-wrap: normal;
+            word-break: normal;
         }
 
         .right {
@@ -104,6 +167,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            font-weight: bold;
         }
 
     </style>
@@ -112,8 +176,9 @@
     @php
         $po = $receivingReport->purchaseOrder;
         $rowStartTopMm = $sy(73);
-        $rowHeightMm = $sy(8);
-        $maxRows = 11;
+        // Leave space before the accounting block (starts around base-y 166).
+        $itemsBottomLimitMm = $sy(152);
+        $maxRows = max(1, (int) floor(($itemsBottomLimitMm - $rowStartTopMm) / $rowHeightMm));
         $rows = $receivingReport->items->take($maxRows)->values();
         $rowCount = $rows->count();
         $allItems = $receivingReport->items;
@@ -212,7 +277,7 @@
                 $top = $rowStartTopMm + ($index * $rowHeightMm);
             @endphp
 
-            <div class="cell item-cell" style="left: {{ $mmX(15) }}; top: {{ $top }}mm; width: {{ $mmX(65) }};">{{ $item?->name ?? '-' }}</div>
+            <div class="cell item-cell" style="left: {{ $mmX(15) }}; top: {{ $top }}mm; width: {{ $mmX(65) }};">{{ $fitItemNameToRows((string) ($item?->name ?? '-'), $itemNameCharsPerLine) }}</div>
             <div class="cell center" style="left: {{ $mmX(83) }}; top: {{ $top }}mm; width: {{ $mmX(20) }};">{{ $item?->code ?? '-' }}</div>
             <div class="cell center" style="left: {{ $mmX(108) }}; top: {{ $top }}mm; width: {{ $mmX(25) }};">{{ $departmentCode }}</div>
             <div class="cell right" style="left: {{ $mmX(138) }}; top: {{ $top }}mm; width: {{ $mmX(23) }};">{{ number_format($qtyTotal, 2, '.', ',') }}</div>

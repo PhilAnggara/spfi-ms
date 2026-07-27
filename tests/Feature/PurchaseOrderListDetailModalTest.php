@@ -48,8 +48,14 @@ it('shows po detail in a modal and opens print confirm before printing', functio
         ->get(route('purchase-orders.index'));
 
     $response->assertSuccessful();
-    $response->assertDontSee(
+    $response->assertSee(
         'href="'.route('purchase-orders.show', $this->purchaseOrder).'"',
+        false
+    );
+    $response->assertSee('Cancel PO');
+    $response->assertSee('confirmCancelPo(', false);
+    $response->assertSee(
+        'action="'.route('purchase-orders.cancel', $this->purchaseOrder).'"',
         false
     );
     $response->assertSee('data-bs-target="#poDetail-'.$this->purchaseOrder->id.'"', false);

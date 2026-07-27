@@ -149,7 +149,7 @@
                                                                 </div>
                                                             </td>
                                                             <td class="text-end" data-label="Unit Price">
-                                                                <span class="sc-price">{{ number_format($canvassing->unit_price, 2) }}</span>
+                                                                <span class="sc-price">{{ format_po_decimal($canvassing->unit_price) }}</span>
                                                             </td>
                                                             <td class="text-center" data-label="Lead Time">{{ $canvassing->lead_time_days ?? '-' }}</td>
                                                             <td data-label="Term of Payment">

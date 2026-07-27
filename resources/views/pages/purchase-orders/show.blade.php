@@ -38,6 +38,13 @@
                     $canWithdraw = $user
                         && $purchaseOrder->status === 'PENDING_APPROVAL'
                         && ($user->hasRole('administrator') || $purchaseOrder->created_by === $user->id);
+                    $canCancel = $user
+                        && $purchaseOrder->status === 'APPROVED'
+                        && $purchaseOrder->receivingReports->isEmpty()
+                        && (
+                            $user->hasAnyRole(['administrator', 'purchasing-manager'])
+                            || $purchaseOrder->created_by === $user->id
+                        );
                     $canRemoveItems = $canEdit && $purchaseOrder->items->count() > 1;
                     $feeItemsForForm = old('fee_items', $purchaseOrder->fees_breakdown ?? []);
 
@@ -334,15 +341,24 @@
                         </form>
                     </div>
                     <div class="col-12 col-md-6 text-md-end">
-                        @role('administrator|purchasing-staff')
+                        @role('administrator|purchasing-staff|purchasing-manager')
                             @if ($canWithdraw)
-                                <form method="post" action="{{ route('purchase-orders.withdraw', $purchaseOrder) }}" class="d-inline" onsubmit="return confirm('Withdraw this PO back to draft so you can edit it?');">
+                                <form id="withdraw-po-{{ $purchaseOrder->id }}" method="post" action="{{ route('purchase-orders.withdraw', $purchaseOrder) }}" class="d-inline">
                                     @csrf
-                                    <button type="submit" class="btn btn-warning">
-                                        <i class="fa-duotone fa-solid fa-rotate-left"></i>
-                                        Withdraw to Draft
-                                    </button>
                                 </form>
+                                <button type="button" class="btn btn-warning" onclick="confirmWithdrawPo('withdraw-po-{{ $purchaseOrder->id }}')">
+                                    <i class="fa-duotone fa-solid fa-rotate-left"></i>
+                                    Withdraw to Draft
+                                </button>
+                            @endif
+                            @if ($canCancel)
+                                <form id="cancel-po-{{ $purchaseOrder->id }}" method="post" action="{{ route('purchase-orders.cancel', $purchaseOrder) }}" class="d-inline">
+                                    @csrf
+                                </form>
+                                <button type="button" class="btn btn-outline-danger" onclick="confirmCancelPo('cancel-po-{{ $purchaseOrder->id }}')">
+                                    <i class="fa-duotone fa-solid fa-ban"></i>
+                                    Cancel PO
+                                </button>
                             @endif
                             @if (in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED']))
                                 <form method="post" action="{{ route('purchase-orders.submit', $purchaseOrder) }}" class="d-inline">
@@ -359,6 +375,12 @@
                                 <i class="fa-duotone fa-solid fa-print"></i>
                                 Print PO
                             </button>
+                        @elseif ($purchaseOrder->status === 'CANCELLED')
+                            <button type="button" class="btn btn-primary disabled" disabled>
+                                <i class="fa-duotone fa-solid fa-print"></i>
+                                Print PO
+                            </button>
+                            <div class="text-muted small mt-2">This purchase order has been cancelled.</div>
                         @else
                             <button type="button" class="btn btn-primary disabled" disabled>
                                 <i class="fa-duotone fa-solid fa-print"></i>
