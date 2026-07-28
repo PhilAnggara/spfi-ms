@@ -163,6 +163,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role:administrator|purchasing-staff')->group(function () {
         Route::get('/canvassing', [CanvassingController::class, 'index'])->name('canvassing.index');
+        Route::get('/canvassing/reports/print', [CanvassingController::class, 'printReports'])->name('canvassing.reports.print');
         Route::get('/canvassing/{prsItem}', [CanvassingController::class, 'show'])->name('canvassing.show');
         Route::get('/canvassing/{prsItem}/report', [CanvassingController::class, 'report'])->name('canvassing.report');
         Route::post('/canvassing/{prsItem}', [CanvassingController::class, 'store'])->name('canvassing.store');

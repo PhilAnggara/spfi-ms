@@ -18,6 +18,35 @@
     margin-bottom: 0;
 }
 
+.canvassing-select-cell {
+    width: 44px;
+    cursor: pointer;
+    vertical-align: middle !important;
+}
+
+.canvassing-select-cell-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.75rem;
+}
+
+.canvassing-select-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.canvassing-print-list {
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.canvassing-print-list-item + .canvassing-print-list-item {
+    margin-top: 0.65rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid #e2e8f0;
+}
+
 @media (max-width: 767.98px) {
     .canvassing-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none {
         justify-content: flex-start !important;

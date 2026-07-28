@@ -77,7 +77,15 @@
 
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                             <h5 class="card-title mb-0">Canvassing Data</h5>
-                            <span class="badge bg-light-primary" id="canvassing-filter-result">{{ $prsItems->total() }} records</span>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="badge bg-light-info text-info-emphasis" id="canvassing-selected-count">0 selected</span>
+                                <button type="button" class="btn btn-light-secondary btn-sm" id="canvassing-clear-selection-btn">Clear Selection</button>
+                                <button type="button" class="btn btn-danger btn-sm" id="canvassing-print-selected-btn" disabled>
+                                    <i class="fa-light fa-file-pdf me-1"></i>
+                                    Print Selected Reports
+                                </button>
+                                <span class="badge bg-light-primary" id="canvassing-filter-result">{{ $prsItems->total() }} records</span>
+                            </div>
                         </div>
 
                         @if ($prsItems->isEmpty())
@@ -91,6 +99,9 @@
                                 <table class="table table-striped align-middle po-table text-nowrap" id="canvassing-table">
                                     <thead>
                                         <tr>
+                                            <th style="width: 44px;">
+                                                <input type="checkbox" class="form-check-input" id="canvassing-select-page-checkbox" title="Select printable items on this page">
+                                            </th>
                                             <th>PRS Number</th>
                                             <th>Department</th>
                                             <th>Item Code</th>
@@ -112,8 +123,28 @@
                                                 $departmentName = $department?->name ?? 'Department not available';
                                                 $itemCode = $item?->code ?? 'N/A';
                                                 $itemName = $item?->name ?? 'Item not found';
+                                                $hasQuotes = $prsItem->canvassingItems->isNotEmpty();
                                             @endphp
                                             <tr>
+                                                <td class="canvassing-select-cell">
+                                                    <div class="canvassing-select-cell-inner">
+                                                        <input
+                                                            id="canvassing-select-{{ $prsItem->id }}"
+                                                            type="checkbox"
+                                                            class="form-check-input canvassing-select-checkbox"
+                                                            value="{{ $prsItem->id }}"
+                                                            data-prs-number="{{ $prsNumber }}"
+                                                            data-item-code="{{ $itemCode }}"
+                                                            data-item-name="{{ $itemName }}"
+                                                            @disabled(! $hasQuotes)
+                                                            @if (! $hasQuotes)
+                                                                data-bstooltip-toggle="tooltip"
+                                                                data-bs-placement="top"
+                                                                title="No supplier data"
+                                                            @endif
+                                                        >
+                                                    </div>
+                                                </td>
                                                 <td>
                                                     <button class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill" onclick="copyToClipboard('{{ $prsNumber }}')">
                                                         <i class="fa-solid fa-regular fa-clipboard"></i>
@@ -143,7 +174,7 @@
                                                 </td>
                                                 <td>
                                                     <div class="btn-group btn-group-sm">
-                                                        <a href="{{ route('canvassing.show', $prsItem->id) }}" class="btn icon {{ $prsItem->canvassingItems->isNotEmpty() ? 'btn-outline-primary' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $prsItem->canvassingItems->isNotEmpty() ? 'Manage Suppliers' : 'Add Supplier' }}">
+                                                        <a href="{{ route('canvassing.show', $prsItem->id) }}" class="btn icon {{ $hasQuotes ? 'btn-outline-primary' : '' }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $hasQuotes ? 'Manage Suppliers' : 'Add Supplier' }}">
                                                             <i class="fa-light fa-pen-to-square"></i>
                                                         </a>
                                                         @if (!$prsItem->purchase_order_id)
@@ -202,6 +233,43 @@
             </div>
         </div>
     @endforeach
+
+    <div class="modal fade" id="canvassing-print-modal" tabindex="-1" aria-labelledby="canvassing-print-modal-label" aria-hidden="true">
+        <div class="modal-dialog">
+            <form
+                method="GET"
+                action="{{ route('canvassing.reports.print') }}"
+                target="_blank"
+                class="modal-content po-detail-modal document-print-confirm-form"
+                id="canvassing-print-form"
+            >
+                <div class="modal-header po-detail-modal-header">
+                    <div>
+                        <h5 class="modal-title" id="canvassing-print-modal-label">Confirm Print Reports</h5>
+                        <small class="text-muted" id="canvassing-print-summary">Selected items: 0</small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-text mb-3">
+                        Selected items will be combined into one PDF before it opens in a new tab.
+                    </div>
+                    <div class="alert alert-light border mb-0">
+                        <div class="fw-semibold mb-2">Selected items</div>
+                        <ul class="list-unstyled mb-0 canvassing-print-list" id="canvassing-print-list"></ul>
+                    </div>
+                    <div id="canvassing-print-hidden-inputs"></div>
+                </div>
+                <div class="modal-footer po-detail-modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-duotone fa-solid fa-print me-1"></i>
+                        Confirm &amp; Print
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 @endsection
 
@@ -213,4 +281,5 @@
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/canvassing-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/canvassing-index.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/document-print-confirm.js') }}"></script>
 @endpush

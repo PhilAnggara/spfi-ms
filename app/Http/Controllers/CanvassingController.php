@@ -11,6 +11,7 @@ use App\Services\PrsHoldService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -272,19 +273,9 @@ class CanvassingController extends Controller
                 ->withErrors(['message' => 'This PRS item is not available for canvassing.']);
         }
 
-        $prsItem->load([
-            'prs.department',
-            'prs.user',
-            'item.unit',
-            'canvassingItems.supplier',
-            'selectedCanvassingItem.supplier',
-        ]);
+        $payload = $this->buildCanvassingReportPayload($prsItem);
 
-        $canvassingItems = $prsItem->canvassingItems
-            ->sortBy('unit_price')
-            ->values();
-
-        if ($canvassingItems->isEmpty()) {
+        if ($payload === null) {
             return redirect()
                 ->route('canvassing.show', $prsItem)
                 ->withErrors(['message' => 'Canvassing report cannot be generated because no supplier data is available yet.']);
@@ -297,13 +288,113 @@ class CanvassingController extends Controller
         );
 
         return Pdf::loadView('pdf.canvassing-report', [
-            'prsItem' => $prsItem,
-            'canvassingItems' => $canvassingItems,
-            'maxUnitPrice' => (float) max($canvassingItems->max('unit_price') ?? 0, 1),
+            'reports' => collect([$payload]),
             'generatedBy' => $request->user(),
         ])
             ->setPaper('a4', 'portrait')
             ->stream($filename);
+    }
+
+    /**
+     * Download canvassing reports for multiple selected PRS items.
+     */
+    public function printReports(Request $request)
+    {
+        $validated = $request->validate([
+            'prs_item_ids' => ['required', 'array', 'min:1'],
+            'prs_item_ids.*' => ['required', 'integer', 'exists:prs_items,id'],
+        ]);
+
+        $requestedIds = collect($validated['prs_item_ids'])
+            ->map(static fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $prsItems = PrsItem::query()
+            ->with([
+                'prs.department',
+                'prs.user',
+                'item.unit',
+                'canvassingItems.supplier',
+                'selectedCanvassingItem.supplier',
+            ])
+            ->whereIn('id', $requestedIds)
+            ->get()
+            ->keyBy('id');
+
+        if ($prsItems->count() !== $requestedIds->count()) {
+            return redirect()
+                ->route('canvassing.index')
+                ->withErrors(['message' => 'One or more selected items could not be found.']);
+        }
+
+        $reports = collect();
+
+        foreach ($requestedIds as $prsItemId) {
+            /** @var PrsItem $prsItem */
+            $prsItem = $prsItems->get($prsItemId);
+
+            if (! $this->canAccessCanvassingItem($prsItem, $request) || ! $this->isPrsItemOpenForCanvassing($prsItem)) {
+                return redirect()
+                    ->route('canvassing.index')
+                    ->withErrors(['message' => 'One or more selected items are not available for canvassing report printing.']);
+            }
+
+            $payload = $this->buildCanvassingReportPayload($prsItem);
+
+            if ($payload === null) {
+                return redirect()
+                    ->route('canvassing.index')
+                    ->withErrors(['message' => 'Canvassing report cannot be generated because one or more selected items have no supplier data yet.']);
+            }
+
+            $reports->push($payload);
+        }
+
+        $reports = $reports
+            ->sortBy([
+                fn (array $report) => (string) ($report['prsItem']->prs?->prs_number ?? ''),
+                fn (array $report) => (string) ($report['prsItem']->item?->code ?? ''),
+                fn (array $report) => (int) $report['prsItem']->id,
+            ])
+            ->values();
+
+        $filename = sprintf('canvassing-reports-%s.pdf', now()->format('YmdHis'));
+
+        return Pdf::loadView('pdf.canvassing-reports', [
+            'reports' => $reports,
+            'generatedBy' => $request->user(),
+        ])
+            ->setPaper('a4', 'portrait')
+            ->stream($filename);
+    }
+
+    /**
+     * @return array{prsItem: PrsItem, canvassingItems: Collection<int, PrsCanvassingItem>, maxUnitPrice: float}|null
+     */
+    private function buildCanvassingReportPayload(PrsItem $prsItem): ?array
+    {
+        $prsItem->loadMissing([
+            'prs.department',
+            'prs.user',
+            'item.unit',
+            'canvassingItems.supplier',
+            'selectedCanvassingItem.supplier',
+        ]);
+
+        $canvassingItems = $prsItem->canvassingItems
+            ->sortBy('unit_price')
+            ->values();
+
+        if ($canvassingItems->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'prsItem' => $prsItem,
+            'canvassingItems' => $canvassingItems,
+            'maxUnitPrice' => (float) max($canvassingItems->max('unit_price') ?? 0, 1),
+        ];
     }
 
     /**
