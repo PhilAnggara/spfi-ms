@@ -208,6 +208,30 @@ it('shows process for requested and edit canvasser for canvassing prs', function
         ->assertDontSee('data-bs-target="#approve-modal-'.$canvassingPrs->id.'"', false);
 });
 
+it('renders assign canvasser modal as scrollable with sticky process button', function () {
+    $prs = createRequestedPrsWithItems(3);
+
+    $response = $this->actingAs($this->manager)
+        ->get(route('prs.approval.index'));
+
+    $response->assertSuccessful()
+        ->assertSee('id="approve-modal-'.$prs->id.'"', false)
+        ->assertSee('assign-canvasser-modal', false)
+        ->assertSee('modal-dialog modal-lg modal-dialog-scrollable', false)
+        ->assertSee('Process')
+        ->assertSee('assets/css/prs-modern.css', false);
+});
+
+it('includes css so assign canvasser form body scrolls and footer stays visible', function () {
+    $css = file_get_contents(public_path('assets/css/prs-modern.css'));
+
+    expect($css)->toContain('.assign-canvasser-modal .modal-content > form');
+    expect($css)->toContain('.assign-canvasser-modal .modal-body');
+    expect($css)->toContain('overflow-y: auto');
+    expect($css)->toContain('.assign-canvasser-modal .modal-footer');
+    expect($css)->toContain('flex-shrink: 0');
+});
+
 it('rejects approve when prs is already canvassing', function () {
     $prs = assignPrsToCanvassing(createRequestedPrsWithItems(1), $this->canvasser);
     $item = $prs->items()->first();
