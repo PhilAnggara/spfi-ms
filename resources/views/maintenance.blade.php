@@ -22,6 +22,7 @@
                     @isset($retryAfter)
                         @php
                             $seconds = (int) $retryAfter;
+                            $endsAt = now()->getTimestamp() + $seconds;
                             if ($seconds < 60) {
                                 $estimateLabel = $seconds.' '.Str::plural('second', $seconds);
                             } elseif ($seconds < 3600) {
@@ -36,7 +37,7 @@
                                 }
                             }
                         @endphp
-                        <div id="maintenance-estimate" class="mt-3 mb-3" data-retry-after="{{ $seconds }}">
+                        <div id="maintenance-estimate" class="mt-3 mb-3" data-retry-after="{{ $seconds }}" data-ends-at="{{ $endsAt }}">
                             <p class="fs-5 text-gray-600 mb-2">Estimated downtime: about {{ $estimateLabel }}.</p>
                             <p class="text-uppercase text-gray-600 small mb-1">Time remaining</p>
                             <p id="maintenance-countdown" class="fs-2 fw-semibold text-primary font-monospace mb-0" aria-live="polite">--:--:--</p>
@@ -59,12 +60,12 @@
                     return;
                 }
 
-                const totalSeconds = parseInt(estimate.dataset.retryAfter, 10);
-                if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+                const endsAtSeconds = parseInt(estimate.dataset.endsAt, 10);
+                if (!Number.isFinite(endsAtSeconds) || endsAtSeconds <= 0) {
                     return;
                 }
 
-                const endsAt = Date.now() + (totalSeconds * 1000);
+                const endsAt = endsAtSeconds * 1000;
 
                 function pad(value) {
                     return String(value).padStart(2, '0');
