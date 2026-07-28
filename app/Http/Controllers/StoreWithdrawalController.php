@@ -549,6 +549,7 @@ class StoreWithdrawalController extends Controller
                 'sw.info',
                 'sw.approved_at',
                 'sw.created_at',
+                'sw.created_by',
                 'd.name as department_name',
                 'creator.name as created_by_name',
                 'approver.name as approved_by_name',
@@ -557,6 +558,14 @@ class StoreWithdrawalController extends Controller
 
         if (! $sws) {
             abort(404);
+        }
+
+        $manager = null;
+        if (! empty($sws->created_by)) {
+            $creator = User::with('department')->find((int) $sws->created_by);
+            if ($creator?->department) {
+                $manager = get_manager($creator);
+            }
         }
 
         $items = DB::table('store_withdrawal_items as swi')
@@ -595,6 +604,7 @@ class StoreWithdrawalController extends Controller
         return Pdf::loadView('pdf.store-withdrawal-slip', [
             'sws' => $sws,
             'items' => $items,
+            'manager' => $manager,
         ])
             ->setPaper('a4', 'portrait')
             ->stream($filename);

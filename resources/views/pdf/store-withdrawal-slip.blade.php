@@ -354,22 +354,20 @@
                 </td>
                 <td style="width: {{ $columnWidth }};">
                     <div class="sig-line"></div>
-                    {{ $sws->approved_by_name ?? '____________________' }}
+                    {{ $manager?->name ?? $sws->approved_by_name ?? '____________________' }}
                 </td>
             </tr>
 
             <tr class="sig-titles">
                 <td style="width: {{ $columnWidth }};">Requester</td>
-                <td style="width: {{ $columnWidth }};">Approver</td>
+                <td style="width: {{ $columnWidth }};">{{ $manager ? get_job_title($manager) : 'Approver' }}</td>
             </tr>
 
             <tr class="sig-dates">
                 <td style="width: {{ $columnWidth }};">
                     {{ $sws->created_at ? \Carbon\Carbon::parse($sws->created_at)->format('d M Y') : 'Date: __________' }}
                 </td>
-                <td style="width: {{ $columnWidth }};">
-                    {{ $sws->approved_at ? \Carbon\Carbon::parse($sws->approved_at)->format('d M Y') : 'Date: __________' }}
-                </td>
+                <td style="width: {{ $columnWidth }};">Date: __________</td>
             </tr>
         </table>
     </div>

@@ -3,6 +3,15 @@
 use Illuminate\Support\Collection;
 
 it('renders sws print layout in prs style with only two signatures', function () {
+    $manager = (object) [
+        'name' => 'Dept Manager',
+        'role' => 'Manager',
+        'department' => (object) [
+            'name' => 'Engineering',
+            'alias' => 'ENG',
+        ],
+    ];
+
     $sws = (object) [
         'sws_number' => 'SWS-PRINT-001',
         'sws_date' => now()->toDateString(),
@@ -11,9 +20,9 @@ it('renders sws print layout in prs style with only two signatures', function ()
         'type' => 'opex',
         'info' => 'Print layout test info',
         'created_by_name' => 'Requester User',
-        'approved_by_name' => 'Approver User',
+        'approved_by_name' => null,
         'created_at' => now()->subDay(),
-        'approved_at' => now(),
+        'approved_at' => null,
     ];
 
     $items = new Collection([
@@ -34,6 +43,7 @@ it('renders sws print layout in prs style with only two signatures', function ()
     $html = view('pdf.store-withdrawal-slip', [
         'sws' => $sws,
         'items' => $items,
+        'manager' => $manager,
     ])->render();
 
     expect($html)->toContain('Stores Withdrawal Slip')
@@ -41,7 +51,8 @@ it('renders sws print layout in prs style with only two signatures', function ()
         ->and($html)->toContain('SWS Number')
         ->and($html)->toContain('SWS-PRINT-001')
         ->and($html)->toContain('Requester User')
-        ->and($html)->toContain('Approver User')
+        ->and($html)->toContain('Dept Manager')
+        ->and($html)->toContain(get_job_title($manager))
         ->and($html)->toContain('Remarks')
         ->and($html)->toContain('Print layout test info')
         ->and($html)->toContain('UOM')
@@ -53,7 +64,33 @@ it('renders sws print layout in prs style with only two signatures', function ()
         ->and(substr_count($html, 'Approved By'))->toBe(1)
         ->and($html)->not->toContain('Checked by')
         ->and($html)->not->toContain('Checked By')
-        ->and($html)->not->toContain('Reviewed By');
+        ->and($html)->not->toContain('Reviewed By')
+        ->and($html)->toContain('Date: __________');
+});
+
+it('falls back to approved_by_name when manager is missing', function () {
+    $sws = (object) [
+        'sws_number' => 'SWS-FALLBACK-001',
+        'sws_date' => now()->toDateString(),
+        'department_code' => '7046',
+        'department_name' => 'Engineering',
+        'type' => 'opex',
+        'info' => null,
+        'created_by_name' => 'Requester User',
+        'approved_by_name' => 'Legacy Approver',
+        'created_at' => now(),
+        'approved_at' => null,
+    ];
+
+    $html = view('pdf.store-withdrawal-slip', [
+        'sws' => $sws,
+        'items' => new Collection,
+        'manager' => null,
+    ])->render();
+
+    expect($html)->toContain('Legacy Approver')
+        ->and($html)->toContain('Approver')
+        ->and(substr_count($html, '>Approved By<'))->toBe(1);
 });
 
 it('renders capex columns and tag on sws print layout', function () {
@@ -88,6 +125,7 @@ it('renders capex columns and tag on sws print layout', function () {
     $html = view('pdf.store-withdrawal-slip', [
         'sws' => $sws,
         'items' => $items,
+        'manager' => null,
     ])->render();
 
     expect($html)->toContain('(CAPEX)')
