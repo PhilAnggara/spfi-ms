@@ -92,7 +92,7 @@
                                                 <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
                                                     <i class="fa-light fa-minus"></i>
                                                 </button>
-                                                <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                                                <input type="number" min="0.00001" step="0.00001" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
                                                 <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
                                                     <i class="fa-light fa-plus"></i>
                                                 </button>

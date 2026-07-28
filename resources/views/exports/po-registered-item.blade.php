@@ -18,7 +18,7 @@
     @php
         $fmtDate = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d-m-Y') : '';
         $fmtMoney = fn ($value) => number_format((float) $value, 2, ',', '.');
-        $fmtQty = fn ($value) => number_format((float) $value, 2, ',', '.');
+        $fmtQty = fn ($value) => \App\Support\PdfFormatters::qty($value);
     @endphp
 
     <table>

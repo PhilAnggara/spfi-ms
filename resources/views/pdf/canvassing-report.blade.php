@@ -139,7 +139,7 @@
             </tr>
             <tr>
                 <td class="label">Quantity</td>
-                <td>: {{ number_format($prsItem->quantity, 0, ',', '.') }} {{ $item->unit->name ?? 'PCS' }}</td>
+                <td>: {{ \App\Support\PdfFormatters::qty($prsItem->quantity) }} {{ $item->unit->name ?? 'PCS' }}</td>
                 <td class="label">Date Needed</td>
                 <td>: {{ $prs?->date_needed ? \Illuminate\Support\Carbon::parse($prs->date_needed)->format('d M Y') : '-' }}</td>
             </tr>

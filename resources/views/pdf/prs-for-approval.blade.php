@@ -264,7 +264,7 @@
                         <td class="text-center">{{ $idx + 1 }}</td>
                         <td>{{ $item->item->code ?? '-' }}</td>
                         <td>{{ $item->item->name ?? '-' }}</td>
-                        <td class="text-right">{{ number_format((float) $item->quantity, 0, ',', '.') }}</td>
+                        <td class="text-right">{{ \App\Support\PdfFormatters::qty($item->quantity) }}</td>
                         <td class="text-center">{{ $item->item->unit?->name ?? 'PCS' }}</td>
                     </tr>
                 @empty

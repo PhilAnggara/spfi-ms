@@ -74,7 +74,7 @@ class PrsItem extends Component
             return;
         }
 
-        $currentQty = (int) ($this->prsItems[$index]['quantity'] ?? 1);
+        $currentQty = (float) ($this->prsItems[$index]['quantity'] ?? 1);
         $this->prsItems[$index]['quantity'] = $currentQty + 1;
         $this->updateCartCount();
     }
@@ -85,8 +85,8 @@ class PrsItem extends Component
             return;
         }
 
-        $currentQty = (int) ($this->prsItems[$index]['quantity'] ?? 1);
-        $this->prsItems[$index]['quantity'] = max(1, $currentQty - 1);
+        $currentQty = (float) ($this->prsItems[$index]['quantity'] ?? 1);
+        $this->prsItems[$index]['quantity'] = max(0.00001, $currentQty - 1);
         $this->updateCartCount();
     }
 
@@ -96,9 +96,9 @@ class PrsItem extends Component
             return;
         }
 
-        $quantity = (int) $quantity;
-        if ($quantity < 1) {
-            $quantity = 1;
+        $quantity = (float) $quantity;
+        if ($quantity < 0.00001) {
+            $quantity = 0.00001;
         }
 
         $item = Item::query()->where('is_active', true)->find($itemId);

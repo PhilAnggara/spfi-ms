@@ -148,8 +148,8 @@
                                                 type="number"
                                                 name="items[{{ $index }}][quantity]"
                                                 class="form-control qty-input text-end"
-                                                min="1"
-                                                step="1"
+                                                min="0.00001"
+                                                step="0.00001"
                                                 value="{{ $item['quantity'] }}"
                                                 data-row="{{ $index }}"
                                                 required

@@ -31,6 +31,7 @@ class PurchaseOrderSeeder extends Seeder
 
         if (empty($poRows)) {
             $this->warn('No PO rows found from configured source.');
+
             return;
         }
 
@@ -73,6 +74,7 @@ class PurchaseOrderSeeder extends Seeder
             $poCode = $this->normalizeValue($poRow['po_code'] ?? null);
             if ($poCode === null) {
                 $skippedPo++;
+
                 continue;
             }
 
@@ -80,6 +82,7 @@ class PurchaseOrderSeeder extends Seeder
             if ($supplierId === null) {
                 $this->warn("PO skipped: supplier_code not found for po_code {$poCode}");
                 $skippedPo++;
+
                 continue;
             }
 
@@ -131,6 +134,7 @@ class PurchaseOrderSeeder extends Seeder
                 if ($itemId === null) {
                     $skippedDetail++;
                     $this->warn("PO detail skipped: product_code not found for po_code {$poCode}");
+
                     continue;
                 }
 
@@ -167,7 +171,7 @@ class PurchaseOrderSeeder extends Seeder
                     'legacy_id' => $detailId,
                     'prs_item_id' => $prsCandidate['id'] ?? null,
                     'item_id' => $itemId,
-                    'quantity' => round($quantity, 2),
+                    'quantity' => round($quantity, 5),
                     'unit_price' => round($unitPrice, 2),
                     'line_subtotal' => round($lineSubtotal, 2),
                     'discount_rate' => $discountRate,
@@ -348,6 +352,7 @@ class PurchaseOrderSeeder extends Seeder
 
                 if ($this->isSqlServer()) {
                     $operation();
+
                     return;
                 }
 
@@ -374,7 +379,8 @@ class PurchaseOrderSeeder extends Seeder
 
         if ($this->isLegacySource() && ! empty($legacyRows)) {
             $this->logImportSource($dataset, 'legacy');
-            $this->command?->info("ℹ [{$dataset}] rows loaded: " . count($legacyRows));
+            $this->command?->info("ℹ [{$dataset}] rows loaded: ".count($legacyRows));
+
             return $legacyRows;
         }
 
@@ -386,7 +392,7 @@ class PurchaseOrderSeeder extends Seeder
             $this->logImportSource($dataset, 'csv');
         }
 
-        $this->command?->info("ℹ [{$dataset}] rows loaded: " . count($csvRows));
+        $this->command?->info("ℹ [{$dataset}] rows loaded: ".count($csvRows));
 
         return $csvRows;
     }
@@ -400,12 +406,14 @@ class PurchaseOrderSeeder extends Seeder
 
         if (! file_exists($csvPath)) {
             $this->warn("CSV for dataset [{$dataset}] not found at {$csvPath}");
+
             return [];
         }
 
         $handle = fopen($csvPath, 'r');
         if ($handle === false) {
             $this->warn("Unable to open CSV for dataset [{$dataset}] at {$csvPath}");
+
             return [];
         }
 
@@ -420,12 +428,14 @@ class PurchaseOrderSeeder extends Seeder
         $header = fgetcsv($handle, 0, $delimiter);
         if ($header === false) {
             fclose($handle);
+
             return [];
         }
 
         $header = array_map(function ($value): string {
             $value = (string) $value;
             $value = preg_replace('/^\xEF\xBB\xBF/', '', $value) ?? $value;
+
             return trim($value);
         }, $header);
 
@@ -455,7 +465,6 @@ class PurchaseOrderSeeder extends Seeder
 
         return $rows;
     }
-
 
     /**
      * @param  array<string, int>  $codeLookup
@@ -600,6 +609,7 @@ class PurchaseOrderSeeder extends Seeder
                 if ((int) $candidate['id'] === $candidateId) {
                     unset($queue[$key][$idx]);
                     $queue[$key] = array_values($queue[$key]);
+
                     return;
                 }
             }
@@ -609,7 +619,8 @@ class PurchaseOrderSeeder extends Seeder
     private function buildPrsKey(string $prsNumber, int $itemId, ?string $departmentCode): string
     {
         $dept = $departmentCode !== null ? $this->normalizeLookupText($departmentCode) : '';
-        return $this->normalizeLookupText($prsNumber) . '|' . $itemId . '|' . $dept;
+
+        return $this->normalizeLookupText($prsNumber).'|'.$itemId.'|'.$dept;
     }
 
     private function mapPoStatus(bool $isApproved, bool $isCertified): string
@@ -755,12 +766,14 @@ class PurchaseOrderSeeder extends Seeder
     private function isAffirmative(mixed $value): bool
     {
         $normalized = strtoupper((string) ($this->normalizeValue($value) ?? ''));
+
         return in_array($normalized, ['Y', 'YES', '1', 'TRUE', 'T'], true);
     }
 
     private function isNegative(mixed $value): bool
     {
         $normalized = strtoupper((string) ($this->normalizeValue($value) ?? ''));
+
         return in_array($normalized, ['N', 'NO', '0', 'FALSE', 'F'], true);
     }
 
@@ -776,6 +789,7 @@ class PurchaseOrderSeeder extends Seeder
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             try {
                 $operation();
+
                 return true;
             } catch (\Throwable $exception) {
                 $isRetryableDrop = $this->isSqlServer()
@@ -786,6 +800,7 @@ class PurchaseOrderSeeder extends Seeder
                     $this->warn("SQL Server connection dropped while processing {$context}. Retrying once.");
                     DB::disconnect();
                     DB::reconnect();
+
                     continue;
                 }
 

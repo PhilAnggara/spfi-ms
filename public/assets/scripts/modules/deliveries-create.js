@@ -227,7 +227,7 @@ function initDeliveryCatalogAndCart() {
     const canSelectStock = (stockValue) => Number(stockValue) > 0;
 
     const getAllowedQuantity = (stockValue, requestedQuantity) => {
-        const normalizedQuantity = Math.max(1, Number(requestedQuantity) || 1);
+        const normalizedQuantity = Math.max(0.00001, Number(requestedQuantity) || 1);
         const normalizedStock = Number(stockValue) || 0;
         if (normalizedStock <= 0) {
             return 0;
@@ -245,7 +245,8 @@ function initDeliveryCatalogAndCart() {
         const payload = getCardPayload(card);
         const allowedQuantity = getAllowedQuantity(payload.stock, qtyInput.value);
 
-        qtyInput.min = '1';
+        qtyInput.min = '0.00001';
+        qtyInput.step = '0.00001';
 
         if (payload.stock > 0) {
             qtyInput.max = String(payload.stock);
@@ -420,7 +421,7 @@ function initDeliveryCatalogAndCart() {
                                 <button type="button" class="btn btn-light-secondary delivery-cart-decrement" data-item-id="${item.itemId}" aria-label="Decrease quantity">
                                     <i class="fa-light fa-minus"></i>
                                 </button>
-                                <input type="number" min="1" ${quantityMaxAttribute} class="form-control delivery-cart-qty" value="${item.quantity}" data-item-id="${item.itemId}">
+                                <input type="number" min="0.00001" step="0.00001" ${quantityMaxAttribute} class="form-control delivery-cart-qty" value="${item.quantity}" data-item-id="${item.itemId}">
                                 <button type="button" class="btn btn-light-secondary delivery-cart-increment" data-item-id="${item.itemId}" aria-label="Increase quantity">
                                     <i class="fa-light fa-plus"></i>
                                 </button>
@@ -751,8 +752,8 @@ function initDeliveryCatalogAndCart() {
             const row = minus.closest('.prs-item-card, .prs-catalog-row');
             const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
-                const current = parseInt(qtyInput.value || '1', 10);
-                qtyInput.value = Math.max(1, Number.isNaN(current) ? 1 : current - 1);
+                const current = parseFloat(qtyInput.value || '1');
+                qtyInput.value = Math.max(0.00001, Number.isNaN(current) ? 1 : current - 1);
             }
             return;
         }
@@ -769,7 +770,7 @@ function initDeliveryCatalogAndCart() {
 
         const payload = getCardPayload(row);
         const qtyInput = row.querySelector('.prs-item-qty');
-        const quantity = Math.max(1, Number(qtyInput?.value || '1') || 1);
+        const quantity = Math.max(0.00001, Number(qtyInput?.value || '1') || 1);
 
         if (qtyInput) {
             qtyInput.value = String(getAllowedQuantity(payload.stock, quantity) || 1);
@@ -786,7 +787,7 @@ function initDeliveryCatalogAndCart() {
 
         const row = qtyInput.closest('.prs-item-card, .prs-catalog-row');
         const payload = row ? getCardPayload(row) : null;
-        const quantity = Math.max(1, Number(qtyInput.value || '1') || 1);
+        const quantity = Math.max(0.00001, Number(qtyInput.value || '1') || 1);
         const allowedQuantity = payload ? getAllowedQuantity(payload.stock, quantity) : quantity;
 
         qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
@@ -809,7 +810,7 @@ function initDeliveryCatalogAndCart() {
             }
 
             const current = state.cart.get(itemId);
-            const quantity = Math.max(1, Number(qtyInput.value || '1') || 1);
+            const quantity = Math.max(0.00001, Number(qtyInput.value || '1') || 1);
             const allowedQuantity = getAllowedQuantity(current.stock, quantity);
             qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
 
@@ -859,7 +860,7 @@ function initDeliveryCatalogAndCart() {
                 const current = state.cart.get(itemId);
                 state.cart.set(itemId, {
                     ...current,
-                    quantity: Math.max(1, Number(current.quantity || 1) - 1),
+                    quantity: Math.max(0.00001, Number(current.quantity || 1) - 1),
                 });
 
                 renderCart();

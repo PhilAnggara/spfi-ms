@@ -201,7 +201,7 @@
                                                                     <div class="fw-semibold">{{ $item?->name ?? 'Item not found' }}</div>
                                                                     <small class="text-muted">{{ $item?->code ?? '-' }}</small>
                                                                 </td>
-                                                                <td class="fw-semibold">{{ $prsItem->quantity }}</td>
+                                                                <td class="fw-semibold">{{ \App\Support\PdfFormatters::qty($prsItem->quantity) }}</td>
                                                                 <td>{{ $item?->unit?->name ?? 'PCS' }}</td>
                                                                 <td class="fw-semibold">{{ format_po_decimal($canvassing?->unit_price ?? 0) }}</td>
                                                                 <td>{{ $canvassing?->notes ?? '-' }}</td>

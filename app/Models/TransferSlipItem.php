@@ -29,7 +29,7 @@ class TransferSlipItem extends Model
         'transfer_slip_id' => 'integer',
         'store_withdrawal_item_id' => 'integer',
         'item_id' => 'integer',
-        'quantity' => 'decimal:3',
+        'quantity' => 'decimal:5',
         'created_by' => 'integer',
         'updated_by' => 'integer',
         'meta' => 'array',

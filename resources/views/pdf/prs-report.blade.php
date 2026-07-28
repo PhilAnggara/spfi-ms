@@ -46,7 +46,7 @@
                         <div class="badge">{{ $prs->items->count() }} item(s)</div>
                         <ul class="items">
                             @foreach ($prs->items as $item)
-                                <li>{{ $item->item->code ?? '-' }} — {{ $item->item->name ?? '-' }} ({{ $item->quantity }} {{ $item->item->unit?->name ?? '' }})</li>
+                                <li>{{ $item->item->code ?? '-' }} — {{ $item->item->name ?? '-' }} ({{ \App\Support\PdfFormatters::qty($item->quantity) }} {{ $item->item->unit?->name ?? '' }})</li>
                             @endforeach
                         </ul>
                     </td>

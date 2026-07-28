@@ -90,7 +90,7 @@
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <span class="badge bg-light-info text-uppercase">{{ $prsItem->item->code }}</span>
                                 <span class="fw-semibold">{{ $prsItem->item->name }}</span>
-                                <span class="badge bg-light-secondary">Qty {{ $prsItem->quantity }} {{ $prsItem->item->unit?->name ?? 'PCS' }}</span>
+                                <span class="badge bg-light-secondary">Qty {{ \App\Support\PdfFormatters::qty($prsItem->quantity) }} {{ $prsItem->item->unit?->name ?? 'PCS' }}</span>
                                 @if ($prsItem->is_direct_purchase)
                                     <span class="badge bg-light-info">
                                         <i class="fa-duotone fa-solid fa-basket-shopping"></i>

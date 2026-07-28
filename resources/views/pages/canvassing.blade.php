@@ -128,7 +128,7 @@
                                                 </td>
                                                 <td data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $itemName }}">{{ Str::limit($itemName, 40) }}</td>
                                                 <td>
-                                                    <span class="fw-semibold">{{ $prsItem->quantity }}</span>
+                                                    <span class="fw-semibold">{{ \App\Support\PdfFormatters::qty($prsItem->quantity) }}</span>
                                                     <small class="text-muted">{{ $item?->unit?->name ?? 'PCS' }}</small>
                                                 </td>
                                                 <td>

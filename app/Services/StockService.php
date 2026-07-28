@@ -48,9 +48,9 @@ class StockService
 
             $currentQty = (float) ($current['qty_good'] ?? 0);
             $previousQty = (float) ($previous['qty_good'] ?? 0);
-            $deltaQty = round($currentQty - $previousQty, 2);
+            $deltaQty = round($currentQty - $previousQty, 5);
 
-            if (abs($deltaQty) < 0.01) {
+            if (abs($deltaQty) < 0.00001) {
                 continue;
             }
 
@@ -188,22 +188,22 @@ class StockService
             $itemId = (int) ($line['item_id'] ?? 0);
             $productCode = (string) ($line['product_code'] ?? '');
             $referenceLineId = (int) ($line['reference_line_id'] ?? 0);
-            $quantity = round((float) ($line['quantity'] ?? 0), 2);
+            $quantity = round((float) ($line['quantity'] ?? 0), 5);
 
-            if ($itemId <= 0 || $productCode === '' || $referenceLineId <= 0 || abs($quantity) < 0.01) {
+            if ($itemId <= 0 || $productCode === '' || $referenceLineId <= 0 || abs($quantity) < 0.00001) {
                 continue;
             }
 
             $netIssued = $this->netIssuedQuantity($referenceType, $referenceId, $referenceLineId, $outBucket);
 
             if ($reverse) {
-                if ($netIssued < 0.01) {
+                if ($netIssued < 0.00001) {
                     continue;
                 }
 
                 $issueQty = -abs($netIssued);
             } else {
-                if ($netIssued >= 0.01) {
+                if ($netIssued >= 0.00001) {
                     continue;
                 }
 
@@ -236,7 +236,7 @@ class StockService
             ->where('reference_type', $referenceType)
             ->where('reference_id', $referenceId)
             ->where('reference_line_id', $referenceLineId)
-            ->sum($outBucket), 2);
+            ->sum($outBucket), 5);
     }
 
     /**
@@ -432,7 +432,7 @@ class StockService
             $endAvgPrice = $endQty > 0 ? $beginAvgPrice : 0;
         }
 
-        $stockInventory->balance = round($endQty, 2);
+        $stockInventory->balance = round($endQty, 5);
         $stockInventory->average_price = round($endAvgPrice, 2);
         $stockInventory->product_code = $productCode;
         $stockInventory->updated_by = $userId;
@@ -443,17 +443,17 @@ class StockService
             'item_id' => $itemId,
             'product_code' => $productCode,
             'wh_code' => $whCode,
-            'begin' => round($begin, 2),
-            'qty_in1' => round($qtyIn1, 2),
+            'begin' => round($begin, 5),
+            'qty_in1' => round($qtyIn1, 5),
             'qty_in2' => 0,
             'qty_in3' => 0,
-            'qty_out1' => round($qtyOut1, 2),
+            'qty_out1' => round($qtyOut1, 5),
             'qty_out2' => 0,
-            'qty_out3' => round($qtyOut3, 2),
-            'end' => round($endQty, 2),
-            'acc_qty_in1' => round($accQtyIn1, 2),
+            'qty_out3' => round($qtyOut3, 5),
+            'end' => round($endQty, 5),
+            'acc_qty_in1' => round($accQtyIn1, 5),
             'acc_average_price_in1' => round($accAveragePriceIn1, 2),
-            'acc_qty_total' => round($endQty, 2),
+            'acc_qty_total' => round($endQty, 5),
             'acc_average_price_total' => round($endAvgPrice, 2),
             'reference_type' => $referenceType,
             'reference_id' => $referenceId,

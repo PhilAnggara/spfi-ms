@@ -21,11 +21,12 @@ class PrsItemSeeder extends Seeder
     {
         $legacyRows = $this->resolveRows('prs_detail', fn (string $message) => $this->command?->warn($message));
 
-        if ($this->isLegacySource() && !empty($legacyRows)) {
+        if ($this->isLegacySource() && ! empty($legacyRows)) {
             $assignCanvRows = $this->resolveRows('assign_canv', fn (string $message) => $this->command?->warn($message));
             $assignCanvDtlRows = $this->resolveRows('assign_canv_dtl', fn (string $message) => $this->command?->warn($message));
 
             $this->seedRows($legacyRows, $assignCanvRows, $assignCanvDtlRows, 'legacy');
+
             return;
         }
 
@@ -33,6 +34,7 @@ class PrsItemSeeder extends Seeder
 
         if (empty($prsDetailRows)) {
             $this->warn('No CSV prs_detail rows loaded.');
+
             return;
         }
 
@@ -57,14 +59,15 @@ class PrsItemSeeder extends Seeder
         $mappedCanvasserIdByLegacyCode = $this->resolveMappedCanvasserIds($legacyCanvasserMap);
 
         if (empty($prsIdByNumber)) {
-            $this->warn("No PRS records found in new DB. Make sure PrsSeeder ran first.");
+            $this->warn('No PRS records found in new DB. Make sure PrsSeeder ran first.');
+
             return;
         }
 
-        $this->command?->info("ℹ [prs_detail] rows loaded: " . count($rows));
+        $this->command?->info('ℹ [prs_detail] rows loaded: '.count($rows));
 
-        $this->command?->info("ℹ [assign_canv] rows loaded: " . count($assignCanvRows));
-        $this->command?->info("ℹ [assign_canv_dtl] rows loaded: " . count($assignCanvDtlRows));
+        $this->command?->info('ℹ [assign_canv] rows loaded: '.count($assignCanvRows));
+        $this->command?->info('ℹ [assign_canv_dtl] rows loaded: '.count($assignCanvDtlRows));
 
         $assignmentLookup = $this->buildAssignCanvLookup($assignCanvRows, $assignCanvDtlRows);
 
@@ -83,8 +86,9 @@ class PrsItemSeeder extends Seeder
             $departmentCode = $this->normalizeLookupToken($data['department_code'] ?? null);
 
             if ($prsNumber === '' || $productCode === '') {
-                $this->warn("PRS Item skipped: missing prsnumber or productcode");
+                $this->warn('PRS Item skipped: missing prsnumber or productcode');
                 $skipped++;
+
                 continue;
             }
 
@@ -93,6 +97,7 @@ class PrsItemSeeder extends Seeder
             if ($prsId === null) {
                 $this->warn("PRS Item skipped: prsnumber '{$prsNumber}' not found in prs table");
                 $skipped++;
+
                 continue;
             }
 
@@ -101,6 +106,7 @@ class PrsItemSeeder extends Seeder
             if ($itemId === null) {
                 $this->warn("PRS Item skipped: productcode '{$productCode}' not found in items table (prsnumber: {$prsNumber})");
                 $skipped++;
+
                 continue;
             }
 
@@ -110,7 +116,7 @@ class PrsItemSeeder extends Seeder
             $isActive = strtoupper(trim((string) ($data['is_active'] ?? 'Y'))) === 'Y';
             $deletedAt = $isActive ? null : $updatedDate;
 
-            $quantity = (int) ($data['qty'] ?? 0);
+            $quantity = (float) ($data['qty'] ?? 0);
 
             $assignment = $this->resolveAssignCanvForPrsItem(
                 $assignmentLookup,
@@ -169,6 +175,7 @@ class PrsItemSeeder extends Seeder
 
             if (! $this->upsertPrsItemWithRetry($attributes, $values, $prsNumber, $productCode)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -190,14 +197,16 @@ class PrsItemSeeder extends Seeder
     {
         $csvPath = $this->csvPathFor($dataset);
 
-        if (!File::exists($csvPath)) {
+        if (! File::exists($csvPath)) {
             $this->warn("{$dataset}.csv not found at: {$csvPath}");
+
             return [];
         }
 
         $handle = fopen($csvPath, 'r');
         if ($handle === false) {
             $this->warn("Failed to open {$dataset}.csv at: {$csvPath}");
+
             return [];
         }
 
@@ -205,6 +214,7 @@ class PrsItemSeeder extends Seeder
         if ($header === false) {
             fclose($handle);
             $this->warn("{$dataset}.csv is empty: {$csvPath}");
+
             return [];
         }
 
@@ -214,12 +224,14 @@ class PrsItemSeeder extends Seeder
         while (($row = fgetcsv($handle, 0, ';')) !== false) {
             if (count($row) !== count($header)) {
                 $skippedInvalidColumns++;
+
                 continue;
             }
 
             $data = array_combine($header, $row);
             if ($data === false) {
                 $skippedInvalidColumns++;
+
                 continue;
             }
 
@@ -259,7 +271,7 @@ class PrsItemSeeder extends Seeder
     /**
      * @param  array<int, array<string, mixed>>  $assignCanvRows
      * @param  array<int, array<string, mixed>>  $assignCanvDtlRows
-    * @return array{strict: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>, loose: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>}
+     * @return array{strict: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>, loose: array<string, array{canvasser: string|null, assigned_at: Carbon|null}>}
      */
     protected function buildAssignCanvLookup(array $assignCanvRows, array $assignCanvDtlRows): array
     {
@@ -282,7 +294,7 @@ class PrsItemSeeder extends Seeder
 
             $assignedAt = $this->resolveAssignedCanvasserAt($row);
 
-            if (!isset($assignTimestampByHeaderId[$headerId]) || $this->shouldReplaceAssignment($assignTimestampByHeaderId[$headerId], $assignedAt, null, null)) {
+            if (! isset($assignTimestampByHeaderId[$headerId]) || $this->shouldReplaceAssignment($assignTimestampByHeaderId[$headerId], $assignedAt, null, null)) {
                 $assignTimestampByHeaderId[$headerId] = $assignedAt;
             }
         }
@@ -351,11 +363,12 @@ class PrsItemSeeder extends Seeder
      */
     protected function upsertBestAssignment(array &$bucket, string $key, ?string $legacyCanvasser, ?Carbon $assignedAt): void
     {
-        if (!isset($bucket[$key])) {
+        if (! isset($bucket[$key])) {
             $bucket[$key] = [
                 'canvasser' => $legacyCanvasser,
                 'assigned_at' => $assignedAt,
             ];
+
             return;
         }
 
@@ -430,7 +443,7 @@ class PrsItemSeeder extends Seeder
     {
         $departmentKey = $departmentCode ?? '*';
 
-        return $prsNumber . '|' . $productCode . '|' . $departmentKey;
+        return $prsNumber.'|'.$productCode.'|'.$departmentKey;
     }
 
     protected function normalizeLookupToken(mixed $value): ?string
@@ -489,7 +502,7 @@ class PrsItemSeeder extends Seeder
         }
 
         foreach ($legacyCanvasserMap as $legacyCode => $username) {
-            if (!isset($mapped[strtoupper($legacyCode)])) {
+            if (! isset($mapped[strtoupper($legacyCode)])) {
                 $this->warn("Mapped canvasser username '{$username}' for legacy code '{$legacyCode}' not found in users table");
             }
         }
@@ -554,5 +567,4 @@ class PrsItemSeeder extends Seeder
     {
         return DB::connection()->getDriverName() === 'sqlsrv';
     }
-
 }

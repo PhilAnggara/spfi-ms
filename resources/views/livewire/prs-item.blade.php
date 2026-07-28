@@ -24,7 +24,7 @@
                             <button type="button" class="btn btn-light-secondary" wire:click="decrementQuantity({{ $loop->index }})" wire:loading.attr="disabled">
                                 <i class="fa-light fa-minus"></i>
                             </button>
-                            <input type="number" min="1" class="form-control" name="prsItems[{{ $loop->index }}][quantity]" wire:model.debounce.300ms="prsItems.{{ $loop->index }}.quantity" required>
+                            <input type="number" min="0.00001" step="0.00001" class="form-control" name="prsItems[{{ $loop->index }}][quantity]" wire:model.debounce.300ms="prsItems.{{ $loop->index }}.quantity" required>
                             <button type="button" class="btn btn-light-secondary" wire:click="incrementQuantity({{ $loop->index }})" wire:loading.attr="disabled">
                                 <i class="fa-light fa-plus"></i>
                             </button>
@@ -62,7 +62,7 @@
                             <div class="col-md-2">
                                 <label for="quantity-only-{{ $contextId }}-{{ $loop->index }}" class="form-label mb-1">Quantity</label>
                                 <div class="input-group">
-                                    <input type="number" id="quantity-only-{{ $contextId }}-{{ $loop->index }}" class="form-control" name="prsItems[{{ $loop->index }}][quantity]" min="1" wire:model.debounce.500ms="prsItems.{{ $loop->index }}.quantity" required>
+                                    <input type="number" id="quantity-only-{{ $contextId }}-{{ $loop->index }}" class="form-control" name="prsItems[{{ $loop->index }}][quantity]" min="0.00001" step="0.00001" wire:model.debounce.500ms="prsItems.{{ $loop->index }}.quantity" required>
                                     <span class="input-group-text">{{ $prsItem['unit'] ?? 'PCS' }}</span>
                                 </div>
                             </div>

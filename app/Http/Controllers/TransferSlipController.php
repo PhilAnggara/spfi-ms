@@ -106,9 +106,9 @@ class TransferSlipController extends Controller
             ->pluck('transferred_quantity', 'tsi.store_withdrawal_item_id');
 
         $items = $sourceItems->map(function ($item) use ($transferredMap, $isCapex) {
-            $transferred = round((float) ($transferredMap[$item->id] ?? 0), 3);
-            $sourceQuantity = round((float) $item->quantity, 3);
-            $remaining = max(0, round($sourceQuantity - $transferred, 3));
+            $transferred = round((float) ($transferredMap[$item->id] ?? 0), 5);
+            $sourceQuantity = round((float) $item->quantity, 5);
+            $remaining = max(0, round($sourceQuantity - $transferred, 5));
             $meta = is_string($item->meta) ? json_decode($item->meta, true) : (array) ($item->meta ?? []);
 
             return [
@@ -163,7 +163,7 @@ class TransferSlipController extends Controller
                 return [
                     'store_withdrawal_item_id' => (int) $row['store_withdrawal_item_id'],
                     'item_id' => (int) $row['item_id'],
-                    'quantity' => round((float) ($row['quantity'] ?? 0), 3),
+                    'quantity' => round((float) ($row['quantity'] ?? 0), 5),
                 ];
             })
             ->filter(fn (array $row): bool => $row['store_withdrawal_item_id'] > 0 && $row['item_id'] > 0 && $row['quantity'] > 0)
@@ -219,8 +219,8 @@ class TransferSlipController extends Controller
                 ]);
             }
 
-            $alreadyTransferred = round((float) ($transferredMap[$storeWithdrawalItemId] ?? 0), 3);
-            $remaining = max(0, round(((float) $sourceItem->quantity) - $alreadyTransferred, 3));
+            $alreadyTransferred = round((float) ($transferredMap[$storeWithdrawalItemId] ?? 0), 5);
+            $remaining = max(0, round(((float) $sourceItem->quantity) - $alreadyTransferred, 5));
 
             if ($row['quantity'] > $remaining) {
                 return redirect()->back()->withInput()->withErrors([
@@ -279,7 +279,7 @@ class TransferSlipController extends Controller
                             'updated_by' => $authUserId,
                             'meta' => json_encode([
                                 'sws_uom' => $sourceItem->uom,
-                                'source_quantity' => round((float) $sourceItem->quantity, 3),
+                                'source_quantity' => round((float) $sourceItem->quantity, 5),
                             ]),
                             'created_at' => $now,
                             'updated_at' => $now,

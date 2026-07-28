@@ -26,6 +26,7 @@ class PrsItem extends Model
         'assigned_canvasser_at' => 'datetime',
         'purchase_order_id' => 'integer',
         'is_direct_purchase' => 'boolean',
+        'quantity' => 'decimal:5',
     ];
 
     protected $hidden = [

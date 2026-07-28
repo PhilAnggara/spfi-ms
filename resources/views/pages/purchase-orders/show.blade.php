@@ -179,7 +179,7 @@
                                             <td>{{ $item->prsItem?->prs?->department?->name ?? '-' }}</td>
                                             <td>
                                                 <input type="hidden" name="items[{{ $index }}][id]" value="{{ $item->id }}">
-                                                <input type="number" name="items[{{ $index }}][quantity]" class="form-control form-control-sm text-end" min="1" step="1" value="{{ $item->quantity }}" required style="min-width: 6.5rem;">
+                                                <input type="number" name="items[{{ $index }}][quantity]" class="form-control form-control-sm text-end" min="0.00001" step="0.00001" value="{{ $item->quantity }}" required style="min-width: 6.5rem;">
                                             </td>
                                             <td>{{ $item->item?->unit?->name ?? 'PCS' }}</td>
                                             <td class="text-end">

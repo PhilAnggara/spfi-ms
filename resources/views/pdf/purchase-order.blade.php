@@ -315,7 +315,7 @@
                         $dept = $item->prsItem?->prs?->department?->code ?? '-';
                         $itemCode = $item->item?->code ?? '-';
                         $unitName = $item->item?->unit?->code ?? $item->item?->unit?->name ?? 'PCS';
-                        $qtyDisplay = number_format($item->quantity, 0, ',', '.') . ' ' . $unitName;
+                        $qtyDisplay = \App\Support\PdfFormatters::qty($item->quantity) . ' ' . $unitName;
                         $qtyIsVeryLong = mb_strlen($qtyDisplay) > 18;
                     @endphp
                     <tr>

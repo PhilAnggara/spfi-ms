@@ -102,7 +102,7 @@ class PrsController extends Controller
             'remarks' => ['nullable', 'string'],
             'prsItems' => ['required', 'array', 'min:1'],
             'prsItems.*.item_id' => ['required', 'exists:items,id'],
-            'prsItems.*.quantity' => ['required', 'numeric', 'min:1'],
+            'prsItems.*.quantity' => ['required', 'numeric', 'min:0.00001'],
         ]);
 
         $authUserId = Auth::id();
@@ -227,7 +227,7 @@ class PrsController extends Controller
             'remarks' => ['nullable', 'string'],
             'prsItems' => ['required', 'array', 'min:1'],
             'prsItems.*.item_id' => ['required', 'exists:items,id'],
-            'prsItems.*.quantity' => ['required', 'numeric', 'min:1'],
+            'prsItems.*.quantity' => ['required', 'numeric', 'min:0.00001'],
         ]);
 
         $shouldRegenerate = $prs->department_id != $validated['department_id'];
@@ -298,7 +298,7 @@ class PrsController extends Controller
             'prsItems' => ['required', 'array', 'min:1'],
             'prsItems.*.prs_item_id' => ['required', 'integer', 'distinct'],
             'prsItems.*.item_id' => ['required', 'integer', 'exists:items,id'],
-            'prsItems.*.quantity' => ['required', 'numeric', 'min:1'],
+            'prsItems.*.quantity' => ['required', 'numeric', 'min:0.00001'],
         ]);
 
         $existingItems = $prs->items->keyBy('id');

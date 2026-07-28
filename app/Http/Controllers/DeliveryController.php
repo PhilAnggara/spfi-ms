@@ -86,7 +86,7 @@ class DeliveryController extends Controller
                     'id' => (int) $item->id,
                     'name' => $item->name,
                     'code' => $item->code,
-                    'stock_on_hand' => round((float) $item->stock_on_hand, 3),
+                    'stock_on_hand' => round((float) $item->stock_on_hand, 5),
                     'unit' => $item->unit?->name ?? 'PCS',
                     'category' => $item->category?->name,
                 ];
@@ -129,14 +129,14 @@ class DeliveryController extends Controller
             'dm_number' => ['nullable', 'string', 'max:80'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_id' => ['required', 'exists:items,id'],
-            'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.00001'],
         ]);
 
         $requestedItems = collect($validated['items'])
             ->map(function (array $row): array {
                 return [
                     'item_id' => (int) ($row['item_id'] ?? 0),
-                    'quantity' => round((float) ($row['quantity'] ?? 0), 3),
+                    'quantity' => round((float) ($row['quantity'] ?? 0), 5),
                 ];
             })
             ->filter(fn (array $row): bool => $row['item_id'] > 0 && $row['quantity'] > 0)
@@ -144,7 +144,7 @@ class DeliveryController extends Controller
             ->map(function ($rows, $itemId): array {
                 return [
                     'item_id' => (int) $itemId,
-                    'quantity' => round((float) $rows->sum('quantity'), 3),
+                    'quantity' => round((float) $rows->sum('quantity'), 5),
                 ];
             })
             ->values();
@@ -176,7 +176,7 @@ class DeliveryController extends Controller
 
         $zeroStockIds = $requestedItems
             ->filter(function (array $row) use ($itemRows): bool {
-                $stock = round((float) ($itemRows[$row['item_id']]->stock_on_hand ?? 0), 3);
+                $stock = round((float) ($itemRows[$row['item_id']]->stock_on_hand ?? 0), 5);
 
                 return $stock <= 0;
             })
@@ -191,7 +191,7 @@ class DeliveryController extends Controller
 
         $overStockIds = $requestedItems
             ->filter(function (array $row) use ($itemRows): bool {
-                $stock = round((float) ($itemRows[$row['item_id']]->stock_on_hand ?? 0), 3);
+                $stock = round((float) ($itemRows[$row['item_id']]->stock_on_hand ?? 0), 5);
 
                 return $row['quantity'] > $stock;
             })
@@ -249,7 +249,7 @@ class DeliveryController extends Controller
                             'created_by' => $authUserId,
                             'updated_by' => $authUserId,
                             'meta' => json_encode([
-                                'stock_on_hand_snapshot' => round((float) ($item->stock_on_hand ?? 0), 3),
+                                'stock_on_hand_snapshot' => round((float) ($item->stock_on_hand ?? 0), 5),
                             ]),
                             'created_at' => $now,
                             'updated_at' => $now,

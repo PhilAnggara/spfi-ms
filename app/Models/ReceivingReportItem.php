@@ -25,8 +25,8 @@ class ReceivingReportItem extends Model
         'id' => 'integer',
         'receiving_report_id' => 'integer',
         'purchase_order_item_id' => 'integer',
-        'qty_good' => 'decimal:2',
-        'qty_bad' => 'decimal:2',
+        'qty_good' => 'decimal:5',
+        'qty_bad' => 'decimal:5',
         'meta' => 'array',
     ];
 

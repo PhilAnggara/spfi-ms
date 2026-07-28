@@ -116,7 +116,7 @@ function initSwsCatalogAndCart() {
     };
 
     const getAllowedQuantity = (stockValue, requestedQuantity) => {
-        const normalizedQuantity = Math.max(1, Number(requestedQuantity) || 1);
+        const normalizedQuantity = Math.max(0.00001, Number(requestedQuantity) || 1);
         if (isCapexMode() || isConfirmatoryType()) {
             const normalizedStock = Number(stockValue) || 0;
             if (isCapexMode() && normalizedStock <= 0) {
@@ -147,7 +147,8 @@ function initSwsCatalogAndCart() {
         const payload = getCardPayload(card);
         const allowedQuantity = getAllowedQuantity(payload.stock, qtyInput.value);
 
-        qtyInput.min = '1';
+        qtyInput.min = '0.00001';
+        qtyInput.step = '0.00001';
 
         if (isConfirmatoryType()) {
             qtyInput.removeAttribute('max');
@@ -354,7 +355,7 @@ function initSwsCatalogAndCart() {
                                 <button type="button" class="btn btn-light-secondary sws-cart-decrement" data-cart-key="${cartKey}" aria-label="Decrease quantity">
                                     <i class="fa-light fa-minus"></i>
                                 </button>
-                                <input type="number" min="1" ${quantityMaxAttribute} class="form-control sws-cart-qty" value="${item.quantity}" data-cart-key="${cartKey}">
+                                <input type="number" min="0.00001" step="0.00001" ${quantityMaxAttribute} class="form-control sws-cart-qty" value="${item.quantity}" data-cart-key="${cartKey}">
                                 <button type="button" class="btn btn-light-secondary sws-cart-increment" data-cart-key="${cartKey}" aria-label="Increase quantity">
                                     <i class="fa-light fa-plus"></i>
                                 </button>
@@ -534,7 +535,7 @@ function initSwsCatalogAndCart() {
                                     <td data-label="Qty">
                                         <div class="prs-catalog-list-qty">
                                             <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity"><i class="fa-light fa-minus"></i></button>
-                                            <input type="number" min="1" max="${item.qty_remaining}" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                                            <input type="number" min="0.00001" step="0.00001" max="${item.qty_remaining}" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
                                             <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity"><i class="fa-light fa-plus"></i></button>
                                         </div>
                                     </td>
@@ -580,7 +581,7 @@ function initSwsCatalogAndCart() {
                     <div class="prs-item-meta text-muted">Remaining ${escapeHtml(item.qty_remaining)} ${escapeHtml(item.unit || 'PCS')}</div>
                     <div class="prs-item-actions">
                         <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity"><i class="fa-light fa-minus"></i></button>
-                        <input type="number" min="1" max="${item.qty_remaining}" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                        <input type="number" min="0.00001" step="0.00001" max="${item.qty_remaining}" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
                         <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity"><i class="fa-light fa-plus"></i></button>
                         <button type="button" class="btn btn-sm btn-primary prs-item-add" data-item-id="${item.item_id}">
                             <i class="fa-light fa-plus"></i> Add
@@ -894,8 +895,8 @@ function initSwsCatalogAndCart() {
             const row = minus.closest('.prs-item-card, .prs-catalog-row');
             const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
-                const current = parseInt(qtyInput.value || '1', 10);
-                qtyInput.value = Math.max(1, Number.isNaN(current) ? 1 : current - 1);
+                const current = parseFloat(qtyInput.value || '1');
+                qtyInput.value = Math.max(0.00001, Number.isNaN(current) ? 1 : current - 1);
             }
             return;
         }
@@ -912,7 +913,7 @@ function initSwsCatalogAndCart() {
 
         const payload = getCardPayload(row);
         const qtyInput = row.querySelector('.prs-item-qty');
-        const quantity = Math.max(1, Number(qtyInput?.value || '1') || 1);
+        const quantity = Math.max(0.00001, Number(qtyInput?.value || '1') || 1);
 
         if (qtyInput) {
             qtyInput.value = String(getAllowedQuantity(payload.stock, quantity) || 1);
@@ -929,7 +930,7 @@ function initSwsCatalogAndCart() {
 
         const row = qtyInput.closest('.prs-item-card, .prs-catalog-row');
         const payload = row ? getCardPayload(row) : null;
-        const quantity = Math.max(1, Number(qtyInput.value || '1') || 1);
+        const quantity = Math.max(0.00001, Number(qtyInput.value || '1') || 1);
         const allowedQuantity = payload ? getAllowedQuantity(payload.stock, quantity) : quantity;
 
         qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
@@ -952,7 +953,7 @@ function initSwsCatalogAndCart() {
             }
 
             const current = state.cart.get(cartKey);
-            const quantity = Math.max(1, Number(qtyInput.value || '1') || 1);
+            const quantity = Math.max(0.00001, Number(qtyInput.value || '1') || 1);
             const allowedQuantity = getAllowedQuantity(current.stock, quantity);
             qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
 
@@ -1002,7 +1003,7 @@ function initSwsCatalogAndCart() {
                 const current = state.cart.get(cartKey);
                 state.cart.set(cartKey, {
                     ...current,
-                    quantity: Math.max(1, Number(current.quantity || 1) - 1),
+                    quantity: Math.max(0.00001, Number(current.quantity || 1) - 1),
                 });
 
                 renderCart();

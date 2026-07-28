@@ -257,9 +257,20 @@ function initRrCreateModal(poLookupUrl) {
     function formatNumber(value) {
         const number = Number(value || 0);
 
-        return Number.isInteger(number)
-            ? number.toLocaleString('en-US')
-            : number.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (!Number.isFinite(number)) {
+            return '0';
+        }
+
+        if (Number.isInteger(number)) {
+            return number.toLocaleString('en-US');
+        }
+
+        const trimmed = number.toFixed(5).replace(/\.?0+$/, '');
+
+        return Number(trimmed).toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 5,
+        });
     }
 
     function showCreateError(message) {
@@ -358,8 +369,8 @@ function initRrCreateModal(poLookupUrl) {
                     <td class="text-end">${formatNumber(item.qty_ordered)}</td>
                     <td class="text-end">${formatNumber(item.qty_received)}</td>
                     <td class="text-end">${formatNumber(item.qty_remaining)}</td>
-                    <td><input type="number" step="0.01" min="0" max="${item.qty_remaining}" name="items[${index}][qty_good]" class="form-control form-control-sm text-end create-qty-good" disabled></td>
-                    <td><input type="number" step="0.01" min="0" max="${item.qty_remaining}" name="items[${index}][qty_bad]" class="form-control form-control-sm text-end create-qty-bad" disabled></td>
+                    <td><input type="number" step="0.00001" min="0" max="${item.qty_remaining}" name="items[${index}][qty_good]" class="form-control form-control-sm text-end create-qty-good" disabled></td>
+                    <td><input type="number" step="0.00001" min="0" max="${item.qty_remaining}" name="items[${index}][qty_bad]" class="form-control form-control-sm text-end create-qty-bad" disabled></td>
                 </tr>
             `;
     }

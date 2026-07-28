@@ -266,11 +266,11 @@
                                     <td class="text-center">
                                         <div class="prs-detail-metric-stack">
                                             <div>
-                                                <span class="prs-detail-metric-value">{{ $itemInfo->quantity }}</span>
+                                                <span class="prs-detail-metric-value">{{ \App\Support\PdfFormatters::qty($itemInfo->quantity) }}</span>
                                                 <span class="prs-detail-metric-label">Ordered</span>
                                             </div>
                                             <div>
-                                                <span class="prs-detail-metric-value">{{ $itemInfo->delivered_quantity }}</span>
+                                                <span class="prs-detail-metric-value">{{ \App\Support\PdfFormatters::qty($itemInfo->delivered_quantity) }}</span>
                                                 <span class="prs-detail-metric-label">Delivered</span>
                                             </div>
                                         </div>

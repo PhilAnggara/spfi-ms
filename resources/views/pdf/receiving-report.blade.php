@@ -280,7 +280,7 @@
             <div class="cell item-cell" style="left: {{ $mmX(15) }}; top: {{ $top }}mm; width: {{ $mmX(65) }};">{{ $fitItemNameToRows((string) ($item?->name ?? '-'), $itemNameCharsPerLine) }}</div>
             <div class="cell center" style="left: {{ $mmX(83) }}; top: {{ $top }}mm; width: {{ $mmX(20) }};">{{ $item?->code ?? '-' }}</div>
             <div class="cell center" style="left: {{ $mmX(108) }}; top: {{ $top }}mm; width: {{ $mmX(25) }};">{{ $departmentCode }}</div>
-            <div class="cell right" style="left: {{ $mmX(138) }}; top: {{ $top }}mm; width: {{ $mmX(23) }};">{{ number_format($qtyTotal, 2, '.', ',') }}</div>
+            <div class="cell right" style="left: {{ $mmX(138) }}; top: {{ $top }}mm; width: {{ $mmX(23) }};">{{ \App\Support\PdfFormatters::qty($qtyTotal) }}</div>
             <div class="cell center" style="left: {{ $mmX(163) }}; top: {{ $top }}mm; width: {{ $mmX(23) }};">{{ $item?->unit?->name ?? 'PCS' }}</div>
             <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $top }}mm; width: {{ $mmX(35) }};">{{ number_format($unitCost, 2, '.', ',') }}</div>
             <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $top }}mm; width: {{ $mmX(50) }};">{{ number_format($amount, 2, '.', ',') }}</div>

@@ -29,7 +29,7 @@ class CapexWithdrawalAvailabilityService
             ->selectRaw('swi.receiving_report_item_id, SUM(swi.quantity) as withdrawn_qty')
             ->groupBy('swi.receiving_report_item_id')
             ->pluck('withdrawn_qty', 'swi.receiving_report_item_id')
-            ->map(fn ($qty) => round((float) $qty, 3))
+            ->map(fn ($qty) => round((float) $qty, 5))
             ->all();
     }
 
@@ -152,7 +152,7 @@ class CapexWithdrawalAvailabilityService
 
         foreach ($requestedLines as $row) {
             $receivingReportItemId = (int) $row['receiving_report_item_id'];
-            $quantity = round((float) $row['quantity'], 3);
+            $quantity = round((float) $row['quantity'], 5);
             $line = $lines->get($receivingReportItemId);
 
             if (! $line) {
@@ -176,9 +176,9 @@ class CapexWithdrawalAvailabilityService
                 ];
             }
 
-            $qtyGood = round((float) $line->qty_good, 3);
-            $withdrawn = round((float) ($withdrawnMap[$receivingReportItemId] ?? 0), 3);
-            $remaining = max(0, round($qtyGood - $withdrawn, 3));
+            $qtyGood = round((float) $line->qty_good, 5);
+            $withdrawn = round((float) ($withdrawnMap[$receivingReportItemId] ?? 0), 5);
+            $remaining = max(0, round($qtyGood - $withdrawn, 5));
 
             if ($quantity <= 0) {
                 return [
@@ -250,9 +250,9 @@ class CapexWithdrawalAvailabilityService
     private function transformAvailableLines(Collection $rows): Collection
     {
         return $rows->map(function ($row) {
-            $qtyGood = round((float) $row->qty_good, 3);
-            $withdrawn = round((float) $row->withdrawn_qty, 3);
-            $remaining = round((float) $row->qty_remaining, 3);
+            $qtyGood = round((float) $row->qty_good, 5);
+            $withdrawn = round((float) $row->withdrawn_qty, 5);
+            $remaining = round((float) $row->qty_remaining, 5);
 
             return [
                 'receiving_report_item_id' => (int) $row->receiving_report_item_id,

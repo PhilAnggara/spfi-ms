@@ -23,6 +23,8 @@ class PdfFormatters
 
     public static function qty(float|int|string $value): string
     {
-        return number_format((float) $value, 2, ',', '.');
+        $formatted = number_format((float) $value, 5, ',', '.');
+
+        return rtrim(rtrim($formatted, '0'), ',') ?: '0';
     }
 }

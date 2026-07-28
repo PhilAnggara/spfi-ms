@@ -178,7 +178,7 @@ it('allows creator to revise quantities and returns prs to canvassing', function
     $this->prsItem->refresh();
 
     expect($this->prs->status)->toBe('CANVASSING');
-    expect($this->prsItem->quantity)->toBe(6);
+    expect((float) $this->prsItem->quantity)->toBe(6.0);
     expect($this->prsItem->canvasser_id)->toBe($this->canvasser->id);
     expect($this->prsItem->selected_canvassing_item_id)->toBe($this->canvassingItem->id);
     expect($this->prs->logs()->where('action', 'QUANTITY_REVISED')->exists())->toBeTrue();

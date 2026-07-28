@@ -254,9 +254,9 @@
                                                                 <td>{{ $loop->iteration }}</td>
                                                                 <td>{{ $detail->item_name ?? '-' }}</td>
                                                                 <td>{{ $detail->item_code ?? $detail->product_code ?? '-' }}</td>
-                                                                <td>{{ rtrim(rtrim(number_format((float) $detail->quantity, 3, '.', ''), '0'), '.') }}</td>
+                                                                <td>{{ \App\Support\PdfFormatters::qty($detail->quantity) }}</td>
                                                                 <td>{{ $detail->uom ?? '-' }}</td>
-                                                                <td>{{ rtrim(rtrim(number_format((float) $detail->stock_on_hand_snapshot, 3, '.', ''), '0'), '.') }}</td>
+                                                                <td>{{ \App\Support\PdfFormatters::qty($detail->stock_on_hand_snapshot) }}</td>
                                                             </tr>
                                                         @empty
                                                             <tr>
@@ -327,10 +327,10 @@
                                                                             <input
                                                                                 type="number"
                                                                                 class="form-control"
-                                                                                min="0.001"
-                                                                                step="0.001"
+                                                                                min="0.00001"
+                                                                                step="0.00001"
                                                                                 name="items[{{ $loop->index }}][quantity]"
-                                                                                value="{{ number_format((float) $detail->quantity, 3, '.', '') }}"
+                                                                                value="{{ rtrim(rtrim(number_format((float) $detail->quantity, 5, '.', ''), '0'), '.') }}"
                                                                                 @disabled($isLocked)
                                                                                 data-sws-qty-input>
                                                                             <span class="input-group-text">{{ $detail->uom ?? '-' }}</span>

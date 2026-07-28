@@ -79,7 +79,7 @@
                             @endif
                             <td>{{ $prsItem->item?->code ?? '-' }}</td>
                             <td>{{ $prsItem->item?->name ?? '-' }}</td>
-                            <td class="text-right">{{ number_format($prsItem->quantity, 0, ',', '.') }}</td>
+                            <td class="text-right">{{ \App\Support\PdfFormatters::qty($prsItem->quantity) }}</td>
                             <td>{{ $prsItem->item?->unit?->name ?? '-' }}</td>
                             <td>{{ $prsItem->canvasser?->name ?? '-' }}</td>
                             <td>{{ $prsItem->purchaseOrder?->po_number ?? '-' }}</td>

@@ -209,7 +209,7 @@ class StoreWithdrawalController extends Controller
             'info' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_id' => ['required', 'exists:items,id'],
-            'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.00001'],
             'items.*.receiving_report_item_id' => ['nullable', 'integer', 'exists:receiving_report_items,id'],
         ]);
 
@@ -227,7 +227,7 @@ class StoreWithdrawalController extends Controller
             ->map(function (array $row): array {
                 return [
                     'item_id' => (int) $row['item_id'],
-                    'quantity' => round((float) $row['quantity'], 3),
+                    'quantity' => round((float) $row['quantity'], 5),
                 ];
             })
             ->filter(fn (array $row): bool => $row['item_id'] > 0 && $row['quantity'] > 0)
@@ -235,7 +235,7 @@ class StoreWithdrawalController extends Controller
             ->map(function ($rows, $itemId): array {
                 return [
                     'item_id' => (int) $itemId,
-                    'quantity' => round((float) $rows->sum('quantity'), 3),
+                    'quantity' => round((float) $rows->sum('quantity'), 5),
                 ];
             })
             ->values();
@@ -276,7 +276,7 @@ class StoreWithdrawalController extends Controller
 
             $overStockIds = $requestedItems
                 ->filter(function (array $row) use ($itemRows): bool {
-                    $stock = round((float) (($itemRows[$row['item_id']]->stock_on_hand ?? 0)), 3);
+                    $stock = round((float) (($itemRows[$row['item_id']]->stock_on_hand ?? 0)), 5);
 
                     return $row['quantity'] > $stock;
                 })
@@ -331,7 +331,7 @@ class StoreWithdrawalController extends Controller
                     'item_id' => (int) $item->id,
                     'product_code' => (string) $item->code,
                     'quantity' => $row['quantity'],
-                    'stock_on_hand_snapshot' => round((float) ($item->stock_on_hand ?? 0), 3),
+                    'stock_on_hand_snapshot' => round((float) ($item->stock_on_hand ?? 0), 5),
                     'uom' => $item->uom_name ?? 'PCS',
                     'created_by' => $authUserId,
                     'updated_by' => $authUserId,
@@ -392,7 +392,7 @@ class StoreWithdrawalController extends Controller
                 return [
                     'receiving_report_item_id' => (int) ($row['receiving_report_item_id'] ?? 0),
                     'item_id' => (int) $row['item_id'],
-                    'quantity' => round((float) $row['quantity'], 3),
+                    'quantity' => round((float) $row['quantity'], 5),
                 ];
             })
             ->filter(fn (array $row): bool => $row['receiving_report_item_id'] > 0 && $row['item_id'] > 0 && $row['quantity'] > 0)
@@ -401,7 +401,7 @@ class StoreWithdrawalController extends Controller
                 return [
                     'receiving_report_item_id' => (int) $receivingReportItemId,
                     'item_id' => (int) $rows->first()['item_id'],
-                    'quantity' => round((float) $rows->sum('quantity'), 3),
+                    'quantity' => round((float) $rows->sum('quantity'), 5),
                 ];
             })
             ->values();
@@ -469,7 +469,7 @@ class StoreWithdrawalController extends Controller
                     'item_id' => (int) $line->item_id,
                     'product_code' => (string) $line->item_code,
                     'quantity' => $row['quantity'],
-                    'stock_on_hand_snapshot' => round((float) $line->qty_good, 3),
+                    'stock_on_hand_snapshot' => round((float) $line->qty_good, 5),
                     'uom' => $line->unit_name ?? 'PCS',
                     'created_by' => $authUserId,
                     'updated_by' => $authUserId,
@@ -479,7 +479,7 @@ class StoreWithdrawalController extends Controller
                         'prs_number' => $line->prs_number,
                         'po_number' => $line->po_number,
                         'rr_number' => $line->rr_number,
-                        'qty_rr_good' => round((float) $line->qty_good, 3),
+                        'qty_rr_good' => round((float) $line->qty_good, 5),
                     ]),
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -631,7 +631,7 @@ class StoreWithdrawalController extends Controller
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer'],
-            'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.00001'],
             'items.*.remove' => ['nullable', 'in:0,1'],
         ]);
 
@@ -682,7 +682,7 @@ class StoreWithdrawalController extends Controller
                     continue;
                 }
 
-                $newQuantity = round((float) $itemRow['quantity'], 3);
+                $newQuantity = round((float) $itemRow['quantity'], 5);
                 $existingItem = $existingItems->firstWhere('id', $itemId);
                 if (! $existingItem || (int) $existingItem->receiving_report_item_id <= 0) {
                     return redirect()->back()->withErrors([
@@ -719,7 +719,7 @@ class StoreWithdrawalController extends Controller
                     continue;
                 }
 
-                $updatePayloads[$itemId] = round((float) $itemRow['quantity'], 3);
+                $updatePayloads[$itemId] = round((float) $itemRow['quantity'], 5);
             }
         }
 
@@ -1097,9 +1097,9 @@ class StoreWithdrawalController extends Controller
             ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
             ->where('sws_number', 'like', $normalizedDepartmentCode.'%')
             ->selectRaw(
-                "MAX(CASE WHEN LEN(SUBSTRING(sws_number, ?, 100)) > 0 "
+                'MAX(CASE WHEN LEN(SUBSTRING(sws_number, ?, 100)) > 0 '
                 ."AND SUBSTRING(sws_number, ?, 100) NOT LIKE '%[^0-9]%' "
-                ."THEN CAST(SUBSTRING(sws_number, ?, 100) AS INT) ELSE NULL END) as last_sequence",
+                .'THEN CAST(SUBSTRING(sws_number, ?, 100) AS INT) ELSE NULL END) as last_sequence',
                 [$start, $start, $start]
             )
             ->value('last_sequence');

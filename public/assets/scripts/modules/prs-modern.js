@@ -254,7 +254,7 @@ function initPrsCatalog() {
                         <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
                             <i class="fa-light fa-minus"></i>
                         </button>
-                        <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                        <input type="number" min="0.00001" step="0.00001" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
                         <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
                             <i class="fa-light fa-plus"></i>
                         </button>
@@ -286,7 +286,7 @@ function initPrsCatalog() {
                         <button type="button" class="btn btn-sm btn-light-secondary prs-qty-minus" aria-label="Decrease quantity">
                             <i class="fa-light fa-minus"></i>
                         </button>
-                        <input type="number" min="1" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
+                        <input type="number" min="0.00001" step="0.00001" value="1" class="form-control form-control-sm prs-item-qty" aria-label="Quantity">
                         <button type="button" class="btn btn-sm btn-light-secondary prs-qty-plus" aria-label="Increase quantity">
                             <i class="fa-light fa-plus"></i>
                         </button>
@@ -605,7 +605,7 @@ function initPrsCatalog() {
             const row = qtyPlus.closest('.prs-item-card, .prs-catalog-row');
             const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
-                const current = parseInt(qtyInput.value || '1', 10);
+                const current = parseFloat(qtyInput.value || '1');
                 qtyInput.value = Number.isNaN(current) ? 1 : current + 1;
             }
             return;
@@ -616,8 +616,8 @@ function initPrsCatalog() {
             const row = qtyMinus.closest('.prs-item-card, .prs-catalog-row');
             const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
-                const current = parseInt(qtyInput.value || '1', 10);
-                qtyInput.value = Math.max(1, Number.isNaN(current) ? 1 : current - 1);
+                const current = parseFloat(qtyInput.value || '1');
+                qtyInput.value = Math.max(0.00001, Number.isNaN(current) ? 1 : current - 1);
             }
             return;
         }
@@ -633,8 +633,8 @@ function initPrsCatalog() {
         }
 
         const qtyInput = row.querySelector('.prs-item-qty');
-        const qtyValue = parseInt(qtyInput?.value || '1', 10);
-        const quantity = Number.isNaN(qtyValue) || qtyValue < 1 ? 1 : qtyValue;
+        const qtyValue = parseFloat(qtyInput?.value || '1');
+        const quantity = Number.isNaN(qtyValue) || qtyValue < 0.00001 ? 0.00001 : qtyValue;
         if (qtyInput) {
             qtyInput.value = quantity;
         }

@@ -114,7 +114,7 @@
                     <div class="po-detail-line-stats">
                         <div class="po-detail-stat">
                             <div class="po-preview-kicker">Quantity</div>
-                            <div class="po-detail-stat-value">{{ rtrim(rtrim(number_format((float) $item->quantity, 5, '.', ''), '0'), '.') ?: '0' }} {{ $item->item?->unit?->name ?? 'PCS' }}</div>
+                            <div class="po-detail-stat-value">{{ \App\Support\PdfFormatters::qty($item->quantity) }} {{ $item->item?->unit?->name ?? 'PCS' }}</div>
                         </div>
                         <div class="po-detail-stat">
                             <div class="po-preview-kicker">Unit Price</div>

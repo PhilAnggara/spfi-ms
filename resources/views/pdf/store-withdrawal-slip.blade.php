@@ -226,10 +226,7 @@
         );
         $capexLabel = $isCapex ? 'CAPEX' : null;
         $columnWidth = '50%';
-        $fmtQty = function (float $n): string {
-            $decimals = ($n != floor($n)) ? 3 : 0;
-            return number_format($n, $decimals, '.', ',');
-        };
+        $fmtQty = fn (float|int|string $n): string => \App\Support\PdfFormatters::qty($n);
     @endphp
 
     <table class="header-table">

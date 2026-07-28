@@ -259,7 +259,7 @@ function initTransferSlipCreateModal(swsLookupUrl) {
                 }
 
                 if (max > 0 && current > max) {
-                    input.value = max.toFixed(3);
+                    input.value = max.toFixed(5);
                 }
 
                 updateSummary();
@@ -339,10 +339,10 @@ function initTransferSlipCreateModal(swsLookupUrl) {
                                 class="form-control ts-qty-input"
                                 name="items[${index}][quantity]"
                                 min="0"
-                                max="${Number(item.quantity_remaining).toFixed(3)}"
-                                step="0.001"
-                                value="${Number(preservedQty || 0).toFixed(3)}"
-                                data-max="${Number(item.quantity_remaining).toFixed(3)}"
+                                max="${Number(item.quantity_remaining).toFixed(5)}"
+                                step="0.00001"
+                                value="${Number(preservedQty || 0).toFixed(5)}"
+                                data-max="${Number(item.quantity_remaining).toFixed(5)}"
                             >
                             <span class="input-group-text">${item.uom || 'PCS'}</span>
                         </div>
@@ -410,7 +410,7 @@ function initTransferSlipCreateModal(swsLookupUrl) {
 
             qtyInputs.forEach((input) => {
                 const max = Number(input.dataset.max || 0);
-                input.value = max.toFixed(3);
+                input.value = max.toFixed(5);
             });
 
             hideSwsError();
