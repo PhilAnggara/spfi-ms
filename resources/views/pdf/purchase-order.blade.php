@@ -6,7 +6,7 @@
     <style>
         @page {
             size: {{ $pageWidthMm ?? 215 }}mm {{ $pageHeightMm ?? 160 }}mm;
-            margin: 8px;
+            margin: 8px 12px;
         }
         body {
             margin: 4px;
@@ -16,7 +16,7 @@
         }
         .po-main {
             /* Reserve space so item rows do not collide with fixed footer */
-            padding-bottom: 52mm;
+            padding-bottom: 38mm;
         }
         .po-footer {
             position: fixed;
@@ -342,7 +342,7 @@
     <div class="po-footer">
         <table class="table-clean">
             <tr>
-                <td style="width: 60%;">
+                <td style="width: 59%;">
                     <div class="note">
                         Untuk menciptakan kode etik bisnis yang adil, jujur dan produktif, PT. Sinar Pure Foods International menerapkan kebijakan antikorupsi dan anti-siap dalam setiap transaksi bisnis.
                     </div>
