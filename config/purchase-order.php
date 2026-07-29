@@ -16,7 +16,7 @@ return [
     'signature' => [
         'certified_by_name' => 'Denny Tuhatelu',
         'approved_by_below_threshold_name' => 'Denny Tuhatelu',
-        'approved_by_at_or_above_threshold_name' => 'S.C. Calamba, Jr',
+        'approved_by_at_or_above_threshold_name' => 'S.C Calamba, Jr',
         'approval_threshold' => 4000000,
         'threshold_currency' => 'IDR',
     ],

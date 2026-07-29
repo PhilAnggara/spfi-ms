@@ -34,7 +34,7 @@ return [
     ],
 
     'general_manager_approver' => [
-        'name' => 'Sam Calamba',
+        'name' => 'S.C Calamba, Jr',
         'title' => 'General Manager',
     ],
 

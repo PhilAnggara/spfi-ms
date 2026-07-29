@@ -75,6 +75,12 @@ class ReceivingReportController extends Controller
             ], 404);
         }
 
+        if ($purchaseOrder->status !== 'APPROVED') {
+            return response()->json([
+                'message' => 'Only approved purchase orders can be used for receiving reports.',
+            ], 422);
+        }
+
         $receivedMap = ReceivingReportItem::query()
             ->join('receiving_reports', 'receiving_reports.id', '=', 'receiving_report_items.receiving_report_id')
             ->whereNull('receiving_reports.deleted_at')
@@ -139,6 +145,12 @@ class ReceivingReportController extends Controller
             'items.prsItem.prs',
         ])
             ->findOrFail($validated['purchase_order_id']);
+
+        if ($purchaseOrder->status !== 'APPROVED') {
+            return redirect()->back()->withErrors([
+                'purchase_order_id' => 'Only approved purchase orders can be used for receiving reports.',
+            ])->withInput();
+        }
 
         $poItemIds = $purchaseOrder->items->pluck('id')->all();
 
