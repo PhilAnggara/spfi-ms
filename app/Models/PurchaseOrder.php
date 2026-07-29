@@ -121,7 +121,7 @@ class PurchaseOrder extends Model
         if ($this->requiresHighLevelApproval()) {
             return (string) config(
                 'purchase-order.signature.approved_by_at_or_above_threshold_name',
-                'S.C. Calamba, Jr'
+                'S.C Calamba, Jr'
             );
         }
 

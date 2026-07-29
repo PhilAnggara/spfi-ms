@@ -101,8 +101,13 @@ beforeEach(function () {
 });
 
 it('renders compact item table, three column summary, and aligned supplier signature', function () {
+    $this->purchaseOrder->update([
+        'term_of_payment_type' => 'credit',
+        'term_of_payment' => '30 days',
+    ]);
+
     $html = view('pdf.purchase-order', [
-        'purchaseOrder' => $this->purchaseOrder->load([
+        'purchaseOrder' => $this->purchaseOrder->fresh()->load([
             'supplier',
             'currency',
             'items.item.unit',
@@ -122,11 +127,18 @@ it('renders compact item table, three column summary, and aligned supplier signa
         ->toContain('class="po-footer"')
         ->toContain('position: fixed')
         ->toContain('po-supplier')
+        ->toContain('<strong>Print Supplier</strong>')
+        ->toContain('CREDIT • 30 days')
         ->toContain('background: none')
         ->toContain('class="po-items"')
+        ->toContain('>Item Name</th>')
+        ->toContain('>Item Code</th>')
         ->toContain('class="item-name"')
-        ->toContain('class="item-meta"')
-        ->toContain('10 PCS')
+        ->toContain('class="col-item-code"')
+        ->toContain('ITM-PO-001')
+        ->toContain('>Unit</th>')
+        ->toContain('class="col-unit"')
+        ->toContain('>PCS</td>')
         ->toContain('class="col-qty"')
         ->toContain('white-space: nowrap')
         ->toContain('>Price</th>')
@@ -135,12 +147,20 @@ it('renders compact item table, three column summary, and aligned supplier signa
         ->toContain('class="summary-middle"')
         ->toContain('5 %')
         ->toContain('11 %')
+        ->toContain('class="po-delivery"')
+        ->toContain('class="po-number"')
+        ->toContain('Delivery to PT Sinar Pure Foods International | PO Number: <span class="po-number">PO-PRINT-001</span>')
         ->toContain('class="signature-pad"')
         ->toContain('class="signature-blank"')
         ->toContain("Supplier's Signature")
         ->toContain('Denny Tuhatelu')
         ->not->toContain('width: 64px')
         ->not->toContain('col-qty col-qty-wrap')
+        ->not->toContain('class="item-meta"')
+        ->not->toContain('>Item</th>')
+        ->not->toContain('10 PCS')
+        ->not->toContain('30 days • credit')
+        ->not->toContain('(<strong>PO Number</strong>')
         ->not->toContain('>Disc</th>')
         ->not->toContain('>PPN</th>')
         ->not->toContain('>PPh</th>')
@@ -155,16 +175,8 @@ it('renders compact item table, three column summary, and aligned supplier signa
 });
 
 it('allows qty column to wrap only when qty display is very long', function () {
-    $longUnit = UnitOfMeasure::query()->create([
-        'name' => 'Extra Long Unit Name',
-        'code' => 'VERYLONGUNIT',
-    ]);
-
-    $this->purchaseOrder->items->first()->item->update([
-        'unit_of_measure_id' => $longUnit->id,
-    ]);
     $this->purchaseOrder->items()->first()->update([
-        'quantity' => 1250000,
+        'quantity' => 1250000000000,
     ]);
 
     $html = view('pdf.purchase-order', [
@@ -182,7 +194,8 @@ it('allows qty column to wrap only when qty display is very long', function () {
 
     expect($html)
         ->toContain('col-qty-wrap')
-        ->toContain('1.250.000 VERYLONGUNIT');
+        ->toContain('1.250.000.000.000')
+        ->toContain('class="col-unit">PCS</td>');
 });
 
 it('prints approved by based on purchase order total threshold', function (float $total, string $approvedName) {
@@ -206,11 +219,11 @@ it('prints approved by based on purchase order total threshold', function (float
         ->toContain($approvedName);
 })->with([
     'below threshold' => [3_999_999.99, 'Denny Tuhatelu'],
-    'at threshold' => [4_000_000.00, 'S.C. Calamba, Jr'],
-    'above threshold' => [4_000_000.01, 'S.C. Calamba, Jr'],
+    'at threshold' => [4_000_000.00, 'S.C Calamba, Jr'],
+    'above threshold' => [4_000_000.01, 'S.C Calamba, Jr'],
 ]);
 
-it('prints approved by S.C. Calamba, Jr for non-IDR currencies regardless of total', function () {
+it('prints approved by S.C Calamba, Jr for non-IDR currencies regardless of total', function () {
     $usd = Currency::query()->create([
         'name' => 'US Dollar',
         'code' => 'USD',
@@ -238,7 +251,7 @@ it('prints approved by S.C. Calamba, Jr for non-IDR currencies regardless of tot
 
     expect($html)
         ->toContain('Denny Tuhatelu')
-        ->toContain('S.C. Calamba, Jr')
+        ->toContain('S.C Calamba, Jr')
         ->toContain('USD');
 });
 

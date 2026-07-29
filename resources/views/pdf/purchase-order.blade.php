@@ -97,11 +97,11 @@
             font-size: 11px;
             line-height: 1.2;
         }
-        .po-items .item-meta {
-            color: #111827;
-            font-size: 9px;
-            font-weight: normal;
-            line-height: 1.15;
+        .po-items .col-item-code,
+        .po-items .col-unit {
+            width: 1%;
+            text-align: center;
+            white-space: nowrap;
         }
         .po-items .col-qty {
             /* Size to content; stay on one line by default */
@@ -110,10 +110,20 @@
             white-space: nowrap;
         }
         .po-items .col-qty-wrap {
-            /* Only very long qty/unit values may wrap */
+            /* Only very long qty values may wrap */
             white-space: normal;
-            max-width: 40mm;
+            max-width: 28mm;
             word-break: break-word;
+        }
+        .po-delivery {
+            margin-top: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            line-height: 1.35;
+        }
+        .po-delivery .po-number {
+            font-size: 12px;
+            letter-spacing: 0.3px;
         }
         .po-items .col-price,
         .po-items .col-amount {
@@ -217,8 +227,7 @@
         $firstMeta = $firstItem?->meta ?? [];
         $termType = $purchaseOrder->term_of_payment_type ?? ($firstMeta['term_of_payment_type'] ?? null);
         $termValue = $purchaseOrder->term_of_payment ?? ($firstMeta['term_of_payment'] ?? null);
-        $termPayment = trim(($termValue ? $termValue . ' ' : '') . ($termType ?? ''));
-        $termPayment = $termPayment !== '' ? $termPayment : '-';
+        $termTypeDisplay = $termType ? strtoupper((string) $termType) : null;
         $firstPoItem = $purchaseOrder->items->first();
         $firstPoMeta = $firstPoItem?->meta ?? [];
         $isCapex = (bool) ($firstPoItem?->prsItem?->prs?->is_capex ?? ($firstPoMeta['is_capex'] ?? false));
@@ -269,7 +278,7 @@
         <table class="table-clean po-supplier">
             <tr>
                 <td class="label">Supplier Name</td>
-                <td>: {{ $supplier?->name ?? '-' }}{{ $supplier?->code ? ' | ' . $supplier->code : '' }}</td>
+                <td>: <strong>{{ $supplier?->name ?? '-' }}</strong>{{ $supplier?->code ? ' | ' . $supplier->code : '' }}</td>
                 <td class="label text-right"></td>
                 <td class="text-right">&nbsp;</td>
             </tr>
@@ -279,14 +288,7 @@
             </tr>
             <tr>
                 <td class="label">Term Payment</td>
-                <td colspan="3">: @if($termValue || $termType)
-                        @if($termValue){{ $termValue }}@endif
-                        @if($termValue && $termType) &bull; @endif
-                        @if($termType){{ $termType }}@endif
-                    @else
-                        -
-                    @endif
-                </td>
+                <td colspan="3">: @if($termTypeDisplay || $termValue){{ trim(implode(' • ', array_filter([$termTypeDisplay, $termValue]))) }}@else-@endif</td>
             </tr>
             <tr>
                 <td class="label">Transaction Type</td>
@@ -300,9 +302,11 @@
             <thead>
                 <tr>
                     <th style="width: 58px;">PRS</th>
-                    <th>Item</th>
+                    <th>Item Name</th>
+                    <th class="col-item-code">Item Code</th>
                     <th style="width: 36px;" class="text-center">Dept</th>
                     <th class="col-qty">Qty</th>
+                    <th class="col-unit">Unit</th>
                     <th style="width: 78px;" class="text-right col-price">Price</th>
                     <th style="width: 86px;" class="text-right col-amount">Amount</th>
                 </tr>
@@ -315,17 +319,18 @@
                         $dept = $item->prsItem?->prs?->department?->code ?? '-';
                         $itemCode = $item->item?->code ?? '-';
                         $unitName = $item->item?->unit?->code ?? $item->item?->unit?->name ?? 'PCS';
-                        $qtyDisplay = \App\Support\PdfFormatters::qty($item->quantity) . ' ' . $unitName;
-                        $qtyIsVeryLong = mb_strlen($qtyDisplay) > 18;
+                        $qtyDisplay = \App\Support\PdfFormatters::qty($item->quantity);
+                        $qtyIsVeryLong = mb_strlen($qtyDisplay) > 12;
                     @endphp
                     <tr>
                         <td>{{ $prsNumber }}</td>
                         <td>
                             <div class="item-name">{{ $item->item?->name ?? '-' }}</div>
-                            <div class="item-meta">{{ $itemCode }}</div>
                         </td>
+                        <td class="col-item-code">{{ $itemCode }}</td>
                         <td class="text-center">{{ $dept }}</td>
                         <td class="col-qty{{ $qtyIsVeryLong ? ' col-qty-wrap' : '' }}">{{ $qtyDisplay }}</td>
+                        <td class="col-unit">{{ $unitName }}</td>
                         <td class="text-right col-price">{{ $formatMoney($item->unit_price) }}</td>
                         <td class="text-right col-amount">{{ $formatMoney($item->total) }}</td>
                     </tr>
@@ -348,8 +353,8 @@
                     <div class="note" style="margin-top:4px;">
                         Hal ini berlaku untuk seluruh supplier, pembeli, kontraktor, karyawan, maupun pemerintah dan pihak luar yang berhubungan dengan PT. Sinar Pure Foods International. Terima kasih untuk usaha anda membantu kami.
                     </div>
-                    <div class="note" style="margin-top: 6px; font-size:9px; font-weight:bold;">
-                        Delivery to PT Sinar Pure Foods International | (<strong>PO Number</strong> : {{ $purchaseOrder->po_number }})
+                    <div class="po-delivery">
+                        Delivery to PT Sinar Pure Foods International | <span style="font-weight: normal;">PO Number</span>: <span class="po-number">{{ $purchaseOrder->po_number }}</span>
                     </div>
                     @if(trim((string)($purchaseOrder->remark_text ?? '')) !== '')
                         <div style="margin-top:4px; font-size:8px;">
