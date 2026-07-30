@@ -128,7 +128,9 @@ it('uses 215mm by 160mm page dimensions in receiving report view', function () {
     expect($html)
         ->toContain('size: 215mm 160mm')
         ->toContain('width: 215mm')
-        ->toContain('height: 160mm');
+        ->toContain('height: 160mm')
+        ->toContain('font-family: Arial, sans-serif')
+        ->not->toContain('DejaVu Sans');
 });
 
 it('keeps long item names to two full lines without truncating the second line', function () {
@@ -216,7 +218,7 @@ it('keeps long item names to two full lines without truncating the second line',
     ])->render();
 
     expect($html)
-        ->toContain("line-height: 1.2;\n            height: 8.98mm;\n            max-height: 8.98mm;")
+        ->toContain("line-height: 1.2;\n            height: 9.91mm;\n            max-height: 9.91mm;")
         ->toContain('white-space: pre-line')
         ->toContain($shortName)
         ->not->toContain($longName)

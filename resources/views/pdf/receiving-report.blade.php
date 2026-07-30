@@ -14,11 +14,11 @@
         $sy = static fn (float $mm): float => round($mm * $scaleY, 2);
         $mmX = static fn (float $mm): string => $sx($mm).'mm';
         $mmY = static fn (float $mm): string => $sy($mm).'mm';
-        $fieldFontSize = round(13 * $scaleY, 1);
-        $poNumberFontSize = round(22 * $scaleY, 1);
-        $capexFontSize = round(20 * $scaleY, 1);
-        $cellFontSize = round(13 * $scaleY, 1);
-        $acctCellFontSize = round(13 * $scaleY, 1);
+        $fieldFontSize = round(14.5 * $scaleY, 1);
+        $poNumberFontSize = round(24 * $scaleY, 1);
+        $capexFontSize = round(22 * $scaleY, 1);
+        $cellFontSize = round(14.5 * $scaleY, 1);
+        $acctCellFontSize = round(14.5 * $scaleY, 1);
         // DomPDF treats CSS px roughly as pt (1/72"), so size the row for 2 full text lines.
         $itemLineHeight = 1.2;
         $twoLineTextHeightMm = round(($cellFontSize * $itemLineHeight * 2) * (25.4 / 72), 2);
@@ -89,7 +89,7 @@
 
         body {
             margin: 0;
-            font-family: DejaVu Sans, sans-serif;
+            font-family: Arial, sans-serif;
             color: #111827;
         }
 
@@ -313,16 +313,16 @@
             $entryStartTop = $sy(166);
             $entryRowHeight = $sy(5.2);
             $entryRows = collect($accountingEntries)->take(6)->values();
-            $totalLineTop = $entryStartTop + ($entryRows->count() * $entryRowHeight) - $sy(1.2);
-            $totalEntryTop = $entryStartTop + ($entryRows->count() * $entryRowHeight) - $sy(0.9);
+            $totalLineTop = $entryStartTop + ($entryRows->count() * $entryRowHeight) - $sy(0.4);
+            $totalEntryTop = $totalLineTop + $sy(2.2);
         @endphp
 
         @if (! empty($currencyConversion['rate_note']))
-            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmX(120) }}; font-size: {{ round(10 * $scaleY, 1) }}px; white-space: normal;">
+            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmX(120) }}; font-size: {{ round(11 * $scaleY, 1) }}px; white-space: normal;">
                 {{ $currencyConversion['rate_note'] }}
             </div>
         @elseif (($currencyConversion['po_currency_code'] ?? 'IDR') === 'USD' && empty($currencyConversion['rate_found']))
-            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmX(120) }}; font-size: {{ round(10 * $scaleY, 1) }}px; white-space: normal;">
+            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmX(120) }}; font-size: {{ round(11 * $scaleY, 1) }}px; white-space: normal;">
                 No USD exchange rate available.
             </div>
         @endif
