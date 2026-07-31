@@ -178,7 +178,7 @@ class TransferSlipController extends Controller
         $storeWithdrawal = DB::table('store_withdrawals')
             ->where('id', (int) $validated['store_withdrawal_id'])
             ->whereNull('deleted_at')
-            ->select(['id', 'sws_number'])
+            ->select(['id', 'sws_number', 'type'])
             ->first();
 
         if (! $storeWithdrawal || $storeWithdrawal->sws_number !== $validated['sws_number']) {
@@ -186,6 +186,8 @@ class TransferSlipController extends Controller
                 'sws_number' => 'Selected SWS is no longer valid. Please load the SWS again.',
             ]);
         }
+
+        $allowNegativeBalance = strtolower((string) ($storeWithdrawal->type ?? '')) === 'confirmatory';
 
         $sourceItems = DB::table('store_withdrawal_items')
             ->whereIn('id', $requestedItems->keys()->all())
@@ -240,7 +242,7 @@ class TransferSlipController extends Controller
             $numberService->assertUnique('TS', $resolvedNumber['number']);
 
             try {
-                DB::transaction(function () use ($validated, $requestedItems, $sourceItems, $authUserId, $now, $resolvedNumber, &$createdTsNumber): void {
+                DB::transaction(function () use ($validated, $requestedItems, $sourceItems, $authUserId, $now, $resolvedNumber, $allowNegativeBalance, &$createdTsNumber): void {
                     $transferSlipId = DB::table('transfer_slips')->insertGetId([
                         'ts_number' => $resolvedNumber['number'],
                         'ts_date' => $validated['ts_date'],
@@ -306,6 +308,7 @@ class TransferSlipController extends Controller
                         movementDate: $validated['ts_date'],
                         lines: $stockLines,
                         userId: $authUserId,
+                        allowNegativeBalance: $allowNegativeBalance,
                     );
 
                     $createdTsNumber = $resolvedNumber['number'];
