@@ -186,3 +186,98 @@ it('rejects invalid decimal places when printing', function () {
     $response->assertSessionHasErrors('decimal_places');
     expect($this->purchaseOrder->fresh()->po_number)->toBe('PO-OLD-001');
 });
+
+it('rejects a duplicate po number when saving the number and shows the supplier', function () {
+    $otherSupplier = Supplier::query()->create([
+        'name' => 'Conflicting Supplier Co',
+        'code' => 'SUP-PO-DUP-001',
+        'created_by' => $this->user->id,
+    ]);
+
+    PurchaseOrder::query()->create([
+        'supplier_id' => $otherSupplier->id,
+        'currency_id' => $this->purchaseOrder->currency_id,
+        'created_by' => $this->user->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-TAKEN-999',
+        'subtotal' => 500,
+        'total' => 500,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->from(route('purchase-orders.show', $this->purchaseOrder))
+        ->post(route('purchase-orders.number', $this->purchaseOrder), [
+            'po_number' => 'PO-TAKEN-999',
+            'po_number_suggested' => 'PO-SUGGESTED',
+        ]);
+
+    $response->assertRedirect(route('purchase-orders.show', $this->purchaseOrder));
+    $response->assertSessionHasErrors([
+        'po_number' => 'The PO Number PO-TAKEN-999 has already been used by supplier Conflicting Supplier Co.',
+    ]);
+    expect($this->purchaseOrder->fresh()->po_number)->toBe('PO-OLD-001');
+
+    $showResponse = $this->actingAs($this->user)
+        ->from(route('purchase-orders.show', $this->purchaseOrder))
+        ->followingRedirects()
+        ->post(route('purchase-orders.number', $this->purchaseOrder), [
+            'po_number' => 'PO-TAKEN-999',
+            'po_number_suggested' => 'PO-SUGGESTED',
+        ]);
+
+    $showResponse->assertSuccessful();
+    $showResponse->assertSee('is-invalid', false);
+    $showResponse->assertSee('The PO Number PO-TAKEN-999 has already been used by supplier Conflicting Supplier Co.');
+    $showResponse->assertSee('icon: \'error\'', false);
+    $showResponse->assertSee('scrollIntoView', false);
+    $showResponse->assertSee('po-number-form', false);
+    $showResponse->assertDontSee('data-auto-show="1"', false);
+});
+
+it('rejects a duplicate po number when printing and reopens the confirm modal with supplier feedback', function () {
+    $otherSupplier = Supplier::query()->create([
+        'name' => 'Print Conflict Supplier',
+        'code' => 'SUP-PO-DUP-PRINT',
+        'created_by' => $this->user->id,
+    ]);
+
+    PurchaseOrder::query()->create([
+        'supplier_id' => $otherSupplier->id,
+        'currency_id' => $this->purchaseOrder->currency_id,
+        'created_by' => $this->user->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-PRINT-DUP',
+        'subtotal' => 750,
+        'total' => 750,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->from(route('purchase-orders.show', $this->purchaseOrder))
+        ->post(route('purchase-orders.print', $this->purchaseOrder), [
+            'po_number' => 'PO-PRINT-DUP',
+            'po_number_suggested' => 'PO-SUGGESTED',
+            'decimal_places' => 2,
+        ]);
+
+    $response->assertRedirect(route('purchase-orders.show', $this->purchaseOrder));
+    $response->assertSessionHasErrors([
+        'po_number' => 'The PO Number PO-PRINT-DUP has already been used by supplier Print Conflict Supplier.',
+    ]);
+    expect($this->purchaseOrder->fresh()->po_number)->toBe('PO-OLD-001');
+
+    $followUp = $this->actingAs($this->user)
+        ->from(route('purchase-orders.show', $this->purchaseOrder))
+        ->followingRedirects()
+        ->post(route('purchase-orders.print', $this->purchaseOrder), [
+            'po_number' => 'PO-PRINT-DUP',
+            'po_number_suggested' => 'PO-SUGGESTED',
+            'decimal_places' => 2,
+        ]);
+
+    $followUp->assertSuccessful();
+    $followUp->assertSee('data-auto-show="1"', false);
+    $followUp->assertSee('The PO Number PO-PRINT-DUP has already been used by supplier Print Conflict Supplier.');
+    $followUp->assertSee('icon: \'error\'', false);
+    $followUp->assertSee('scrollIntoView', false);
+    $followUp->assertSee('is-invalid', false);
+});

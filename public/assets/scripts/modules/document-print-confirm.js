@@ -24,6 +24,11 @@
             return;
         }
 
+        // Keep the submitted value when reopening after a validation failure.
+        if (modalEl.getAttribute('data-auto-show') === '1') {
+            return;
+        }
+
         const sourceInput = document.getElementById(syncFromId);
         const targetInput = form.querySelector('.document-print-confirm-number, .po-print-confirm-number');
 
@@ -44,6 +49,14 @@
         }
 
         window.bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+
+    function showPrintConfirmModal(modalEl) {
+        if (!window.bootstrap?.Modal) {
+            return;
+        }
+
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
     document.addEventListener('show.bs.modal', function (event) {
@@ -67,6 +80,17 @@
             return;
         }
 
+        // Closing happens before the response; failed validation reopens via data-auto-show.
         closePrintConfirmModal(form);
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.modal[data-auto-show="1"]').forEach((modalEl) => {
+            if (!isPrintConfirmModal(modalEl)) {
+                return;
+            }
+
+            showPrintConfirmModal(modalEl);
+        });
     });
 })();

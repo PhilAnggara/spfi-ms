@@ -70,9 +70,45 @@ class DocumentNumberService
 
         if ($query->exists()) {
             throw ValidationException::withMessages([
-                $config['field'] => "The {$config['field']} has already been used.",
+                $config['field'] => $this->duplicateNumberMessage($type, $number, $ignoreId),
             ]);
         }
+    }
+
+    private function duplicateNumberMessage(string $type, string $number, ?int $ignoreId = null): string
+    {
+        $config = $this->config($type);
+        $label = match (strtoupper($type)) {
+            'PO' => 'PO Number',
+            'RR' => 'RR Number',
+            'TS' => 'TS Number',
+            'DR' => 'DR Number',
+            default => $config['field'],
+        };
+        $defaultMessage = "The {$label} has already been used.";
+
+        if (strtoupper($type) !== 'PO') {
+            return $defaultMessage;
+        }
+
+        $conflictQuery = DB::table('purchase_orders')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_orders.supplier_id')
+            ->where('purchase_orders.po_number', $number)
+            ->when($ignoreId !== null, function ($query) use ($ignoreId) {
+                $query->where('purchase_orders.id', '<>', $ignoreId);
+            });
+
+        if ($this->hasSoftDeleteColumn('purchase_orders')) {
+            $conflictQuery->whereNull('purchase_orders.deleted_at');
+        }
+
+        $supplierName = trim((string) $conflictQuery->value('suppliers.name'));
+
+        if ($supplierName === '') {
+            return $defaultMessage;
+        }
+
+        return "The PO Number {$number} has already been used by supplier {$supplierName}.";
     }
 
     public function isDuplicateNumberException(QueryException $exception): bool

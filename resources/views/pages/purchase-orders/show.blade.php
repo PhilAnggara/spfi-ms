@@ -332,10 +332,20 @@
                         <form id="po-number-form" method="post" action="{{ route('purchase-orders.number', $purchaseOrder) }}">
                             @csrf
                             <label class="form-label">PO Number</label>
-                            <div class="input-group">
-                                <input id="po-number-input" type="text" name="po_number" class="form-control" value="{{ old('po_number', $purchaseOrder->po_number ?: ($nextPoNumber ?? '')) }}">
+                            <div class="input-group has-validation">
+                                <input
+                                    id="po-number-input"
+                                    type="text"
+                                    name="po_number"
+                                    class="form-control @error('po_number') is-invalid @enderror"
+                                    value="{{ old('po_number', $purchaseOrder->po_number ?: ($nextPoNumber ?? '')) }}"
+                                    aria-invalid="{{ $errors->has('po_number') ? 'true' : 'false' }}"
+                                >
                                 <input type="hidden" name="po_number_suggested" value="{{ $nextPoNumber ?? '' }}">
                                 <button type="submit" class="btn btn-outline-primary">Save Number</button>
+                                @error('po_number')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
                             </div>
                             <div class="form-text">Auto-generated, but editable if using existing pre-numbered forms.</div>
                         </form>
@@ -410,6 +420,26 @@
 
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/document-print-confirm.js') }}"></script>
+    @error('po_number')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const poNumberTarget = document.getElementById('po-number-form')
+                    || document.getElementById('po-number-input');
+
+                if (poNumberTarget) {
+                    poNumberTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: @json($message),
+                        icon: 'error',
+                        timer: 5000,
+                    });
+                }
+            });
+        </script>
+    @enderror
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const container = document.getElementById('po-fee-items-container');

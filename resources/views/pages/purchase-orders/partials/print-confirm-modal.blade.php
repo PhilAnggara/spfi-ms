@@ -8,6 +8,8 @@
     $decimalPlacesDefault = (int) config('purchase-order.print.decimal_places.default', 2);
     $decimalPlacesOptions = config('purchase-order.print.decimal_places.options', range(0, 10));
     $decimalPlacesValue = (int) old('decimal_places', $decimalPlacesDefault);
+    $cameFromPrintConfirm = session()->hasOldInput('decimal_places');
+    $shouldReopenPrintModal = $cameFromPrintConfirm && ($errors->has('po_number') || $errors->has('decimal_places'));
 @endphp
 
 <div
@@ -16,6 +18,7 @@
     tabindex="-1"
     aria-labelledby="{{ $modalId }}Label"
     aria-hidden="true"
+    @if ($shouldReopenPrintModal) data-auto-show="1" @endif
 >
     <div class="modal-dialog">
         <form
@@ -39,12 +42,16 @@
                     type="text"
                     id="{{ $modalId }}-number"
                     name="po_number"
-                    class="form-control document-print-confirm-number po-print-confirm-number"
+                    class="form-control document-print-confirm-number po-print-confirm-number @error('po_number') is-invalid @enderror"
                     value="{{ $poNumberValue }}"
                     required
                     autocomplete="off"
+                    aria-invalid="{{ $errors->has('po_number') ? 'true' : 'false' }}"
                 >
                 <input type="hidden" name="po_number_suggested" value="{{ $suggestedNumber }}">
+                @error('po_number')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
                 <div class="form-text">
                     This number will be saved before the PDF opens in a new tab.
                 </div>
@@ -54,7 +61,7 @@
                     <select
                         id="{{ $modalId }}-decimal-places"
                         name="decimal_places"
-                        class="form-select"
+                        class="form-select @error('decimal_places') is-invalid @enderror"
                     >
                         @foreach ($decimalPlacesOptions as $option)
                             <option
@@ -65,6 +72,9 @@
                             </option>
                         @endforeach
                     </select>
+                    @error('decimal_places')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
                     <div class="form-text">
                         Number of digits after the decimal separator for prices and amounts on the printed PO.
                     </div>
