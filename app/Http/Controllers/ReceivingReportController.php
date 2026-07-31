@@ -434,9 +434,15 @@ class ReceivingReportController extends Controller
         ]);
 
         $previousStockLines = $this->buildStockLinesFromReceivingReportItems($receivingReport->items);
+        $releasedNumber = $receivingReport->rr_number;
 
         DB::transaction(function () use ($receivingReport, $previousStockLines) {
             $receivingReport->items()->delete();
+
+            $receivingReport->update([
+                'rr_number' => 'DELETED-'.$receivingReport->id,
+            ]);
+
             $receivingReport->delete();
 
             app(StockService::class)->applyReceivingReportAdjustment(
@@ -458,7 +464,7 @@ class ReceivingReportController extends Controller
         app(NotificationRecipientService::class)->notify($recipients, [
             'type' => 'receiving_report_deleted',
             'title' => 'Receiving Report Deleted',
-            'message' => 'RR #'.$receivingReport->rr_number.' has been deleted.',
+            'message' => 'RR #'.($releasedNumber ?: '-').' has been deleted.',
             'action_url' => '/receiving-reports',
             'icon' => 'fa-light fa-trash-can',
             'icon_color' => 'bg-danger',
@@ -470,7 +476,7 @@ class ReceivingReportController extends Controller
 
         return redirect()
             ->route('receiving-reports.index')
-            ->with('success', 'Receiving report has been deleted.');
+            ->with('success', 'Receiving report has been deleted. The RR number was released for reuse.');
     }
 
     public function print(Request $request, ReceivingReport $receivingReport)

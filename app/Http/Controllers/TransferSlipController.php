@@ -535,7 +535,7 @@ class TransferSlipController extends Controller
             $transferSlip = DB::table('transfer_slips')
                 ->where('id', $transferSlipId)
                 ->whereNull('deleted_at')
-                ->first(['id', 'ts_date']);
+                ->first(['id', 'ts_date', 'ts_number']);
 
             if (! $transferSlip) {
                 return 0;
@@ -573,6 +573,7 @@ class TransferSlipController extends Controller
                 ->where('id', $transferSlipId)
                 ->whereNull('deleted_at')
                 ->update([
+                    'ts_number' => 'DELETED-'.$transferSlipId,
                     'updated_by' => $authUserId,
                     'updated_at' => $now,
                     'deleted_at' => $now,
@@ -583,7 +584,7 @@ class TransferSlipController extends Controller
             return redirect()->back()->with('error', 'Transfer slip not found or already deleted.');
         }
 
-        return redirect()->back()->with('success', 'Transfer slip deleted successfully.');
+        return redirect()->back()->with('success', 'Transfer slip deleted successfully. The TS number was released for reuse.');
     }
 
     /**

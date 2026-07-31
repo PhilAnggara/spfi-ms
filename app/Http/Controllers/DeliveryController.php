@@ -311,7 +311,7 @@ class DeliveryController extends Controller
             $delivery = DB::table('deliveries')
                 ->where('id', $deliveryId)
                 ->whereNull('deleted_at')
-                ->first(['id', 'dr_date']);
+                ->first(['id', 'dr_date', 'dr_number']);
 
             if (! $delivery) {
                 return 0;
@@ -349,6 +349,7 @@ class DeliveryController extends Controller
                 ->where('id', $deliveryId)
                 ->whereNull('deleted_at')
                 ->update([
+                    'dr_number' => 'DELETED-'.$deliveryId,
                     'updated_by' => $authUserId,
                     'updated_at' => $now,
                     'deleted_at' => $now,
@@ -359,7 +360,7 @@ class DeliveryController extends Controller
             return redirect()->back()->with('error', 'Delivery not found or already deleted.');
         }
 
-        return redirect()->back()->with('success', 'Delivery deleted successfully.');
+        return redirect()->back()->with('success', 'Delivery deleted successfully. The DR number was released for reuse.');
     }
 
     private function paginateDeliveries(array $filters = [], int $perPage = 10): LengthAwarePaginator
