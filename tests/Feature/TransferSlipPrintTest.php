@@ -119,6 +119,7 @@ it('saves an edited ts number when printing from the confirmation modal', functi
         ->post(route('transfer-slips.print', ['transferSlip' => $this->transferSlipId, 'mode' => 'print']), [
             'ts_number' => 'TS-PAPER-777',
             'ts_number_suggested' => 'TS-SUGGESTED',
+            'print_confirm_id' => $this->transferSlipId,
         ]);
 
     $response->assertSuccessful();
@@ -127,6 +128,63 @@ it('saves an edited ts number when printing from the confirmation modal', functi
 
     $tsNumber = DB::table('transfer_slips')->where('id', $this->transferSlipId)->value('ts_number');
     expect($tsNumber)->toBe('TS-PAPER-777');
+});
+
+it('rejects a duplicate ts number when printing and shows sws feedback', function () {
+    $now = now();
+
+    $otherStoreWithdrawalId = (int) DB::table('store_withdrawals')->insertGetId([
+        'sws_number' => 'SWS-TS-DUP-001',
+        'sws_date' => $now->toDateString(),
+        'department_id' => $this->department->id,
+        'department_code' => $this->department->code,
+        'type' => 'regular',
+        'info' => 'Duplicate SWS',
+        'created_by' => $this->user->id,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    DB::table('transfer_slips')->insert([
+        'ts_number' => 'TS-TAKEN-999',
+        'ts_date' => $now->toDateString(),
+        'store_withdrawal_id' => $otherStoreWithdrawalId,
+        'for_production' => false,
+        'remarks' => 'Taken TS',
+        'created_by' => $this->user->id,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->from(route('transfer-slips.index'))
+        ->post(route('transfer-slips.print', ['transferSlip' => $this->transferSlipId, 'mode' => 'print']), [
+            'ts_number' => 'TS-TAKEN-999',
+            'ts_number_suggested' => 'TS-SUGGESTED',
+            'print_confirm_id' => $this->transferSlipId,
+        ]);
+
+    $response->assertRedirect(route('transfer-slips.index'));
+    $response->assertSessionHasErrors([
+        'ts_number' => 'The TS Number TS-TAKEN-999 has already been used by SWS SWS-TS-DUP-001.',
+    ]);
+    expect(DB::table('transfer_slips')->where('id', $this->transferSlipId)->value('ts_number'))->toBe('TS-PRINT-001');
+
+    $followUp = $this->actingAs($this->user)
+        ->from(route('transfer-slips.index'))
+        ->followingRedirects()
+        ->post(route('transfer-slips.print', ['transferSlip' => $this->transferSlipId, 'mode' => 'print']), [
+            'ts_number' => 'TS-TAKEN-999',
+            'ts_number_suggested' => 'TS-SUGGESTED',
+            'print_confirm_id' => $this->transferSlipId,
+        ]);
+
+    $followUp->assertSuccessful();
+    $followUp->assertSee('data-auto-show="1"', false);
+    $followUp->assertSee('The TS Number TS-TAKEN-999 has already been used by SWS SWS-TS-DUP-001.');
+    $followUp->assertDontSee('icon: \'error\'', false);
+    $followUp->assertSee('is-invalid', false);
+    $followUp->assertDontSee('Transfer slip could not be saved.');
 });
 
 it('omits blank form background and ts number in print mode', function () {

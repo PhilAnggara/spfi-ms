@@ -56,7 +56,19 @@
             return;
         }
 
-        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        const numberInput = modalEl.querySelector('.document-print-confirm-number, .po-print-confirm-number');
+
+        modalEl.addEventListener('shown.bs.modal', function onShown() {
+            modalEl.removeEventListener('shown.bs.modal', onShown);
+
+            if (numberInput instanceof HTMLElement) {
+                numberInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                numberInput.focus();
+            }
+        });
+
+        modal.show();
     }
 
     document.addEventListener('show.bs.modal', function (event) {

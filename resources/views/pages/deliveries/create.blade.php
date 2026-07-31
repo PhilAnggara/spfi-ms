@@ -162,8 +162,18 @@
                         <div class="row g-2">
                             <div class="col-12 col-md-6">
                                 <label for="delivery-dr-number" class="form-label">DR Number</label>
-                                <input type="text" class="form-control" id="delivery-dr-number" name="dr_number" value="{{ old('dr_number', $nextDrNumber ?? '') }}">
+                                <input
+                                    type="text"
+                                    class="form-control @error('dr_number') is-invalid @enderror"
+                                    id="delivery-dr-number"
+                                    name="dr_number"
+                                    value="{{ old('dr_number', $nextDrNumber ?? '') }}"
+                                    aria-invalid="{{ $errors->has('dr_number') ? 'true' : 'false' }}"
+                                >
                                 <input type="hidden" name="dr_number_suggested" value="{{ $nextDrNumber ?? '' }}">
+                                @error('dr_number')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
                                 <div class="form-text">Auto-generated, but editable if using existing pre-numbered forms.</div>
                             </div>
                             <div class="col-12 col-md-6">
@@ -256,4 +266,24 @@
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/catalog-layout.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/deliveries-create.js') }}"></script>
+    @error('dr_number')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const drNumberInput = document.getElementById('delivery-dr-number');
+
+                if (drNumberInput) {
+                    drNumberInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    drNumberInput.focus();
+                }
+
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: @json($message),
+                        icon: 'error',
+                        timer: 5000,
+                    });
+                }
+            });
+        </script>
+    @enderror
 @endpush

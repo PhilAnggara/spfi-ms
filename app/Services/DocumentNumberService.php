@@ -78,37 +78,98 @@ class DocumentNumberService
     private function duplicateNumberMessage(string $type, string $number, ?int $ignoreId = null): string
     {
         $config = $this->config($type);
-        $label = match (strtoupper($type)) {
+        $documentType = strtoupper($type);
+        $label = match ($documentType) {
             'PO' => 'PO Number',
             'RR' => 'RR Number',
             'TS' => 'TS Number',
             'DR' => 'DR Number',
             default => $config['field'],
         };
-        $defaultMessage = "The {$label} has already been used.";
+        $fallbackMessage = "The {$label} {$number} has already been used.";
+        $context = $this->duplicateNumberContext($documentType, $number, $ignoreId);
 
-        if (strtoupper($type) !== 'PO') {
-            return $defaultMessage;
+        if ($context === null) {
+            return $fallbackMessage;
         }
 
-        $conflictQuery = DB::table('purchase_orders')
-            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_orders.supplier_id')
-            ->where('purchase_orders.po_number', $number)
-            ->when($ignoreId !== null, function ($query) use ($ignoreId) {
-                $query->where('purchase_orders.id', '<>', $ignoreId);
+        return "The {$label} {$number} has already been used by {$context}.";
+    }
+
+    private function duplicateNumberContext(string $type, string $number, ?int $ignoreId = null): ?string
+    {
+        return match ($type) {
+            'PO' => $this->conflictSupplierName(
+                table: 'purchase_orders',
+                numberColumn: 'po_number',
+                number: $number,
+                ignoreId: $ignoreId,
+            ),
+            'RR' => $this->conflictRrSupplierName($number, $ignoreId),
+            'TS' => $this->conflictTsSwsNumber($number, $ignoreId),
+            'DR' => $this->conflictSupplierName(
+                table: 'deliveries',
+                numberColumn: 'dr_number',
+                number: $number,
+                ignoreId: $ignoreId,
+            ),
+            default => null,
+        };
+    }
+
+    private function conflictSupplierName(string $table, string $numberColumn, string $number, ?int $ignoreId = null): ?string
+    {
+        $query = DB::table($table)
+            ->leftJoin('suppliers', 'suppliers.id', '=', "{$table}.supplier_id")
+            ->where("{$table}.{$numberColumn}", $number)
+            ->when($ignoreId !== null, function ($query) use ($table, $ignoreId) {
+                $query->where("{$table}.id", '<>', $ignoreId);
             });
 
-        if ($this->hasSoftDeleteColumn('purchase_orders')) {
-            $conflictQuery->whereNull('purchase_orders.deleted_at');
+        if ($this->hasSoftDeleteColumn($table)) {
+            $query->whereNull("{$table}.deleted_at");
         }
 
-        $supplierName = trim((string) $conflictQuery->value('suppliers.name'));
+        $supplierName = trim((string) $query->value('suppliers.name'));
 
-        if ($supplierName === '') {
-            return $defaultMessage;
+        return $supplierName !== '' ? "supplier {$supplierName}" : null;
+    }
+
+    private function conflictRrSupplierName(string $number, ?int $ignoreId = null): ?string
+    {
+        $query = DB::table('receiving_reports')
+            ->leftJoin('purchase_orders', 'purchase_orders.id', '=', 'receiving_reports.purchase_order_id')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_orders.supplier_id')
+            ->where('receiving_reports.rr_number', $number)
+            ->when($ignoreId !== null, function ($query) use ($ignoreId) {
+                $query->where('receiving_reports.id', '<>', $ignoreId);
+            });
+
+        if ($this->hasSoftDeleteColumn('receiving_reports')) {
+            $query->whereNull('receiving_reports.deleted_at');
         }
 
-        return "The PO Number {$number} has already been used by supplier {$supplierName}.";
+        $supplierName = trim((string) $query->value('suppliers.name'));
+
+        return $supplierName !== '' ? "supplier {$supplierName}" : null;
+    }
+
+    private function conflictTsSwsNumber(string $number, ?int $ignoreId = null): ?string
+    {
+        $query = DB::table('transfer_slips')
+            ->leftJoin('store_withdrawals', 'store_withdrawals.id', '=', 'transfer_slips.store_withdrawal_id')
+            ->where('transfer_slips.ts_number', $number)
+            ->when($ignoreId !== null, function ($query) use ($ignoreId) {
+                $query->where('transfer_slips.id', '<>', $ignoreId);
+            });
+
+        if ($this->hasSoftDeleteColumn('transfer_slips')) {
+            $query->whereNull('transfer_slips.deleted_at');
+        }
+
+        $swsNumber = trim((string) $query->value('store_withdrawals.sws_number'));
+
+        return $swsNumber !== '' ? "SWS {$swsNumber}" : null;
     }
 
     public function isDuplicateNumberException(QueryException $exception): bool

@@ -421,24 +421,30 @@
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/document-print-confirm.js') }}"></script>
     @error('po_number')
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                const poNumberTarget = document.getElementById('po-number-form')
-                    || document.getElementById('po-number-input');
+        @php
+            $isPrintConfirmNumberError = session()->hasOldInput('decimal_places')
+                || session()->hasOldInput('print_confirm_id');
+        @endphp
+        @unless ($isPrintConfirmNumberError)
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const poNumberTarget = document.getElementById('po-number-form')
+                        || document.getElementById('po-number-input');
 
-                if (poNumberTarget) {
-                    poNumberTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
+                    if (poNumberTarget) {
+                        poNumberTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
 
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        title: @json($message),
-                        icon: 'error',
-                        timer: 5000,
-                    });
-                }
-            });
-        </script>
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            title: @json($message),
+                            icon: 'error',
+                            timer: 5000,
+                        });
+                    }
+                });
+            </script>
+        @endunless
     @enderror
     <script>
         document.addEventListener('DOMContentLoaded', function () {

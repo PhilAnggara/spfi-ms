@@ -7,7 +7,7 @@
     class="page-heading po-page"
     id="ts-page"
     data-sws-lookup-url="{{ route('transfer-slips.sws-by-number') }}"
-    data-open-create-modal="{{ $errors->any() ? '1' : '0' }}"
+    data-open-create-modal="{{ $errors->any() && !session()->hasOldInput('print_confirm_id') ? '1' : '0' }}"
     data-old-sws-number="{{ old('sws_number', '') }}"
 >
     <div class="page-title mb-4">
@@ -31,7 +31,12 @@
         </div>
     </div>
 
-    @if ($errors->any())
+    @php
+        $isPrintConfirmNumberError = session()->hasOldInput('print_confirm_id')
+            && ($errors->has('ts_number') || $errors->has('ts_number_suggested'));
+    @endphp
+
+    @if ($errors->any() && ! $isPrintConfirmNumberError)
         <div class="alert alert-danger shadow-sm border-0">
             <div class="fw-semibold mb-1">Transfer slip could not be saved.</div>
             <ul class="mb-0 ps-3">
@@ -465,8 +470,10 @@
 
 @push('addon-script')
     @php
+        $isPrintConfirmNumberError = session()->hasOldInput('print_confirm_id')
+            && ($errors->has('ts_number') || $errors->has('ts_number_suggested'));
         $transferSlipPrefillData = [
-            'shouldOpenModal' => $errors->any(),
+            'shouldOpenModal' => $errors->any() && ! $isPrintConfirmNumberError,
             'swsNumber' => old('sws_number', ''),
             'items' => old('items', []),
         ];

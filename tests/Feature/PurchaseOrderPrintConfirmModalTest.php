@@ -277,7 +277,6 @@ it('rejects a duplicate po number when printing and reopens the confirm modal wi
     $followUp->assertSuccessful();
     $followUp->assertSee('data-auto-show="1"', false);
     $followUp->assertSee('The PO Number PO-PRINT-DUP has already been used by supplier Print Conflict Supplier.');
-    $followUp->assertSee('icon: \'error\'', false);
-    $followUp->assertSee('scrollIntoView', false);
+    $followUp->assertDontSee('icon: \'error\'', false);
     $followUp->assertSee('is-invalid', false);
 });

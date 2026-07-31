@@ -8,8 +8,13 @@
     $decimalPlacesDefault = (int) config('purchase-order.print.decimal_places.default', 2);
     $decimalPlacesOptions = config('purchase-order.print.decimal_places.options', range(0, 10));
     $decimalPlacesValue = (int) old('decimal_places', $decimalPlacesDefault);
-    $cameFromPrintConfirm = session()->hasOldInput('decimal_places');
-    $shouldReopenPrintModal = $cameFromPrintConfirm && ($errors->has('po_number') || $errors->has('decimal_places'));
+    $cameFromPrintConfirm = session()->hasOldInput('decimal_places') || session()->hasOldInput('print_confirm_id');
+    $shouldReopenPrintModal = $cameFromPrintConfirm
+        && ($errors->has('po_number') || $errors->has('decimal_places'))
+        && (
+            ! session()->hasOldInput('print_confirm_id')
+            || (int) old('print_confirm_id') === (int) $purchaseOrder->id
+        );
 @endphp
 
 <div
@@ -29,6 +34,7 @@
             data-sync-from="{{ $syncFromInputId ?? '' }}"
         >
             @csrf
+            <input type="hidden" name="print_confirm_id" value="{{ $purchaseOrder->id }}">
             <div class="modal-header po-detail-modal-header">
                 <div>
                     <h5 class="modal-title" id="{{ $modalId }}Label">Confirm PO Number</h5>

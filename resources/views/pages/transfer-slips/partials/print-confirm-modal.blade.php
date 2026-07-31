@@ -5,6 +5,8 @@
     $paperWidthMm = (int) config('transfer-slip.paper.width_mm', 215);
     $paperHeightMm = (int) config('transfer-slip.paper.height_mm', 105);
     $paperLabel = (string) config('transfer-slip.paper.label', "TS Form {$paperWidthMm} x {$paperHeightMm} mm");
+    $shouldReopenPrintModal = $errors->has('ts_number')
+        && (int) old('print_confirm_id') === (int) $transferSlip->id;
 @endphp
 
 <div
@@ -13,6 +15,7 @@
     tabindex="-1"
     aria-labelledby="{{ $modalId }}Label"
     aria-hidden="true"
+    @if ($shouldReopenPrintModal) data-auto-show="1" @endif
 >
     <div class="modal-dialog">
         <form
@@ -23,6 +26,7 @@
             data-sync-from="{{ $syncFromInputId ?? '' }}"
         >
             @csrf
+            <input type="hidden" name="print_confirm_id" value="{{ $transferSlip->id }}">
             <div class="modal-header">
                 <div>
                     <h5 class="modal-title" id="{{ $modalId }}Label">Confirm TS Number</h5>
@@ -36,12 +40,18 @@
                     type="text"
                     id="{{ $modalId }}-number"
                     name="ts_number"
-                    class="form-control document-print-confirm-number"
-                    value="{{ $tsNumberValue }}"
+                    class="form-control document-print-confirm-number @error('ts_number'){{ $shouldReopenPrintModal ? ' is-invalid' : '' }}@enderror"
+                    value="{{ $shouldReopenPrintModal ? old('ts_number', $tsNumberValue) : ($transferSlip->ts_number ?: $suggestedNumber) }}"
                     required
                     autocomplete="off"
+                    aria-invalid="{{ $shouldReopenPrintModal ? 'true' : 'false' }}"
                 >
                 <input type="hidden" name="ts_number_suggested" value="{{ $suggestedNumber }}">
+                @if ($shouldReopenPrintModal)
+                    @error('ts_number')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                @endif
                 <div class="form-text">
                     This number will be saved before the PDF opens in a new tab.
                 </div>

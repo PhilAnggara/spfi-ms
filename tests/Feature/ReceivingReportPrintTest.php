@@ -99,12 +99,64 @@ it('saves an edited rr number when printing from the confirmation modal', functi
         ->post(route('receiving-reports.print', ['receivingReport' => $this->receivingReport, 'mode' => 'print']), [
             'rr_number' => 'RR-PAPER-777',
             'rr_number_suggested' => 'RR-SUGGESTED',
+            'print_confirm_id' => $this->receivingReport->id,
         ]);
 
     $response->assertSuccessful();
     expect($response->headers->get('content-type'))->toContain('application/pdf');
     expect($response->getContent())->toContain('/PrintScaling /None');
     expect($this->receivingReport->fresh()->rr_number)->toBe('RR-PAPER-777');
+});
+
+it('rejects a duplicate rr number when printing and shows supplier feedback', function () {
+    $otherSupplier = Supplier::query()->create([
+        'name' => 'RR Conflict Supplier',
+        'code' => 'SUP-RR-DUP',
+        'created_by' => $this->user->id,
+    ]);
+
+    $otherPurchaseOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $otherSupplier->id,
+        'created_by' => $this->user->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-RR-DUP-001',
+    ]);
+
+    ReceivingReport::query()->create([
+        'rr_number' => 'RR-TAKEN-999',
+        'purchase_order_id' => $otherPurchaseOrder->id,
+        'received_date' => now()->toDateString(),
+        'created_by' => $this->user->id,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->from(route('receiving-reports.index'))
+        ->post(route('receiving-reports.print', ['receivingReport' => $this->receivingReport, 'mode' => 'print']), [
+            'rr_number' => 'RR-TAKEN-999',
+            'rr_number_suggested' => 'RR-SUGGESTED',
+            'print_confirm_id' => $this->receivingReport->id,
+        ]);
+
+    $response->assertRedirect(route('receiving-reports.index'));
+    $response->assertSessionHasErrors([
+        'rr_number' => 'The RR Number RR-TAKEN-999 has already been used by supplier RR Conflict Supplier.',
+    ]);
+    expect($this->receivingReport->fresh()->rr_number)->toBe('RR-TEST-001');
+
+    $followUp = $this->actingAs($this->user)
+        ->from(route('receiving-reports.index'))
+        ->followingRedirects()
+        ->post(route('receiving-reports.print', ['receivingReport' => $this->receivingReport, 'mode' => 'print']), [
+            'rr_number' => 'RR-TAKEN-999',
+            'rr_number_suggested' => 'RR-SUGGESTED',
+            'print_confirm_id' => $this->receivingReport->id,
+        ]);
+
+    $followUp->assertSuccessful();
+    $followUp->assertSee('data-auto-show="1"', false);
+    $followUp->assertSee('The RR Number RR-TAKEN-999 has already been used by supplier RR Conflict Supplier.');
+    $followUp->assertDontSee('icon: \'error\'', false);
+    $followUp->assertSee('is-invalid', false);
 });
 
 it('uses 215mm by 160mm page dimensions in receiving report view', function () {
