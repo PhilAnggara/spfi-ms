@@ -16,47 +16,6 @@
         });
     }
 
-    function initSwsEditFormBehavior() {
-        document.addEventListener('change', function (event) {
-            const checkbox = event.target.closest('[data-sws-remove-toggle]');
-            if (!checkbox) {
-                return;
-            }
-
-            const row = checkbox.closest('[data-sws-edit-row]');
-            const quantityInput = row ? row.querySelector('[data-sws-qty-input]') : null;
-            if (quantityInput) {
-                quantityInput.disabled = checkbox.checked;
-            }
-
-            if (row) {
-                row.classList.toggle('table-danger', checkbox.checked);
-            }
-        });
-
-        document.addEventListener('submit', function (event) {
-            const form = event.target.closest('.sws-edit-form');
-            if (!form) {
-                return;
-            }
-
-            const removeChecks = Array.from(form.querySelectorAll('[data-sws-remove-toggle]'));
-            if (removeChecks.length === 0) {
-                return;
-            }
-
-            const removeCount = removeChecks.filter((input) => input.checked).length;
-            if (removeCount >= removeChecks.length) {
-                event.preventDefault();
-                window.Swal?.fire({
-                    icon: 'warning',
-                    title: 'Cannot remove all items',
-                    text: 'At least one item must remain in the stores withdrawal.',
-                });
-            }
-        });
-    }
-
     function setLoading(active) {
         const loadingEl = document.getElementById('sws-page-loading');
         if (!loadingEl) {
@@ -150,5 +109,4 @@
     });
 
     initPageTooltips(document);
-    initSwsEditFormBehavior();
 })();

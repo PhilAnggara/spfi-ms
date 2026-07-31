@@ -168,7 +168,7 @@ class StoreWithdrawalController extends Controller
         return $this->capexLinesJsonResponse($request);
     }
 
-    private function capexLinesJsonResponse(Request $request)
+    private function capexLinesJsonResponse(Request $request, ?int $excludeStoreWithdrawalId = null)
     {
         $departmentId = (int) $request->query('department_id', 0);
         if ($departmentId <= 0) {
@@ -186,8 +186,10 @@ class StoreWithdrawalController extends Controller
 
         $search = trim((string) $request->query('search', ''));
         $page = max(1, (int) $request->query('page', 1));
+        $excludeId = $excludeStoreWithdrawalId
+            ?? ((int) $request->query('exclude_store_withdrawal_id', 0) ?: null);
         $lines = app(CapexWithdrawalAvailabilityService::class)
-            ->paginateAvailableLines($departmentId, $search, $page, 36);
+            ->paginateAvailableLines($departmentId, $search, $page, 36, $excludeId);
 
         return response()->json([
             'data' => $lines->items(),
@@ -610,11 +612,94 @@ class StoreWithdrawalController extends Controller
             ->stream($filename);
     }
 
-    public function edit(string $storeWithdrawal)
+    public function edit(Request $request, string $storeWithdrawal)
     {
-        return redirect()
-            ->route('stores-withdrawals.index')
-            ->with('info', 'Stores Withdrawal edit page is not implemented yet (scaffold stage).');
+        $storeWithdrawalId = (int) $storeWithdrawal;
+
+        $this->ensureUserCanManageStoreWithdrawal($request, $storeWithdrawalId);
+
+        $sws = DB::table('store_withdrawals')
+            ->where('id', $storeWithdrawalId)
+            ->whereNull('deleted_at')
+            ->first([
+                'id',
+                'sws_number',
+                'sws_date',
+                'department_id',
+                'department_code',
+                'type',
+                'info',
+            ]);
+
+        if (! $sws) {
+            abort(404);
+        }
+
+        if ($this->hasActiveTransferSlip($storeWithdrawalId)) {
+            return redirect()
+                ->route('stores-withdrawals.index')
+                ->with('error', 'Stores withdrawal cannot be edited because a transfer slip has already been created.');
+        }
+
+        $isCapex = strtolower((string) ($sws->type ?? '')) === 'capex';
+        $withdrawalMode = $isCapex ? 'capex' : 'normal';
+        $departments = Department::all();
+        $categories = ItemCategory::query()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+
+        if ($isCapex && ($request->expectsJson() || $request->ajax())) {
+            return $this->capexLinesJsonResponse($request, $storeWithdrawalId);
+        }
+
+        if (! $isCapex && ($request->expectsJson() || $request->ajax())) {
+            return $this->catalogJsonResponse($request);
+        }
+
+        $existingCartItems = $this->buildExistingCartItems($storeWithdrawalId, $isCapex);
+
+        $items = new LengthAwarePaginator([], 0, 36);
+        $search = trim((string) $request->query('search', ''));
+        $categoryId = '';
+        $stockFilter = '';
+
+        if (! $isCapex) {
+            $categoryId = trim((string) $request->query('category'));
+            $stockFilter = trim((string) $request->query('stock'));
+            if (! in_array($stockFilter, ['in_stock', 'zero_stock'], true)) {
+                $stockFilter = '';
+            }
+
+            $itemsBaseQuery = Item::query()
+                ->select(['id', 'name', 'code', 'stock_on_hand', 'unit_of_measure_id', 'category_id'])
+                ->where('is_active', true)
+                ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
+                    $query->where('category_id', (int) $categoryId);
+                })
+                ->when($stockFilter === 'in_stock', function ($query) {
+                    $query->where('stock_on_hand', '>', 0);
+                })
+                ->when($stockFilter === 'zero_stock', function ($query) {
+                    $query->where('stock_on_hand', '<=', 0);
+                });
+
+            $items = $this->smartCatalogPaginator($itemsBaseQuery, $search, 36);
+        }
+
+        return view('pages.stores-withdrawals.edit', [
+            'storeWithdrawal' => $sws,
+            'departments' => $departments,
+            'categories' => $categories,
+            'items' => $items,
+            'search' => $search,
+            'selectedCategory' => $categoryId,
+            'selectedStockFilter' => $stockFilter,
+            'withdrawalMode' => $withdrawalMode,
+            'selectedDepartmentId' => (string) ($sws->department_id ?? ''),
+            'existingCartItems' => $existingCartItems,
+            'typeValue' => strtoupper((string) ($sws->type ?? 'NORMAL')),
+        ]);
     }
 
     public function update(Request $request, string $storeWithdrawal)
@@ -623,168 +708,329 @@ class StoreWithdrawalController extends Controller
 
         $this->ensureUserCanManageStoreWithdrawal($request, $storeWithdrawalId);
 
-        $exists = DB::table('store_withdrawals')
-            ->where('id', $storeWithdrawalId)
-            ->whereNull('deleted_at')
-            ->exists();
-
-        if (! $exists) {
-            abort(404);
-        }
-
-        if ($this->hasActiveTransferSlip($storeWithdrawalId)) {
-            return redirect()->back()->withErrors([
-                'items' => 'Stores withdrawal cannot be edited because a transfer slip has already been created.',
-            ]);
-        }
-
-        $validated = $request->validate([
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.id' => ['required', 'integer'],
-            'items.*.quantity' => ['required', 'numeric', 'min:0.00001'],
-            'items.*.remove' => ['nullable', 'in:0,1'],
-        ]);
-
-        $existingItemIds = DB::table('store_withdrawal_items')
-            ->where('store_withdrawal_id', $storeWithdrawalId)
-            ->whereNull('deleted_at')
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if (empty($existingItemIds)) {
-            return redirect()->back()->withErrors([
-                'items' => 'No active item found for this stores withdrawal.',
-            ]);
-        }
-
-        $existingItemLookup = array_fill_keys($existingItemIds, true);
-        $updatePayloads = [];
-        $removeIds = [];
-
-        $storeWithdrawal = DB::table('store_withdrawals')
+        $existing = DB::table('store_withdrawals')
             ->where('id', $storeWithdrawalId)
             ->whereNull('deleted_at')
             ->first(['id', 'sws_number', 'created_by', 'type']);
 
-        if (! $storeWithdrawal) {
+        if (! $existing) {
             abort(404);
         }
 
-        $isCapexWithdrawal = strtolower((string) ($storeWithdrawal->type ?? '')) === 'capex';
+        if ($this->hasActiveTransferSlip($storeWithdrawalId)) {
+            return redirect()
+                ->route('stores-withdrawals.index')
+                ->withErrors([
+                    'items' => 'Stores withdrawal cannot be edited because a transfer slip has already been created.',
+                ]);
+        }
 
-        if ($isCapexWithdrawal) {
-            $existingItems = DB::table('store_withdrawal_items')
+        $isCapexWithdrawal = strtolower((string) ($existing->type ?? '')) === 'capex';
+
+        $validated = $request->validate([
+            'department_id' => ['required', 'exists:departments,id'],
+            'sws_date' => ['required', 'date'],
+            'type' => ['required', 'in:NORMAL,CONFIRMATORY,CAPEX'],
+            'info' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.item_id' => ['required', 'exists:items,id'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.00001'],
+            'items.*.receiving_report_item_id' => ['nullable', 'integer', 'exists:receiving_report_items,id'],
+        ]);
+
+        if ($isCapexWithdrawal && $validated['type'] !== 'CAPEX') {
+            return redirect()->back()->withInput()->withErrors([
+                'type' => 'CAPEX withdrawals cannot change type.',
+            ]);
+        }
+
+        if (! $isCapexWithdrawal && $validated['type'] === 'CAPEX') {
+            return redirect()->back()->withInput()->withErrors([
+                'type' => 'Non-CAPEX withdrawals cannot switch to CAPEX.',
+            ]);
+        }
+
+        if ($validated['type'] === 'CAPEX') {
+            return $this->updateCapexWithdrawal($validated, $storeWithdrawalId, $existing);
+        }
+
+        return $this->updateNormalWithdrawal($validated, $storeWithdrawalId, $existing);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function updateNormalWithdrawal(array $validated, int $storeWithdrawalId, object $existing)
+    {
+        $department = Department::query()
+            ->select(['id', 'code'])
+            ->findOrFail((int) $validated['department_id']);
+        $departmentCode = strtoupper(trim((string) $department->code));
+
+        $swsDate = Carbon::parse($validated['sws_date'])->startOfDay();
+        $requestedItems = collect($validated['items'])
+            ->map(function (array $row): array {
+                return [
+                    'item_id' => (int) $row['item_id'],
+                    'quantity' => round((float) $row['quantity'], 5),
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['item_id'] > 0 && $row['quantity'] > 0)
+            ->groupBy('item_id')
+            ->map(function ($rows, $itemId): array {
+                return [
+                    'item_id' => (int) $itemId,
+                    'quantity' => round((float) $rows->sum('quantity'), 5),
+                ];
+            })
+            ->values();
+
+        if ($requestedItems->isEmpty()) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Add at least one valid item before submitting.',
+            ]);
+        }
+
+        $itemRows = DB::table('items as i')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->whereIn('i.id', $requestedItems->pluck('item_id')->all())
+            ->whereNull('i.deleted_at')
+            ->select([
+                'i.id',
+                'i.code',
+                'i.stock_on_hand',
+                'u.name as uom_name',
+            ])
+            ->get()
+            ->keyBy('id');
+
+        if ($itemRows->count() !== $requestedItems->count()) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Some selected items are no longer available.',
+            ]);
+        }
+
+        if ($validated['type'] === 'NORMAL') {
+            $zeroStockIds = $requestedItems
+                ->filter(function (array $row) use ($itemRows): bool {
+                    $stock = (float) (($itemRows[$row['item_id']]->stock_on_hand ?? 0));
+
+                    return $stock <= 0;
+                })
+                ->pluck('item_id');
+
+            $overStockIds = $requestedItems
+                ->filter(function (array $row) use ($itemRows): bool {
+                    $stock = round((float) (($itemRows[$row['item_id']]->stock_on_hand ?? 0)), 5);
+
+                    return $row['quantity'] > $stock;
+                })
+                ->pluck('item_id');
+
+            if ($zeroStockIds->isNotEmpty()) {
+                return redirect()->back()->withInput()
+                    ->withErrors([
+                        'items' => 'Normal type does not allow zero-stock items. Use Confirmatory if needed.',
+                    ]);
+            }
+
+            if ($overStockIds->isNotEmpty()) {
+                return redirect()->back()->withInput()
+                    ->withErrors([
+                        'items' => 'Normal type does not allow quantity to exceed available stock. Reduce the quantity or switch to Confirmatory.',
+                    ]);
+            }
+        }
+
+        $authUserId = Auth::id();
+        $now = now();
+
+        $this->transactionSerializable(function () use ($storeWithdrawalId, $department, $departmentCode, $swsDate, $validated, $requestedItems, $itemRows, $authUserId, $now): void {
+            DB::table('store_withdrawal_items')
                 ->where('store_withdrawal_id', $storeWithdrawalId)
                 ->whereNull('deleted_at')
-                ->get(['id', 'receiving_report_item_id', 'quantity']);
+                ->update([
+                    'updated_by' => $authUserId,
+                    'updated_at' => $now,
+                    'deleted_at' => $now,
+                ]);
 
-            foreach ($validated['items'] as $itemRow) {
-                $itemId = (int) $itemRow['id'];
-                if (! isset($existingItemLookup[$itemId])) {
-                    continue;
-                }
+            $detailRows = $requestedItems->map(function (array $row) use ($storeWithdrawalId, $itemRows, $authUserId, $now): array {
+                $item = $itemRows[$row['item_id']];
 
-                $remove = ((string) ($itemRow['remove'] ?? '0')) === '1';
-                if ($remove) {
-                    $removeIds[$itemId] = true;
+                return [
+                    'store_withdrawal_id' => $storeWithdrawalId,
+                    'item_id' => (int) $item->id,
+                    'product_code' => (string) $item->code,
+                    'quantity' => $row['quantity'],
+                    'stock_on_hand_snapshot' => round((float) ($item->stock_on_hand ?? 0), 5),
+                    'uom' => $item->uom_name ?? 'PCS',
+                    'created_by' => $authUserId,
+                    'updated_by' => $authUserId,
+                    'meta' => json_encode([
+                        'created_from' => 'sws-edit-form',
+                    ]),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                    'deleted_at' => null,
+                ];
+            })->all();
 
-                    continue;
-                }
-
-                $newQuantity = round((float) $itemRow['quantity'], 5);
-                $existingItem = $existingItems->firstWhere('id', $itemId);
-                if (! $existingItem || (int) $existingItem->receiving_report_item_id <= 0) {
-                    return redirect()->back()->withErrors([
-                        'items' => 'CAPEX withdrawal lines are missing receiving report references.',
-                    ]);
-                }
-
-                $lineValidation = app(CapexWithdrawalAvailabilityService::class)->validateRequestedLines([
-                    [
-                        'receiving_report_item_id' => (int) $existingItem->receiving_report_item_id,
-                        'quantity' => $newQuantity,
-                    ],
-                ], $storeWithdrawalId);
-
-                if (! $lineValidation['valid']) {
-                    return redirect()->back()->withErrors([
-                        'items' => $lineValidation['message'],
-                    ]);
-                }
-
-                $updatePayloads[$itemId] = $newQuantity;
-            }
-        } else {
-            foreach ($validated['items'] as $itemRow) {
-                $itemId = (int) $itemRow['id'];
-                if (! isset($existingItemLookup[$itemId])) {
-                    continue;
-                }
-
-                $remove = ((string) ($itemRow['remove'] ?? '0')) === '1';
-                if ($remove) {
-                    $removeIds[$itemId] = true;
-
-                    continue;
-                }
-
-                $updatePayloads[$itemId] = round((float) $itemRow['quantity'], 5);
-            }
-        }
-
-        if (count($existingItemIds) <= 1 && ! empty($removeIds)) {
-            return redirect()->back()->withErrors([
-                'items' => 'Cannot remove item because this stores withdrawal only has one item.',
-            ]);
-        }
-
-        if (empty($updatePayloads)) {
-            return redirect()->back()->withErrors([
-                'items' => 'At least one item must remain in this stores withdrawal.',
-            ]);
-        }
-
-        $now = now();
-        $authUserId = Auth::id();
-        $removeItemIds = array_keys($removeIds);
-
-        DB::transaction(function () use ($storeWithdrawalId, $updatePayloads, $removeItemIds, $now, $authUserId): void {
-            foreach ($updatePayloads as $itemId => $quantity) {
-                DB::table('store_withdrawal_items')
-                    ->where('id', $itemId)
-                    ->where('store_withdrawal_id', $storeWithdrawalId)
-                    ->whereNull('deleted_at')
-                    ->update([
-                        'quantity' => $quantity,
-                        'updated_by' => $authUserId,
-                        'updated_at' => $now,
-                    ]);
-            }
-
-            if (! empty($removeItemIds)) {
-                DB::table('store_withdrawal_items')
-                    ->where('store_withdrawal_id', $storeWithdrawalId)
-                    ->whereIn('id', $removeItemIds)
-                    ->whereNull('deleted_at')
-                    ->update([
-                        'updated_by' => $authUserId,
-                        'updated_at' => $now,
-                        'deleted_at' => $now,
-                    ]);
-            }
+            DB::table('store_withdrawal_items')->insert($detailRows);
 
             DB::table('store_withdrawals')
                 ->where('id', $storeWithdrawalId)
                 ->whereNull('deleted_at')
                 ->update([
+                    'sws_date' => $swsDate->toDateString(),
+                    'department_id' => (int) $department->id,
+                    'department_code' => $departmentCode,
+                    'type' => strtolower((string) $validated['type']),
+                    'info' => $validated['info'] ?? null,
                     'updated_by' => $authUserId,
                     'updated_at' => $now,
+                    'meta' => json_encode([
+                        'source' => 'sws-edit-form',
+                        'item_count' => $requestedItems->count(),
+                    ]),
                 ]);
         });
 
+        $this->notifyStoreWithdrawalUpdated($existing, $authUserId);
+
+        return redirect()
+            ->route('stores-withdrawals.index')
+            ->with('success', 'Stores withdrawal updated successfully.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function updateCapexWithdrawal(array $validated, int $storeWithdrawalId, object $existing)
+    {
+        $department = Department::query()
+            ->select(['id', 'code'])
+            ->findOrFail((int) $validated['department_id']);
+        $departmentCode = strtoupper(trim((string) $department->code));
+
+        $requestedLines = collect($validated['items'])
+            ->map(function (array $row): array {
+                return [
+                    'receiving_report_item_id' => (int) ($row['receiving_report_item_id'] ?? 0),
+                    'item_id' => (int) $row['item_id'],
+                    'quantity' => round((float) $row['quantity'], 5),
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['receiving_report_item_id'] > 0 && $row['item_id'] > 0 && $row['quantity'] > 0)
+            ->groupBy('receiving_report_item_id')
+            ->map(function ($rows, $receivingReportItemId): array {
+                return [
+                    'receiving_report_item_id' => (int) $receivingReportItemId,
+                    'item_id' => (int) $rows->first()['item_id'],
+                    'quantity' => round((float) $rows->sum('quantity'), 5),
+                ];
+            })
+            ->values();
+
+        if ($requestedLines->isEmpty()) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Add at least one valid CAPEX line before submitting.',
+            ]);
+        }
+
+        $availability = app(CapexWithdrawalAvailabilityService::class);
+        $validation = $availability->validateRequestedLines($requestedLines->all(), $storeWithdrawalId);
+        if (! $validation['valid']) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => $validation['message'],
+            ]);
+        }
+
+        $lineRows = $availability->loadLinesByReceivingReportItemIds(
+            $requestedLines->pluck('receiving_report_item_id')->all()
+        );
+
+        if ((int) $lineRows->first()->department_id !== (int) $department->id) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Selected CAPEX lines must match the charged department.',
+            ]);
+        }
+
+        $swsDate = Carbon::parse($validated['sws_date'])->startOfDay();
+        $authUserId = Auth::id();
+        $now = now();
+
+        $this->transactionSerializable(function () use ($storeWithdrawalId, $department, $departmentCode, $swsDate, $validated, $requestedLines, $lineRows, $authUserId, $now): void {
+            DB::table('store_withdrawal_items')
+                ->where('store_withdrawal_id', $storeWithdrawalId)
+                ->whereNull('deleted_at')
+                ->update([
+                    'updated_by' => $authUserId,
+                    'updated_at' => $now,
+                    'deleted_at' => $now,
+                ]);
+
+            $detailRows = $requestedLines->map(function (array $row) use ($storeWithdrawalId, $lineRows, $authUserId, $now): array {
+                $line = $lineRows->get($row['receiving_report_item_id']);
+
+                return [
+                    'store_withdrawal_id' => $storeWithdrawalId,
+                    'receiving_report_item_id' => (int) $row['receiving_report_item_id'],
+                    'purchase_order_item_id' => (int) $line->purchase_order_item_id,
+                    'prs_item_id' => (int) $line->prs_item_id,
+                    'item_id' => (int) $line->item_id,
+                    'product_code' => (string) $line->item_code,
+                    'quantity' => $row['quantity'],
+                    'stock_on_hand_snapshot' => round((float) $line->qty_good, 5),
+                    'uom' => $line->unit_name ?? 'PCS',
+                    'created_by' => $authUserId,
+                    'updated_by' => $authUserId,
+                    'meta' => json_encode([
+                        'created_from' => 'sws-edit-form',
+                        'is_capex' => true,
+                        'prs_number' => $line->prs_number,
+                        'po_number' => $line->po_number,
+                        'rr_number' => $line->rr_number,
+                        'qty_rr_good' => round((float) $line->qty_good, 5),
+                    ]),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                    'deleted_at' => null,
+                ];
+            })->all();
+
+            DB::table('store_withdrawal_items')->insert($detailRows);
+
+            DB::table('store_withdrawals')
+                ->where('id', $storeWithdrawalId)
+                ->whereNull('deleted_at')
+                ->update([
+                    'sws_date' => $swsDate->toDateString(),
+                    'department_id' => (int) $department->id,
+                    'department_code' => $departmentCode,
+                    'type' => 'capex',
+                    'info' => $validated['info'] ?? null,
+                    'updated_by' => $authUserId,
+                    'updated_at' => $now,
+                    'meta' => json_encode([
+                        'source' => 'sws-edit-form',
+                        'withdrawal_mode' => 'capex',
+                        'item_count' => $requestedLines->count(),
+                    ]),
+                ]);
+        });
+
+        $this->notifyStoreWithdrawalUpdated($existing, $authUserId);
+
+        return redirect()
+            ->route('stores-withdrawals.index')
+            ->with('success', 'Stores withdrawal updated successfully.');
+    }
+
+    private function notifyStoreWithdrawalUpdated(object $existing, ?int $authUserId): void
+    {
         $recipientService = app(NotificationRecipientService::class);
-        $documentUsers = User::whereIn('id', array_filter([(int) ($storeWithdrawal->created_by ?? 0), (int) $authUserId]))->get();
+        $documentUsers = User::whereIn('id', array_filter([(int) ($existing->created_by ?? 0), (int) $authUserId]))->get();
         $recipients = $recipientService->uniqueUsers(
             $recipientService->inventoryTeam(),
             $documentUsers
@@ -793,17 +1039,138 @@ class StoreWithdrawalController extends Controller
         $recipientService->notify($recipients, [
             'type' => 'store_withdrawal_updated',
             'title' => 'Store Withdrawal Updated',
-            'message' => 'SWS '.($storeWithdrawal->sws_number ?? $storeWithdrawalId).' has been updated.',
+            'message' => 'SWS '.($existing->sws_number ?? $existing->id).' has been updated.',
             'action_url' => '/stores-withdrawals',
             'icon' => 'fa-light fa-pen-to-square',
             'icon_color' => 'bg-info',
             'meta' => [
-                'store_withdrawal_id' => $storeWithdrawalId,
-                'sws_number' => $storeWithdrawal->sws_number ?? null,
+                'store_withdrawal_id' => (int) $existing->id,
+                'sws_number' => $existing->sws_number ?? null,
             ],
         ]);
+    }
 
-        return redirect()->back()->with('success', 'Stores withdrawal updated successfully.');
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildExistingCartItems(int $storeWithdrawalId, bool $isCapex): array
+    {
+        $rows = DB::table('store_withdrawal_items as swi')
+            ->leftJoin('items as i', 'i.id', '=', 'swi.item_id')
+            ->where('swi.store_withdrawal_id', $storeWithdrawalId)
+            ->whereNull('swi.deleted_at')
+            ->orderBy('swi.id')
+            ->select([
+                'swi.id',
+                'swi.item_id',
+                'swi.receiving_report_item_id',
+                'swi.product_code',
+                'swi.quantity',
+                'swi.uom',
+                'swi.meta',
+                'i.name as item_name',
+                'i.code as item_code',
+                'i.stock_on_hand',
+            ])
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $remainingByRrItem = [];
+        if ($isCapex) {
+            $rrIds = $rows
+                ->pluck('receiving_report_item_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (! empty($rrIds)) {
+                $availability = app(CapexWithdrawalAvailabilityService::class);
+                $lines = $availability->loadLinesByReceivingReportItemIds($rrIds);
+                $withdrawnMap = $availability->withdrawnQuantitiesByReceivingReportItem($rrIds, $storeWithdrawalId);
+
+                foreach ($rrIds as $rrId) {
+                    $line = $lines->get($rrId);
+                    $qtyGood = round((float) ($line->qty_good ?? 0), 5);
+                    $withdrawn = round((float) ($withdrawnMap[$rrId] ?? 0), 5);
+                    $remainingByRrItem[$rrId] = max(0, round($qtyGood - $withdrawn, 5));
+                }
+            }
+        }
+
+        return $rows->map(function ($row) use ($isCapex, $remainingByRrItem): array {
+            $meta = is_string($row->meta) ? json_decode($row->meta, true) : (array) ($row->meta ?? []);
+            $rrId = (int) ($row->receiving_report_item_id ?? 0);
+
+            return [
+                'receivingReportItemId' => $rrId,
+                'itemId' => (int) $row->item_id,
+                'name' => (string) ($row->item_name ?? $row->product_code ?? ''),
+                'code' => (string) ($row->item_code ?? $row->product_code ?? ''),
+                'stock' => $isCapex
+                    ? (float) ($remainingByRrItem[$rrId] ?? 0)
+                    : (float) ($row->stock_on_hand ?? 0),
+                'unit' => (string) ($row->uom ?? 'PCS'),
+                'quantity' => round((float) $row->quantity, 5),
+                'prsNumber' => (string) ($meta['prs_number'] ?? ''),
+                'poNumber' => (string) ($meta['po_number'] ?? ''),
+                'rrNumber' => (string) ($meta['rr_number'] ?? ''),
+            ];
+        })->values()->all();
+    }
+
+    private function catalogJsonResponse(Request $request)
+    {
+        $search = trim((string) $request->query('search'));
+        $categoryId = trim((string) $request->query('category'));
+        $stockFilter = trim((string) $request->query('stock'));
+        if (! in_array($stockFilter, ['in_stock', 'zero_stock'], true)) {
+            $stockFilter = '';
+        }
+
+        $itemsBaseQuery = Item::query()
+            ->select(['id', 'name', 'code', 'stock_on_hand', 'unit_of_measure_id', 'category_id'])
+            ->where('is_active', true)
+            ->when($categoryId !== '' && is_numeric($categoryId), function ($query) use ($categoryId) {
+                $query->where('category_id', (int) $categoryId);
+            })
+            ->when($stockFilter === 'in_stock', function ($query) {
+                $query->where('stock_on_hand', '>', 0);
+            })
+            ->when($stockFilter === 'zero_stock', function ($query) {
+                $query->where('stock_on_hand', '<=', 0);
+            });
+
+        $items = $this->smartCatalogPaginator($itemsBaseQuery, $search, 36);
+
+        $transformedItems = $items->getCollection()->map(function ($item) {
+            $categoryName = $item->category?->name ?? 'Uncategorized';
+
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'code' => $item->code,
+                'stock_on_hand' => (float) $item->stock_on_hand,
+                'unit' => $item->unit?->name ?? 'PCS',
+                'category' => $categoryName,
+                'category_icon' => category_icon($categoryName),
+                'category_data' => category_data_attr($categoryName),
+            ];
+        })->values();
+
+        return response()->json([
+            'data' => $transformedItems,
+            'meta' => [
+                'current_page' => $items->currentPage(),
+                'last_page' => $items->lastPage(),
+                'total' => $items->total(),
+                'per_page' => $items->perPage(),
+            ],
+        ]);
     }
 
     public function destroy(Request $request, string $storeWithdrawal)
@@ -1103,18 +1470,31 @@ class StoreWithdrawalController extends Controller
 
         $start = strlen($normalizedDepartmentCode) + 1;
 
-        $lastSequence = DB::table('store_withdrawals')
-            ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
-            ->where('sws_number', 'like', $normalizedDepartmentCode.'%')
-            ->selectRaw(
-                'MAX(CASE WHEN LEN(SUBSTRING(sws_number, ?, 100)) > 0 '
-                ."AND SUBSTRING(sws_number, ?, 100) NOT LIKE '%[^0-9]%' "
-                .'THEN CAST(SUBSTRING(sws_number, ?, 100) AS INT) ELSE NULL END) as last_sequence',
-                [$start, $start, $start]
-            )
-            ->value('last_sequence');
+        if ($this->isSqlServer()) {
+            $lastSequence = DB::table('store_withdrawals')
+                ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
+                ->where('sws_number', 'like', $normalizedDepartmentCode.'%')
+                ->selectRaw(
+                    'MAX(CASE WHEN LEN(SUBSTRING(sws_number, ?, 100)) > 0 '
+                    ."AND SUBSTRING(sws_number, ?, 100) NOT LIKE '%[^0-9]%' "
+                    .'THEN CAST(SUBSTRING(sws_number, ?, 100) AS INT) ELSE NULL END) as last_sequence',
+                    [$start, $start, $start]
+                )
+                ->value('last_sequence');
 
-        $lastNumber = (int) ($lastSequence ?? 0);
+            $lastNumber = (int) ($lastSequence ?? 0);
+        } else {
+            $lastNumber = (int) DB::table('store_withdrawals')
+                ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
+                ->where('sws_number', 'like', $normalizedDepartmentCode.'%')
+                ->get(['sws_number'])
+                ->map(function ($row) use ($normalizedDepartmentCode): int {
+                    $suffix = substr((string) $row->sws_number, strlen($normalizedDepartmentCode));
+
+                    return ctype_digit($suffix) ? (int) $suffix : 0;
+                })
+                ->max() ?? 0;
+        }
 
         // Sequence selalu 7 digit agar konsisten: 0000001, 0000002, dst.
         $newNumber = str_pad((string) ($lastNumber + 1), 7, '0', STR_PAD_LEFT);

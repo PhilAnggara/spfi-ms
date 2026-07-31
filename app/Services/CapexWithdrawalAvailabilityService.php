@@ -33,8 +33,13 @@ class CapexWithdrawalAvailabilityService
             ->all();
     }
 
-    public function paginateAvailableLines(int $departmentId, string $search = '', int $page = 1, int $perPage = 36): LengthAwarePaginator
-    {
+    public function paginateAvailableLines(
+        int $departmentId,
+        string $search = '',
+        int $page = 1,
+        int $perPage = 36,
+        ?int $excludeStoreWithdrawalId = null,
+    ): LengthAwarePaginator {
         $page = max(1, $page);
         $search = trim($search);
         $searchLike = '%'.mb_strtolower($search).'%';
@@ -45,6 +50,9 @@ class CapexWithdrawalAvailabilityService
             ->whereNull('swi.deleted_at')
             ->whereNull('sw.deleted_at')
             ->whereNotNull('swi.receiving_report_item_id')
+            ->when($excludeStoreWithdrawalId !== null, function ($query) use ($excludeStoreWithdrawalId) {
+                $query->where('sw.id', '!=', $excludeStoreWithdrawalId);
+            })
             ->selectRaw('swi.receiving_report_item_id, SUM(swi.quantity) as withdrawn_qty')
             ->groupBy('swi.receiving_report_item_id');
 

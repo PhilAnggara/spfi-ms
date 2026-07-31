@@ -254,11 +254,14 @@ it('locks capex store withdrawal edit after transfer slip is created', function 
     ]);
 
     $response = $this->actingAs($this->user)->put(route('stores-withdrawals.update', $storeWithdrawal->id), [
+        'department_id' => $this->department->id,
+        'sws_date' => now()->toDateString(),
+        'type' => 'CAPEX',
         'items' => [
             [
-                'id' => $storeWithdrawalItem->id,
+                'item_id' => $this->item->id,
+                'receiving_report_item_id' => $this->receivingReportItem->id,
                 'quantity' => 1,
-                'remove' => '0',
             ],
         ],
     ]);

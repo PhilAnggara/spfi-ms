@@ -139,16 +139,15 @@ it('shows only own stores withdrawals for regular staff', function () {
 
 it('forbids regular staff from updating another users stores withdrawal', function () {
     $otherWithdrawalId = createStoreWithdrawalForUser($this->otherUser, $this->department, $this->item, 'OTH-002');
-    $otherItemId = (int) DB::table('store_withdrawal_items')
-        ->where('store_withdrawal_id', $otherWithdrawalId)
-        ->value('id');
 
     $response = $this->actingAs($this->regularUser)->put(route('stores-withdrawals.update', $otherWithdrawalId), [
+        'department_id' => $this->department->id,
+        'sws_date' => now()->toDateString(),
+        'type' => 'NORMAL',
         'items' => [
             [
-                'id' => $otherItemId,
+                'item_id' => $this->item->id,
                 'quantity' => 1,
-                'remove' => '0',
             ],
         ],
     ]);
@@ -178,22 +177,27 @@ it('allows im staff to see all stores withdrawals', function () {
 
 it('allows im staff to update another users stores withdrawal', function () {
     $otherWithdrawalId = createStoreWithdrawalForUser($this->otherUser, $this->department, $this->item, 'OTH-005');
-    $otherItemId = (int) DB::table('store_withdrawal_items')
-        ->where('store_withdrawal_id', $otherWithdrawalId)
-        ->value('id');
 
     $response = $this->actingAs($this->imStaff)->put(route('stores-withdrawals.update', $otherWithdrawalId), [
+        'department_id' => $this->department->id,
+        'sws_date' => now()->toDateString(),
+        'type' => 'NORMAL',
+        'info' => 'Updated by IM',
         'items' => [
             [
-                'id' => $otherItemId,
-                'quantity' => 1,
-                'remove' => '0',
+                'item_id' => $this->item->id,
+                'quantity' => 1.25,
             ],
         ],
     ]);
 
-    $response->assertRedirect();
+    $response->assertRedirect(route('stores-withdrawals.index'));
     $response->assertSessionHasNoErrors();
 
-    expect((float) DB::table('store_withdrawal_items')->where('id', $otherItemId)->value('quantity'))->toBe(1.0);
+    $activeQty = (float) DB::table('store_withdrawal_items')
+        ->where('store_withdrawal_id', $otherWithdrawalId)
+        ->whereNull('deleted_at')
+        ->value('quantity');
+
+    expect($activeQty)->toBe(1.25);
 });

@@ -52,10 +52,10 @@ function initSwsCatalogAndCart() {
         return;
     }
 
-    const createPage = document.getElementById('sws-create-page');
+    const createPage = document.getElementById('sws-create-page') || document.getElementById('sws-edit-page');
     const filterBar = document.getElementById('sws-catalog-filter-form');
     const baseUrl = filterBar?.dataset.baseUrl || window.location.pathname;
-    const capexUrl = filterBar?.dataset.capexUrl || `${window.location.pathname.replace(/\/create$/, '')}/capex-lines`;
+    const capexUrl = filterBar?.dataset.capexUrl || `${window.location.pathname.replace(/\/(create|edit)$/, '')}/capex-lines`;
     const searchInput = document.getElementById('sws-item-search');
     const categoryFilter = document.getElementById('sws-category-filter');
     const stockFilter = document.getElementById('sws-stock-filter');
@@ -71,12 +71,15 @@ function initSwsCatalogAndCart() {
     const floatingCartBtn = document.getElementById('toggle-sws-cart-mobile');
     const topCartBtn = document.getElementById('toggle-sws-cart');
     const stockRuleHint = document.getElementById('sws-stock-rule-hint');
-    const form = document.getElementById('sws-create-form');
+    const form = document.getElementById('sws-create-form') || document.getElementById('sws-edit-form');
     const modeToggle = document.querySelector('.sws-withdrawal-mode-toggle');
     const normalModeHint = document.getElementById('sws-normal-mode-hint');
     const capexModeHint = document.getElementById('sws-capex-mode-hint');
     const cartDepartmentSelect = document.getElementById('sws-department');
     const normalOnlyFilters = document.querySelectorAll('.sws-normal-only-filter');
+    const modeLocked = createPage?.dataset.modeLocked === '1';
+    const autoOpenCart = createPage?.dataset.autoOpenCart === '1';
+    const excludeStoreWithdrawalId = parseInt(createPage?.dataset.excludeStoreWithdrawalId || '0', 10) || 0;
     let catalogAbortController = null;
     let catalogRequestSeq = 0;
     const LAYOUT_KEY = 'sws-create-catalog-layout';
@@ -88,6 +91,15 @@ function initSwsCatalogAndCart() {
         page: parseInt(paginationContainer?.dataset.currentPage || '1', 10) || 1,
         lastPage: parseInt(paginationContainer?.dataset.lastPage || '1', 10) || 1,
         cart: new Map(),
+    };
+
+    const parseQuantity = (raw, fallback = 1) => {
+        const parsed = parseFloat(String(raw ?? '').trim().replace(',', '.'));
+        if (Number.isNaN(parsed) || parsed < 0.00001) {
+            return fallback;
+        }
+
+        return parsed;
     };
 
     const isCapexMode = () => withdrawalMode === 'capex';
@@ -116,7 +128,7 @@ function initSwsCatalogAndCart() {
     };
 
     const getAllowedQuantity = (stockValue, requestedQuantity) => {
-        const normalizedQuantity = Math.max(0.00001, Number(requestedQuantity) || 1);
+        const normalizedQuantity = Math.max(0.00001, parseQuantity(requestedQuantity, 1));
         if (isCapexMode() || isConfirmatoryType()) {
             const normalizedStock = Number(stockValue) || 0;
             if (isCapexMode() && normalizedStock <= 0) {
@@ -302,6 +314,25 @@ function initSwsCatalogAndCart() {
         }
     };
 
+    const syncHiddenInputs = () => {
+        if (!hiddenInputsContainer) {
+            return;
+        }
+
+        const cartItems = Array.from(state.cart.values());
+        hiddenInputsContainer.innerHTML = cartItems.map((item, index) => {
+            const receivingReportItemInput = isCapexMode()
+                ? `<input type="hidden" name="items[${index}][receiving_report_item_id]" value="${item.receivingReportItemId}">`
+                : '';
+
+            return `
+                <input type="hidden" name="items[${index}][item_id]" value="${item.itemId}">
+                ${receivingReportItemInput}
+                <input type="hidden" name="items[${index}][quantity]" value="${item.quantity}">
+            `;
+        }).join('');
+    };
+
     const renderCart = () => {
         if (!cartItemsContainer || !hiddenInputsContainer) {
             return;
@@ -373,20 +404,70 @@ function initSwsCatalogAndCart() {
             `;
         }).join('');
 
-        hiddenInputsContainer.innerHTML = cartItems.map((item, index) => {
-            const receivingReportItemInput = isCapexMode()
-                ? `<input type="hidden" name="items[${index}][receiving_report_item_id]" value="${item.receivingReportItemId}">`
-                : '';
-
-            return `
-                <input type="hidden" name="items[${index}][item_id]" value="${item.itemId}">
-                ${receivingReportItemInput}
-                <input type="hidden" name="items[${index}][quantity]" value="${item.quantity}">
-            `;
-        }).join('');
-
+        syncHiddenInputs();
         updateCountBadge();
         updateCatalogButtons();
+    };
+
+    const commitCartQuantity = (qtyInput, { rewriteValue = true } = {}) => {
+        const cartKey = parseCartKey(qtyInput.dataset.cartKey || '');
+        if (!cartKey || !state.cart.has(cartKey)) {
+            return;
+        }
+
+        const current = state.cart.get(cartKey);
+        const quantity = parseQuantity(qtyInput.value, Number(current.quantity) || 1);
+        const allowedQuantity = getAllowedQuantity(current.stock, quantity);
+        const nextQuantity = allowedQuantity <= 0 ? 1 : allowedQuantity;
+
+        if (rewriteValue) {
+            qtyInput.value = String(nextQuantity);
+        }
+
+        state.cart.set(cartKey, {
+            ...current,
+            quantity: nextQuantity,
+        });
+
+        if (!isConfirmatoryType() && !isCapexMode() && quantity > allowedQuantity) {
+            showStockRuleHint('Normal type quantity cannot exceed available stock.');
+        }
+
+        syncHiddenInputs();
+    };
+
+    const seedExistingCartItems = () => {
+        const raw = createPage?.dataset.existingCart || '[]';
+        let items = [];
+
+        try {
+            items = JSON.parse(raw);
+        } catch (_) {
+            items = [];
+        }
+
+        if (!Array.isArray(items) || items.length === 0) {
+            return;
+        }
+
+        items.forEach((item) => {
+            const payload = {
+                receivingReportItemId: Number(item.receivingReportItemId || 0),
+                itemId: Number(item.itemId || 0),
+                name: item.name || '',
+                code: item.code || '',
+                stock: Number(item.stock || 0),
+                unit: item.unit || 'PCS',
+                prsNumber: item.prsNumber || '',
+                poNumber: item.poNumber || '',
+                rrNumber: item.rrNumber || '',
+            };
+            const quantity = parseQuantity(item.quantity, 1);
+            state.cart.set(getCartKey(payload), {
+                ...payload,
+                quantity,
+            });
+        });
     };
 
     const removeZeroStockItemsIfNormal = () => {
@@ -723,7 +804,11 @@ function initSwsCatalogAndCart() {
             }
             query.set('department_id', departmentId);
             query.set('page', String(page));
-            targetUrl = `${capexUrl}?${query.toString()}`;
+            if (excludeStoreWithdrawalId > 0) {
+                query.set('exclude_store_withdrawal_id', String(excludeStoreWithdrawalId));
+            }
+            // On edit, use the page URL so remaining qty excludes the current SWS.
+            targetUrl = `${modeLocked ? baseUrl : capexUrl}?${query.toString()}`;
         } else {
             const category = (categoryFilter?.value || '').trim();
             const stock = (stockFilter?.value || '').trim();
@@ -878,8 +963,8 @@ function initSwsCatalogAndCart() {
             const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
                 const payload = row ? getCardPayload(row) : null;
-                const current = Number(qtyInput.value || '1');
-                const nextValue = (Number.isNaN(current) ? 1 : current + 1);
+                const current = parseQuantity(qtyInput.value, 1);
+                const nextValue = current + 1;
                 const allowedQuantity = payload ? getAllowedQuantity(payload.stock, nextValue) : nextValue;
                 qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
 
@@ -895,8 +980,8 @@ function initSwsCatalogAndCart() {
             const row = minus.closest('.prs-item-card, .prs-catalog-row');
             const qtyInput = row?.querySelector('.prs-item-qty');
             if (qtyInput) {
-                const current = parseFloat(qtyInput.value || '1');
-                qtyInput.value = Math.max(0.00001, Number.isNaN(current) ? 1 : current - 1);
+                const current = parseQuantity(qtyInput.value, 1);
+                qtyInput.value = String(Math.max(0.00001, current - 1));
             }
             return;
         }
@@ -913,31 +998,13 @@ function initSwsCatalogAndCart() {
 
         const payload = getCardPayload(row);
         const qtyInput = row.querySelector('.prs-item-qty');
-        const quantity = Math.max(0.00001, Number(qtyInput?.value || '1') || 1);
+        const quantity = parseQuantity(qtyInput?.value, 1);
 
         if (qtyInput) {
             qtyInput.value = String(getAllowedQuantity(payload.stock, quantity) || 1);
         }
 
         addToCart(payload, quantity);
-    });
-
-    grid.addEventListener('input', (event) => {
-        const qtyInput = event.target.closest('.prs-item-qty');
-        if (!qtyInput) {
-            return;
-        }
-
-        const row = qtyInput.closest('.prs-item-card, .prs-catalog-row');
-        const payload = row ? getCardPayload(row) : null;
-        const quantity = Math.max(0.00001, Number(qtyInput.value || '1') || 1);
-        const allowedQuantity = payload ? getAllowedQuantity(payload.stock, quantity) : quantity;
-
-        qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
-
-        if (!isConfirmatoryType() && payload && quantity > allowedQuantity) {
-            showStockRuleHint('Normal type quantity cannot exceed available stock.');
-        }
     });
 
     if (cartItemsContainer) {
@@ -947,26 +1014,16 @@ function initSwsCatalogAndCart() {
                 return;
             }
 
-            const cartKey = parseCartKey(qtyInput.dataset.cartKey || '');
-            if (!cartKey || !state.cart.has(cartKey)) {
+            commitCartQuantity(qtyInput, { rewriteValue: false });
+        });
+
+        cartItemsContainer.addEventListener('change', (event) => {
+            const qtyInput = event.target.closest('.sws-cart-qty');
+            if (!qtyInput) {
                 return;
             }
 
-            const current = state.cart.get(cartKey);
-            const quantity = Math.max(0.00001, Number(qtyInput.value || '1') || 1);
-            const allowedQuantity = getAllowedQuantity(current.stock, quantity);
-            qtyInput.value = String(allowedQuantity <= 0 ? 1 : allowedQuantity);
-
-            state.cart.set(cartKey, {
-                ...current,
-                quantity: allowedQuantity <= 0 ? 1 : allowedQuantity,
-            });
-
-            if (!isConfirmatoryType() && !isCapexMode() && quantity > allowedQuantity) {
-                showStockRuleHint('Normal type quantity cannot exceed available stock.');
-            }
-
-            renderCart();
+            commitCartQuantity(qtyInput, { rewriteValue: true });
         });
 
         cartItemsContainer.addEventListener('click', (event) => {
@@ -978,7 +1035,7 @@ function initSwsCatalogAndCart() {
                 }
 
                 const current = state.cart.get(cartKey);
-                const nextQuantity = getAllowedQuantity(current.stock, Number(current.quantity || 1) + 1);
+                const nextQuantity = getAllowedQuantity(current.stock, parseQuantity(current.quantity, 1) + 1);
 
                 if (!isConfirmatoryType() && !isCapexMode() && nextQuantity === Number(current.quantity || 1)) {
                     showStockRuleHint('Normal type quantity cannot exceed available stock.');
@@ -1003,7 +1060,7 @@ function initSwsCatalogAndCart() {
                 const current = state.cart.get(cartKey);
                 state.cart.set(cartKey, {
                     ...current,
-                    quantity: Math.max(0.00001, Number(current.quantity || 1) - 1),
+                    quantity: Math.max(0.00001, parseQuantity(current.quantity, 1) - 1),
                 });
 
                 renderCart();
@@ -1139,6 +1196,10 @@ function initSwsCatalogAndCart() {
 
     if (modeToggle) {
         modeToggle.addEventListener('click', (event) => {
+            if (modeLocked) {
+                return;
+            }
+
             const button = event.target.closest('[data-withdrawal-mode]');
             if (!button) {
                 return;
@@ -1158,11 +1219,26 @@ function initSwsCatalogAndCart() {
 
     setLayoutActiveState();
     applyWithdrawalModeUi();
+    seedExistingCartItems();
+
+    if (autoOpenCart) {
+        const cartPopup = document.getElementById('sws-cart-popup');
+        const backdrop = document.getElementById('sws-cart-backdrop');
+        if (cartPopup) {
+            cartPopup.classList.remove('is-hidden');
+            cartPopup.setAttribute('aria-hidden', 'false');
+        }
+        if (backdrop) {
+            backdrop.classList.remove('is-hidden');
+        }
+    }
 
     if (isCapexMode()) {
         fetchCatalog(1);
+        renderCart();
     } else if (catalogLayout === 'list') {
         fetchCatalog(state.page);
+        renderCart();
     } else {
         renderPagination();
         renderCart();

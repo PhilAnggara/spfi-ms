@@ -150,9 +150,9 @@
                                                             <i class="fa-light fa-lock text-secondary"></i>
                                                         </button>
                                                     @elseif ($canManageSws)
-                                                        <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $sws->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                                                        <a href="{{ route('stores-withdrawals.edit', $sws->id) }}" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                             <i class="fa-light fa-edit text-primary"></i>
-                                                        </button>
+                                                        </a>
                                                         <button
                                                             type="button"
                                                             class="btn icon"
@@ -181,11 +181,9 @@
                             {{ $storeWithdrawals->onEachSide(1)->links('pagination::bootstrap-5') }}
                         </div>
 
-                        @foreach ($storeWithdrawals as $sws)
+                            @foreach ($storeWithdrawals as $sws)
                             @php
                                 $detailItems = collect($storeWithdrawalItems[$sws->id] ?? []);
-                                $canRemoveItem = $detailItems->count() > 1;
-                                $isLocked = (bool) ($lockedStoreWithdrawalLookup[$sws->id] ?? false);
                                 $canManageSws = auth()->user()->hasAnyRole(['administrator', 'im-manager', 'im-supervisor', 'im-staff'])
                                     || auth()->id() === (int) ($sws->created_by ?? 0);
                             @endphp
@@ -277,101 +275,6 @@
                                     </div>
                                 </div>
                             </div>
-
-                            @if ($canManageSws)
-                            <div class="modal fade" id="edit-modal-{{ $sws->id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                                    <div class="modal-content">
-                                        <form method="POST" action="{{ route('stores-withdrawals.update', $sws->id) }}" class="sws-edit-form" data-sws-id="{{ $sws->id }}">
-                                            @csrf
-                                            @method('PUT')
-                                            <div class="modal-header sws-modal-header">
-                                                <div>
-                                                    <h5 class="modal-title mb-1">Edit Stores Withdrawal</h5>
-                                                    <small class="text-muted">{{ $sws->sws_number }}</small>
-                                                </div>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                @if ($isLocked)
-                                                    <div class="alert alert-warning border-0 sws-edit-alert mb-3">
-                                                        <div class="fw-semibold mb-1">Edit Locked</div>
-                                                        <div class="small">Stores withdrawal ini sudah dipakai di transfer slip, jadi tidak bisa diedit lagi.</div>
-                                                    </div>
-                                                @endif
-                                                <div class="alert alert-info border-0 sws-edit-alert">
-                                                    <div class="fw-semibold mb-1">Quick Edit Rules</div>
-                                                    <div class="small">You can update quantity and remove existing items. Adding new items is disabled in this modal.</div>
-                                                </div>
-
-                                                <div class="table-responsive">
-                                                    <table class="table table-striped table-sm align-middle sws-modal-table">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>#</th>
-                                                                <th>Item</th>
-                                                                <th>Code</th>
-                                                                <th style="width: 180px;">Quantity</th>
-                                                                <th style="width: 160px;">Remove</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            @forelse ($detailItems as $detail)
-                                                                <tr data-sws-edit-row>
-                                                                    <td>{{ $loop->iteration }}</td>
-                                                                    <td>{{ $detail->item_name ?? '-' }}</td>
-                                                                    <td>{{ $detail->item_code ?? $detail->product_code ?? '-' }}</td>
-                                                                    <td>
-                                                                        <input type="hidden" name="items[{{ $loop->index }}][id]" value="{{ $detail->id }}">
-                                                                        <div class="input-group input-group-sm">
-                                                                            <input
-                                                                                type="number"
-                                                                                class="form-control"
-                                                                                min="0.00001"
-                                                                                step="0.00001"
-                                                                                name="items[{{ $loop->index }}][quantity]"
-                                                                                value="{{ rtrim(rtrim(number_format((float) $detail->quantity, 5, '.', ''), '0'), '.') }}"
-                                                                                @disabled($isLocked)
-                                                                                data-sws-qty-input>
-                                                                            <span class="input-group-text">{{ $detail->uom ?? '-' }}</span>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td>
-                                                                        @if ($canRemoveItem)
-                                                                            <input type="hidden" name="items[{{ $loop->index }}][remove]" value="0">
-                                                                            <div class="form-check m-0">
-                                                                                <input
-                                                                                    class="form-check-input"
-                                                                                    type="checkbox"
-                                                                                    name="items[{{ $loop->index }}][remove]"
-                                                                                    value="1"
-                                                                                    @disabled($isLocked)
-                                                                                    data-sws-remove-toggle>
-                                                                                <label class="form-check-label">Remove</label>
-                                                                            </div>
-                                                                        @else
-                                                                            <span class="badge bg-light-secondary">Keep (single item)</span>
-                                                                        @endif
-                                                                    </td>
-                                                                </tr>
-                                                            @empty
-                                                                <tr>
-                                                                    <td colspan="5" class="text-center text-muted">No editable item found.</td>
-                                                                </tr>
-                                                            @endforelse
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                <button type="submit" class="btn btn-primary" @disabled($detailItems->isEmpty() || $isLocked)>Save Changes</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                            @endif
                         @endforeach
                     @endif
                 </div>
