@@ -84,6 +84,36 @@ it('creates a stores withdrawal with decimal quantity', function () {
         ->value('quantity'))->toBe(0.5);
 });
 
+it('allows normal stores withdrawal when quantity matches fractional stock_on_hand', function () {
+    $this->item->update(['stock_on_hand' => 25.1]);
+
+    $response = $this->actingAs($this->user)->post(route('stores-withdrawals.store'), [
+        'department_id' => $this->department->id,
+        'sws_date' => now()->toDateString(),
+        'type' => 'NORMAL',
+        'info' => 'Fractional SOH create',
+        'items' => [
+            [
+                'item_id' => $this->item->id,
+                'quantity' => 25.1,
+            ],
+        ],
+    ]);
+
+    $response->assertRedirect(route('stores-withdrawals.index'));
+    $response->assertSessionHasNoErrors();
+
+    $storeWithdrawalId = (int) DB::table('store_withdrawals')
+        ->where('created_by', $this->user->id)
+        ->latest('id')
+        ->value('id');
+
+    expect((float) DB::table('store_withdrawal_items')
+        ->where('store_withdrawal_id', $storeWithdrawalId)
+        ->whereNull('deleted_at')
+        ->value('quantity'))->toBe(25.1);
+});
+
 it('shows the edit page with existing cart items', function () {
     $create = $this->actingAs($this->user)->post(route('stores-withdrawals.store'), [
         'department_id' => $this->department->id,
@@ -163,11 +193,12 @@ it('updates stores withdrawal lines and decimal quantities from the edit page pa
 
     expect(DB::table('store_withdrawal_items')
         ->where('store_withdrawal_id', $storeWithdrawalId)
-        ->whereNotNull('deleted_at')
-        ->count())->toBeGreaterThan(0);
+        ->where('item_id', $this->item->id)
+        ->whereNull('deleted_at')
+        ->count())->toBe(1);
 });
 
-it('redirects edit when a transfer slip already exists', function () {
+it('redirects edit when all lines are fully transferred', function () {
     $this->actingAs($this->user)->post(route('stores-withdrawals.store'), [
         'department_id' => $this->department->id,
         'sws_date' => now()->toDateString(),
@@ -185,11 +216,28 @@ it('redirects edit when a transfer slip already exists', function () {
         ->latest('id')
         ->value('id');
 
-    DB::table('transfer_slips')->insert([
+    $storeWithdrawalItemId = (int) DB::table('store_withdrawal_items')
+        ->where('store_withdrawal_id', $storeWithdrawalId)
+        ->whereNull('deleted_at')
+        ->value('id');
+
+    $transferSlipId = (int) DB::table('transfer_slips')->insertGetId([
         'ts_number' => 'TS-LOCK-001',
         'ts_date' => now()->toDateString(),
         'store_withdrawal_id' => $storeWithdrawalId,
         'for_production' => false,
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('transfer_slip_items')->insert([
+        'transfer_slip_id' => $transferSlipId,
+        'store_withdrawal_item_id' => $storeWithdrawalItemId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 1,
         'created_by' => $this->user->id,
         'updated_by' => $this->user->id,
         'created_at' => now(),

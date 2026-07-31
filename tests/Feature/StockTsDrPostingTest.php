@@ -57,7 +57,7 @@ it('posts transfer slip issues to qty_out1 and reduces inventory', function () {
 
     $inventory = StockInventory::query()->where('item_id', $this->item->id)->first();
     expect((float) $inventory->balance)->toBe(85.0);
-    expect((int) $this->item->fresh()->stock_on_hand)->toBe(85);
+    expect((float) $this->item->fresh()->stock_on_hand)->toBe(85.0);
 
     $balance = StockBalance::query()
         ->where('reference_type', StockService::REF_TRANSFER_SLIP)

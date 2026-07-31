@@ -12,15 +12,18 @@ class Item extends Model
     use SoftDeletes;
 
     protected $table = 'items';
+
     protected $guarded = [
-        'id'
+        'id',
     ];
 
     protected $casts = [
         'id' => 'integer',
         'unit_of_measure_id' => 'integer',
         'category_id' => 'integer',
+        'stock_on_hand' => 'decimal:5',
     ];
+
     protected $hidden = [
 
     ];
@@ -29,6 +32,7 @@ class Item extends Model
     {
         return $this->belongsTo(UnitOfMeasure::class, 'unit_of_measure_id')->withTrashed();
     }
+
     public function category()
     {
         return $this->belongsTo(ItemCategory::class, 'category_id')->withTrashed();

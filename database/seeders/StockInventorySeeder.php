@@ -23,6 +23,7 @@ class StockInventorySeeder extends Seeder
 
         if (empty($rows)) {
             $this->warn('No stock_inventory rows found from configured source.');
+
             return;
         }
 
@@ -41,6 +42,7 @@ class StockInventorySeeder extends Seeder
 
             if ($itemId === null) {
                 $skipped++;
+
                 continue;
             }
 
@@ -107,7 +109,7 @@ class StockInventorySeeder extends Seeder
             DB::table('items')
                 ->where('id', (int) $itemId)
                 ->update([
-                    'stock_on_hand' => (int) round((float) $totalBalance),
+                    'stock_on_hand' => round((float) $totalBalance, 5),
                 ]);
         }
     }
@@ -118,7 +120,8 @@ class StockInventorySeeder extends Seeder
 
         if ($this->isLegacySource() && ! empty($legacyRows)) {
             $this->logImportSource($dataset, 'legacy');
-            $this->command?->info("ℹ [{$dataset}] rows loaded: " . count($legacyRows));
+            $this->command?->info("ℹ [{$dataset}] rows loaded: ".count($legacyRows));
+
             return $legacyRows;
         }
 
@@ -130,7 +133,7 @@ class StockInventorySeeder extends Seeder
             $this->logImportSource($dataset, 'csv');
         }
 
-        $this->command?->info("ℹ [{$dataset}] rows loaded: " . count($csvRows));
+        $this->command?->info("ℹ [{$dataset}] rows loaded: ".count($csvRows));
 
         return $csvRows;
     }
@@ -141,12 +144,14 @@ class StockInventorySeeder extends Seeder
 
         if (! file_exists($csvPath)) {
             $this->warn("CSV for dataset [{$dataset}] not found at {$csvPath}");
+
             return [];
         }
 
         $handle = fopen($csvPath, 'r');
         if ($handle === false) {
             $this->warn("Unable to open CSV for dataset [{$dataset}] at {$csvPath}");
+
             return [];
         }
 
@@ -161,12 +166,14 @@ class StockInventorySeeder extends Seeder
         $header = fgetcsv($handle, 0, $delimiter);
         if ($header === false) {
             fclose($handle);
+
             return [];
         }
 
         $header = array_map(function ($value): string {
             $value = (string) $value;
             $value = preg_replace('/^\xEF\xBB\xBF/', '', $value) ?? $value;
+
             return trim($value);
         }, $header);
 
@@ -240,6 +247,7 @@ class StockInventorySeeder extends Seeder
             }
 
             $value = $this->normalizeDecimal($row[$key]);
+
             return $value;
         }
 
@@ -367,12 +375,14 @@ class StockInventorySeeder extends Seeder
     private function isAffirmative(mixed $value): bool
     {
         $normalized = strtoupper((string) ($this->normalizeValue($value) ?? ''));
+
         return in_array($normalized, ['Y', 'YES', 'TRUE', '1'], true);
     }
 
     private function isNegative(mixed $value): bool
     {
         $normalized = strtoupper((string) ($this->normalizeValue($value) ?? ''));
+
         return in_array($normalized, ['N', 'NO', 'FALSE', '0'], true);
     }
 

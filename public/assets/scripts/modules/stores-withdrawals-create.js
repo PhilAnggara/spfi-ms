@@ -127,11 +127,18 @@ function initSwsCatalogAndCart() {
         return Number(stockValue) > 0;
     };
 
-    const getAllowedQuantity = (stockValue, requestedQuantity) => {
-        const normalizedQuantity = Math.max(0.00001, parseQuantity(requestedQuantity, 1));
+    const getTransferredQuantity = (item) => Math.max(0, Number(item?.quantityTransferred || 0));
+
+    const isCartLineLocked = (item) => Boolean(item?.isLineLocked);
+
+    const getAllowedQuantity = (stockValue, requestedQuantity, item = null) => {
+        const transferred = getTransferredQuantity(item);
+        const minQuantity = transferred > 0.00001 ? transferred : 0.00001;
+        const normalizedQuantity = Math.max(minQuantity, parseQuantity(requestedQuantity, minQuantity));
+
         if (isCapexMode() || isConfirmatoryType()) {
             const normalizedStock = Number(stockValue) || 0;
-            if (isCapexMode() && normalizedStock <= 0) {
+            if (isCapexMode() && normalizedStock <= 0 && transferred <= 0.00001) {
                 return 0;
             }
 
@@ -139,15 +146,17 @@ function initSwsCatalogAndCart() {
                 return normalizedQuantity;
             }
 
-            return Math.min(normalizedQuantity, normalizedStock);
+            // Capex remaining already excludes this SWS; allow qty >= transferred up to remaining + transferred.
+            return Math.max(minQuantity, Math.min(normalizedQuantity, normalizedStock + transferred));
         }
 
         const normalizedStock = Number(stockValue) || 0;
-        if (normalizedStock <= 0) {
+        const maxQuantity = normalizedStock + transferred;
+        if (maxQuantity <= 0.00001 && transferred <= 0.00001) {
             return 0;
         }
 
-        return Math.min(normalizedQuantity, normalizedStock);
+        return Math.max(minQuantity, Math.min(normalizedQuantity, maxQuantity > 0 ? maxQuantity : minQuantity));
     };
 
     const syncCatalogQuantityInput = (card) => {
@@ -357,16 +366,42 @@ function initSwsCatalogAndCart() {
 
         cartItemsContainer.innerHTML = cartItems.map((item) => {
             const cartKey = getCartKey(item);
+            const transferred = getTransferredQuantity(item);
+            const lineLocked = isCartLineLocked(item);
             const stockLabelClass = Number(item.stock) <= 0 ? 'text-danger fw-semibold' : 'text-muted';
-            const quantityMaxAttribute = !isConfirmatoryType() && Number(item.stock) > 0
-                ? `max="${item.stock}"`
+            const quantityMin = transferred > 0.00001 ? transferred : 0.00001;
+            const quantityMaxAttribute = !isConfirmatoryType() && (Number(item.stock) + transferred) > 0
+                ? `max="${Number(item.stock) + transferred}"`
                 : '';
             const stockLabel = isCapexMode()
                 ? `Remaining ${item.stock}`
                 : `Stock ${item.stock}`;
+            const transferLabel = transferred > 0.00001
+                ? `<small class="text-muted d-block">Transferred ${transferred}${lineLocked ? ' · fully transferred (locked)' : ` · remaining ${Math.max(0, Number(item.quantity) - transferred)}`}</small>`
+                : '';
             const referenceLine = isCapexMode()
                 ? `<small class="text-muted d-block">PRS ${escapeHtml(item.prsNumber || '-')} · PO ${escapeHtml(item.poNumber || '-')} · RR ${escapeHtml(item.rrNumber || '-')}</small>`
                 : '';
+            const qtyControls = lineLocked
+                ? `<input type="number" class="form-control sws-cart-qty" value="${item.quantity}" data-cart-key="${cartKey}" readonly disabled>
+                   <span class="input-group-text">${escapeHtml(item.unit)}</span>`
+                : `<button type="button" class="btn btn-light-secondary sws-cart-decrement" data-cart-key="${cartKey}" aria-label="Decrease quantity">
+                        <i class="fa-light fa-minus"></i>
+                   </button>
+                   <input type="number" min="${quantityMin}" step="0.00001" ${quantityMaxAttribute} class="form-control sws-cart-qty" value="${item.quantity}" data-cart-key="${cartKey}">
+                   <button type="button" class="btn btn-light-secondary sws-cart-increment" data-cart-key="${cartKey}" aria-label="Increase quantity">
+                        <i class="fa-light fa-plus"></i>
+                   </button>
+                   <span class="input-group-text">${escapeHtml(item.unit)}</span>`;
+            const removeControl = lineLocked
+                ? `<button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Fully transferred lines cannot be removed">
+                        <i class="fa-light fa-lock"></i>
+                        Locked
+                   </button>`
+                : `<button type="button" class="btn btn-sm btn-outline-danger sws-cart-remove" data-cart-key="${cartKey}" ${transferred > 0.00001 ? 'disabled title="Cannot remove: transfer slip already created for this line"' : ''}>
+                        <i class="fa-regular fa-trash"></i>
+                        Remove
+                   </button>`;
 
             return `
                 <div class="prs-cart-item" data-cart-key="${cartKey}">
@@ -378,26 +413,17 @@ function initSwsCatalogAndCart() {
                             <div class="fw-semibold">${escapeHtml(item.name)}</div>
                             <small class="text-muted">${escapeHtml(item.code)} · <span class="${stockLabelClass}">${stockLabel}</span> ${escapeHtml(item.unit)}</small>
                             ${referenceLine}
+                            ${transferLabel}
                         </div>
                     </div>
                     <div class="prs-cart-item-actions">
                         <div class="prs-cart-item-qty">
                             <div class="input-group input-group-sm">
-                                <button type="button" class="btn btn-light-secondary sws-cart-decrement" data-cart-key="${cartKey}" aria-label="Decrease quantity">
-                                    <i class="fa-light fa-minus"></i>
-                                </button>
-                                <input type="number" min="0.00001" step="0.00001" ${quantityMaxAttribute} class="form-control sws-cart-qty" value="${item.quantity}" data-cart-key="${cartKey}">
-                                <button type="button" class="btn btn-light-secondary sws-cart-increment" data-cart-key="${cartKey}" aria-label="Increase quantity">
-                                    <i class="fa-light fa-plus"></i>
-                                </button>
-                                <span class="input-group-text">${escapeHtml(item.unit)}</span>
+                                ${qtyControls}
                             </div>
                         </div>
                         <div class="prs-cart-item-remove">
-                            <button type="button" class="btn btn-sm btn-outline-danger sws-cart-remove" data-cart-key="${cartKey}">
-                                <i class="fa-regular fa-trash"></i>
-                                Remove
-                            </button>
+                            ${removeControl}
                         </div>
                     </div>
                 </div>
@@ -416,9 +442,15 @@ function initSwsCatalogAndCart() {
         }
 
         const current = state.cart.get(cartKey);
-        const quantity = parseQuantity(qtyInput.value, Number(current.quantity) || 1);
-        const allowedQuantity = getAllowedQuantity(current.stock, quantity);
-        const nextQuantity = allowedQuantity <= 0 ? 1 : allowedQuantity;
+        if (isCartLineLocked(current)) {
+            qtyInput.value = String(current.quantity);
+            return;
+        }
+
+        const transferred = getTransferredQuantity(current);
+        const quantity = parseQuantity(qtyInput.value, Number(current.quantity) || transferred || 1);
+        const allowedQuantity = getAllowedQuantity(current.stock, quantity, current);
+        const nextQuantity = allowedQuantity <= 0 ? Math.max(0.00001, transferred || 1) : allowedQuantity;
 
         if (rewriteValue) {
             qtyInput.value = String(nextQuantity);
@@ -431,6 +463,10 @@ function initSwsCatalogAndCart() {
 
         if (!isConfirmatoryType() && !isCapexMode() && quantity > allowedQuantity) {
             showStockRuleHint('Normal type quantity cannot exceed available stock.');
+        }
+
+        if (quantity + 0.00001 < transferred) {
+            showStockRuleHint('Quantity cannot be below the amount already transferred.');
         }
 
         syncHiddenInputs();
@@ -452,12 +488,16 @@ function initSwsCatalogAndCart() {
 
         items.forEach((item) => {
             const payload = {
+                storeWithdrawalItemId: Number(item.storeWithdrawalItemId || 0),
                 receivingReportItemId: Number(item.receivingReportItemId || 0),
                 itemId: Number(item.itemId || 0),
                 name: item.name || '',
                 code: item.code || '',
                 stock: Number(item.stock || 0),
                 unit: item.unit || 'PCS',
+                quantityTransferred: Number(item.quantityTransferred || 0),
+                quantityRemaining: Number(item.quantityRemaining || 0),
+                isLineLocked: Boolean(item.isLineLocked),
                 prsNumber: item.prsNumber || '',
                 poNumber: item.poNumber || '',
                 rrNumber: item.rrNumber || '',
@@ -477,6 +517,10 @@ function initSwsCatalogAndCart() {
 
         let removedCount = 0;
         Array.from(state.cart.entries()).forEach(([cartKey, item]) => {
+            if (getTransferredQuantity(item) > 0.00001 || isCartLineLocked(item)) {
+                return;
+            }
+
             if (Number(item.stock) <= 0) {
                 state.cart.delete(cartKey);
                 removedCount += 1;
@@ -500,9 +544,14 @@ function initSwsCatalogAndCart() {
         let adjustedCount = 0;
 
         Array.from(state.cart.entries()).forEach(([cartKey, item]) => {
-            const allowedQuantity = getAllowedQuantity(item.stock, item.quantity);
+            if (isCartLineLocked(item)) {
+                return;
+            }
 
-            if (allowedQuantity <= 0) {
+            const transferred = getTransferredQuantity(item);
+            const allowedQuantity = getAllowedQuantity(item.stock, item.quantity, item);
+
+            if (allowedQuantity <= 0 && transferred <= 0.00001) {
                 state.cart.delete(cartKey);
                 removedCount += 1;
                 return;
@@ -517,22 +566,15 @@ function initSwsCatalogAndCart() {
             }
         });
 
-        if (removedCount > 0 && adjustedCount > 0) {
-            showStockRuleHint(`Normal type is active. ${removedCount} zero-stock item(s) were removed and ${adjustedCount} item quantity was adjusted to available stock.`);
-            return;
+        if (removedCount > 0 || adjustedCount > 0) {
+            showStockRuleHint(
+                removedCount > 0
+                    ? `Normal type is active. ${removedCount} item(s) were removed and ${adjustedCount} quantity value(s) were adjusted.`
+                    : `Normal type is active. ${adjustedCount} quantity value(s) were adjusted to available stock.`
+            );
+        } else {
+            showStockRuleHint('');
         }
-
-        if (removedCount > 0) {
-            showStockRuleHint(`Normal type is active. ${removedCount} zero-stock item(s) were removed from the cart.`);
-            return;
-        }
-
-        if (adjustedCount > 0) {
-            showStockRuleHint(`Normal type is active. ${adjustedCount} item quantity was adjusted to available stock.`);
-            return;
-        }
-
-        showStockRuleHint('');
     };
 
     const addToCart = (payload, quantity) => {
@@ -1035,7 +1077,11 @@ function initSwsCatalogAndCart() {
                 }
 
                 const current = state.cart.get(cartKey);
-                const nextQuantity = getAllowedQuantity(current.stock, parseQuantity(current.quantity, 1) + 1);
+                if (isCartLineLocked(current)) {
+                    return;
+                }
+
+                const nextQuantity = getAllowedQuantity(current.stock, parseQuantity(current.quantity, 1) + 1, current);
 
                 if (!isConfirmatoryType() && !isCapexMode() && nextQuantity === Number(current.quantity || 1)) {
                     showStockRuleHint('Normal type quantity cannot exceed available stock.');
@@ -1043,7 +1089,7 @@ function initSwsCatalogAndCart() {
 
                 state.cart.set(cartKey, {
                     ...current,
-                    quantity: nextQuantity <= 0 ? 1 : nextQuantity,
+                    quantity: nextQuantity <= 0 ? Math.max(0.00001, getTransferredQuantity(current) || 1) : nextQuantity,
                 });
 
                 renderCart();
@@ -1058,9 +1104,15 @@ function initSwsCatalogAndCart() {
                 }
 
                 const current = state.cart.get(cartKey);
+                if (isCartLineLocked(current)) {
+                    return;
+                }
+
+                const transferred = getTransferredQuantity(current);
+                const minQuantity = transferred > 0.00001 ? transferred : 0.00001;
                 state.cart.set(cartKey, {
                     ...current,
-                    quantity: Math.max(0.00001, parseQuantity(current.quantity, 1) - 1),
+                    quantity: Math.max(minQuantity, parseQuantity(current.quantity, 1) - 1),
                 });
 
                 renderCart();
@@ -1068,12 +1120,18 @@ function initSwsCatalogAndCart() {
             }
 
             const removeButton = event.target.closest('.sws-cart-remove');
-            if (!removeButton) {
+            if (!removeButton || removeButton.disabled) {
                 return;
             }
 
             const cartKey = parseCartKey(removeButton.dataset.cartKey || '');
-            if (!cartKey) {
+            if (!cartKey || !state.cart.has(cartKey)) {
+                return;
+            }
+
+            const current = state.cart.get(cartKey);
+            if (isCartLineLocked(current) || getTransferredQuantity(current) > 0.00001) {
+                showStockRuleHint('Items that already have a transfer slip cannot be removed.');
                 return;
             }
 
@@ -1107,14 +1165,24 @@ function initSwsCatalogAndCart() {
             }
 
             if (!isConfirmatoryType()) {
-                const hasZeroStock = Array.from(state.cart.values()).some((item) => Number(item.stock) <= 0);
+                const hasZeroStock = Array.from(state.cart.values()).some((item) => {
+                    const transferred = getTransferredQuantity(item);
+                    const additional = Number(item.quantity) - transferred;
+
+                    return Number(item.stock) <= 0 && additional > 0.00001;
+                });
                 if (hasZeroStock) {
                     event.preventDefault();
                     showStockRuleHint('Normal type cannot contain zero-stock items.');
                     return;
                 }
 
-                const hasOverStock = Array.from(state.cart.values()).some((item) => Number(item.quantity) > Number(item.stock || 0));
+                const hasOverStock = Array.from(state.cart.values()).some((item) => {
+                    const transferred = getTransferredQuantity(item);
+                    const additional = Number(item.quantity) - transferred;
+
+                    return additional > Number(item.stock || 0);
+                });
                 if (hasOverStock) {
                     event.preventDefault();
                     normalizeCartForStockRules();

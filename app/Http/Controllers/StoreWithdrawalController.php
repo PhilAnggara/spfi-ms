@@ -55,8 +55,10 @@ class StoreWithdrawalController extends Controller
             ->all();
 
         $storeWithdrawalItems = $this->groupStoreWithdrawalItems($storeWithdrawalIds);
-        $lockedStoreWithdrawalIds = $this->lockedStoreWithdrawalIds($storeWithdrawalIds);
+        $lockedStoreWithdrawalIds = $this->fullyTransferredStoreWithdrawalIds($storeWithdrawalIds);
         $lockedStoreWithdrawalLookup = array_fill_keys($lockedStoreWithdrawalIds, true);
+        $deleteLockedStoreWithdrawalIds = $this->lockedStoreWithdrawalIds($storeWithdrawalIds);
+        $deleteLockedStoreWithdrawalLookup = array_fill_keys($deleteLockedStoreWithdrawalIds, true);
 
         $departmentOptions = Department::query()
             ->select(['code', 'name'])
@@ -67,6 +69,7 @@ class StoreWithdrawalController extends Controller
             'storeWithdrawals' => $storeWithdrawals,
             'storeWithdrawalItems' => $storeWithdrawalItems,
             'lockedStoreWithdrawalLookup' => $lockedStoreWithdrawalLookup,
+            'deleteLockedStoreWithdrawalLookup' => $deleteLockedStoreWithdrawalLookup,
             'departmentOptions' => $canViewAll ? $departmentOptions : collect(),
             'canFilterDepartment' => $canViewAll,
             'filters' => $filters,
@@ -635,10 +638,10 @@ class StoreWithdrawalController extends Controller
             abort(404);
         }
 
-        if ($this->hasActiveTransferSlip($storeWithdrawalId)) {
+        if ($this->isStoreWithdrawalFullyTransferred($storeWithdrawalId)) {
             return redirect()
                 ->route('stores-withdrawals.index')
-                ->with('error', 'Stores withdrawal cannot be edited because a transfer slip has already been created.');
+                ->with('error', 'Stores withdrawal cannot be edited because all items have already been fully transferred.');
         }
 
         $isCapex = strtolower((string) ($sws->type ?? '')) === 'capex';
@@ -717,11 +720,11 @@ class StoreWithdrawalController extends Controller
             abort(404);
         }
 
-        if ($this->hasActiveTransferSlip($storeWithdrawalId)) {
+        if ($this->isStoreWithdrawalFullyTransferred($storeWithdrawalId)) {
             return redirect()
                 ->route('stores-withdrawals.index')
                 ->withErrors([
-                    'items' => 'Stores withdrawal cannot be edited because a transfer slip has already been created.',
+                    'items' => 'Stores withdrawal cannot be edited because all items have already been fully transferred.',
                 ]);
         }
 
@@ -791,6 +794,33 @@ class StoreWithdrawalController extends Controller
             ]);
         }
 
+        $existingItems = DB::table('store_withdrawal_items')
+            ->where('store_withdrawal_id', $storeWithdrawalId)
+            ->whereNull('deleted_at')
+            ->get(['id', 'item_id', 'quantity'])
+            ->keyBy(fn ($row) => (int) $row->item_id);
+
+        $transferredMap = $this->transferredQuantitiesByStoreWithdrawalItemIds(
+            $existingItems->pluck('id')->map(fn ($id) => (int) $id)->all()
+        );
+
+        foreach ($existingItems as $itemId => $existingItem) {
+            $transferred = round((float) ($transferredMap[(int) $existingItem->id] ?? 0), 5);
+            $requested = $requestedItems->firstWhere('item_id', (int) $itemId);
+
+            if ($transferred > 0.00001 && $requested === null) {
+                return redirect()->back()->withInput()->withErrors([
+                    'items' => 'Items that already have a transfer slip cannot be removed.',
+                ]);
+            }
+
+            if ($requested !== null && $transferred > $requested['quantity'] + 0.00001) {
+                return redirect()->back()->withInput()->withErrors([
+                    'items' => 'Quantity cannot be below the amount already transferred on a transfer slip.',
+                ]);
+            }
+        }
+
         $itemRows = DB::table('items as i')
             ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
             ->whereIn('i.id', $requestedItems->pluck('item_id')->all())
@@ -812,18 +842,28 @@ class StoreWithdrawalController extends Controller
 
         if ($validated['type'] === 'NORMAL') {
             $zeroStockIds = $requestedItems
-                ->filter(function (array $row) use ($itemRows): bool {
+                ->filter(function (array $row) use ($itemRows, $existingItems, $transferredMap): bool {
                     $stock = (float) (($itemRows[$row['item_id']]->stock_on_hand ?? 0));
+                    $existingItem = $existingItems->get($row['item_id']);
+                    $transferred = $existingItem
+                        ? round((float) ($transferredMap[(int) $existingItem->id] ?? 0), 5)
+                        : 0.0;
+                    $additional = round($row['quantity'] - $transferred, 5);
 
-                    return $stock <= 0;
+                    return $stock <= 0 && $additional > 0.00001;
                 })
                 ->pluck('item_id');
 
             $overStockIds = $requestedItems
-                ->filter(function (array $row) use ($itemRows): bool {
+                ->filter(function (array $row) use ($itemRows, $existingItems, $transferredMap): bool {
                     $stock = round((float) (($itemRows[$row['item_id']]->stock_on_hand ?? 0)), 5);
+                    $existingItem = $existingItems->get($row['item_id']);
+                    $transferred = $existingItem
+                        ? round((float) ($transferredMap[(int) $existingItem->id] ?? 0), 5)
+                        : 0.0;
+                    $additional = round($row['quantity'] - $transferred, 5);
 
-                    return $row['quantity'] > $stock;
+                    return $additional > $stock;
                 })
                 ->pluck('item_id');
 
@@ -844,21 +884,30 @@ class StoreWithdrawalController extends Controller
 
         $authUserId = Auth::id();
         $now = now();
+        $requestedItemIds = $requestedItems->pluck('item_id')->map(fn ($id) => (int) $id)->all();
 
-        $this->transactionSerializable(function () use ($storeWithdrawalId, $department, $departmentCode, $swsDate, $validated, $requestedItems, $itemRows, $authUserId, $now): void {
-            DB::table('store_withdrawal_items')
-                ->where('store_withdrawal_id', $storeWithdrawalId)
-                ->whereNull('deleted_at')
-                ->update([
-                    'updated_by' => $authUserId,
-                    'updated_at' => $now,
-                    'deleted_at' => $now,
-                ]);
-
-            $detailRows = $requestedItems->map(function (array $row) use ($storeWithdrawalId, $itemRows, $authUserId, $now): array {
+        $this->transactionSerializable(function () use ($storeWithdrawalId, $department, $departmentCode, $swsDate, $validated, $requestedItems, $itemRows, $existingItems, $requestedItemIds, $authUserId, $now): void {
+            foreach ($requestedItems as $row) {
                 $item = $itemRows[$row['item_id']];
+                $existingItem = $existingItems->get($row['item_id']);
 
-                return [
+                if ($existingItem) {
+                    DB::table('store_withdrawal_items')
+                        ->where('id', (int) $existingItem->id)
+                        ->whereNull('deleted_at')
+                        ->update([
+                            'quantity' => $row['quantity'],
+                            'stock_on_hand_snapshot' => round((float) ($item->stock_on_hand ?? 0), 5),
+                            'uom' => $item->uom_name ?? 'PCS',
+                            'product_code' => (string) $item->code,
+                            'updated_by' => $authUserId,
+                            'updated_at' => $now,
+                        ]);
+
+                    continue;
+                }
+
+                DB::table('store_withdrawal_items')->insert([
                     'store_withdrawal_id' => $storeWithdrawalId,
                     'item_id' => (int) $item->id,
                     'product_code' => (string) $item->code,
@@ -873,10 +922,25 @@ class StoreWithdrawalController extends Controller
                     'created_at' => $now,
                     'updated_at' => $now,
                     'deleted_at' => null,
-                ];
-            })->all();
+                ]);
+            }
 
-            DB::table('store_withdrawal_items')->insert($detailRows);
+            $removableIds = $existingItems
+                ->filter(fn ($row, $itemId) => ! in_array((int) $itemId, $requestedItemIds, true))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if (! empty($removableIds)) {
+                DB::table('store_withdrawal_items')
+                    ->whereIn('id', $removableIds)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'updated_by' => $authUserId,
+                        'updated_at' => $now,
+                        'deleted_at' => $now,
+                    ]);
+            }
 
             DB::table('store_withdrawals')
                 ->where('id', $storeWithdrawalId)
@@ -938,6 +1002,33 @@ class StoreWithdrawalController extends Controller
             ]);
         }
 
+        $existingItems = DB::table('store_withdrawal_items')
+            ->where('store_withdrawal_id', $storeWithdrawalId)
+            ->whereNull('deleted_at')
+            ->get(['id', 'receiving_report_item_id', 'item_id', 'quantity'])
+            ->keyBy(fn ($row) => (int) $row->receiving_report_item_id);
+
+        $transferredMap = $this->transferredQuantitiesByStoreWithdrawalItemIds(
+            $existingItems->pluck('id')->map(fn ($id) => (int) $id)->all()
+        );
+
+        foreach ($existingItems as $receivingReportItemId => $existingItem) {
+            $transferred = round((float) ($transferredMap[(int) $existingItem->id] ?? 0), 5);
+            $requested = $requestedLines->firstWhere('receiving_report_item_id', (int) $receivingReportItemId);
+
+            if ($transferred > 0.00001 && $requested === null) {
+                return redirect()->back()->withInput()->withErrors([
+                    'items' => 'Items that already have a transfer slip cannot be removed.',
+                ]);
+            }
+
+            if ($requested !== null && $transferred > $requested['quantity'] + 0.00001) {
+                return redirect()->back()->withInput()->withErrors([
+                    'items' => 'Quantity cannot be below the amount already transferred on a transfer slip.',
+                ]);
+            }
+        }
+
         $availability = app(CapexWithdrawalAvailabilityService::class);
         $validation = $availability->validateRequestedLines($requestedLines->all(), $storeWithdrawalId);
         if (! $validation['valid']) {
@@ -959,21 +1050,38 @@ class StoreWithdrawalController extends Controller
         $swsDate = Carbon::parse($validated['sws_date'])->startOfDay();
         $authUserId = Auth::id();
         $now = now();
+        $requestedRrIds = $requestedLines->pluck('receiving_report_item_id')->map(fn ($id) => (int) $id)->all();
 
-        $this->transactionSerializable(function () use ($storeWithdrawalId, $department, $departmentCode, $swsDate, $validated, $requestedLines, $lineRows, $authUserId, $now): void {
-            DB::table('store_withdrawal_items')
-                ->where('store_withdrawal_id', $storeWithdrawalId)
-                ->whereNull('deleted_at')
-                ->update([
-                    'updated_by' => $authUserId,
-                    'updated_at' => $now,
-                    'deleted_at' => $now,
-                ]);
-
-            $detailRows = $requestedLines->map(function (array $row) use ($storeWithdrawalId, $lineRows, $authUserId, $now): array {
+        $this->transactionSerializable(function () use ($storeWithdrawalId, $department, $departmentCode, $swsDate, $validated, $requestedLines, $lineRows, $existingItems, $requestedRrIds, $authUserId, $now): void {
+            foreach ($requestedLines as $row) {
                 $line = $lineRows->get($row['receiving_report_item_id']);
+                $existingItem = $existingItems->get($row['receiving_report_item_id']);
 
-                return [
+                if ($existingItem) {
+                    DB::table('store_withdrawal_items')
+                        ->where('id', (int) $existingItem->id)
+                        ->whereNull('deleted_at')
+                        ->update([
+                            'quantity' => $row['quantity'],
+                            'stock_on_hand_snapshot' => round((float) $line->qty_good, 5),
+                            'uom' => $line->unit_name ?? 'PCS',
+                            'product_code' => (string) $line->item_code,
+                            'updated_by' => $authUserId,
+                            'updated_at' => $now,
+                            'meta' => json_encode([
+                                'created_from' => 'sws-edit-form',
+                                'is_capex' => true,
+                                'prs_number' => $line->prs_number,
+                                'po_number' => $line->po_number,
+                                'rr_number' => $line->rr_number,
+                                'qty_rr_good' => round((float) $line->qty_good, 5),
+                            ]),
+                        ]);
+
+                    continue;
+                }
+
+                DB::table('store_withdrawal_items')->insert([
                     'store_withdrawal_id' => $storeWithdrawalId,
                     'receiving_report_item_id' => (int) $row['receiving_report_item_id'],
                     'purchase_order_item_id' => (int) $line->purchase_order_item_id,
@@ -996,10 +1104,25 @@ class StoreWithdrawalController extends Controller
                     'created_at' => $now,
                     'updated_at' => $now,
                     'deleted_at' => null,
-                ];
-            })->all();
+                ]);
+            }
 
-            DB::table('store_withdrawal_items')->insert($detailRows);
+            $removableIds = $existingItems
+                ->filter(fn ($row, $rrId) => ! in_array((int) $rrId, $requestedRrIds, true))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if (! empty($removableIds)) {
+                DB::table('store_withdrawal_items')
+                    ->whereIn('id', $removableIds)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'updated_by' => $authUserId,
+                        'updated_at' => $now,
+                        'deleted_at' => $now,
+                    ]);
+            }
 
             DB::table('store_withdrawals')
                 ->where('id', $storeWithdrawalId)
@@ -1078,6 +1201,10 @@ class StoreWithdrawalController extends Controller
             return [];
         }
 
+        $transferredMap = $this->transferredQuantitiesByStoreWithdrawalItemIds(
+            $rows->pluck('id')->map(fn ($id) => (int) $id)->all()
+        );
+
         $remainingByRrItem = [];
         if ($isCapex) {
             $rrIds = $rows
@@ -1102,11 +1229,15 @@ class StoreWithdrawalController extends Controller
             }
         }
 
-        return $rows->map(function ($row) use ($isCapex, $remainingByRrItem): array {
+        return $rows->map(function ($row) use ($isCapex, $remainingByRrItem, $transferredMap): array {
             $meta = is_string($row->meta) ? json_decode($row->meta, true) : (array) ($row->meta ?? []);
             $rrId = (int) ($row->receiving_report_item_id ?? 0);
+            $quantity = round((float) $row->quantity, 5);
+            $transferred = round((float) ($transferredMap[(int) $row->id] ?? 0), 5);
+            $remaining = max(0, round($quantity - $transferred, 5));
 
             return [
+                'storeWithdrawalItemId' => (int) $row->id,
                 'receivingReportItemId' => $rrId,
                 'itemId' => (int) $row->item_id,
                 'name' => (string) ($row->item_name ?? $row->product_code ?? ''),
@@ -1115,7 +1246,10 @@ class StoreWithdrawalController extends Controller
                     ? (float) ($remainingByRrItem[$rrId] ?? 0)
                     : (float) ($row->stock_on_hand ?? 0),
                 'unit' => (string) ($row->uom ?? 'PCS'),
-                'quantity' => round((float) $row->quantity, 5),
+                'quantity' => $quantity,
+                'quantityTransferred' => $transferred,
+                'quantityRemaining' => $remaining,
+                'isLineLocked' => $remaining <= 0.00001 && $transferred > 0.00001,
                 'prsNumber' => (string) ($meta['prs_number'] ?? ''),
                 'poNumber' => (string) ($meta['po_number'] ?? ''),
                 'rrNumber' => (string) ($meta['rr_number'] ?? ''),
@@ -1380,6 +1514,73 @@ class StoreWithdrawalController extends Controller
             ->distinct()
             ->pluck('store_withdrawal_id')
             ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $storeWithdrawalIds
+     * @return array<int, int>
+     */
+    private function fullyTransferredStoreWithdrawalIds(array $storeWithdrawalIds): array
+    {
+        if (empty($storeWithdrawalIds)) {
+            return [];
+        }
+
+        return collect($storeWithdrawalIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $this->isStoreWithdrawalFullyTransferred($id))
+            ->values()
+            ->all();
+    }
+
+    private function isStoreWithdrawalFullyTransferred(int $storeWithdrawalId): bool
+    {
+        $items = DB::table('store_withdrawal_items')
+            ->where('store_withdrawal_id', $storeWithdrawalId)
+            ->whereNull('deleted_at')
+            ->get(['id', 'quantity']);
+
+        if ($items->isEmpty()) {
+            return false;
+        }
+
+        $transferredMap = $this->transferredQuantitiesByStoreWithdrawalItemIds(
+            $items->pluck('id')->map(fn ($id) => (int) $id)->all()
+        );
+
+        foreach ($items as $item) {
+            $quantity = round((float) $item->quantity, 5);
+            $transferred = round((float) ($transferredMap[(int) $item->id] ?? 0), 5);
+            $remaining = round($quantity - $transferred, 5);
+
+            if ($remaining > 0.00001) {
+                return false;
+            }
+        }
+
+        return collect($transferredMap)->sum() > 0.00001;
+    }
+
+    /**
+     * @param  array<int, int>  $storeWithdrawalItemIds
+     * @return array<int, float>
+     */
+    private function transferredQuantitiesByStoreWithdrawalItemIds(array $storeWithdrawalItemIds): array
+    {
+        if (empty($storeWithdrawalItemIds)) {
+            return [];
+        }
+
+        return DB::table('transfer_slip_items as tsi')
+            ->join('transfer_slips as ts', 'ts.id', '=', 'tsi.transfer_slip_id')
+            ->whereNull('ts.deleted_at')
+            ->whereNull('tsi.deleted_at')
+            ->whereIn('tsi.store_withdrawal_item_id', $storeWithdrawalItemIds)
+            ->selectRaw('tsi.store_withdrawal_item_id, SUM(tsi.quantity) as transferred_quantity')
+            ->groupBy('tsi.store_withdrawal_item_id')
+            ->pluck('transferred_quantity', 'tsi.store_withdrawal_item_id')
+            ->map(fn ($qty) => round((float) $qty, 5))
             ->all();
     }
 

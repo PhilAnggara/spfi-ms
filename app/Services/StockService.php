@@ -473,7 +473,7 @@ class StockService
             ->sum('balance');
 
         Item::query()->whereKey($itemId)->update([
-            'stock_on_hand' => (int) round($totalBalance),
+            'stock_on_hand' => round($totalBalance, 5),
         ]);
     }
 }

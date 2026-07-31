@@ -220,7 +220,7 @@ it('creates transfer slip from capex store withdrawal', function () {
     $response->assertRedirect(route('transfer-slips.index'));
 });
 
-it('locks capex store withdrawal edit after transfer slip is created', function () {
+it('locks capex store withdrawal edit after all quantity is transferred', function () {
     $this->actingAs($this->user)->post(route('stores-withdrawals.store'), [
         'department_id' => $this->department->id,
         'sws_date' => now()->toDateString(),
@@ -237,20 +237,30 @@ it('locks capex store withdrawal edit after transfer slip is created', function 
     $storeWithdrawal = DB::table('store_withdrawals')->where('type', 'capex')->latest('id')->first();
     $storeWithdrawalItem = DB::table('store_withdrawal_items')
         ->where('store_withdrawal_id', $storeWithdrawal->id)
+        ->whereNull('deleted_at')
         ->first();
 
-    $this->actingAs($this->user)->post(route('transfer-slips.store'), [
+    $transferSlipId = (int) DB::table('transfer_slips')->insertGetId([
+        'ts_number' => 'TS-CPX-LOCK-001',
         'ts_date' => now()->toDateString(),
-        'for_production' => '0',
-        'sws_number' => $storeWithdrawal->sws_number,
         'store_withdrawal_id' => $storeWithdrawal->id,
-        'items' => [
-            [
-                'store_withdrawal_item_id' => $storeWithdrawalItem->id,
-                'item_id' => $this->item->id,
-                'quantity' => 1,
-            ],
-        ],
+        'for_production' => false,
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('transfer_slip_items')->insert([
+        'transfer_slip_id' => $transferSlipId,
+        'store_withdrawal_item_id' => $storeWithdrawalItem->id,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 2,
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
     $response = $this->actingAs($this->user)->put(route('stores-withdrawals.update', $storeWithdrawal->id), [
@@ -266,7 +276,7 @@ it('locks capex store withdrawal edit after transfer slip is created', function 
         ],
     ]);
 
-    $response->assertRedirect();
+    $response->assertRedirect(route('stores-withdrawals.index'));
     $response->assertSessionHasErrors('items');
 });
 
