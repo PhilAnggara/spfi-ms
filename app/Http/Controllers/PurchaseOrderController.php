@@ -61,6 +61,7 @@ class PurchaseOrderController extends Controller
         $canViewAll = $user->hasAnyRole([
             'administrator',
             'purchasing-manager',
+            'purchasing-staff',
             'general-manager',
         ]);
 
