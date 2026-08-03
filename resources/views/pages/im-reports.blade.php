@@ -181,8 +181,8 @@
                                 <label class="form-label" for="transfer-ts-type">TS Type</label>
                                 <select id="transfer-ts-type" name="ts_type" class="form-select" required>
                                     <option value="">Select TS Type</option>
-                                    @foreach ($tsTypes as $tsType)
-                                        <option value="{{ $tsType }}">{{ $tsType }}</option>
+                                    @foreach ($tsTypes as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
                             </div>

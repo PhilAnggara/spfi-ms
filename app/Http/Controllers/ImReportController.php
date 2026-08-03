@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\ImDeliveryRegisterSpreadsheet;
+use App\Exports\ImReceivingRegisterSpreadsheet;
 use App\Exports\ImStockInventorySpreadsheet;
+use App\Exports\ImSwsRegisterSpreadsheet;
 use App\Exports\ImTransactionSpreadsheet;
+use App\Exports\ImTransferRegisterSpreadsheet;
 use App\Models\Department;
 use App\Models\Item;
 use App\Support\PdfReport;
@@ -38,11 +42,9 @@ class ImReportController extends Controller
     ];
 
     private const TS_TYPES = [
-        'Finished Goods',
-        'Raw Materials',
-        'Spare Parts',
-        'Supplies',
-        'Others',
+        'all' => 'All type',
+        'normal' => 'Normal',
+        'others' => 'Others',
     ];
 
     public function index(): View
@@ -136,50 +138,136 @@ class ImReportController extends Controller
         return PdfReport::analytical('pdf.reports.im-transaction', $data, $filename);
     }
 
-    public function receivingRegister(Request $request): RedirectResponse
+    public function receivingRegister(Request $request): Response
     {
-        $request->validate([
+        $validated = $request->validate([
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        return $this->reportNotReady();
+        $data = array_merge([
+            'company' => PdfReport::DEFAULT_COMPANY,
+            'title' => 'Receiving Report Register',
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
+            'printed_at' => now()->format('d-m-Y H:i'),
+            'rows' => $this->receivingRegisterRows($validated['date_from'], $validated['date_to']),
+        ], $this->reportSignatories($request));
+
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('im-receiving-register-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new ImReceivingRegisterSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('im-receiving-register-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.im-receiving-register', $data, $filename);
     }
 
-    public function swsRegister(Request $request): RedirectResponse
+    public function swsRegister(Request $request): Response
     {
-        $request->validate([
+        $validated = $request->validate([
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'department_id' => ['nullable', 'exists:departments,id'],
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        return $this->reportNotReady();
+        $departmentLabel = 'All departments';
+        if (! empty($validated['department_id'])) {
+            $department = Department::query()->find($validated['department_id']);
+            $departmentLabel = $department
+                ? trim(($department->code ? $department->code.' - ' : '').$department->name)
+                : $departmentLabel;
+        }
+
+        $data = array_merge([
+            'company' => PdfReport::DEFAULT_COMPANY,
+            'title' => 'Stores Withdrawal Slip Register',
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
+            'department' => $departmentLabel,
+            'printed_at' => now()->format('d-m-Y H:i'),
+            'rows' => $this->swsRegisterRows(
+                $validated['date_from'],
+                $validated['date_to'],
+                $validated['department_id'] ?? null
+            ),
+        ], $this->reportSignatories($request));
+
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('im-sws-register-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new ImSwsRegisterSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('im-sws-register-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.im-sws-register', $data, $filename);
     }
 
-    public function transferRegister(Request $request): RedirectResponse
+    public function transferRegister(Request $request): Response
     {
-        $request->validate([
+        $validated = $request->validate([
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
-            'ts_type' => ['required', 'in:'.implode(',', self::TS_TYPES)],
+            'ts_type' => ['required', 'in:'.implode(',', array_keys(self::TS_TYPES))],
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        return $this->reportNotReady();
+        $data = array_merge([
+            'company' => PdfReport::DEFAULT_COMPANY,
+            'title' => 'Transfer Slip Register',
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
+            'ts_type_label' => self::TS_TYPES[$validated['ts_type']],
+            'printed_at' => now()->format('d-m-Y H:i'),
+            'rows' => $this->transferRegisterRows(
+                $validated['date_from'],
+                $validated['date_to'],
+                $validated['ts_type']
+            ),
+        ], $this->reportSignatories($request));
+
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('im-transfer-register-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new ImTransferRegisterSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('im-transfer-register-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.im-transfer-register', $data, $filename);
     }
 
-    public function deliveryRegister(Request $request): RedirectResponse
+    public function deliveryRegister(Request $request): Response
     {
-        $request->validate([
+        $validated = $request->validate([
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        return $this->reportNotReady();
+        $data = array_merge([
+            'company' => PdfReport::DEFAULT_COMPANY,
+            'title' => 'Delivery Receipt Register',
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
+            'printed_at' => now()->format('d-m-Y H:i'),
+            'rows' => $this->deliveryRegisterRows($validated['date_from'], $validated['date_to']),
+        ], $this->reportSignatories($request));
+
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('im-delivery-register-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new ImDeliveryRegisterSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('im-delivery-register-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.im-delivery-register', $data, $filename);
     }
 
     /**
@@ -288,6 +376,271 @@ class ImReportController extends Controller
                     'rows' => $sorted,
                 ];
             })
+            ->values();
+    }
+
+    /**
+     * @return array{prepared_by_name: string, prepared_by_title: string, checked_by_name: string, checked_by_title: string, approved_by_name: string, approved_by_title: string}
+     */
+    private function reportSignatories(Request $request): array
+    {
+        return [
+            'prepared_by_name' => $request->user()?->name ?? '',
+            'prepared_by_title' => '',
+            'checked_by_name' => 'Daniel Watuna',
+            'checked_by_title' => 'IM Supervisor',
+            'approved_by_name' => 'Rommy Tendean',
+            'approved_by_title' => 'IM Manager',
+        ];
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function receivingRegisterRows(string $dateFrom, string $dateTo): Collection
+    {
+        return DB::table('receiving_report_items as rri')
+            ->join('receiving_reports as rr', 'rr.id', '=', 'rri.receiving_report_id')
+            ->join('purchase_order_items as poi', 'poi.id', '=', 'rri.purchase_order_item_id')
+            ->join('purchase_orders as po', 'po.id', '=', 'rr.purchase_order_id')
+            ->leftJoin('suppliers as s', 's.id', '=', 'po.supplier_id')
+            ->join('items as i', 'i.id', '=', 'poi.item_id')
+            ->leftJoin('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->leftJoin('prs_items as pri', 'pri.id', '=', 'poi.prs_item_id')
+            ->leftJoin('users as canvasser', 'canvasser.id', '=', 'pri.canvasser_id')
+            ->leftJoin('prs as pr', 'pr.id', '=', 'pri.prs_id')
+            ->leftJoin('departments as d', 'd.id', '=', 'pr.department_id')
+            ->whereNull('rr.deleted_at')
+            ->whereNull('rri.deleted_at')
+            ->whereDate('rr.received_date', '>=', $dateFrom)
+            ->whereDate('rr.received_date', '<=', $dateTo)
+            ->orderBy('rr.received_date')
+            ->orderBy('rr.rr_number')
+            ->orderBy('i.code')
+            ->select([
+                'rr.rr_number',
+                'rr.received_date as rr_date',
+                's.name as supplier_name',
+                'i.code as item_code',
+                'i.name as item_name',
+                'ic.name as item_category',
+                'u.name as unit',
+                'rri.qty_good',
+                'rri.qty_bad',
+                'po.po_number',
+                'po.created_at as po_created_at',
+                'po.term_of_payment',
+                'po.term_of_payment_type',
+                'canvasser.name as canvasser_name',
+                'd.code as end_user_code',
+                'rr.notes',
+            ])
+            ->get()
+            ->map(function ($row) {
+                $paymentParts = array_filter([
+                    $row->term_of_payment,
+                    $row->term_of_payment_type,
+                ]);
+
+                return [
+                    'rr_number' => (string) $row->rr_number,
+                    'rr_date' => Carbon::parse($row->rr_date)->toDateString(),
+                    'from' => (string) ($row->supplier_name ?? ''),
+                    'item_code' => (string) $row->item_code,
+                    'item_name' => (string) $row->item_name,
+                    'item_category' => (string) ($row->item_category ?? ''),
+                    'unit' => $row->unit ?: null,
+                    'qty_good' => (float) $row->qty_good,
+                    'qty_bad' => (float) $row->qty_bad,
+                    'po_number' => (string) ($row->po_number ?? ''),
+                    'po_date' => $row->po_created_at
+                        ? Carbon::parse($row->po_created_at)->toDateString()
+                        : null,
+                    'payment_term' => $paymentParts === [] ? '' : implode(' / ', $paymentParts),
+                    'canvasser' => (string) ($row->canvasser_name ?? ''),
+                    'end_user' => (string) ($row->end_user_code ?? ''),
+                    'remarks' => (string) ($row->notes ?? ''),
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function swsRegisterRows(string $dateFrom, string $dateTo, ?int $departmentId): Collection
+    {
+        $query = DB::table('store_withdrawal_items as swi')
+            ->join('store_withdrawals as sw', 'sw.id', '=', 'swi.store_withdrawal_id')
+            ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
+            ->leftJoin('items as i', 'i.id', '=', 'swi.item_id')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->leftJoin('users as creator', 'creator.id', '=', 'sw.created_by')
+            ->whereNull('sw.deleted_at')
+            ->whereNull('swi.deleted_at')
+            ->whereDate('sw.sws_date', '>=', $dateFrom)
+            ->whereDate('sw.sws_date', '<=', $dateTo);
+
+        if ($departmentId !== null) {
+            $query->where('sw.department_id', $departmentId);
+        }
+
+        return $query
+            ->orderBy('sw.sws_date')
+            ->orderBy('sw.sws_number')
+            ->orderBy('i.code')
+            ->select([
+                'sw.sws_number',
+                'sw.sws_date',
+                'sw.department_code',
+                'd.name as department_name',
+                'i.code as item_code',
+                'swi.product_code',
+                'i.name as item_name',
+                'swi.uom',
+                'u.name as unit_name',
+                'swi.stock_on_hand_snapshot',
+                'swi.quantity',
+                'creator.name as creator_name',
+                'sw.info',
+            ])
+            ->get()
+            ->map(function ($row) {
+                $deptCode = $row->department_code ?: '';
+                $deptName = $row->department_name ?: '';
+                $department = trim($deptCode.($deptCode !== '' && $deptName !== '' ? ' - ' : '').$deptName);
+
+                return [
+                    'sws_number' => (string) $row->sws_number,
+                    'sws_date' => Carbon::parse($row->sws_date)->toDateString(),
+                    'department' => $department,
+                    'item_code' => (string) ($row->item_code ?: $row->product_code ?: ''),
+                    'item_name' => (string) ($row->item_name ?? ''),
+                    'unit' => $row->unit_name ?: ($row->uom ?: null),
+                    'stock_on_hand' => (float) $row->stock_on_hand_snapshot,
+                    'request_qty' => (float) $row->quantity,
+                    'creator' => (string) ($row->creator_name ?? ''),
+                    'info' => (string) ($row->info ?? ''),
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function transferRegisterRows(string $dateFrom, string $dateTo, string $tsType): Collection
+    {
+        $query = DB::table('transfer_slip_items as tsi')
+            ->join('transfer_slips as ts', 'ts.id', '=', 'tsi.transfer_slip_id')
+            ->leftJoin('store_withdrawals as sw', 'sw.id', '=', 'ts.store_withdrawal_id')
+            ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
+            ->leftJoin('store_withdrawal_items as swi', 'swi.id', '=', 'tsi.store_withdrawal_item_id')
+            ->leftJoin('items as i', 'i.id', '=', 'tsi.item_id')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->leftJoin('users as creator', 'creator.id', '=', 'ts.created_by')
+            ->whereNull('ts.deleted_at')
+            ->whereNull('tsi.deleted_at')
+            ->whereDate('ts.ts_date', '>=', $dateFrom)
+            ->whereDate('ts.ts_date', '<=', $dateTo);
+
+        if ($tsType === 'normal') {
+            $query->where('ts.for_production', false);
+        } elseif ($tsType === 'others') {
+            $query->where('ts.for_production', true);
+        }
+
+        return $query
+            ->orderBy('ts.ts_date')
+            ->orderBy('ts.ts_number')
+            ->orderBy('i.code')
+            ->select([
+                'ts.ts_number',
+                'ts.ts_date',
+                'sw.sws_number',
+                'ts.for_production',
+                'sw.department_code',
+                'd.name as department_name',
+                'i.code as item_code',
+                'tsi.product_code',
+                'i.name as item_name',
+                'swi.uom',
+                'u.name as unit_name',
+                'swi.quantity as request_qty',
+                'tsi.quantity as transfer_qty',
+                'creator.name as creator_name',
+                'ts.remarks',
+            ])
+            ->get()
+            ->map(function ($row) {
+                $deptCode = $row->department_code ?: '';
+                $deptName = $row->department_name ?: '';
+                $department = trim($deptCode.($deptCode !== '' && $deptName !== '' ? ' - ' : '').$deptName);
+
+                return [
+                    'ts_number' => (string) $row->ts_number,
+                    'ts_date' => Carbon::parse($row->ts_date)->toDateString(),
+                    'sws_number' => (string) ($row->sws_number ?? ''),
+                    'ts_type' => $row->for_production ? 'Others' : 'Normal',
+                    'to_department' => $department,
+                    'item_code' => (string) ($row->item_code ?: $row->product_code ?: ''),
+                    'item_name' => (string) ($row->item_name ?? ''),
+                    'unit' => $row->unit_name ?: ($row->uom ?: null),
+                    'request_qty' => (float) ($row->request_qty ?? 0),
+                    'transfer_qty' => (float) $row->transfer_qty,
+                    'creator' => (string) ($row->creator_name ?? ''),
+                    'info' => (string) ($row->remarks ?? ''),
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function deliveryRegisterRows(string $dateFrom, string $dateTo): Collection
+    {
+        return DB::table('delivery_items as di')
+            ->join('deliveries as d', 'd.id', '=', 'di.delivery_id')
+            ->leftJoin('suppliers as s', 's.id', '=', 'd.supplier_id')
+            ->leftJoin('items as i', 'i.id', '=', 'di.item_id')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->leftJoin('users as creator', 'creator.id', '=', 'd.created_by')
+            ->whereNull('d.deleted_at')
+            ->whereNull('di.deleted_at')
+            ->whereDate('d.dr_date', '>=', $dateFrom)
+            ->whereDate('d.dr_date', '<=', $dateTo)
+            ->orderBy('d.dr_date')
+            ->orderBy('d.dr_number')
+            ->orderBy('i.code')
+            ->select([
+                'd.dr_number',
+                'd.dr_date',
+                'd.from_name',
+                's.name as to_name',
+                'i.code as item_code',
+                'di.product_code',
+                'i.name as item_name',
+                'di.uom',
+                'u.name as unit_name',
+                'di.quantity',
+                'creator.name as creator_name',
+                'd.remarks',
+            ])
+            ->get()
+            ->map(fn ($row) => [
+                'dr_number' => (string) $row->dr_number,
+                'dr_date' => Carbon::parse($row->dr_date)->toDateString(),
+                'from' => (string) ($row->from_name ?? ''),
+                'to' => (string) ($row->to_name ?? ''),
+                'item_code' => (string) ($row->item_code ?: $row->product_code ?: ''),
+                'item_name' => (string) ($row->item_name ?? ''),
+                'unit' => $row->unit_name ?: ($row->uom ?: null),
+                'quantity' => (float) $row->quantity,
+                'creator' => (string) ($row->creator_name ?? ''),
+                'remarks' => (string) ($row->remarks ?? ''),
+            ])
             ->values();
     }
 

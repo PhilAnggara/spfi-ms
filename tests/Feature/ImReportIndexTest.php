@@ -63,12 +63,14 @@ it('redirects guests to login', function () {
         ->assertRedirect(route('login'));
 });
 
-it('shows department code and all-departments option on sws register', function () {
-    $user = createImReportsUser('im-staff', 'im-reports-sws-dept');
+it('shows all-type normal and others options on transfer register', function () {
+    $user = createImReportsUser('im-staff', 'im-reports-ts-types');
 
     $this->actingAs($user)
         ->get(route('im.reports.index'))
         ->assertOk()
-        ->assertSee('All departments')
-        ->assertSee($this->department->code.' - '.$this->department->name);
+        ->assertSee('All type')
+        ->assertSee('Normal')
+        ->assertSee('Others')
+        ->assertDontSee('Finished Goods');
 });
