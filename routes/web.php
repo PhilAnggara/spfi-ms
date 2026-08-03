@@ -49,22 +49,22 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/', [MainController::class, 'dashboard'])->name('dashboard');
 
-    Route::middleware('role:administrator|purchasing-staff|purchasing-manager|engineering-managersss|im-manager|im-supervisor')->prefix('master')->group(function () {
+    Route::middleware('role:administrator|it-staff|purchasing-staff|purchasing-manager|engineering-managersss|im-manager|im-supervisor')->prefix('master')->group(function () {
         Route::get('product', [ProductController::class, 'index'])->name('product.index');
         Route::get('product/datatables', [ProductController::class, 'datatable'])->name('product.datatables');
         Route::get('product/{item}/purchase-history', [ProductController::class, 'purchaseHistory'])->name('product.purchase-history');
     });
 
-    Route::middleware('role:administrator|engineering-manager|im-manager|im-supervisor')->prefix('master')->group(function () {
+    Route::middleware('role:administrator|it-staff|engineering-manager|im-manager|im-supervisor')->prefix('master')->group(function () {
         Route::post('product', [ProductController::class, 'store'])->name('product.store');
     });
 
-    Route::middleware('role:administrator|im-manager|im-supervisor')->prefix('master')->group(function () {
+    Route::middleware('role:administrator|it-staff|im-manager|im-supervisor')->prefix('master')->group(function () {
         Route::put('product/{product}', [ProductController::class, 'update'])->name('product.update');
         Route::delete('product/{product}', [ProductController::class, 'destroy'])->name('product.destroy');
     });
 
-    Route::middleware('role:administrator|purchasing-staff|purchasing-manager')->prefix('master')->group(function () {
+    Route::middleware('role:administrator|it-staff|purchasing-staff|purchasing-manager')->prefix('master')->group(function () {
         Route::get('supplier', [SupplierController::class, 'index'])->name('supplier.index');
         Route::get('supplier/datatables', [SupplierController::class, 'datatable'])->name('supplier.datatables');
         Route::get('supplier/{supplier}/purchase-history', [SupplierController::class, 'purchaseHistory'])->name('supplier.purchase-history');
@@ -72,7 +72,7 @@ Route::middleware('auth')->group(function () {
         Route::put('supplier/{supplier}', [SupplierController::class, 'update'])->name('supplier.update');
     });
 
-    Route::middleware('role:administrator')->prefix('master')->group(function () {
+    Route::middleware('role:administrator|it-staff')->prefix('master')->group(function () {
         Route::resource('user', UserController::class);
         Route::get('employees/id-cards/print', [EmployeeController::class, 'printIdCards'])->name('employees.id-cards.print');
         Route::resource('employees', EmployeeController::class)->except(['create', 'show', 'edit']);

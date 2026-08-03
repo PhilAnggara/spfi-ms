@@ -69,7 +69,7 @@
                     </a>
                 </li>
 
-                @role('administrator')
+                @role('administrator|it-staff')
                     <li class="menu-item  has-sub">
                         <a href="#" class='menu-link'>
                             <span>

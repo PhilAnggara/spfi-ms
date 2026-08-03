@@ -34,10 +34,14 @@ class SupplierController extends Controller
             ],
             'canManageSuppliers' => auth()->user()?->hasAnyRole([
                 'administrator',
+                'it-staff',
                 'purchasing-staff',
                 'purchasing-manager',
             ]) ?? false,
-            'canDeleteSuppliers' => auth()->user()?->hasRole('administrator') ?? false,
+            'canDeleteSuppliers' => auth()->user()?->hasAnyRole([
+                'administrator',
+                'it-staff',
+            ]) ?? false,
             'canViewPurchaseOrders' => auth()->user()?->hasAnyRole([
                 'administrator',
                 'purchasing-staff',

@@ -195,3 +195,40 @@ it('forbids im staff from accessing product master', function () {
         ->get(route('product.index'))
         ->assertForbidden();
 });
+
+it('allows it-staff full product crud', function () {
+    $user = createProductUser('it-staff');
+
+    $this->actingAs($user)
+        ->get(route('product.index'))
+        ->assertSuccessful()
+        ->assertSee('data-can-create="1"', false)
+        ->assertSee('data-can-manage="1"', false);
+
+    $this->actingAs($user)
+        ->post(route('product.store'), array_merge($this->productPayload, [
+            'code' => 'ITSTAFF1',
+        ]))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $this->actingAs($user)
+        ->put(route('product.update', $this->item), [
+            'code' => 'TSTPRD01',
+            'name' => 'IT Staff Updated Product',
+            'unit_of_measure_id' => $this->unit->id,
+            'category_id' => $this->category->id,
+            'type' => 'Raw Material',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($this->item->fresh()->name)->toBe('IT Staff Updated Product');
+
+    $this->actingAs($user)
+        ->delete(route('product.destroy', $this->item))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect(Item::query()->whereKey($this->item->id)->exists())->toBeFalse();
+});

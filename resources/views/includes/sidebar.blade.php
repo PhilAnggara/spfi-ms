@@ -58,7 +58,7 @@
                             </a>
                         </li>
 
-                        @role('administrator')
+                        @role('administrator|it-staff')
                             <li class="sidebar-item {{ is_active_menu(['master/*']) }} has-sub">
                                 <a href="#" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-user-tie {{ Request::is('master/*') ? 'fa-fade' : '' }}"></i>

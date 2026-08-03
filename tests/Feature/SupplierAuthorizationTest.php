@@ -173,3 +173,38 @@ it('forbids engineering manager from creating and updating suppliers', function 
         ])
         ->assertForbidden();
 });
+
+it('allows it-staff full supplier crud', function () {
+    $user = createSupplierUser('it-staff');
+
+    $this->actingAs($user)
+        ->get(route('supplier.index'))
+        ->assertSuccessful()
+        ->assertSee('data-can-manage="1"', false)
+        ->assertSee('data-can-delete="1"', false);
+
+    $this->actingAs($user)
+        ->post(route('supplier.store'), array_merge($this->supplierPayload, [
+            'code' => 'SUP-IT01',
+        ]))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $this->actingAs($user)
+        ->put(route('supplier.update', $this->supplier), [
+            'code' => 'SUP-EXIST',
+            'name' => 'Updated by IT Staff',
+            'address' => 'Updated Address',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($this->supplier->fresh()->name)->toBe('Updated by IT Staff');
+
+    $this->actingAs($user)
+        ->delete(route('supplier.destroy', $this->supplier))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect(Supplier::query()->whereKey($this->supplier->id)->exists())->toBeFalse();
+});

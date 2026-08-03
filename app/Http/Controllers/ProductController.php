@@ -19,6 +19,7 @@ class ProductController extends Controller
     /** @var list<string> */
     private const ROLES_CREATE_PRODUCTS = [
         'administrator',
+        'it-staff',
         'engineering-manager',
         'im-manager',
         'im-supervisor',
@@ -27,6 +28,7 @@ class ProductController extends Controller
     /** @var list<string> */
     private const ROLES_MANAGE_PRODUCTS = [
         'administrator',
+        'it-staff',
         'im-manager',
         'im-supervisor',
     ];
