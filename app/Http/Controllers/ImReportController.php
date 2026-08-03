@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\ImStockInventorySpreadsheet;
 use App\Models\Department;
 use App\Models\Item;
 use App\Support\PdfReport;
@@ -71,6 +72,7 @@ class ImReportController extends Controller
             'title' => 'Stock Inventory per Category',
             'as_of' => $validated['as_of'],
             'category' => $validated['category'],
+            'printed_at' => now()->format('d-m-Y H:i'),
             'rows' => $rows,
             'prepared_by_name' => $request->user()?->name ?? '',
             'prepared_by_title' => '',
@@ -80,13 +82,15 @@ class ImReportController extends Controller
             'approved_by_title' => 'IM Manager',
         ];
 
-        return $this->exportReport(
-            $validated['format'],
-            'exports.im-stock-inventory',
-            $data,
-            'im-stock-inventory',
-            'pdf.reports.im-stock-inventory'
-        );
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('im-stock-inventory-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new ImStockInventorySpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('im-stock-inventory-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.im-stock-inventory', $data, $filename);
     }
 
     public function transaction(Request $request): RedirectResponse

@@ -9,6 +9,10 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Testing\TestResponse;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 beforeEach(function () {
     $this->seed(RolePermissionSeeder::class);
@@ -129,34 +133,38 @@ it('exports stock inventory excel from stock_balances ledger', function () {
     ]);
 
     $response->assertSuccessful();
-    expect($response->headers->get('content-type'))->toContain('application/vnd.ms-excel');
+    expect($response->headers->get('content-type'))->toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    expect($response->headers->get('content-type'))->not->toContain('application/vnd.ms-excel');
+    expect($response->headers->get('content-disposition'))->toContain('.xlsx');
 
-    ob_start();
-    $response->sendContent();
-    $content = ob_get_clean();
+    $sheet = loadStockInventorySheet($response);
 
     // Beginning 100, RR 50, TS 20, DR 10, Ending 120 (not inventory 999; not July moves)
-    expect($content)
-        ->toContain('Bearing 6205')
-        ->toContain('SP-6205')
-        ->toContain('100,00')
-        ->toContain('50,00')
-        ->toContain('20,00')
-        ->toContain('10,00')
-        ->toContain('120,00')
-        ->toContain('Prepared by')
-        ->toContain('IM Stock Report User')
-        ->toContain('Checked by')
-        ->toContain('Daniel Watuna')
-        ->toContain('IM Supervisor')
-        ->toContain('Approved by')
-        ->toContain('Rommy Tendean')
-        ->toContain('IM Manager')
-        ->not->toContain('999,00')
-        ->not->toContain('99,00')
-        ->not->toContain('77,00')
-        ->not->toContain('55,00')
-        ->not->toContain('87,00');
+    expect($sheet->getCell('A8')->getValue())->toBe('Bearing 6205');
+    expect($sheet->getCell('B8')->getValue())->toBe('SP-6205');
+    expect((float) $sheet->getCell('D8')->getValue())->toBe(100.0);
+    expect((float) $sheet->getCell('E8')->getValue())->toBe(50.0);
+    expect((float) $sheet->getCell('F8')->getValue())->toBe(20.0);
+    expect((float) $sheet->getCell('G8')->getValue())->toBe(10.0);
+    expect((float) $sheet->getCell('H8')->getValue())->toBe(120.0);
+    expect((float) $sheet->getCell('D8')->getValue())->not->toBe(999.0);
+    expect((float) $sheet->getCell('E8')->getValue())->not->toBe(99.0);
+
+    $asOfCell = $sheet->getCell('B3');
+    expect(is_numeric($asOfCell->getValue()))->toBeTrue();
+    expect(Date::excelToDateTimeObject($asOfCell->getValue())->format('Y-m-d'))->toBe('2026-06-30');
+    expect($sheet->getStyle('B3')->getNumberFormat()->getFormatCode())->toBe('dd-mmm-yyyy');
+
+    expect($sheet->getCell('A12')->getValue())->toBe('Prepared by');
+    expect($sheet->getCell('A15')->getValue())->toBe('IM Stock Report User');
+    expect($sheet->getCell('D12')->getValue())->toBe('Checked by');
+    expect($sheet->getCell('D15')->getValue())->toBe('Daniel Watuna');
+    expect($sheet->getCell('D17')->getValue())->toBe('IM Supervisor');
+    expect($sheet->getCell('G12')->getValue())->toBe('Approved by');
+    expect($sheet->getCell('G15')->getValue())->toBe('Rommy Tendean');
+    expect($sheet->getCell('G17')->getValue())->toBe('IM Manager');
 });
 
 it('falls back to earliest begin in as-of month when no prior month end', function () {
@@ -169,13 +177,14 @@ it('falls back to earliest begin in as-of month when no prior month end', functi
     ]);
 
     $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
 
-    ob_start();
-    $response->sendContent();
-    $content = ob_get_clean();
+    $sheet = loadStockInventorySheet($response);
 
     // Earliest June begin = 100
-    expect($content)->toContain('100,00');
+    expect((float) $sheet->getCell('D8')->getValue())->toBe(100.0);
 });
 
 it('falls back to stock_inventories balance when no ledger ending', function () {
@@ -188,12 +197,13 @@ it('falls back to stock_inventories balance when no ledger ending', function () 
     ]);
 
     $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
 
-    ob_start();
-    $response->sendContent();
-    $content = ob_get_clean();
+    $sheet = loadStockInventorySheet($response);
 
-    expect($content)->toContain('999,00');
+    expect((float) $sheet->getCell('H8')->getValue())->toBe(999.0);
 });
 
 it('exports stock inventory pdf successfully', function () {
@@ -224,3 +234,15 @@ it('forbids unrelated roles from exporting stock inventory', function () {
         'format' => 'excel',
     ])->assertForbidden();
 });
+
+function loadStockInventorySheet(TestResponse $response): Worksheet
+{
+    $tmp = tempnam(sys_get_temp_dir(), 'im-stock-xlsx');
+    file_put_contents($tmp, $response->streamedContent());
+
+    try {
+        return IOFactory::load($tmp)->getActiveSheet();
+    } finally {
+        @unlink($tmp);
+    }
+}
