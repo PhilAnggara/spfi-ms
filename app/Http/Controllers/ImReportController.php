@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\ImStockInventorySpreadsheet;
+use App\Exports\ImTransactionSpreadsheet;
 use App\Models\Department;
 use App\Models\Item;
 use App\Support\PdfReport;
@@ -93,16 +94,46 @@ class ImReportController extends Controller
         return PdfReport::analytical('pdf.reports.im-stock-inventory', $data, $filename);
     }
 
-    public function transaction(Request $request): RedirectResponse
+    public function transaction(Request $request): Response
     {
-        $request->validate([
+        $validated = $request->validate([
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'category' => ['required', 'in:'.implode(',', self::CATEGORIES)],
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        return $this->reportNotReady();
+        $groups = $this->transactionGroups(
+            $validated['date_from'],
+            $validated['date_to'],
+            $validated['category']
+        );
+
+        $data = [
+            'company' => PdfReport::DEFAULT_COMPANY,
+            'title' => 'Transaction Report per Category',
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
+            'category' => $validated['category'],
+            'printed_at' => now()->format('d-m-Y H:i'),
+            'groups' => $groups,
+            'prepared_by_name' => $request->user()?->name ?? '',
+            'prepared_by_title' => '',
+            'checked_by_name' => 'Daniel Watuna',
+            'checked_by_title' => 'IM Supervisor',
+            'approved_by_name' => 'Rommy Tendean',
+            'approved_by_title' => 'IM Manager',
+        ];
+
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('im-transaction-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new ImTransactionSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('im-transaction-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.im-transaction', $data, $filename);
     }
 
     public function receivingRegister(Request $request): RedirectResponse
@@ -149,6 +180,115 @@ class ImReportController extends Controller
         ]);
 
         return $this->reportNotReady();
+    }
+
+    /**
+     * @return Collection<int, array{item_code: string, item_name: string, unit: string|null, rows: Collection<int, array{doc_date: string, doc_type: string, doc_number: string, quantity: float}>}>
+     */
+    private function transactionGroups(string $dateFrom, string $dateTo, string $category): Collection
+    {
+        $rr = DB::table('receiving_report_items as rri')
+            ->join('receiving_reports as rr', 'rr.id', '=', 'rri.receiving_report_id')
+            ->join('purchase_order_items as poi', 'poi.id', '=', 'rri.purchase_order_item_id')
+            ->join('items as i', 'i.id', '=', 'poi.item_id')
+            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->whereNull('rr.deleted_at')
+            ->whereNull('rri.deleted_at')
+            ->whereDate('rr.received_date', '>=', $dateFrom)
+            ->whereDate('rr.received_date', '<=', $dateTo)
+            ->where('ic.name', $category)
+            ->where('rri.qty_good', '>', 0)
+            ->select([
+                'i.code as item_code',
+                'i.name as item_name',
+                'rr.received_date as doc_date',
+                DB::raw("'RR' as doc_type"),
+                'rr.rr_number as doc_number',
+                'rri.qty_good as quantity',
+                'u.name as unit',
+            ]);
+
+        $ts = DB::table('transfer_slip_items as tsi')
+            ->join('transfer_slips as ts', 'ts.id', '=', 'tsi.transfer_slip_id')
+            ->join('items as i', 'i.id', '=', 'tsi.item_id')
+            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->whereNull('ts.deleted_at')
+            ->whereNull('tsi.deleted_at')
+            ->whereDate('ts.ts_date', '>=', $dateFrom)
+            ->whereDate('ts.ts_date', '<=', $dateTo)
+            ->where('ic.name', $category)
+            ->where('tsi.quantity', '>', 0)
+            ->select([
+                'i.code as item_code',
+                'i.name as item_name',
+                'ts.ts_date as doc_date',
+                DB::raw("'TS' as doc_type"),
+                'ts.ts_number as doc_number',
+                'tsi.quantity as quantity',
+                'u.name as unit',
+            ]);
+
+        $dr = DB::table('delivery_items as di')
+            ->join('deliveries as d', 'd.id', '=', 'di.delivery_id')
+            ->join('items as i', 'i.id', '=', 'di.item_id')
+            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->whereNull('d.deleted_at')
+            ->whereNull('di.deleted_at')
+            ->whereDate('d.dr_date', '>=', $dateFrom)
+            ->whereDate('d.dr_date', '<=', $dateTo)
+            ->where('ic.name', $category)
+            ->where('di.quantity', '>', 0)
+            ->select([
+                'i.code as item_code',
+                'i.name as item_name',
+                'd.dr_date as doc_date',
+                DB::raw("'DR' as doc_type"),
+                'd.dr_number as doc_number',
+                'di.quantity as quantity',
+                DB::raw('COALESCE(u.name, di.uom) as unit'),
+            ]);
+
+        $typeOrder = ['RR' => 1, 'TS' => 2, 'DR' => 3];
+
+        return collect($rr->unionAll($ts)->unionAll($dr)->get())
+            ->map(fn ($row) => [
+                'item_code' => (string) $row->item_code,
+                'item_name' => (string) $row->item_name,
+                'doc_date' => Carbon::parse($row->doc_date)->toDateString(),
+                'doc_type' => (string) $row->doc_type,
+                'doc_number' => (string) $row->doc_number,
+                'quantity' => (float) $row->quantity,
+                'unit' => $row->unit ?: null,
+            ])
+            ->groupBy('item_code')
+            ->sortKeys()
+            ->map(function (Collection $itemRows) use ($typeOrder) {
+                $first = $itemRows->first();
+                $sorted = $itemRows
+                    ->sortBy([
+                        ['doc_date', 'asc'],
+                        fn ($row) => $typeOrder[$row['doc_type']] ?? 99,
+                        ['doc_number', 'asc'],
+                    ])
+                    ->values()
+                    ->map(fn (array $row) => [
+                        'doc_date' => $row['doc_date'],
+                        'doc_type' => $row['doc_type'],
+                        'doc_number' => $row['doc_number'],
+                        'quantity' => $row['quantity'],
+                    ]);
+
+                return [
+                    'item_code' => $first['item_code'],
+                    'item_name' => $first['item_name'],
+                    'unit' => $first['unit'],
+                    'rows' => $sorted,
+                ];
+            })
+            ->values();
     }
 
     /**
