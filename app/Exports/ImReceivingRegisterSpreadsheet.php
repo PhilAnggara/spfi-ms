@@ -5,7 +5,7 @@ namespace App\Exports;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class ImReceivingRegisterSpreadsheet extends ImAnalyticalSpreadsheet
+class ImReceivingRegisterSpreadsheet extends AnalyticalSpreadsheet
 {
     protected function sheetTitle(): string
     {

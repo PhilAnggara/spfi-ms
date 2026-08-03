@@ -338,10 +338,31 @@ it('filters the po not yet delivered report by purchase order payment type witho
 
     expect($response->getStatusCode())->toBeGreaterThanOrEqual(200);
     expect($response->getStatusCode())->toBeLessThan(300);
-    expect($response->headers->get('content-type'))->toContain('application/vnd.ms-excel');
-    expect($content)->toContain('PO-CASH-001');
-    expect($content)->not->toContain('PO-CREDIT-001');
-    expect($content)->toContain('CASH');
+    expect($response->headers->get('content-type'))->toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    expect($response->headers->get('content-type'))->not->toContain('application/vnd.ms-excel');
+    expect($response->headers->get('content-disposition'))->toContain('.xlsx');
+
+    $tmp = tempnam(sys_get_temp_dir(), 'po-nyd-xlsx');
+    file_put_contents($tmp, $content);
+
+    try {
+        $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp)->getActiveSheet();
+    } finally {
+        @unlink($tmp);
+    }
+
+    expect($sheet->getCell('A8')->getValue())->toBe('PO-CASH-001');
+    expect($sheet->getCell('C8')->getValue())->toBe('CASH');
+
+    $highestRow = $sheet->getHighestDataRow();
+    $poNumbers = [];
+    for ($row = 8; $row <= $highestRow; $row++) {
+        $poNumbers[] = (string) $sheet->getCell('A'.$row)->getValue();
+    }
+
+    expect($poNumbers)->not->toContain('PO-CREDIT-001');
 });
 
 it('renders the po not yet delivered pdf with compact table sizing', function () {

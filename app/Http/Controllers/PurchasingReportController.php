@@ -2,6 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\PoNotYetDeliveredSpreadsheet;
+use App\Exports\PoRegisteredDepartmentSpreadsheet;
+use App\Exports\PoRegisteredItemSpreadsheet;
+use App\Exports\PoRegisteredPeriodSpreadsheet;
+use App\Exports\PoRegisteredSupplierSpreadsheet;
+use App\Exports\PrsNotYetPoSpreadsheet;
 use App\Exports\PurchasingLeadTimeSpreadsheet;
 use App\Models\PrsItem;
 use App\Models\PurchaseOrder;
@@ -11,7 +17,6 @@ use App\Support\PdfReport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PurchasingReportController extends Controller
 {
@@ -87,16 +92,19 @@ class PurchasingReportController extends Controller
             'title' => 'Purchase Requisition Slip (PRS) Not Yet Purchase Order (PO)',
             'as_of' => $validated['date_to'],
             'canvasser' => $this->canvasserName($validated['canvasser_id'] ?? null),
+            'printed_at' => now()->format('d-m-Y H:i'),
             'rows' => $rows,
         ];
 
-        return $this->exportReport(
-            $validated['format'],
-            'exports.prs-not-yet-po',
-            $data,
-            'prs-not-yet-po',
-            'pdf.reports.prs-not-yet-po'
-        );
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('prs-not-yet-po-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new PrsNotYetPoSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('prs-not-yet-po-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.prs-not-yet-po', $data, $filename);
     }
 
     public function poNotYetDelivered(Request $request)
@@ -162,16 +170,19 @@ class PurchasingReportController extends Controller
             'as_of' => $validated['date_to'],
             'canvasser' => $this->canvasserName($validated['canvasser_id'] ?? null),
             'po_type' => $validated['po_type'],
+            'printed_at' => now()->format('d-m-Y H:i'),
             'rows' => $rows,
         ];
 
-        return $this->exportReport(
-            $validated['format'],
-            'exports.po-not-yet-delivered',
-            $data,
-            'po-not-yet-delivered',
-            'pdf.reports.po-not-yet-delivered'
-        );
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('po-not-yet-delivered-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new PoNotYetDeliveredSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('po-not-yet-delivered-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.po-not-yet-delivered', $data, $filename);
     }
 
     public function poRegisteredPerPeriod(Request $request)
@@ -238,17 +249,20 @@ class PurchasingReportController extends Controller
             'title' => 'Purchase Order (PO) Register Per Period',
             'date_from' => $validated['date_from'],
             'date_to' => $validated['date_to'],
+            'printed_at' => now()->format('d-m-Y H:i'),
             'rows' => $rows,
             'totals' => $this->sumCurrencyBuckets($rows),
         ];
 
-        return $this->exportReport(
-            $validated['format'],
-            'exports.po-registered-period',
-            $data,
-            'po-registered-period',
-            'pdf.reports.po-registered-period'
-        );
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('po-registered-period-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new PoRegisteredPeriodSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('po-registered-period-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.po-registered-period', $data, $filename);
     }
 
     public function poRegisteredPerDepartment(Request $request)
@@ -322,16 +336,19 @@ class PurchasingReportController extends Controller
             'title' => 'Purchase Order (PO) Register Per Department',
             'date_from' => $validated['date_from'],
             'date_to' => $validated['date_to'],
+            'printed_at' => now()->format('d-m-Y H:i'),
             'groups' => $groups,
         ];
 
-        return $this->exportReport(
-            $validated['format'],
-            'exports.po-registered-department',
-            $data,
-            'po-registered-department',
-            'pdf.reports.po-registered-department'
-        );
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('po-registered-department-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new PoRegisteredDepartmentSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('po-registered-department-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.po-registered-department', $data, $filename);
     }
 
     public function poRegisteredPerItem(Request $request)
@@ -400,16 +417,19 @@ class PurchasingReportController extends Controller
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
             'title' => 'Purchase Order (PO) Register Per Item',
             'as_of' => $validated['as_of'],
+            'printed_at' => now()->format('d-m-Y H:i'),
             'rows' => collect($rows)->values(),
         ];
 
-        return $this->exportReport(
-            $validated['format'],
-            'exports.po-registered-item',
-            $data,
-            'po-registered-item',
-            'pdf.reports.po-registered-item'
-        );
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('po-registered-item-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new PoRegisteredItemSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('po-registered-item-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.po-registered-item', $data, $filename);
     }
 
     public function poRegisteredPerSupplier(Request $request)
@@ -462,16 +482,19 @@ class PurchasingReportController extends Controller
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
             'title' => 'Purchase Order (PO) Register Per Supplier',
             'as_of' => $validated['as_of'],
+            'printed_at' => now()->format('d-m-Y H:i'),
             'rows' => collect($rows)->values(),
         ];
 
-        return $this->exportReport(
-            $validated['format'],
-            'exports.po-registered-supplier',
-            $data,
-            'po-registered-supplier',
-            'pdf.reports.po-registered-supplier'
-        );
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('po-registered-supplier-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new PoRegisteredSupplierSpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('po-registered-supplier-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.po-registered-supplier', $data, $filename);
     }
 
     public function purchasingLeadTime(Request $request)
@@ -656,33 +679,6 @@ class PurchasingReportController extends Controller
         return $rows
             ->sortBy(fn (array $row) => [$row['rr_date'], $row['prs_id']])
             ->values();
-    }
-
-    private function exportReport(
-        string $format,
-        string $excelView,
-        array $data,
-        string $filePrefix,
-        string $pdfView
-    ) {
-        if ($format === 'excel') {
-            return $this->streamExcel($filePrefix, $excelView, $data);
-        }
-
-        $filename = sprintf('%s-%s.pdf', $filePrefix, now()->format('Ymd-His'));
-
-        return PdfReport::analytical($pdfView, $data, $filename);
-    }
-
-    private function streamExcel(string $filePrefix, string $view, array $data): StreamedResponse
-    {
-        $filename = sprintf('%s-%s.xls', $filePrefix, now()->format('Ymd-His'));
-
-        return response()->streamDownload(function () use ($view, $data) {
-            echo view($view, $data)->render();
-        }, $filename, [
-            'Content-Type' => 'application/vnd.ms-excel',
-        ]);
     }
 
     private function canvasserName(?int $canvasserId): string

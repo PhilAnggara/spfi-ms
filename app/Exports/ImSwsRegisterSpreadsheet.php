@@ -4,7 +4,7 @@ namespace App\Exports;
 
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class ImSwsRegisterSpreadsheet extends ImAnalyticalSpreadsheet
+class ImSwsRegisterSpreadsheet extends AnalyticalSpreadsheet
 {
     protected function sheetTitle(): string
     {

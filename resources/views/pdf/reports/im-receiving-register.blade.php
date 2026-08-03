@@ -59,7 +59,7 @@
                     <th class="section-col col-sep">Date</th>
                     <th class="section-col col-sep">Payment Term</th>
                     <th class="section-col section-sep">Canvasser</th>
-                    <th class="section-col section-start section-sep">End User</th>
+                    <th class="section-col section-start section-sep">Dept</th>
                     <th class="section-col section-start">Remarks</th>
                 </tr>
             </thead>

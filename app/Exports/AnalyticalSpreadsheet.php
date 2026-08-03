@@ -12,11 +12,13 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-abstract class ImAnalyticalSpreadsheet
+abstract class AnalyticalSpreadsheet
 {
     protected const TABLE_DATE_FORMAT = 'dd-mmm-yyyy';
 
     protected const QTY_FORMAT = '#,##0.00';
+
+    protected const MONEY_FORMAT = '#,##0.00';
 
     public function __construct(
         protected readonly array $data,
@@ -61,6 +63,19 @@ abstract class ImAnalyticalSpreadsheet
      */
     abstract protected function writeDataRow(Worksheet $sheet, int $rowIndex, array $row): void;
 
+    /**
+     * @return list<string>
+     */
+    protected function moneyColumns(): array
+    {
+        return [];
+    }
+
+    protected function includeSignatures(): bool
+    {
+        return true;
+    }
+
     public function download(string $filename): StreamedResponse
     {
         return response()->streamDownload(function () {
@@ -84,11 +99,7 @@ abstract class ImAnalyticalSpreadsheet
         $sheet->setCellValue('A2', $this->data['title'] ?? '');
         $sheet->mergeCells("A2:{$lastCol}2");
 
-        $sheet->setCellValue('A3', 'Date From');
-        $this->writeExcelDate($sheet, 'B3', $this->data['date_from'] ?? null);
-        $sheet->setCellValue('C3', 'Date To');
-        $this->writeExcelDate($sheet, 'D3', $this->data['date_to'] ?? null);
-
+        $this->writePeriodFilters($sheet, $lastCol);
         $this->writeExtraFilters($sheet, $lastCol);
 
         $sheet->setCellValue(
@@ -98,8 +109,6 @@ abstract class ImAnalyticalSpreadsheet
 
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(11);
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(10);
-        $sheet->getStyle('A3')->getFont()->setBold(true);
-        $sheet->getStyle('C3')->getFont()->setBold(true);
         $sheet->getStyle($lastCol.'4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
         $groupRow = 6;
@@ -121,6 +130,7 @@ abstract class ImAnalyticalSpreadsheet
 
         $rows = $this->rows();
         $rowIndex = $dataStartRow;
+        $groupTitleRows = [];
 
         if ($rows === []) {
             $sheet->mergeCells("A{$rowIndex}:{$lastCol}{$rowIndex}");
@@ -129,6 +139,24 @@ abstract class ImAnalyticalSpreadsheet
             $lastDataRow = $rowIndex;
         } else {
             foreach ($rows as $row) {
+                if (($row['_type'] ?? null) === 'group') {
+                    $sheet->mergeCells("A{$rowIndex}:{$lastCol}{$rowIndex}");
+                    $sheet->setCellValue("A{$rowIndex}", $row['label'] ?? '');
+                    $sheet->getStyle("A{$rowIndex}:{$lastCol}{$rowIndex}")->getFont()->setBold(true);
+                    $groupTitleRows[] = $rowIndex;
+                    $rowIndex++;
+
+                    continue;
+                }
+
+                if (($row['_type'] ?? null) === 'total') {
+                    $this->writeDataRow($sheet, $rowIndex, $row);
+                    $sheet->getStyle("A{$rowIndex}:{$lastCol}{$rowIndex}")->getFont()->setBold(true);
+                    $rowIndex++;
+
+                    continue;
+                }
+
                 $this->writeDataRow($sheet, $rowIndex, $row);
                 $rowIndex++;
             }
@@ -180,10 +208,29 @@ abstract class ImAnalyticalSpreadsheet
                     ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             }
 
+            foreach ($this->moneyColumns() as $col) {
+                $sheet->getStyle("{$col}{$dataStartRow}:{$col}{$lastDataRow}")
+                    ->getNumberFormat()
+                    ->setFormatCode(self::MONEY_FORMAT);
+                $sheet->getStyle("{$col}{$dataStartRow}:{$col}{$lastDataRow}")
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            }
+
             foreach ($this->dateColumns() as $col) {
                 $sheet->getStyle("{$col}{$dataStartRow}:{$col}{$lastDataRow}")
                     ->getNumberFormat()
                     ->setFormatCode(self::TABLE_DATE_FORMAT);
+            }
+
+            foreach ($groupTitleRows as $groupRowIndex) {
+                $sheet->getStyle("A{$groupRowIndex}:{$lastCol}{$groupRowIndex}")->applyFromArray([
+                    'font' => ['bold' => true, 'size' => 10],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'E5E7EB'],
+                    ],
+                ]);
             }
 
             $sheet->freezePane('A'.$dataStartRow);
@@ -196,9 +243,31 @@ abstract class ImAnalyticalSpreadsheet
         $sheet->getRowDimension($groupRow)->setRowHeight(18);
         $sheet->getRowDimension($columnRow)->setRowHeight(20);
 
-        $this->writeSignatures($sheet, $lastDataRow + 3);
+        if ($this->includeSignatures()) {
+            $this->writeSignatures($sheet, $lastDataRow + 3);
+        }
 
         return $spreadsheet;
+    }
+
+    protected function writePeriodFilters(Worksheet $sheet, string $lastCol): void
+    {
+        if (array_key_exists('date_from', $this->data) || array_key_exists('date_to', $this->data)) {
+            $sheet->setCellValue('A3', 'Date From');
+            $this->writeExcelDate($sheet, 'B3', $this->data['date_from'] ?? null);
+            $sheet->setCellValue('C3', 'Date To');
+            $this->writeExcelDate($sheet, 'D3', $this->data['date_to'] ?? null);
+            $sheet->getStyle('A3')->getFont()->setBold(true);
+            $sheet->getStyle('C3')->getFont()->setBold(true);
+
+            return;
+        }
+
+        if (array_key_exists('as_of', $this->data)) {
+            $sheet->setCellValue('A3', 'As Of');
+            $this->writeExcelDate($sheet, 'B3', $this->data['as_of'] ?? null);
+            $sheet->getStyle('A3')->getFont()->setBold(true);
+        }
     }
 
     protected function writeExtraFilters(Worksheet $sheet, string $lastCol): void
@@ -223,6 +292,24 @@ abstract class ImAnalyticalSpreadsheet
         }
 
         return Date::PHPToExcel(Carbon::parse($value)->startOfDay());
+    }
+
+    /**
+     * @param  array<string, float|int>|null  $buckets
+     * @return array{0: float, 1: float, 2: float, 3: float, 4: float, 5: float}
+     */
+    protected function currencyValues(?array $buckets): array
+    {
+        $buckets ??= [];
+
+        return [
+            (float) ($buckets['IDR'] ?? 0),
+            (float) ($buckets['PHP'] ?? 0),
+            (float) ($buckets['EUR'] ?? 0),
+            (float) ($buckets['GBP'] ?? 0),
+            (float) ($buckets['USD'] ?? 0),
+            (float) ($buckets['YEN'] ?? 0),
+        ];
     }
 
     private function writeSignatures(Worksheet $sheet, int $startRow): void
@@ -272,6 +359,9 @@ abstract class ImAnalyticalSpreadsheet
             'J' => 'I',
             'L' => 'K',
             'O' => 'N',
+            'W' => 'V',
+            'X' => 'W',
+            'Z' => 'Y',
         ];
 
         return $map[$lastCol] ?? 'E';
