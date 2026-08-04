@@ -593,7 +593,10 @@ class LegacyIncrementalImporter
             ]);
         }
 
-        $this->importedReceivingReportIds[] = $rrId;
+        // Alias copies exist only for audit; stock already follows the kept SPFI document.
+        if (! $aliasedFrom) {
+            $this->importedReceivingReportIds[] = $rrId;
+        }
         $this->log('rr', $legacyNumber, $aliasedFrom ? 'import_alias' : 'import', $rrId, $spfiNumber);
 
         return true;
@@ -761,7 +764,10 @@ class LegacyIncrementalImporter
             ]);
         }
 
-        $this->importedTransferSlipIds[] = $tsId;
+        // Alias copies exist only for audit; stock already follows the kept SPFI document.
+        if (! $aliasedFrom) {
+            $this->importedTransferSlipIds[] = $tsId;
+        }
         $this->log('ts', $legacyNumber, $aliasedFrom ? 'import_alias' : 'import', $tsId, $spfiNumber);
 
         return true;

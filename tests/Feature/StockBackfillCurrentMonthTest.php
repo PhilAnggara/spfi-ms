@@ -16,6 +16,7 @@ use App\Services\StockService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
     $this->seed(RolePermissionSeeder::class);
@@ -239,4 +240,136 @@ it('skips already posted references on a second backfill run', function () {
 
     expect(StockBalance::query()->count())->toBe($countAfterFirst);
     expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(215.0);
+});
+
+it('limits the window with --from and --to', function () {
+    $this->artisan('stock:backfill-current-month', [
+        '--from' => now()->addDay()->toDateString(),
+        '--to' => now()->addDays(2)->toDateString(),
+        '--force' => true,
+    ])->assertSuccessful();
+
+    expect(StockBalance::query()->count())->toBe(0);
+    expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(200.0);
+
+    $this->artisan('stock:backfill-current-month', [
+        '--from' => now()->startOfMonth()->toDateString(),
+        '--to' => now()->toDateString(),
+        '--force' => true,
+    ])->assertSuccessful();
+
+    expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(215.0);
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_TRANSFER_SLIP)
+        ->where('qty_out1', 99)
+        ->exists())->toBeFalse();
+});
+
+it('rebuild purges then re-posts without stacking duplicate ledger rows', function () {
+    $this->artisan('stock:backfill-current-month', ['--force' => true])->assertSuccessful();
+    expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(215.0);
+
+    $this->artisan('stock:backfill-current-month', [
+        '--from' => now()->startOfMonth()->toDateString(),
+        '--to' => now()->toDateString(),
+        '--rebuild' => true,
+        '--force' => true,
+    ])->assertSuccessful();
+
+    $this->artisan('stock:backfill-current-month', [
+        '--from' => now()->startOfMonth()->toDateString(),
+        '--to' => now()->toDateString(),
+        '--rebuild' => true,
+        '--force' => true,
+    ])->assertSuccessful();
+
+    expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(215.0);
+
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_RECEIVING_REPORT)
+        ->where('reference_id', $this->rr->id)
+        ->count())->toBe(1);
+
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_TRANSFER_SLIP)
+        ->where('reference_id', $this->tsId)
+        ->count())->toBe(1);
+
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_DELIVERY)
+        ->where('reference_id', $this->drId)
+        ->count())->toBe(1);
+});
+
+it('rebuild dry-run does not write ledger rows', function () {
+    $this->artisan('stock:backfill-current-month', [
+        '--from' => now()->startOfMonth()->toDateString(),
+        '--rebuild' => true,
+        '--dry-run' => true,
+    ])->assertSuccessful();
+
+    expect(StockBalance::query()->count())->toBe(0);
+});
+
+it('skips reconcile-alias transfer slips when posting stock', function () {
+    $now = now();
+
+    $aliasTsId = (int) DB::table('transfer_slips')->insertGetId([
+        'ts_number' => '011999',
+        'ts_date' => now()->toDateString(),
+        'store_withdrawal_id' => DB::table('transfer_slips')->where('id', $this->tsId)->value('store_withdrawal_id'),
+        'for_production' => false,
+        'remarks' => null,
+        'created_by' => User::query()->value('id'),
+        'meta' => json_encode([
+            'legacy_ts_code' => '047999',
+            'aliased_from' => '047999',
+            'reconcile_import' => true,
+        ]),
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $aliasLineId = (int) DB::table('transfer_slip_items')->insertGetId([
+        'transfer_slip_id' => $aliasTsId,
+        'store_withdrawal_item_id' => DB::table('transfer_slip_items')->where('id', $this->tsItemId)->value('store_withdrawal_item_id'),
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 10,
+        'created_by' => User::query()->value('id'),
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    if (Schema::hasTable('reconciliation_number_maps')) {
+        DB::table('reconciliation_number_maps')->insert([
+            'document_type' => 'ts',
+            'ims_number' => '047999',
+            'spfi_number' => '011999',
+            'existing_spfi_number' => 'TS-BF-001',
+            'resolution' => 'import_as_alias',
+            'ims_fingerprint' => 'a',
+            'spfi_fingerprint' => 'b',
+            'meta' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    $this->artisan('stock:backfill-current-month', ['--force' => true])->assertSuccessful();
+
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_TRANSFER_SLIP)
+        ->where('reference_id', $aliasTsId)
+        ->exists())->toBeFalse();
+
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_TRANSFER_SLIP)
+        ->where('reference_id', $this->tsId)
+        ->where('reference_line_id', $this->tsItemId)
+        ->exists())->toBeTrue();
+
+    // Only one TS issue of 10, not doubled by alias.
+    expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(215.0);
+    expect($aliasLineId)->toBeGreaterThan(0);
 });

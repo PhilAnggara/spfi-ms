@@ -172,6 +172,55 @@ class StockService
     }
 
     /**
+     * Remove all ledger rows for a document and undo their net effect on inventory.
+     * Used by stock rebuild so reverse+replay does not accumulate duplicate movements.
+     */
+    public function purgeDocumentMovements(string $referenceType, int $referenceId): int
+    {
+        $rows = StockBalance::query()
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $referenceId)
+            ->orderBy('id')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return 0;
+        }
+
+        $rows->groupBy(fn (StockBalance $row): string => $row->item_id.'|'.$row->wh_code)
+            ->each(function ($group): void {
+                /** @var \Illuminate\Support\Collection<int, StockBalance> $group */
+                $first = $group->first();
+                $net = (float) $group->sum('qty_in1')
+                    - (float) $group->sum('qty_out1')
+                    - (float) $group->sum('qty_out3');
+
+                $inventory = StockInventory::query()
+                    ->where('item_id', $first->item_id)
+                    ->where('wh_code', $first->wh_code)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $inventory) {
+                    return;
+                }
+
+                $inventory->balance = round((float) $inventory->balance - $net, 5);
+                $inventory->updated_by = null;
+                $inventory->save();
+
+                $this->syncItemStockOnHand((int) $first->item_id);
+            });
+
+        StockBalance::query()
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $referenceId)
+            ->delete();
+
+        return $rows->count();
+    }
+
+    /**
      * @param  array<int, array{item_id: int, product_code: string, quantity: float|int|string, reference_line_id: int, wh_code?: string}>  $lines
      */
     private function applyDocumentIssue(

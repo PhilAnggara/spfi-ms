@@ -84,6 +84,25 @@ php artisan config:clear
 - Parent PO/SWS diimpor otomatis bila dibutuhkan RR/TS.
 - Dokumen yang **soft-deleted** di SPFI-MS tapi masih ada di IMS akan **di-restore** (bukan gagal duplicate key).
 
+## Stock rebuild sejak 15 Juli (RR / TS / DR)
+
+Jika ledger stok partial/salah setelah sync, hitung ulang dampak dokumen aktif di jendela tanggal lewat `StockService` (bukan overwrite dari `stock_inventory` IMS). Opening sebelum `--from` tetap dari sisa ledger setelah purge.
+
+`--rebuild` **menghapus** baris `stock_balances` RR/TS/DR di jendela (termasuk dokumen alias reconcile), mengembalikan efek net-nya ke `stock_inventory`, lalu **mem-post ulang hanya dokumen non-alias** secara kronologis. Ini mencegah double-post dari:
+
+- TS/RR alias (`import_as_alias`, nomor seperti `011xxx`) yang isinya duplikat dokumen SPFI yang sudah ada
+- rebuild berulang yang menumpuk baris reverse/replay
+
+```bash
+# Dry-run — daftar dokumen yang akan di-purge lalu di-replay
+php artisan stock:backfill-current-month --from=2026-07-15 --rebuild --dry-run
+
+# Apply (backup spfi_ms dulu; --force mengizinkan saldo sementara negatif saat replay)
+php artisan stock:backfill-current-month --from=2026-07-15 --rebuild --force
+```
+
+Tanpa `--rebuild`, command hanya mengisi posting yang belum ada (`hasPostedReference` = false). Tanpa `--from`, jendela tetap bulan kalender dari `--date` (default: hari ini). Impor reconcile **tidak** mem-post stok untuk dokumen alias.
+
 ## Related config
 
 - [`config/reconcile.php`](../config/reconcile.php)
