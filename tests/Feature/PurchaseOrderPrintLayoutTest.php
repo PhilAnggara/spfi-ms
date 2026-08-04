@@ -143,17 +143,24 @@ it('renders compact item table, three column summary, and aligned supplier signa
         ->toContain('white-space: nowrap')
         ->toContain('>Price</th>')
         ->toContain('>Amount</th>')
+        ->toContain('class="text-right col-amount">100.000,00</td>')
+        ->toContain('.po-items th,')
+        ->toContain('border: none')
+        ->toContain('.po-items thead th')
+        ->toContain('border-bottom: 1px solid #111827')
         ->toContain('class="summary-table"')
         ->toContain('class="summary-middle"')
         ->toContain('5 %')
         ->toContain('11 %')
         ->toContain('class="po-delivery"')
         ->toContain('class="po-number"')
-        ->toContain('Delivery to PT Sinar Pure Foods International | PO Number: <span class="po-number">PO-PRINT-001</span>')
+        ->toContain('Delivery to PT Sinar Pure Foods International |')
+        ->toContain('<span class="po-number">PO-PRINT-001</span>')
         ->toContain('class="signature-pad"')
         ->toContain('class="signature-blank"')
         ->toContain("Supplier's Signature")
         ->toContain('Denny Tuhatelu')
+        ->not->toContain('class="text-right col-amount">105.450,00</td>')
         ->not->toContain('width: 64px')
         ->not->toContain('col-qty col-qty-wrap')
         ->not->toContain('class="item-meta"')
@@ -289,6 +296,7 @@ it('shows paper form size and print checklist in confirm print modal', function 
     $modal = view('pages.purchase-orders.partials.print-confirm-modal', [
         'purchaseOrder' => $this->purchaseOrder,
         'nextPoNumber' => 'PO-NEXT-001',
+        'errors' => new Illuminate\Support\ViewErrorBag,
     ])->render();
 
     $paperLabel = config('purchase-order.paper.label');

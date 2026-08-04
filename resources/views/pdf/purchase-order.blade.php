@@ -85,8 +85,12 @@
         }
         .po-items th,
         .po-items td {
+            border: none;
             padding: 3px 4px;
             vertical-align: middle;
+        }
+        .po-items thead th {
+            border-bottom: 1px solid #111827;
         }
         .po-items th {
             font-size: 10px;
@@ -332,7 +336,7 @@
                         <td class="col-qty{{ $qtyIsVeryLong ? ' col-qty-wrap' : '' }}">{{ $qtyDisplay }}</td>
                         <td class="col-unit">{{ $unitName }}</td>
                         <td class="text-right col-price">{{ $formatMoney($item->unit_price) }}</td>
-                        <td class="text-right col-amount">{{ $formatMoney($item->total) }}</td>
+                        <td class="text-right col-amount">{{ $formatMoney($item->line_subtotal) }}</td>
                     </tr>
                 @endforeach
             </tbody>
