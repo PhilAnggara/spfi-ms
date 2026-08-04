@@ -575,15 +575,17 @@ class PrsController extends Controller
     {
         $codeLength = strlen($departmentCode);
         $startPosition = $codeLength + 1;
+        // Format is {DEPTCODE}{#######}; ignore longer numeric junk that overflows INT/BIGINT casts.
+        $maxSequenceDigits = 10;
 
         if ($this->isSqlServer()) {
             $lastSequence = Prs::withTrashed()
                 ->where('prs_number', 'like', $departmentCode.'%')
                 ->selectRaw(
-                    'MAX(CASE WHEN LEN(SUBSTRING(prs_number, ?, 100)) > 0 '
+                    'MAX(CASE WHEN LEN(SUBSTRING(prs_number, ?, 100)) BETWEEN 1 AND ? '
                     ."AND SUBSTRING(prs_number, ?, 100) NOT LIKE '%[^0-9]%' "
-                    .'THEN CAST(SUBSTRING(prs_number, ?, 100) AS INT) ELSE NULL END) as last_sequence',
-                    [$startPosition, $startPosition, $startPosition]
+                    .'THEN CAST(SUBSTRING(prs_number, ?, 100) AS BIGINT) ELSE NULL END) as last_sequence',
+                    [$startPosition, $maxSequenceDigits, $startPosition, $startPosition]
                 )
                 ->value('last_sequence');
 
@@ -595,9 +597,9 @@ class PrsController extends Controller
         Prs::withTrashed()
             ->where('prs_number', 'like', $departmentCode.'%')
             ->pluck('prs_number')
-            ->each(function (mixed $prsNumber) use (&$lastNumber, $codeLength): void {
+            ->each(function (mixed $prsNumber) use (&$lastNumber, $codeLength, $maxSequenceDigits): void {
                 $suffix = substr((string) $prsNumber, $codeLength);
-                if ($suffix !== '' && ctype_digit($suffix)) {
+                if ($suffix !== '' && strlen($suffix) <= $maxSequenceDigits && ctype_digit($suffix)) {
                     $lastNumber = max($lastNumber, (int) $suffix);
                 }
             });

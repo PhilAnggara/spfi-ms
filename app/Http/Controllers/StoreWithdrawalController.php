@@ -1670,16 +1670,17 @@ class StoreWithdrawalController extends Controller
         $normalizedDepartmentCode = strtoupper(trim($departmentCode));
 
         $start = strlen($normalizedDepartmentCode) + 1;
+        $maxSequenceDigits = 10;
 
         if ($this->isSqlServer()) {
             $lastSequence = DB::table('store_withdrawals')
                 ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
                 ->where('sws_number', 'like', $normalizedDepartmentCode.'%')
                 ->selectRaw(
-                    'MAX(CASE WHEN LEN(SUBSTRING(sws_number, ?, 100)) > 0 '
+                    'MAX(CASE WHEN LEN(SUBSTRING(sws_number, ?, 100)) BETWEEN 1 AND ? '
                     ."AND SUBSTRING(sws_number, ?, 100) NOT LIKE '%[^0-9]%' "
-                    .'THEN CAST(SUBSTRING(sws_number, ?, 100) AS INT) ELSE NULL END) as last_sequence',
-                    [$start, $start, $start]
+                    .'THEN CAST(SUBSTRING(sws_number, ?, 100) AS BIGINT) ELSE NULL END) as last_sequence',
+                    [$start, $maxSequenceDigits, $start, $start]
                 )
                 ->value('last_sequence');
 
@@ -1689,10 +1690,10 @@ class StoreWithdrawalController extends Controller
                 ->whereRaw('UPPER(department_code) = ?', [$normalizedDepartmentCode])
                 ->where('sws_number', 'like', $normalizedDepartmentCode.'%')
                 ->get(['sws_number'])
-                ->map(function ($row) use ($normalizedDepartmentCode): int {
+                ->map(function ($row) use ($normalizedDepartmentCode, $maxSequenceDigits): int {
                     $suffix = substr((string) $row->sws_number, strlen($normalizedDepartmentCode));
 
-                    return ctype_digit($suffix) ? (int) $suffix : 0;
+                    return ctype_digit($suffix) && strlen($suffix) <= $maxSequenceDigits ? (int) $suffix : 0;
                 })
                 ->max() ?? 0;
         }

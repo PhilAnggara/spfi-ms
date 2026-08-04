@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Item;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class PrsItem extends Component
@@ -90,6 +91,7 @@ class PrsItem extends Component
         $this->updateCartCount();
     }
 
+    #[On('prs-catalog-add')]
     public function addFromCatalog($itemId, $quantity = 1)
     {
         if (! $itemId || ! is_numeric($itemId)) {

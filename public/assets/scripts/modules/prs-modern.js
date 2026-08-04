@@ -5,6 +5,70 @@ document.addEventListener('DOMContentLoaded', function () {
     initPrsCartCount();
 });
 
+function normalizePrsCartCountDetail(detail) {
+    if (Array.isArray(detail)) {
+        return {
+            count: detail[0] ?? 0,
+            itemIds: detail[1] ?? [],
+        };
+    }
+
+    if (detail && typeof detail === 'object') {
+        return {
+            count: detail.count ?? 0,
+            itemIds: detail.itemIds ?? [],
+        };
+    }
+
+    return { count: 0, itemIds: [] };
+}
+
+function resolvePrsCartWire() {
+    if (!window.Livewire) {
+        return null;
+    }
+
+    const host = document.querySelector('#prs-cart-component [wire\\:id]');
+    const componentId = host?.getAttribute('wire:id');
+    if (componentId) {
+        const wire = window.Livewire.find?.(componentId);
+        if (wire) {
+            return wire;
+        }
+    }
+
+    const byName = window.Livewire.getByName?.('prs-item');
+    if (Array.isArray(byName) && byName.length > 0) {
+        return byName[0];
+    }
+
+    return null;
+}
+
+function dispatchPrsCatalogAdd(itemId, quantity) {
+    if (typeof window.Livewire?.dispatch === 'function') {
+        window.Livewire.dispatch('prs-catalog-add', { itemId, quantity });
+        return true;
+    }
+
+    const wire = resolvePrsCartWire();
+    if (!wire) {
+        return false;
+    }
+
+    if (typeof wire.call === 'function') {
+        wire.call('addFromCatalog', itemId, quantity);
+        return true;
+    }
+
+    if (typeof wire.addFromCatalog === 'function') {
+        wire.addFromCatalog(itemId, quantity);
+        return true;
+    }
+
+    return false;
+}
+
 function initPrsFilters() {
     const filterForm = document.getElementById('prs-filter-form');
     if (!filterForm) {
@@ -644,22 +708,41 @@ function initPrsCatalog() {
             return;
         }
 
-        const livewireHost = document.querySelector('#prs-cart-component [wire\\:id]');
-        const componentId = livewireHost?.getAttribute('wire:id');
-        const component = componentId ? window.Livewire?.find(componentId) : null;
-        if (component) {
-            component.call('addFromCatalog', itemId, quantity);
+        const dispatched = dispatchPrsCatalogAdd(itemId, quantity);
+        if (!dispatched) {
+            console.error('PRS cart: Livewire is not available to add items.');
+            return;
         }
 
         cartItems.add(itemId);
         updateInCartState();
     });
 
-    window.addEventListener('prs-cart-count', (event) => {
-        const ids = Array.isArray(event.detail?.itemIds) ? event.detail.itemIds : [];
+    const syncCartItemsFromDetail = (detail) => {
+        const payload = normalizePrsCartCountDetail(detail);
+        const ids = Array.isArray(payload.itemIds) ? payload.itemIds : [];
         cartItems.clear();
-        ids.forEach((id) => cartItems.add(parseInt(id, 10)));
+        ids.forEach((id) => {
+            const parsed = parseInt(id, 10);
+            if (!Number.isNaN(parsed) && parsed > 0) {
+                cartItems.add(parsed);
+            }
+        });
         updateInCartState();
+    };
+
+    window.addEventListener('prs-cart-count', (event) => {
+        syncCartItemsFromDetail(event.detail);
+    });
+
+    document.addEventListener('livewire:initialized', () => {
+        if (typeof window.Livewire?.on !== 'function') {
+            return;
+        }
+
+        window.Livewire.on('prs-cart-count', (detail) => {
+            syncCartItemsFromDetail(detail);
+        });
     });
 
     setLayoutActiveState();
@@ -708,9 +791,24 @@ function initPrsCartCount() {
     }
 
     // Update both badges when cart count changes
-    window.addEventListener('prs-cart-count', (event) => {
-        const count = event.detail?.count ?? 0;
+    const syncBadges = (detail) => {
+        const payload = normalizePrsCartCountDetail(detail);
+        const count = payload.count ?? 0;
         countEl.textContent = count;
         floatingBadge.textContent = count;
+    };
+
+    window.addEventListener('prs-cart-count', (event) => {
+        syncBadges(event.detail);
+    });
+
+    document.addEventListener('livewire:initialized', () => {
+        if (typeof window.Livewire?.on !== 'function') {
+            return;
+        }
+
+        window.Livewire.on('prs-cart-count', (detail) => {
+            syncBadges(detail);
+        });
     });
 }

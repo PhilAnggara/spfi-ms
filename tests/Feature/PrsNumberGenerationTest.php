@@ -138,3 +138,42 @@ it('starts at 0000001 when no matching department code prefix exists', function 
 
     expect($created->prs_number)->toBe('71010000001');
 });
+
+it('ignores oversized numeric suffixes that would overflow sql int', function () {
+    Prs::query()->create([
+        'prs_number' => '710100021520000001',
+        'user_id' => $this->creator->id,
+        'department_id' => $this->otherDepartment->id,
+        'prs_date' => '2016-05-01',
+        'date_needed' => '2016-05-10',
+        'is_capex' => false,
+        'remarks' => 'Malformed legacy import',
+        'status' => 'APPROVED',
+        'created_at' => '2016-05-01 08:00:00',
+        'updated_at' => '2016-05-01 08:00:00',
+    ]);
+
+    Prs::query()->create([
+        'prs_number' => '71010000012',
+        'user_id' => $this->creator->id,
+        'department_id' => $this->otherDepartment->id,
+        'prs_date' => '2016-05-02',
+        'date_needed' => '2016-05-11',
+        'is_capex' => false,
+        'remarks' => 'Valid legacy',
+        'status' => 'APPROVED',
+        'created_at' => '2016-05-02 08:00:00',
+        'updated_at' => '2016-05-02 08:00:00',
+    ]);
+
+    $this->actingAs($this->creator)
+        ->post(route('prs.store'), validPrsStorePayload($this->department, $this->item))
+        ->assertRedirect(route('prs.index'));
+
+    $created = Prs::query()
+        ->where('department_id', $this->department->id)
+        ->latest('id')
+        ->first();
+
+    expect($created->prs_number)->toBe('71010000013');
+});
