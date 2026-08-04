@@ -242,6 +242,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [TransferSlipController::class, 'store'])->name('store');
     });
 
+    Route::middleware('permission:update-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {
+        Route::put('/{transferSlip}', [TransferSlipController::class, 'update'])->name('update');
+    });
+
     Route::middleware('permission:delete-transfer')->prefix('transfer-slips')->name('transfer-slips.')->group(function () {
         Route::delete('/{transferSlip}', [TransferSlipController::class, 'destroy'])->name('destroy');
     });

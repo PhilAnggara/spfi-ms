@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ReceivingReportController extends Controller
 {
@@ -371,37 +372,42 @@ class ReceivingReportController extends Controller
             }
         }
 
-        DB::transaction(function () use ($receivingReport, $validated, $selectedRows, $request, $currentStockLines, $previousStockLines, $requiresCustomsDocument) {
-            $receivingReport->update([
-                'received_date' => $validated['received_date'],
-                'requires_customs_document' => $requiresCustomsDocument,
-                'customs_document_number' => $requiresCustomsDocument ? ($validated['customs_document_number'] ?? null) : null,
-                'customs_document_type_id' => $requiresCustomsDocument ? ($validated['customs_document_type_id'] ?? null) : null,
-                'customs_document_date' => $requiresCustomsDocument ? ($validated['customs_document_date'] ?? null) : null,
-                'notes' => $validated['notes'] ?? null,
-            ]);
-
-            $receivingReport->items()->delete();
-
-            foreach ($selectedRows as $row) {
-                ReceivingReportItem::create([
-                    'receiving_report_id' => $receivingReport->id,
-                    'purchase_order_item_id' => $row['purchase_order_item_id'],
-                    'qty_good' => (float) ($row['qty_good'] ?? 0),
-                    'qty_bad' => (float) ($row['qty_bad'] ?? 0),
+        try {
+            DB::transaction(function () use ($receivingReport, $validated, $selectedRows, $request, $currentStockLines, $previousStockLines, $requiresCustomsDocument) {
+                $receivingReport->update([
+                    'received_date' => $validated['received_date'],
+                    'requires_customs_document' => $requiresCustomsDocument,
+                    'customs_document_number' => $requiresCustomsDocument ? ($validated['customs_document_number'] ?? null) : null,
+                    'customs_document_type_id' => $requiresCustomsDocument ? ($validated['customs_document_type_id'] ?? null) : null,
+                    'customs_document_date' => $requiresCustomsDocument ? ($validated['customs_document_date'] ?? null) : null,
+                    'notes' => $validated['notes'] ?? null,
                 ]);
-            }
 
-            app(StockService::class)->applyReceivingReportAdjustment(
-                receivingReport: $receivingReport,
-                currentLines: $currentStockLines,
-                previousLines: $previousStockLines,
-                userId: $request->user()->id,
-            );
+                // Soft-delete would collide with unique(rr_id, po_item_id) when recreating lines.
+                $receivingReport->items()->forceDelete();
 
-            // Trigger PRS status check for all affected items
-            $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
-        });
+                foreach ($selectedRows as $row) {
+                    ReceivingReportItem::create([
+                        'receiving_report_id' => $receivingReport->id,
+                        'purchase_order_item_id' => $row['purchase_order_item_id'],
+                        'qty_good' => (float) ($row['qty_good'] ?? 0),
+                        'qty_bad' => (float) ($row['qty_bad'] ?? 0),
+                    ]);
+                }
+
+                app(StockService::class)->applyReceivingReportAdjustment(
+                    receivingReport: $receivingReport,
+                    currentLines: $currentStockLines,
+                    previousLines: $previousStockLines,
+                    userId: $request->user()->id,
+                );
+
+                // Trigger PRS status check for all affected items
+                $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
+            });
+        } catch (ValidationException $exception) {
+            return redirect()->back()->withInput()->withErrors($exception->errors());
+        }
 
         $receivingReport->loadMissing('purchaseOrder.items.prsItem.prs.user');
         $recipients = app(NotificationRecipientService::class)->uniqueUsers(

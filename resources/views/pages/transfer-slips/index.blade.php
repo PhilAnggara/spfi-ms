@@ -7,7 +7,8 @@
     class="page-heading po-page"
     id="ts-page"
     data-sws-lookup-url="{{ route('transfer-slips.sws-by-number') }}"
-    data-open-create-modal="{{ $errors->any() && !session()->hasOldInput('print_confirm_id') ? '1' : '0' }}"
+    data-open-create-modal="{{ $errors->any() && !session()->hasOldInput('print_confirm_id') && !session()->hasOldInput('_edit_transfer_slip_id') ? '1' : '0' }}"
+    data-open-edit-modal-id="{{ old('_edit_transfer_slip_id', '') }}"
     data-old-sws-number="{{ old('sws_number', '') }}"
 >
     <div class="page-title mb-4">
@@ -168,6 +169,11 @@
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#tsPrintConfirm-{{ $transferSlip->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
                                                     <i class="fa-light fa-print text-primary"></i>
                                                 </button>
+                                                @can('update-transfer')
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#ts-edit-modal-{{ $transferSlip->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                                                        <i class="fa-light fa-pen-to-square text-warning"></i>
+                                                    </button>
+                                                @endcan
                                                 @can('delete-transfer')
                                                     <button type="button" class="btn icon" onclick="confirmDeleteTransferSlip({{ $transferSlip->id }}, '{{ $transferSlip->ts_number }}')" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
                                                         <i class="fa-light fa-trash text-secondary"></i>
@@ -288,6 +294,191 @@
                             'transferSlip' => $transferSlip,
                             'nextTsNumber' => $nextTsNumber ?? '',
                         ])
+
+                        @can('update-transfer')
+                            @php
+                                $editItems = collect($transferSlipEditItems[$transferSlip->id] ?? []);
+                                $isEditingThis = (string) old('_edit_transfer_slip_id') === (string) $transferSlip->id;
+                                $oldEditItems = collect($isEditingThis ? old('items', []) : [])
+                                    ->keyBy(fn ($row) => (int) ($row['store_withdrawal_item_id'] ?? 0));
+                            @endphp
+                            <div class="modal fade" id="ts-edit-modal-{{ $transferSlip->id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                    <div class="modal-content border-0 shadow">
+                                        <form method="POST" action="{{ route('transfer-slips.update', $transferSlip->id) }}" class="ts-edit-form" id="edit-ts-form-{{ $transferSlip->id }}">
+                                            @csrf
+                                            @method('PUT')
+                                            <input type="hidden" name="_edit_transfer_slip_id" value="{{ $transferSlip->id }}">
+                                            <input type="hidden" name="sws_number" value="{{ $transferSlip->sws_number }}">
+                                            <input type="hidden" name="store_withdrawal_id" value="{{ $transferSlip->store_withdrawal_id }}">
+
+                                            <div class="modal-header ts-modal-header">
+                                                <div>
+                                                    <h5 class="modal-title mb-1">Edit Transfer Slip - {{ $transferSlip->ts_number }}</h5>
+                                                    <div class="text-muted small">Update header and quantities. Set qty to 0 to remove an item. Linked SWS cannot be changed.</div>
+                                                </div>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="alert alert-danger d-none mb-3 ts-edit-error"></div>
+
+                                                <div class="row g-3 mb-3">
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">TS Number</label>
+                                                        <input type="text" class="form-control" value="{{ $transferSlip->ts_number }}" readonly>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label for="edit_ts_date_{{ $transferSlip->id }}" class="form-label">TS Date</label>
+                                                        <input
+                                                            type="date"
+                                                            class="form-control"
+                                                            id="edit_ts_date_{{ $transferSlip->id }}"
+                                                            name="ts_date"
+                                                            value="{{ $isEditingThis ? old('ts_date', \Carbon\Carbon::parse($transferSlip->ts_date)->toDateString()) : \Carbon\Carbon::parse($transferSlip->ts_date)->toDateString() }}"
+                                                            required
+                                                        >
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label d-block">For Production</label>
+                                                        @php
+                                                            $editForProduction = $isEditingThis
+                                                                ? old('for_production', (string) (int) $transferSlip->for_production)
+                                                                : (string) (int) $transferSlip->for_production;
+                                                        @endphp
+                                                        <div class="ts-production-toggle" role="radiogroup" aria-label="For production option">
+                                                            <input type="radio" class="btn-check edit-production-choice" name="for_production" id="edit-for-production-yes-{{ $transferSlip->id }}" value="1" @checked($editForProduction === '1')>
+                                                            <label class="btn btn-outline-success" for="edit-for-production-yes-{{ $transferSlip->id }}">
+                                                                <i class="fa-regular fa-industry me-1"></i>
+                                                                Yes
+                                                            </label>
+
+                                                            <input type="radio" class="btn-check edit-production-choice" name="for_production" id="edit-for-production-no-{{ $transferSlip->id }}" value="0" @checked($editForProduction !== '1')>
+                                                            <label class="btn btn-outline-secondary" for="edit-for-production-no-{{ $transferSlip->id }}">
+                                                                <i class="fa-regular fa-ban me-1"></i>
+                                                                No
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label for="edit_remarks_{{ $transferSlip->id }}" class="form-label">Remarks</label>
+                                                        <textarea class="form-control" id="edit_remarks_{{ $transferSlip->id }}" name="remarks" rows="2" placeholder="Optional transfer remarks">{{ $isEditingThis ? old('remarks', $transferSlip->remarks) : $transferSlip->remarks }}</textarea>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row g-3 mb-3">
+                                                    <div class="col-md-4">
+                                                        <div class="ts-info-card">
+                                                            <small>SWS Number</small>
+                                                            <div>{{ $transferSlip->sws_number ?? '-' }}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="ts-info-card">
+                                                            <small>Department</small>
+                                                            <div>{{ $transferSlip->department_code ?? '-' }} / {{ $transferSlip->department_name ?? '-' }}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="ts-info-card">
+                                                            <small>Tip</small>
+                                                            <div>Qty 0 removes the item from this TS.</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 mt-1 ts-qty-tools">
+                                                    <small class="text-muted">Quick action: fill all lines with available quantity, or clear all quantities.</small>
+                                                    <div class="btn-group btn-group-sm" role="group" aria-label="Qty quick actions">
+                                                        <button type="button" class="btn btn-outline-success ts-edit-fill-remaining">
+                                                            <i class="fa-regular fa-wand-magic-sparkles me-1"></i>
+                                                            Fill All Remaining
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-secondary ts-edit-clear-qty">
+                                                            <i class="fa-regular fa-eraser me-1"></i>
+                                                            Clear Qty
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="table-responsive">
+                                                    <table class="table table-striped align-middle ts-create-table mb-0">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Product Code</th>
+                                                                <th>Item Name</th>
+                                                                <th class="text-end">SWS Qty</th>
+                                                                <th class="text-end">Other TS</th>
+                                                                <th class="text-end">Available</th>
+                                                                <th style="min-width: 180px;">Qty Out</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @forelse ($editItems as $index => $editItem)
+                                                                @php
+                                                                    $oldQty = $oldEditItems->get((int) $editItem['store_withdrawal_item_id']);
+                                                                    $qtyValue = $isEditingThis && $oldQty !== null
+                                                                        ? (float) ($oldQty['quantity'] ?? 0)
+                                                                        : (float) $editItem['quantity_current'];
+                                                                @endphp
+                                                                <tr>
+                                                                    <td>
+                                                                        {{ $editItem['product_code'] ?? '-' }}
+                                                                        <input type="hidden" name="items[{{ $index }}][store_withdrawal_item_id]" value="{{ $editItem['store_withdrawal_item_id'] }}">
+                                                                        <input type="hidden" name="items[{{ $index }}][item_id]" value="{{ $editItem['item_id'] }}">
+                                                                    </td>
+                                                                    <td>{{ $editItem['item_name'] ?? '-' }}</td>
+                                                                    <td class="text-end">{{ number_format((float) $editItem['quantity_source'], 3) }}</td>
+                                                                    <td class="text-end">{{ number_format((float) $editItem['quantity_transferred'], 3) }}</td>
+                                                                    <td class="text-end">{{ number_format((float) $editItem['quantity_remaining'], 3) }}</td>
+                                                                    <td>
+                                                                        <div class="input-group">
+                                                                            <input
+                                                                                type="number"
+                                                                                class="form-control ts-qty-input"
+                                                                                name="items[{{ $index }}][quantity]"
+                                                                                min="0"
+                                                                                max="{{ number_format((float) $editItem['quantity_remaining'], 5, '.', '') }}"
+                                                                                step="0.00001"
+                                                                                value="{{ number_format($qtyValue, 5, '.', '') }}"
+                                                                                data-max="{{ number_format((float) $editItem['quantity_remaining'], 5, '.', '') }}"
+                                                                            >
+                                                                            <span class="input-group-text">{{ $editItem['uom'] ?? 'PCS' }}</span>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            @empty
+                                                                <tr>
+                                                                    <td colspan="6" class="text-center text-muted py-4">No SWS items available for this transfer slip.</td>
+                                                                </tr>
+                                                            @endforelse
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                <div class="row g-3 mt-1">
+                                                    <div class="col-md-6">
+                                                        <div class="ts-summary-card">
+                                                            <small>Selected Lines</small>
+                                                            <div class="ts-edit-summary-lines">0</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="ts-summary-card">
+                                                            <small>Total Qty Out</small>
+                                                            <div class="ts-edit-summary-qty">0.000</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-warning">Update Transfer Slip</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        @endcan
                     @endforeach
                 @endif
             </div>
@@ -472,8 +663,9 @@
     @php
         $isPrintConfirmNumberError = session()->hasOldInput('print_confirm_id')
             && ($errors->has('ts_number') || $errors->has('ts_number_suggested'));
+        $isEditValidationError = session()->hasOldInput('_edit_transfer_slip_id');
         $transferSlipPrefillData = [
-            'shouldOpenModal' => $errors->any() && ! $isPrintConfirmNumberError,
+            'shouldOpenModal' => $errors->any() && ! $isPrintConfirmNumberError && ! $isEditValidationError,
             'swsNumber' => old('sws_number', ''),
             'items' => old('items', []),
         ];

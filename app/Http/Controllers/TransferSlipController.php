@@ -34,6 +34,7 @@ class TransferSlipController extends Controller
             ->all();
 
         $transferSlipItems = $this->groupTransferSlipItems($transferSlipIds);
+        $transferSlipEditItems = $this->buildEditPayload($transferSlips->getCollection()->all());
 
         $departmentOptions = Department::query()
             ->select(['code', 'name'])
@@ -43,6 +44,7 @@ class TransferSlipController extends Controller
         return view('pages.transfer-slips.index', [
             'transferSlips' => $transferSlips,
             'transferSlipItems' => $transferSlipItems,
+            'transferSlipEditItems' => $transferSlipEditItems,
             'departmentOptions' => $departmentOptions,
             'filters' => $filters,
             'nextTsNumber' => app(DocumentNumberService::class)->previewNext('TS'),
@@ -334,6 +336,237 @@ class TransferSlipController extends Controller
             ->with('success', "Transfer slip {$createdTsNumber} has been created successfully.");
     }
 
+    public function update(Request $request, string $transferSlip)
+    {
+        $transferSlipId = (int) $transferSlip;
+
+        $existing = DB::table('transfer_slips')
+            ->where('id', $transferSlipId)
+            ->whereNull('deleted_at')
+            ->first([
+                'id',
+                'ts_number',
+                'ts_date',
+                'store_withdrawal_id',
+                'for_production',
+                'remarks',
+                'meta',
+            ]);
+
+        if (! $existing) {
+            return redirect()
+                ->route('transfer-slips.index')
+                ->with('error', 'Transfer slip not found or already deleted.');
+        }
+
+        $validated = $request->validate([
+            'ts_date' => ['required', 'date'],
+            'remarks' => ['nullable', 'string'],
+            'for_production' => ['required', 'in:0,1'],
+            'sws_number' => ['required', 'string', 'max:50'],
+            'store_withdrawal_id' => ['required', 'integer', 'exists:store_withdrawals,id'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.store_withdrawal_item_id' => ['required', 'integer', 'exists:store_withdrawal_items,id'],
+            'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'items.*.quantity' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        if ((int) $validated['store_withdrawal_id'] !== (int) $existing->store_withdrawal_id) {
+            return redirect()->back()->withInput()->withErrors([
+                'store_withdrawal_id' => 'The linked SWS cannot be changed when editing a transfer slip.',
+            ]);
+        }
+
+        $requestedItems = collect($validated['items'])
+            ->map(function (array $row): array {
+                return [
+                    'store_withdrawal_item_id' => (int) $row['store_withdrawal_item_id'],
+                    'item_id' => (int) $row['item_id'],
+                    'quantity' => round((float) ($row['quantity'] ?? 0), 5),
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['store_withdrawal_item_id'] > 0 && $row['item_id'] > 0 && $row['quantity'] > 0)
+            ->keyBy('store_withdrawal_item_id');
+
+        if ($requestedItems->isEmpty()) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Add at least one transfer quantity greater than 0.',
+            ]);
+        }
+
+        $storeWithdrawal = DB::table('store_withdrawals')
+            ->where('id', (int) $existing->store_withdrawal_id)
+            ->whereNull('deleted_at')
+            ->select(['id', 'sws_number', 'type'])
+            ->first();
+
+        if (! $storeWithdrawal || $storeWithdrawal->sws_number !== $validated['sws_number']) {
+            return redirect()->back()->withInput()->withErrors([
+                'sws_number' => 'Selected SWS is no longer valid. Please reload the transfer slip.',
+            ]);
+        }
+
+        $allowNegativeBalance = strtolower((string) ($storeWithdrawal->type ?? '')) === 'confirmatory';
+
+        $sourceItems = DB::table('store_withdrawal_items')
+            ->whereIn('id', $requestedItems->keys()->all())
+            ->where('store_withdrawal_id', (int) $storeWithdrawal->id)
+            ->whereNull('deleted_at')
+            ->select(['id', 'store_withdrawal_id', 'item_id', 'product_code', 'quantity', 'uom'])
+            ->get()
+            ->keyBy('id');
+
+        if ($sourceItems->count() !== $requestedItems->count()) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Some SWS items are no longer available. Please reload the transfer slip.',
+            ]);
+        }
+
+        $transferredMap = DB::table('transfer_slip_items as tsi')
+            ->join('transfer_slips as ts', 'ts.id', '=', 'tsi.transfer_slip_id')
+            ->whereNull('ts.deleted_at')
+            ->whereNull('tsi.deleted_at')
+            ->where('ts.id', '!=', $transferSlipId)
+            ->whereIn('tsi.store_withdrawal_item_id', $requestedItems->keys()->all())
+            ->selectRaw('tsi.store_withdrawal_item_id, SUM(tsi.quantity) as transferred_quantity')
+            ->groupBy('tsi.store_withdrawal_item_id')
+            ->pluck('transferred_quantity', 'tsi.store_withdrawal_item_id');
+
+        foreach ($requestedItems as $storeWithdrawalItemId => $row) {
+            $sourceItem = $sourceItems->get($storeWithdrawalItemId);
+
+            if (! $sourceItem || (int) $sourceItem->item_id !== $row['item_id']) {
+                return redirect()->back()->withInput()->withErrors([
+                    'items' => 'The selected item payload does not match the current SWS detail rows.',
+                ]);
+            }
+
+            $alreadyTransferred = round((float) ($transferredMap[$storeWithdrawalItemId] ?? 0), 5);
+            $remaining = max(0, round(((float) $sourceItem->quantity) - $alreadyTransferred, 5));
+
+            if ($row['quantity'] > $remaining) {
+                return redirect()->back()->withInput()->withErrors([
+                    'items' => 'Transfer quantity exceeds the remaining quantity for one or more SWS items.',
+                ]);
+            }
+        }
+
+        $authUserId = Auth::id();
+        $now = now();
+        $tsNumber = (string) $existing->ts_number;
+
+        try {
+            DB::transaction(function () use (
+                $validated,
+                $requestedItems,
+                $sourceItems,
+                $authUserId,
+                $now,
+                $allowNegativeBalance,
+                $existing,
+                $transferSlipId,
+                $storeWithdrawal
+            ): void {
+                $previousStockLines = DB::table('transfer_slip_items')
+                    ->where('transfer_slip_id', $transferSlipId)
+                    ->whereNull('deleted_at')
+                    ->get(['id', 'item_id', 'product_code', 'quantity'])
+                    ->map(fn ($row): array => [
+                        'item_id' => (int) $row->item_id,
+                        'product_code' => (string) $row->product_code,
+                        'quantity' => (float) $row->quantity,
+                        'reference_line_id' => (int) $row->id,
+                    ])
+                    ->all();
+
+                app(StockService::class)->reverseTransferSlipIssue(
+                    transferSlipId: $transferSlipId,
+                    movementDate: (string) $existing->ts_date,
+                    lines: $previousStockLines,
+                    userId: $authUserId,
+                );
+
+                DB::table('transfer_slip_items')
+                    ->where('transfer_slip_id', $transferSlipId)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'updated_by' => $authUserId,
+                        'updated_at' => $now,
+                        'deleted_at' => $now,
+                    ]);
+
+                $existingMeta = is_string($existing->meta)
+                    ? (json_decode($existing->meta, true) ?: [])
+                    : (array) ($existing->meta ?? []);
+
+                DB::table('transfer_slips')
+                    ->where('id', $transferSlipId)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'ts_date' => $validated['ts_date'],
+                        'for_production' => ((string) $validated['for_production']) === '1',
+                        'remarks' => $validated['remarks'] ?? null,
+                        'updated_by' => $authUserId,
+                        'meta' => json_encode(array_merge($existingMeta, [
+                            'source' => 'transfer-slip-edit-modal',
+                            'sws_number' => $storeWithdrawal->sws_number,
+                            'item_count' => $requestedItems->count(),
+                        ])),
+                        'updated_at' => $now,
+                    ]);
+
+                $detailRows = $requestedItems->map(function (array $row) use ($transferSlipId, $sourceItems, $authUserId, $now): array {
+                    $sourceItem = $sourceItems->get($row['store_withdrawal_item_id']);
+
+                    return [
+                        'transfer_slip_id' => $transferSlipId,
+                        'store_withdrawal_item_id' => $row['store_withdrawal_item_id'],
+                        'item_id' => $row['item_id'],
+                        'product_code' => $sourceItem->product_code,
+                        'quantity' => $row['quantity'],
+                        'created_by' => $authUserId,
+                        'updated_by' => $authUserId,
+                        'meta' => json_encode([
+                            'sws_uom' => $sourceItem->uom,
+                            'source_quantity' => round((float) $sourceItem->quantity, 5),
+                        ]),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                        'deleted_at' => null,
+                    ];
+                })->values()->all();
+
+                DB::table('transfer_slip_items')->insert($detailRows);
+
+                $stockLines = DB::table('transfer_slip_items')
+                    ->where('transfer_slip_id', $transferSlipId)
+                    ->whereNull('deleted_at')
+                    ->get(['id', 'item_id', 'product_code', 'quantity'])
+                    ->map(fn ($row): array => [
+                        'item_id' => (int) $row->item_id,
+                        'product_code' => (string) $row->product_code,
+                        'quantity' => (float) $row->quantity,
+                        'reference_line_id' => (int) $row->id,
+                    ])
+                    ->all();
+
+                app(StockService::class)->applyTransferSlipIssue(
+                    transferSlipId: $transferSlipId,
+                    movementDate: $validated['ts_date'],
+                    lines: $stockLines,
+                    userId: $authUserId,
+                    allowNegativeBalance: $allowNegativeBalance,
+                );
+            });
+        } catch (ValidationException $exception) {
+            return redirect()->back()->withInput()->withErrors($exception->errors());
+        }
+
+        return redirect()
+            ->route('transfer-slips.index')
+            ->with('success', "Transfer slip {$tsNumber} has been updated successfully.");
+    }
+
     public function print(Request $request, string $transferSlip)
     {
         $transferSlipId = (int) $transferSlip;
@@ -623,6 +856,7 @@ class TransferSlipController extends Controller
                 'ts.id',
                 'ts.ts_number',
                 'ts.ts_date',
+                'ts.store_withdrawal_id',
                 'ts.for_production',
                 'ts.remarks',
                 'ts.transfer_to',
@@ -696,6 +930,7 @@ class TransferSlipController extends Controller
                     'ts.id',
                     'ts.ts_number',
                     'ts.ts_date',
+                    'ts.store_withdrawal_id',
                     'ts.for_production',
                     'ts.remarks',
                     'ts.transfer_to',
@@ -730,6 +965,103 @@ class TransferSlipController extends Controller
     private function isSqlServer(): bool
     {
         return DB::connection()->getDriverName() === 'sqlsrv';
+    }
+
+    /**
+     * @param  array<int, object>  $transferSlips
+     * @return array<int, array<int, array<string, mixed>>>
+     */
+    private function buildEditPayload(array $transferSlips): array
+    {
+        if ($transferSlips === []) {
+            return [];
+        }
+
+        $storeWithdrawalIds = collect($transferSlips)
+            ->map(fn ($row) => (int) ($row->store_withdrawal_id ?? 0))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($storeWithdrawalIds === []) {
+            return [];
+        }
+
+        $sourceItems = DB::table('store_withdrawal_items as swi')
+            ->leftJoin('items as i', 'i.id', '=', 'swi.item_id')
+            ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->whereIn('swi.store_withdrawal_id', $storeWithdrawalIds)
+            ->whereNull('swi.deleted_at')
+            ->orderBy('swi.id')
+            ->select([
+                'swi.id',
+                'swi.store_withdrawal_id',
+                'swi.item_id',
+                'swi.product_code',
+                'swi.quantity',
+                'swi.uom',
+                'i.name as item_name',
+                'u.name as unit_name',
+            ])
+            ->get();
+
+        $sourceItemIds = $sourceItems->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $allActiveTransfers = collect();
+        if ($sourceItemIds !== []) {
+            $allActiveTransfers = DB::table('transfer_slip_items as tsi')
+                ->join('transfer_slips as ts', 'ts.id', '=', 'tsi.transfer_slip_id')
+                ->whereNull('ts.deleted_at')
+                ->whereNull('tsi.deleted_at')
+                ->whereIn('tsi.store_withdrawal_item_id', $sourceItemIds)
+                ->select([
+                    'tsi.transfer_slip_id',
+                    'tsi.store_withdrawal_item_id',
+                    'tsi.quantity',
+                ])
+                ->get()
+                ->groupBy('store_withdrawal_item_id');
+        }
+
+        $sourceItemsBySws = $sourceItems->groupBy('store_withdrawal_id');
+        $payload = [];
+
+        foreach ($transferSlips as $transferSlip) {
+            $transferSlipId = (int) $transferSlip->id;
+            $storeWithdrawalId = (int) ($transferSlip->store_withdrawal_id ?? 0);
+            $rows = $sourceItemsBySws->get($storeWithdrawalId, collect());
+
+            $payload[$transferSlipId] = $rows->map(function ($item) use ($transferSlipId, $allActiveTransfers) {
+                $sourceQuantity = round((float) $item->quantity, 5);
+                $storeWithdrawalItemId = (int) $item->id;
+                $transfersForItem = $allActiveTransfers->get($storeWithdrawalItemId, collect());
+
+                $transferredByOthersQty = round((float) $transfersForItem
+                    ->filter(fn ($row) => (int) $row->transfer_slip_id !== $transferSlipId)
+                    ->sum('quantity'), 5);
+
+                $currentQuantity = round((float) $transfersForItem
+                    ->filter(fn ($row) => (int) $row->transfer_slip_id === $transferSlipId)
+                    ->sum('quantity'), 5);
+
+                $remaining = max(0, round($sourceQuantity - $transferredByOthersQty, 5));
+
+                return [
+                    'store_withdrawal_item_id' => $storeWithdrawalItemId,
+                    'item_id' => (int) $item->item_id,
+                    'product_code' => $item->product_code,
+                    'item_name' => $item->item_name,
+                    'quantity_source' => $sourceQuantity,
+                    'quantity_transferred' => $transferredByOthersQty,
+                    'quantity_remaining' => $remaining,
+                    'quantity_current' => $currentQuantity,
+                    'uom' => $item->uom ?? $item->unit_name ?? 'PCS',
+                ];
+            })->values()->all();
+        }
+
+        return $payload;
     }
 
     /**

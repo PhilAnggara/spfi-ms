@@ -14,6 +14,7 @@ function initTransferSlipPage() {
     initTransferSlipFilters();
     initTransferSlipDeleteAction();
     initTransferSlipCreateModal(tsPage.dataset.swsLookupUrl || '');
+    initTransferSlipEditModals(tsPage);
 }
 
 function initTransferSlipFilters() {
@@ -470,5 +471,119 @@ function initTransferSlipCreateModal(swsLookupUrl) {
     if (prefill.swsNumber) {
         createSwsNumberInput.value = prefill.swsNumber;
         loadSws(Array.isArray(prefill.items) ? prefill.items : []);
+    }
+}
+
+function initTransferSlipEditModals(tsPage) {
+    const formatNumber = (value) => Number(value || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
+    });
+
+    const updateEditSummary = (form) => {
+        const qtyInputs = Array.from(form.querySelectorAll('.ts-qty-input'));
+        const selectedLines = qtyInputs.filter((input) => Number(input.value || 0) > 0);
+        const totalQty = selectedLines.reduce((sum, input) => sum + Number(input.value || 0), 0);
+
+        const linesEl = form.querySelector('.ts-edit-summary-lines');
+        const qtyEl = form.querySelector('.ts-edit-summary-qty');
+
+        if (linesEl) {
+            linesEl.textContent = String(selectedLines.length);
+        }
+
+        if (qtyEl) {
+            qtyEl.textContent = formatNumber(totalQty);
+        }
+    };
+
+    const showEditError = (form, message) => {
+        const errorEl = form.querySelector('.ts-edit-error');
+        if (!errorEl) {
+            return;
+        }
+
+        errorEl.textContent = message;
+        errorEl.classList.remove('d-none');
+    };
+
+    const hideEditError = (form) => {
+        const errorEl = form.querySelector('.ts-edit-error');
+        if (!errorEl) {
+            return;
+        }
+
+        errorEl.textContent = '';
+        errorEl.classList.add('d-none');
+    };
+
+    document.querySelectorAll('.ts-edit-form').forEach((form) => {
+        if (form.dataset.tsEditInitialized === '1') {
+            return;
+        }
+        form.dataset.tsEditInitialized = '1';
+
+        form.querySelectorAll('.ts-qty-input').forEach((input) => {
+            input.addEventListener('input', function () {
+                const max = Number(input.dataset.max || 0);
+                const current = Number(input.value || 0);
+
+                if (current < 0) {
+                    input.value = '0';
+                }
+
+                if (max > 0 && current > max) {
+                    input.value = max.toFixed(5);
+                }
+
+                updateEditSummary(form);
+            });
+        });
+
+        const fillButton = form.querySelector('.ts-edit-fill-remaining');
+        if (fillButton) {
+            fillButton.addEventListener('click', function () {
+                form.querySelectorAll('.ts-qty-input').forEach((input) => {
+                    const max = Number(input.dataset.max || 0);
+                    input.value = max.toFixed(5);
+                });
+                hideEditError(form);
+                updateEditSummary(form);
+            });
+        }
+
+        const clearButton = form.querySelector('.ts-edit-clear-qty');
+        if (clearButton) {
+            clearButton.addEventListener('click', function () {
+                form.querySelectorAll('.ts-qty-input').forEach((input) => {
+                    input.value = '0.00000';
+                });
+                hideEditError(form);
+                updateEditSummary(form);
+            });
+        }
+
+        form.addEventListener('submit', function (event) {
+            const qtyInputs = Array.from(form.querySelectorAll('.ts-qty-input'));
+            const hasPositiveQty = qtyInputs.some((input) => Number(input.value || 0) > 0);
+
+            if (!hasPositiveQty) {
+                event.preventDefault();
+                showEditError(form, 'Keep at least one quantity out greater than 0. Use Delete to remove the whole transfer slip.');
+                return;
+            }
+
+            hideEditError(form);
+        });
+
+        updateEditSummary(form);
+    });
+
+    const openEditModalId = String(tsPage.dataset.openEditModalId || '').trim();
+    if (openEditModalId && window.bootstrap && window.bootstrap.Modal) {
+        const modalEl = document.getElementById('ts-edit-modal-' + openEditModalId);
+        if (modalEl) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
     }
 }
