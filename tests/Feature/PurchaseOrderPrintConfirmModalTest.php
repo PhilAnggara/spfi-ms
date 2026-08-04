@@ -280,3 +280,65 @@ it('rejects a duplicate po number when printing and reopens the confirm modal wi
     $followUp->assertDontSee('icon: \'error\'', false);
     $followUp->assertSee('is-invalid', false);
 });
+
+it('allows printing a draft purchase order', function () {
+    $this->purchaseOrder->update(['status' => 'DRAFT']);
+
+    $response = $this->actingAs($this->user)
+        ->post(route('purchase-orders.print', $this->purchaseOrder), [
+            'po_number' => 'PO-DRAFT-PRINT',
+            'decimal_places' => 2,
+        ]);
+
+    $response->assertSuccessful();
+    $response->assertHeader('content-type', 'application/pdf');
+});
+
+it('allows printing a pending approval purchase order', function () {
+    $this->purchaseOrder->update([
+        'status' => 'PENDING_APPROVAL',
+        'submitted_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->post(route('purchase-orders.print', $this->purchaseOrder), [
+            'po_number' => 'PO-PENDING-PRINT',
+            'decimal_places' => 2,
+        ]);
+
+    $response->assertSuccessful();
+    $response->assertHeader('content-type', 'application/pdf');
+});
+
+it('rejects printing a cancelled purchase order', function () {
+    $this->purchaseOrder->update(['status' => 'CANCELLED']);
+
+    $response = $this->actingAs($this->user)
+        ->from(route('purchase-orders.show', $this->purchaseOrder))
+        ->post(route('purchase-orders.print', $this->purchaseOrder), [
+            'po_number' => 'PO-CANCELLED-PRINT',
+            'decimal_places' => 2,
+        ]);
+
+    $response->assertRedirect(route('purchase-orders.show', $this->purchaseOrder));
+    $response->assertSessionHasErrors('message');
+});
+
+it('shows print controls for an unapproved purchase order on show and index', function () {
+    $this->purchaseOrder->update(['status' => 'DRAFT']);
+
+    $show = $this->actingAs($this->user)
+        ->get(route('purchase-orders.show', $this->purchaseOrder));
+
+    $show->assertSuccessful();
+    $show->assertSee('data-bs-target="#poPrintConfirm-'.$this->purchaseOrder->id.'"', false);
+    $show->assertSee('id="poPrintConfirm-'.$this->purchaseOrder->id.'"', false);
+    $show->assertDontSee('PO must be approved before printing.');
+
+    $index = $this->actingAs($this->user)
+        ->get(route('purchase-orders.index'));
+
+    $index->assertSuccessful();
+    $index->assertSee('data-bs-target="#poPrintConfirm-'.$this->purchaseOrder->id.'"', false);
+    $index->assertSee('id="poPrintConfirm-'.$this->purchaseOrder->id.'"', false);
+});

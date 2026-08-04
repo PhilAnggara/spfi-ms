@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Currency;
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -18,26 +17,19 @@ beforeEach(function () {
 
     $department = Department::query()->create([
         'name' => 'Purchasing',
-        'code' => '7200',
+        'code' => '7211',
         'alias' => 'PUR',
     ]);
 
     $this->canvasser = User::query()->create([
-        'name' => 'PO Preview Canvasser',
-        'username' => 'po-preview-canvasser',
-        'email' => 'po-preview-canvasser@example.test',
+        'name' => 'Draft Unchecked Canvasser',
+        'username' => 'po-draft-unchecked',
+        'email' => 'po-draft-unchecked@example.test',
         'password' => Hash::make('password'),
         'department_id' => $department->id,
         'role' => 'Staff',
     ]);
     $this->canvasser->assignRole('purchasing-staff');
-
-    Currency::query()->create([
-        'code' => 'IDR',
-        'name' => 'Indonesian Rupiah',
-        'symbol' => 'Rp',
-        'created_by' => $this->canvasser->id,
-    ]);
 
     $unit = UnitOfMeasure::query()->create([
         'name' => 'Pieces',
@@ -50,8 +42,8 @@ beforeEach(function () {
     ]);
 
     $item = Item::query()->create([
-        'name' => 'Preview Precision Item',
-        'code' => 'PREV-ITEM-001',
+        'name' => 'Draft Unchecked Item',
+        'code' => 'DRAFT-UC-001',
         'unit_of_measure_id' => $unit->id,
         'category_id' => $category->id,
         'type' => 'Consumable',
@@ -60,19 +52,19 @@ beforeEach(function () {
     ]);
 
     $supplier = Supplier::query()->create([
-        'code' => 'SUP-PREV-001',
-        'name' => 'Preview Supplier',
+        'code' => 'SUP-DRAFT-UC',
+        'name' => 'Draft Unchecked Supplier',
         'created_by' => $this->canvasser->id,
     ]);
 
     $prs = Prs::query()->create([
-        'prs_number' => '71010000777',
+        'prs_number' => '72110000999',
         'user_id' => $this->canvasser->id,
         'department_id' => $department->id,
         'prs_date' => now()->toDateString(),
         'date_needed' => now()->addDays(7)->toDateString(),
         'is_capex' => false,
-        'remarks' => 'Preview layout PRS',
+        'remarks' => 'Draft unchecked PRS',
         'status' => 'CANVASSING',
     ]);
 
@@ -89,7 +81,7 @@ beforeEach(function () {
         'prs_id' => $prs->id,
         'prs_item_id' => $prsItem->id,
         'supplier_id' => $supplier->id,
-        'unit_price' => 1234.56789,
+        'unit_price' => 1000,
         'lead_time_days' => 7,
         'term_of_payment_type' => 'cash',
         'canvased_by' => $this->canvasser->id,
@@ -98,46 +90,16 @@ beforeEach(function () {
     $prsItem->update([
         'selected_canvassing_item_id' => $canvassing->id,
     ]);
-
-    $this->supplier = $supplier;
-    $this->prsItem = $prsItem;
 });
 
-it('renders po preview with five decimal precision and spacious line layout', function () {
+it('renders draft purchase order items unchecked by default', function () {
     $response = $this->actingAs($this->canvasser)
-        ->post(route('purchase-orders.preview'), [
-            'supplier_id' => $this->supplier->id,
-            'items' => [
-                [
-                    'prs_item_id' => $this->prsItem->id,
-                    'quantity' => 2,
-                    'unit_price' => 1234.56789,
-                    'notes' => null,
-                    'checked' => '1',
-                ],
-            ],
-        ]);
+        ->get(route('purchase-orders.draft'));
 
     $response->assertSuccessful();
-    $response->assertSee('po-preview-page', false);
-    $response->assertSee('po-preview-line', false);
-    $response->assertSee('po-preview-line-primary', false);
-    $response->assertSee('po-preview-field--price', false);
-    $response->assertSee('step="0.00001"', false);
-    $response->assertSee('value="1234.56789"', false);
-    $response->assertSee('Line Items');
-
-    $css = file_get_contents(public_path('assets/css/purchase-orders-modern.css'));
-
-    expect($css)
-        ->toContain('.po-preview-page')
-        ->toContain('#eef8fa')
-        ->toContain('border-left: 3px solid #1f7a8c')
-        ->toContain('.po-preview-line:nth-child(even)')
-        ->toContain('background: #eef8fa');
-});
-
-it('formats po decimals with five places', function () {
-    expect(format_po_decimal(1234.567891, true))->toBe('1234.56789')
-        ->and(format_po_decimal(1234.5))->toBe('1.234,50000');
+    $response->assertSee('class="form-check-input item-checkbox"', false);
+    $response->assertDontSee('class="form-check-input item-checkbox" checked', false);
+    $response->assertDontSee('class="form-check-input item-checkbox" data-accounting-category="non_capex" checked', false);
+    $response->assertSee('class="item-checked" value="0"', false);
+    $response->assertSee('select-all', false);
 });

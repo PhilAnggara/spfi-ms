@@ -868,7 +868,7 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Print approved PO.
+     * Print PO.
      */
     public function print(Request $request, PurchaseOrder $purchaseOrder)
     {
@@ -882,8 +882,8 @@ class PurchaseOrderController extends Controller
             'approvedBy',
         ]);
 
-        if ($purchaseOrder->status !== 'APPROVED') {
-            return redirect()->back()->withErrors(['message' => 'PO must be approved before printing.']);
+        if ($purchaseOrder->status === 'CANCELLED') {
+            return redirect()->back()->withErrors(['message' => 'Cancelled purchase orders cannot be printed.']);
         }
 
         $decimalPlacesOptions = config('purchase-order.print.decimal_places.options', range(0, 10));

@@ -380,23 +380,17 @@
                                 </form>
                             @endif
                         @endrole
-                        @if ($purchaseOrder->status === 'APPROVED')
+                        @if ($purchaseOrder->status !== 'CANCELLED')
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#poPrintConfirm-{{ $purchaseOrder->id }}">
                                 <i class="fa-duotone fa-solid fa-print"></i>
                                 Print PO
                             </button>
-                        @elseif ($purchaseOrder->status === 'CANCELLED')
-                            <button type="button" class="btn btn-primary disabled" disabled>
-                                <i class="fa-duotone fa-solid fa-print"></i>
-                                Print PO
-                            </button>
-                            <div class="text-muted small mt-2">This purchase order has been cancelled.</div>
                         @else
                             <button type="button" class="btn btn-primary disabled" disabled>
                                 <i class="fa-duotone fa-solid fa-print"></i>
                                 Print PO
                             </button>
-                            <div class="text-muted small mt-2">PO must be approved before printing.</div>
+                            <div class="text-muted small mt-2">This purchase order has been cancelled.</div>
                         @endif
                     </div>
                 </div>
@@ -405,7 +399,7 @@
     </section>
 </div>
 
-@if ($purchaseOrder->status === 'APPROVED')
+@if ($purchaseOrder->status !== 'CANCELLED')
     @include('pages.purchase-orders.partials.print-confirm-modal', [
         'purchaseOrder' => $purchaseOrder,
         'nextPoNumber' => $nextPoNumber ?? '',

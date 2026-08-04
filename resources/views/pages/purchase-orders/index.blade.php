@@ -179,7 +179,7 @@
                                                 <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#poDetail-{{ $po->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail">
                                                     <i class="fa-light fa-eye"></i>
                                                 </button>
-                                                @if ($po->status === 'APPROVED')
+                                                @if ($po->status !== 'CANCELLED')
                                                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#poPrintConfirm-{{ $po->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
                                                         <i class="fa-light fa-print"></i>
                                                     </button>
@@ -251,7 +251,7 @@
                                                 Cancel PO
                                             </button>
                                         @endif
-                                        @if ($po->status === 'APPROVED')
+                                        @if ($po->status !== 'CANCELLED')
                                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#poPrintConfirm-{{ $po->id }}">
                                                 <i class="fa-light fa-print me-1"></i>
                                                 Print
@@ -262,7 +262,7 @@
                             </div>
                         </div>
 
-                        @if ($po->status === 'APPROVED')
+                        @if ($po->status !== 'CANCELLED')
                             @include('pages.purchase-orders.partials.print-confirm-modal', [
                                 'purchaseOrder' => $po,
                                 'nextPoNumber' => $nextPoNumber ?? '',

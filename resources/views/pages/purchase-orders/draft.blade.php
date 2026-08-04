@@ -180,7 +180,7 @@
                                                                 $item = $prsItem->item;
                                                                 $isCapex = (bool) ($prsItem->prs?->is_capex ?? false);
                                                                 $accountingCategory = $isCapex ? 'capex' : 'non_capex';
-                                                                $isInitiallySelected = $index < 11;
+                                                                $isInitiallySelected = false;
                                                             @endphp
                                                             <tr data-accounting-category="{{ $accountingCategory }}">
                                                                 <td>
