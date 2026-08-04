@@ -16,7 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'reconcile.freeze' => \App\Http\Middleware\BlockTransactionalWritesDuringReconcile::class,
         ]);
+
+        $middleware->appendToGroup('web', \App\Http\Middleware\BlockTransactionalWritesDuringReconcile::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

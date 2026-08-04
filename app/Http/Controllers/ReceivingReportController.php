@@ -77,7 +77,8 @@ class ReceivingReportController extends Controller
 
         if ($purchaseOrder->status !== 'APPROVED') {
             return response()->json([
-                'message' => 'Only approved purchase orders can be used for receiving reports.',
+                // 'message' => 'Only approved purchase orders can be used for receiving reports.',
+                'message' => 'PO ini belum approve bu jadi belum bisa beking dpe RR. Mintol Purchasing ato IT approve akang jo dulu supaya boleh beking.',
             ], 422);
         }
 

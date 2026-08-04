@@ -14,6 +14,9 @@
         <div id="main" class='layout-horizontal'>
             @include('includes.navbar-horizontal')
             <div id="main-content">
+                @if (config('reconcile.freeze_writes'))
+                    @include('partials.reconcile-freeze-banner')
+                @endif
 
                 @yield('content')
 
