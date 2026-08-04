@@ -430,7 +430,7 @@ class ReceivingReportController extends Controller
 
         return redirect()
             ->route('receiving-reports.index')
-            ->with('success', 'Receiving report has been updated.');
+            ->with('success', 'Receiving report has been updated successfully.');
     }
 
     public function destroy(ReceivingReport $receivingReport)

@@ -151,7 +151,7 @@ it('updates receiving report quantities without unique constraint error', functi
 
     $response->assertRedirect(route('receiving-reports.index'));
     $response->assertSessionHasNoErrors();
-    $response->assertSessionHas('success');
+    $response->assertSessionHas('success', 'Receiving report has been updated successfully.');
 
     $receivingReport->refresh();
     expect($receivingReport->notes)->toBe('Updated RR')
@@ -183,6 +183,7 @@ it('adjusts stock when receiving report qty good is edited', function () {
 
     $response->assertRedirect(route('receiving-reports.index'));
     $response->assertSessionHasNoErrors();
+    $response->assertSessionHas('success', 'Receiving report has been updated successfully.');
 
     expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(65.0)
         ->and((float) Item::query()->where('id', $this->item->id)->value('stock_on_hand'))->toBe(65.0);

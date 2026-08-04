@@ -208,6 +208,8 @@ it('updates header and quantities and adjusts stock', function () {
     $response->assertSessionHasNoErrors();
 
     $transferSlip = DB::table('transfer_slips')->where('id', $transferSlipId)->whereNull('deleted_at')->first();
+    $response->assertSessionHas('success', "Transfer slip {$transferSlip->ts_number} has been updated successfully.");
+
     expect($transferSlip)->not->toBeNull()
         ->and((string) $transferSlip->ts_date)->toStartWith($newDate)
         ->and((int) $transferSlip->for_production)->toBe(1)

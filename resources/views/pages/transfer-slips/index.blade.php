@@ -32,6 +32,12 @@
         </div>
     </div>
 
+    @if (session('success'))
+        <div class="alert alert-success shadow-sm border-0">
+            {{ session('success') }}
+        </div>
+    @endif
+
     @php
         $isPrintConfirmNumberError = session()->hasOldInput('print_confirm_id')
             && ($errors->has('ts_number') || $errors->has('ts_number_suggested'));

@@ -25,6 +25,12 @@
         </div>
     </div>
 
+    @if (session('success'))
+        <div class="alert alert-success shadow-sm border-0">
+            {{ session('success') }}
+        </div>
+    @endif
+
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-6 col-xl-3">
             <div class="card shadow-sm border-0 h-100 mb-0">

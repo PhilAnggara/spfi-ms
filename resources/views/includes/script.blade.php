@@ -78,7 +78,7 @@
         Swal.fire({
             // title: "Success!",
             // text: "{{ session('success') }}",
-            title: "{{ session('success') }}",
+            title: @json(session('success')),
             icon: "success",
             timer: 5000,
         });
