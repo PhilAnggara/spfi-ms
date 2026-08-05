@@ -44,14 +44,16 @@
    Bootstrap flex only targets direct children of .modal-content, so we must make the
    form behave the same way - a flex column that fills available height and lets
    .modal-body overflow-scroll independently. */
-#create-ts-modal .modal-content {
+#create-ts-modal .modal-content,
+[id^="ts-edit-modal-"] .modal-content {
     display: flex;
     flex-direction: column;
     max-height: 100%;
     overflow: hidden;
 }
 
-#create-ts-modal .modal-content > form {
+#create-ts-modal .modal-content > form,
+[id^="ts-edit-modal-"] .modal-content > form {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
@@ -59,14 +61,17 @@
     overflow: hidden;
 }
 
-#create-ts-modal .modal-body {
+#create-ts-modal .modal-body,
+[id^="ts-edit-modal-"] .modal-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
 }
 
 #create-ts-modal .modal-header,
-#create-ts-modal .modal-footer {
+#create-ts-modal .modal-footer,
+[id^="ts-edit-modal-"] .modal-header,
+[id^="ts-edit-modal-"] .modal-footer {
     flex-shrink: 0;
 }
 

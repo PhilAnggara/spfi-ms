@@ -57,10 +57,18 @@ class TransferSlipController extends Controller
             'sws_number' => ['required', 'string', 'max:50'],
         ]);
 
+        $swsNumber = $this->normalizeSwsNumber($validated['sws_number']);
+
+        if ($swsNumber === '') {
+            return response()->json([
+                'message' => 'SWS number not found.',
+            ], 404);
+        }
+
         $storeWithdrawal = DB::table('store_withdrawals as sw')
             ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
             ->whereNull('sw.deleted_at')
-            ->where('sw.sws_number', $validated['sws_number'])
+            ->whereRaw('LOWER(sw.sws_number) = ?', [strtolower($swsNumber)])
             ->select([
                 'sw.id',
                 'sw.sws_number',
@@ -160,6 +168,8 @@ class TransferSlipController extends Controller
             'items.*.quantity' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        $validated['sws_number'] = $this->normalizeSwsNumber($validated['sws_number']);
+
         $requestedItems = collect($validated['items'])
             ->map(function (array $row): array {
                 return [
@@ -183,11 +193,13 @@ class TransferSlipController extends Controller
             ->select(['id', 'sws_number', 'type'])
             ->first();
 
-        if (! $storeWithdrawal || $storeWithdrawal->sws_number !== $validated['sws_number']) {
+        if (! $storeWithdrawal || ! $this->swsNumbersMatch((string) $storeWithdrawal->sws_number, $validated['sws_number'])) {
             return redirect()->back()->withInput()->withErrors([
                 'sws_number' => 'Selected SWS is no longer valid. Please load the SWS again.',
             ]);
         }
+
+        $validated['sws_number'] = trim((string) $storeWithdrawal->sws_number);
 
         $allowNegativeBalance = strtolower((string) ($storeWithdrawal->type ?? '')) === 'confirmatory';
 
@@ -371,6 +383,8 @@ class TransferSlipController extends Controller
             'items.*.quantity' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        $validated['sws_number'] = $this->normalizeSwsNumber($validated['sws_number']);
+
         if ((int) $validated['store_withdrawal_id'] !== (int) $existing->store_withdrawal_id) {
             return redirect()->back()->withInput()->withErrors([
                 'store_withdrawal_id' => 'The linked SWS cannot be changed when editing a transfer slip.',
@@ -400,11 +414,13 @@ class TransferSlipController extends Controller
             ->select(['id', 'sws_number', 'type'])
             ->first();
 
-        if (! $storeWithdrawal || $storeWithdrawal->sws_number !== $validated['sws_number']) {
+        if (! $storeWithdrawal || ! $this->swsNumbersMatch((string) $storeWithdrawal->sws_number, $validated['sws_number'])) {
             return redirect()->back()->withInput()->withErrors([
                 'sws_number' => 'Selected SWS is no longer valid. Please reload the transfer slip.',
             ]);
         }
+
+        $validated['sws_number'] = trim((string) $storeWithdrawal->sws_number);
 
         $allowNegativeBalance = strtolower((string) ($storeWithdrawal->type ?? '')) === 'confirmatory';
 
@@ -1062,6 +1078,19 @@ class TransferSlipController extends Controller
         }
 
         return $payload;
+    }
+
+    private function normalizeSwsNumber(?string $swsNumber): string
+    {
+        $normalized = str_replace("\u{00A0}", ' ', (string) $swsNumber);
+        $normalized = preg_replace('/\s+/u', ' ', $normalized) ?? '';
+
+        return trim($normalized);
+    }
+
+    private function swsNumbersMatch(string $left, string $right): bool
+    {
+        return strcasecmp($this->normalizeSwsNumber($left), $this->normalizeSwsNumber($right)) === 0;
     }
 
     /**

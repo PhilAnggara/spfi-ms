@@ -295,6 +295,10 @@ function initTransferSlipCreateModal(swsLookupUrl) {
             createStoreWithdrawalIdInput.value = String(payload.store_withdrawal.id || '');
         }
 
+        if (payload.store_withdrawal && payload.store_withdrawal.sws_number) {
+            createSwsNumberInput.value = String(payload.store_withdrawal.sws_number);
+        }
+
         if (createSwsDetails) {
             createSwsDetails.classList.remove('d-none');
         }
@@ -436,6 +440,14 @@ function initTransferSlipCreateModal(swsLookupUrl) {
         });
     }
 
+    createSwsNumberInput.addEventListener('input', function () {
+        if (!createStoreWithdrawalIdInput || createStoreWithdrawalIdInput.value === '') {
+            return;
+        }
+
+        renderEmptyState('SWS number changed. Load the SWS again to continue.');
+    });
+
     createSwsNumberInput.addEventListener('keydown', function (event) {
         if (event.key === 'Enter') {
             event.preventDefault();
@@ -444,12 +456,20 @@ function initTransferSlipCreateModal(swsLookupUrl) {
     });
 
     createForm.addEventListener('submit', function (event) {
+        createSwsNumberInput.value = String(createSwsNumberInput.value || '').trim();
+
         const qtyInputs = Array.from(createForm.querySelectorAll('.ts-qty-input'));
         const hasPositiveQty = qtyInputs.some((input) => Number(input.value || 0) > 0);
 
         if (!hasPositiveQty) {
             event.preventDefault();
             showSwsError('Fill at least one quantity out greater than 0 before saving.');
+            return;
+        }
+
+        if (!createStoreWithdrawalIdInput || createStoreWithdrawalIdInput.value === '') {
+            event.preventDefault();
+            showSwsError('Load an SWS number before saving.');
             return;
         }
 
