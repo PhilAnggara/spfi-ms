@@ -1,9 +1,7 @@
 @extends('pages.dashboard.layout')
 
 @section('dashboard-content')
-    @include('pages.dashboard.partials.quick-links', ['links' => $dashboard['quick_links']])
-
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-3 dashboard-kpi-row">
         @include('pages.dashboard.partials.kpi-card', [
             'label' => 'PRS ('.$dashboardMonthLabel.')',
             'value' => $metrics['prs_this_month'] ?? 0,
@@ -34,19 +32,16 @@
         @include('pages.dashboard.partials.chart-card', [
             'title' => 'Engineering PRS Status',
             'chartId' => 'chart-visitors-profile',
-            'col' => 'col-12 col-lg-6',
+            'col' => 'col-12',
         ])
     </div>
 
     <div class="row g-3">
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent Engineering PRS',
+            'icon' => 'fa-cart-shopping',
             'col' => 'col-12',
-            'rows' => collect($dashboard['lists']['recent_prs'] ?? [])->map(fn ($item) => [
-                $item->prs_number ?? ('#'.$item->id),
-                str_replace('_', ' ', (string) $item->status),
-                $item->prs_date ? \Illuminate\Support\Carbon::parse($item->prs_date)->format('d M Y') : '—',
-            ])->all(),
+            'items' => $dashboard['lists']['recent_prs'] ?? [],
         ])
     </div>
 @endsection

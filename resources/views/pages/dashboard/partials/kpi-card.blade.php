@@ -5,10 +5,11 @@
     $tone = $tone ?? 'blue';
     $prefix = $prefix ?? '';
     $delay = $delay ?? 0;
+    $col = $col ?? 'col-6 col-lg-3';
 @endphp
 
-<div class="col-6 col-lg-3 col-md-6" data-aos="fade-up" data-aos-delay="{{ $delay }}">
-    <div class="card shadow-sm border-0 dashboard-kpi-card">
+<div class="{{ $col }}" data-aos="fade-up" data-aos-delay="{{ $delay }}">
+    <div class="card shadow-sm border-0 dashboard-kpi-card h-100">
         <div class="card-body px-4 py-4">
             <div class="d-flex align-items-start gap-3">
                 <div class="stats-icon {{ $tone }} mb-0">

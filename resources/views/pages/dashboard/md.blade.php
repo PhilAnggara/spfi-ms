@@ -1,9 +1,7 @@
 @extends('pages.dashboard.layout')
 
 @section('dashboard-content')
-    @include('pages.dashboard.partials.quick-links', ['links' => $dashboard['quick_links']])
-
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-3 dashboard-kpi-row">
         @include('pages.dashboard.partials.kpi-card', [
             'label' => 'PRS ('.$dashboardMonthLabel.')',
             'value' => $metrics['prs_this_month'] ?? 0,
@@ -48,26 +46,20 @@
         @include('pages.dashboard.partials.chart-card', [
             'title' => 'PO Status Distribution',
             'chartId' => 'chart-po-status',
-            'col' => 'col-12 col-lg-4',
+            'col' => 'col-12 col-lg-6',
         ])
     </div>
 
     <div class="row g-3">
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent PRS',
-            'rows' => collect($dashboard['lists']['recent_prs'] ?? [])->map(fn ($item) => [
-                $item->prs_number ?? ('#'.$item->id),
-                str_replace('_', ' ', (string) $item->status),
-                $item->prs_date ? \Illuminate\Support\Carbon::parse($item->prs_date)->format('d M Y') : '—',
-            ])->all(),
+            'icon' => 'fa-cart-shopping',
+            'items' => $dashboard['lists']['recent_prs'] ?? [],
         ])
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent Purchase Orders',
-            'rows' => collect($dashboard['lists']['recent_po'] ?? [])->map(fn ($item) => [
-                $item->po_number ?? ('#'.$item->id),
-                str_replace('_', ' ', (string) $item->status),
-                'Rp '.number_format((float) $item->total, 0, ',', '.'),
-            ])->all(),
+            'icon' => 'fa-file-invoice',
+            'items' => $dashboard['lists']['recent_po'] ?? [],
         ])
     </div>
 @endsection

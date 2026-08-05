@@ -1,9 +1,7 @@
 @extends('pages.dashboard.layout')
 
 @section('dashboard-content')
-    @include('pages.dashboard.partials.quick-links', ['links' => $dashboard['quick_links']])
-
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-3 dashboard-kpi-row">
         @include('pages.dashboard.partials.kpi-card', [
             'label' => 'User Accounts',
             'value' => $metrics['user_accounts'] ?? 0,
@@ -34,7 +32,7 @@
         ])
     </div>
 
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-3 dashboard-kpi-row">
         @include('pages.dashboard.partials.kpi-card', [
             'label' => 'Approved PO Value',
             'value' => $metrics['po_approved_value_this_month'] ?? 0,
@@ -66,7 +64,7 @@
         ])
     </div>
 
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-3 dashboard-kpi-row">
         @include('pages.dashboard.partials.kpi-card', [
             'label' => 'Deliveries ('.$dashboardMonthLabel.')',
             'value' => $metrics['deliveries_this_month'] ?? 0,
@@ -135,35 +133,23 @@
     <div class="row g-3">
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent PRS',
-            'rows' => collect($dashboard['lists']['recent_prs'] ?? [])->map(fn ($item) => [
-                $item->prs_number ?? ('#'.$item->id),
-                str_replace('_', ' ', (string) $item->status),
-                $item->prs_date ? \Illuminate\Support\Carbon::parse($item->prs_date)->format('d M Y') : '—',
-            ])->all(),
+            'icon' => 'fa-cart-shopping',
+            'items' => $dashboard['lists']['recent_prs'] ?? [],
         ])
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent Purchase Orders',
-            'rows' => collect($dashboard['lists']['recent_po'] ?? [])->map(fn ($item) => [
-                $item->po_number ?? ('#'.$item->id),
-                str_replace('_', ' ', (string) $item->status),
-                'Rp '.number_format((float) $item->total, 0, ',', '.'),
-            ])->all(),
+            'icon' => 'fa-file-invoice',
+            'items' => $dashboard['lists']['recent_po'] ?? [],
         ])
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent Receiving Reports',
-            'rows' => collect($dashboard['lists']['recent_rr'] ?? [])->map(fn ($item) => [
-                $item->rr_number ?? ('#'.$item->id),
-                $item->received_date ? \Illuminate\Support\Carbon::parse($item->received_date)->format('d M Y') : '—',
-                '',
-            ])->all(),
+            'icon' => 'fa-boxes-stacked',
+            'items' => $dashboard['lists']['recent_rr'] ?? [],
         ])
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent Users',
-            'rows' => collect($dashboard['lists']['recent_users'] ?? [])->map(fn ($item) => [
-                $item->name,
-                $item->username,
-                $item->department?->alias ?? '—',
-            ])->all(),
+            'icon' => 'fa-users',
+            'items' => $dashboard['lists']['recent_users'] ?? [],
         ])
     </div>
 @endsection

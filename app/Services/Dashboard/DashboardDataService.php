@@ -26,8 +26,7 @@ class DashboardDataService
      *     month_label: string,
      *     metrics: array<string, int|float>,
      *     charts: array<string, array{labels: array<int, string>, series: array<int, int|float>}>,
-     *     lists: array<string, Collection>,
-     *     quick_links: array<int, array{label: string, route: string, icon: string}>
+     *     lists: array<string, Collection>
      * }
      */
     public function build(User $user, string $key): array
@@ -77,16 +76,6 @@ class DashboardDataService
                 'recent_rr' => $this->recentReceivingReports(),
                 'recent_users' => $this->recentUsers(),
             ],
-            quickLinks: [
-                ['label' => 'PRS', 'route' => 'prs.index', 'icon' => 'fa-cart-shopping'],
-                ['label' => 'Canvassing', 'route' => 'canvassing.index', 'icon' => 'fa-scale-balanced'],
-                ['label' => 'Purchase Orders', 'route' => 'purchase-orders.index', 'icon' => 'fa-file-invoice'],
-                ['label' => 'Receiving Reports', 'route' => 'receiving-reports.index', 'icon' => 'fa-boxes-stacked'],
-                ['label' => 'Stores Withdrawals', 'route' => 'stores-withdrawals.index', 'icon' => 'fa-warehouse'],
-                ['label' => 'Transfer Slips', 'route' => 'transfer-slips.index', 'icon' => 'fa-right-left'],
-                ['label' => 'Deliveries', 'route' => 'deliveries.index', 'icon' => 'fa-truck'],
-                ['label' => 'Users', 'route' => 'user.index', 'icon' => 'fa-users'],
-            ],
         );
     }
 
@@ -106,12 +95,6 @@ class DashboardDataService
             lists: [
                 'recent_prs' => $this->recentPrs(),
                 'recent_po' => $this->recentPurchaseOrders(),
-            ],
-            quickLinks: [
-                ['label' => 'PRS', 'route' => 'prs.index', 'icon' => 'fa-cart-shopping'],
-                ['label' => 'Canvassing', 'route' => 'canvassing.index', 'icon' => 'fa-scale-balanced'],
-                ['label' => 'Purchase Orders', 'route' => 'purchase-orders.index', 'icon' => 'fa-file-invoice'],
-                ['label' => 'PO Approval', 'route' => 'purchase-orders.approval', 'icon' => 'fa-clipboard-check'],
             ],
         );
     }
@@ -133,12 +116,6 @@ class DashboardDataService
                 'recent_rr' => $this->recentReceivingReports(),
                 'recent_ts' => $this->recentTransferSlips(),
                 'recent_deliveries' => $this->recentDeliveries(),
-            ],
-            quickLinks: [
-                ['label' => 'Receiving Reports', 'route' => 'receiving-reports.index', 'icon' => 'fa-boxes-stacked'],
-                ['label' => 'Stores Withdrawals', 'route' => 'stores-withdrawals.index', 'icon' => 'fa-warehouse'],
-                ['label' => 'Transfer Slips', 'route' => 'transfer-slips.index', 'icon' => 'fa-right-left'],
-                ['label' => 'Deliveries', 'route' => 'deliveries.index', 'icon' => 'fa-truck'],
             ],
         );
     }
@@ -168,11 +145,6 @@ class DashboardDataService
                 'recent_po' => $this->recentPurchaseOrders(),
                 'recent_rr' => $this->recentReceivingReports(),
             ],
-            quickLinks: [
-                ['label' => 'Purchase Orders', 'route' => 'purchase-orders.index', 'icon' => 'fa-file-invoice'],
-                ['label' => 'Receiving Reports', 'route' => 'receiving-reports.index', 'icon' => 'fa-boxes-stacked'],
-                ['label' => 'Accounting Reports', 'route' => 'accounting.reports.index', 'icon' => 'fa-chart-line'],
-            ],
         );
     }
 
@@ -196,10 +168,6 @@ class DashboardDataService
             lists: [
                 'recent_prs' => $this->recentPrs($departmentId),
             ],
-            quickLinks: [
-                ['label' => 'My Department PRS', 'route' => 'prs.index', 'icon' => 'fa-cart-shopping'],
-                ['label' => 'Create PRS', 'route' => 'prs.create', 'icon' => 'fa-plus'],
-            ],
         );
     }
 
@@ -220,12 +188,6 @@ class DashboardDataService
             ],
             lists: [
                 'recent_users' => $this->recentUsers(),
-            ],
-            quickLinks: [
-                ['label' => 'Users', 'route' => 'user.index', 'icon' => 'fa-users'],
-                ['label' => 'Employees', 'route' => 'employees.index', 'icon' => 'fa-id-card'],
-                ['label' => 'Products', 'route' => 'product.index', 'icon' => 'fa-box'],
-                ['label' => 'Suppliers', 'route' => 'supplier.index', 'icon' => 'fa-truck-field'],
             ],
         );
     }
@@ -256,11 +218,6 @@ class DashboardDataService
                 'recent_prs' => $this->recentPrs(),
                 'recent_po' => $this->recentPurchaseOrders(),
             ],
-            quickLinks: [
-                ['label' => 'PRS Approval', 'route' => 'prs.approval.index', 'icon' => 'fa-clipboard-check'],
-                ['label' => 'Purchase Orders', 'route' => 'purchase-orders.index', 'icon' => 'fa-file-invoice'],
-                ['label' => 'Purchasing Reports', 'route' => 'procurement.reports.index', 'icon' => 'fa-chart-column'],
-            ],
         );
     }
 
@@ -275,19 +232,20 @@ class DashboardDataService
         return $this->payload(
             key: 'default',
             title: 'Department Dashboard',
-            subtitle: "Purchase request activity for {$departmentName}.",
+            subtitle: "Purchase requests and stores withdrawals for {$departmentName}.",
             user: $user,
             monthLabel: $monthLabel,
-            metrics: $this->departmentPrsMetrics($departmentId, $monthStart, $monthEnd),
+            metrics: array_merge(
+                $this->departmentPrsMetrics($departmentId, $monthStart, $monthEnd),
+                $this->departmentSwsMetrics($departmentId, $monthStart, $monthEnd),
+            ),
             charts: [
+                'monthly_prs' => $this->monthlyPrsChart($departmentId),
                 'prs_status' => $this->prsStatusChart($departmentId),
             ],
             lists: [
                 'recent_prs' => $this->recentPrs($departmentId),
-            ],
-            quickLinks: [
-                ['label' => 'View PRS', 'route' => 'prs.index', 'icon' => 'fa-cart-shopping'],
-                ['label' => 'Create PRS', 'route' => 'prs.create', 'icon' => 'fa-plus'],
+                'recent_sws' => $this->recentStoreWithdrawals($departmentId),
             ],
         );
     }
@@ -296,7 +254,6 @@ class DashboardDataService
      * @param  array<string, int|float>  $metrics
      * @param  array<string, array{labels: array<int, string>, series: array<int, int|float>}>  $charts
      * @param  array<string, Collection>  $lists
-     * @param  array<int, array{label: string, route: string, icon: string}>  $quickLinks
      * @return array<string, mixed>
      */
     private function payload(
@@ -308,7 +265,6 @@ class DashboardDataService
         array $metrics,
         array $charts,
         array $lists,
-        array $quickLinks,
     ): array {
         return [
             'key' => $key,
@@ -320,10 +276,6 @@ class DashboardDataService
             'metrics' => $metrics,
             'charts' => $charts,
             'lists' => $lists,
-            'quick_links' => array_values(array_filter(
-                $quickLinks,
-                fn (array $link): bool => \Illuminate\Support\Facades\Route::has($link['route'])
-            )),
         ];
     }
 
@@ -385,6 +337,23 @@ class DashboardDataService
             'prs_open' => (clone $base)->whereIn('status', $openStatuses)->count(),
             'prs_completed' => (clone $base)->where('status', 'PO_CREATED')->count(),
             'prs_total' => (clone $base)->count(),
+        ];
+    }
+
+    /**
+     * @return array<string, int|float>
+     */
+    private function departmentSwsMetrics(?int $departmentId, Carbon $monthStart, Carbon $monthEnd): array
+    {
+        $base = DB::table('store_withdrawals')
+            ->whereNull('deleted_at')
+            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId));
+
+        return [
+            'sws_this_month' => (clone $base)
+                ->whereBetween('sws_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+                ->count(),
+            'sws_open' => (clone $base)->whereNull('approved_at')->count(),
         ];
     }
 
@@ -597,15 +566,23 @@ class DashboardDataService
      */
     private function poStatusChart(): array
     {
+        $statuses = ['PENDING_APPROVAL', 'APPROVED'];
+
         $rows = PurchaseOrder::query()
+            ->whereIn('status', $statuses)
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
-            ->get();
+            ->get()
+            ->mapWithKeys(fn ($row) => [strtoupper((string) $row->status) => (int) $row->total]);
 
-        return [
-            'labels' => $rows->map(fn ($row) => str_replace('_', ' ', strtoupper((string) $row->status)))->values()->all(),
-            'series' => $rows->map(fn ($row) => (int) $row->total)->values()->all(),
-        ];
+        $labels = [];
+        $series = [];
+        foreach ($statuses as $status) {
+            $labels[] = str_replace('_', ' ', $status);
+            $series[] = (int) ($rows[$status] ?? 0);
+        }
+
+        return compact('labels', 'series');
     }
 
     /**
@@ -685,8 +662,53 @@ class DashboardDataService
             ->count();
     }
 
+    private function formatDate(mixed $date): string
+    {
+        if ($date === null || $date === '') {
+            return '—';
+        }
+
+        return Carbon::parse($date)->format('d M Y');
+    }
+
+    private function statusLabel(string $status): string
+    {
+        return str_replace('_', ' ', strtoupper($status));
+    }
+
+    private function statusTone(string $status): string
+    {
+        return match (strtoupper($status)) {
+            'APPROVED', 'PO_CREATED', 'RECEIVED' => 'success',
+            'PENDING_APPROVAL', 'REQUESTED', 'PENDING', 'OPEN' => 'warning',
+            'CANVASSING' => 'info',
+            'ON_HOLD', 'CANVASSER_HOLD', 'REVISED', 'CANCELLED', 'REJECTED' => 'danger',
+            default => 'secondary',
+        };
+    }
+
     /**
-     * @return Collection<int, Prs>
+     * @return array{title: string, subtitle: string, meta: string, status: string, status_label: string, tone: string}
+     */
+    private function recentItem(
+        string $title,
+        string $subtitle,
+        string $meta,
+        string $status,
+        ?string $tone = null,
+    ): array {
+        return [
+            'title' => $title,
+            'subtitle' => $subtitle,
+            'meta' => $meta,
+            'status' => $status,
+            'status_label' => $this->statusLabel($status),
+            'tone' => $tone ?? $this->statusTone($status),
+        ];
+    }
+
+    /**
+     * @return Collection<int, array{title: string, subtitle: string, meta: string, status: string, status_label: string, tone: string}>
      */
     private function recentPrs(?int $departmentId = null): Collection
     {
@@ -695,11 +717,17 @@ class DashboardDataService
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
             ->latest('id')
             ->limit(5)
-            ->get(['id', 'prs_number', 'status', 'prs_date', 'department_id']);
+            ->get(['id', 'prs_number', 'status', 'prs_date', 'department_id'])
+            ->map(fn (Prs $item) => $this->recentItem(
+                title: (string) ($item->prs_number ?: '#'.$item->id),
+                subtitle: $item->department?->name ?? 'No department',
+                meta: $this->formatDate($item->prs_date),
+                status: (string) $item->status,
+            ));
     }
 
     /**
-     * @return Collection<int, PurchaseOrder>
+     * @return Collection<int, array{title: string, subtitle: string, meta: string, status: string, status_label: string, tone: string}>
      */
     private function recentPurchaseOrders(): Collection
     {
@@ -707,44 +735,74 @@ class DashboardDataService
             ->with('supplier:id,name')
             ->latest('id')
             ->limit(5)
-            ->get(['id', 'po_number', 'status', 'total', 'supplier_id', 'created_at']);
+            ->get(['id', 'po_number', 'status', 'total', 'supplier_id', 'created_at'])
+            ->map(fn (PurchaseOrder $item) => $this->recentItem(
+                title: (string) ($item->po_number ?: '#'.$item->id),
+                subtitle: $item->supplier?->name ?? 'Unknown supplier',
+                meta: 'Rp '.number_format((float) $item->total, 0, ',', '.'),
+                status: (string) $item->status,
+            ));
     }
 
     /**
-     * @return Collection<int, ReceivingReport>
+     * @return Collection<int, array{title: string, subtitle: string, meta: string, status: string, status_label: string, tone: string}>
      */
     private function recentReceivingReports(): Collection
     {
         return ReceivingReport::query()
             ->latest('id')
             ->limit(5)
-            ->get(['id', 'rr_number', 'received_date', 'purchase_order_id']);
+            ->get(['id', 'rr_number', 'received_date', 'purchase_order_id'])
+            ->map(fn (ReceivingReport $item) => $this->recentItem(
+                title: (string) ($item->rr_number ?: '#'.$item->id),
+                subtitle: $item->purchase_order_id ? 'PO #'.$item->purchase_order_id : 'No linked PO',
+                meta: $this->formatDate($item->received_date),
+                status: 'RECEIVED',
+                tone: 'success',
+            ));
     }
 
     /**
-     * @return Collection<int, TransferSlip>
+     * @return Collection<int, array{title: string, subtitle: string, meta: string, status: string, status_label: string, tone: string}>
      */
     private function recentTransferSlips(): Collection
     {
         return TransferSlip::query()
             ->latest('id')
             ->limit(5)
-            ->get(['id', 'ts_number', 'ts_date', 'approved_at']);
+            ->get(['id', 'ts_number', 'ts_date', 'approved_at'])
+            ->map(function (TransferSlip $item) {
+                $status = $item->approved_at ? 'APPROVED' : 'PENDING';
+
+                return $this->recentItem(
+                    title: (string) ($item->ts_number ?: '#'.$item->id),
+                    subtitle: 'Transfer slip',
+                    meta: $this->formatDate($item->ts_date),
+                    status: $status,
+                );
+            });
     }
 
     /**
-     * @return Collection<int, Delivery>
+     * @return Collection<int, array{title: string, subtitle: string, meta: string, status: string, status_label: string, tone: string}>
      */
     private function recentDeliveries(): Collection
     {
         return Delivery::query()
             ->latest('id')
             ->limit(5)
-            ->get(['id', 'dr_number', 'dr_date', 'to_location']);
+            ->get(['id', 'dr_number', 'dr_date', 'to_location'])
+            ->map(fn (Delivery $item) => $this->recentItem(
+                title: (string) ($item->dr_number ?: '#'.$item->id),
+                subtitle: $item->to_location ?: 'No destination',
+                meta: $this->formatDate($item->dr_date),
+                status: 'DELIVERED',
+                tone: 'info',
+            ));
     }
 
     /**
-     * @return Collection<int, User>
+     * @return Collection<int, array{title: string, subtitle: string, meta: string, status: string, status_label: string, tone: string}>
      */
     private function recentUsers(): Collection
     {
@@ -752,6 +810,36 @@ class DashboardDataService
             ->with('department:id,name,alias')
             ->latest('id')
             ->limit(5)
-            ->get(['id', 'name', 'username', 'email', 'department_id', 'created_at']);
+            ->get(['id', 'name', 'username', 'email', 'department_id', 'created_at'])
+            ->map(fn (User $item) => $this->recentItem(
+                title: (string) $item->name,
+                subtitle: '@'.$item->username.' · '.($item->department?->alias ?? 'No dept'),
+                meta: $this->formatDate($item->created_at),
+                status: 'ACTIVE',
+                tone: 'secondary',
+            ));
+    }
+
+    /**
+     * @return Collection<int, array{title: string, subtitle: string, meta: string, status: string, status_label: string, tone: string}>
+     */
+    private function recentStoreWithdrawals(?int $departmentId = null): Collection
+    {
+        return DB::table('store_withdrawals')
+            ->whereNull('deleted_at')
+            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get(['id', 'sws_number', 'sws_date', 'type', 'approved_at'])
+            ->map(function ($item) {
+                $status = $item->approved_at ? 'APPROVED' : 'OPEN';
+
+                return $this->recentItem(
+                    title: (string) ($item->sws_number ?: '#'.$item->id),
+                    subtitle: strtoupper((string) ($item->type ?: 'normal')).' withdrawal',
+                    meta: $this->formatDate($item->sws_date),
+                    status: $status,
+                );
+            });
     }
 }

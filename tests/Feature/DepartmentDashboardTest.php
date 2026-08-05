@@ -2,8 +2,10 @@
 
 use App\Models\Department;
 use App\Models\Prs;
+use App\Models\PurchaseOrder;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 beforeEach(function () {
@@ -49,7 +51,26 @@ it('shows the full administrator dashboard regardless of department', function (
         ->assertSee('Canvass Open')
         ->assertSee('SWS Open')
         ->assertSee('TS Pending')
-        ->assertSee('Deliveries');
+        ->assertSee('Deliveries')
+        ->assertDontSee('dashboard-quick-link', false);
+});
+
+it('shows the full administrator dashboard for general-manager', function () {
+    $user = makeDashboardUser('general-manager', [
+        'name' => 'Office Of The Managing Director',
+        'code' => '7054',
+        'alias' => 'MD',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertSee('data-dashboard-key="admin"', false)
+        ->assertSee('Administrator Dashboard')
+        ->assertSee('User Accounts')
+        ->assertSee('Canvass Open')
+        ->assertSee('SWS Open')
+        ->assertDontSee('Executive Dashboard');
 });
 
 it('shows the purchasing dashboard for PUR department users', function () {
@@ -154,7 +175,7 @@ it('shows the engineering dashboard filtered to engineering department prs', fun
         ->assertDontSee('QA-PRS-001');
 });
 
-it('shows the it dashboard for non-admin it staff', function () {
+it('shows the administrator dashboard for it-staff', function () {
     $user = makeDashboardUser('it-staff', [
         'name' => 'Information Technology',
         'code' => '7056',
@@ -164,19 +185,43 @@ it('shows the it dashboard for non-admin it staff', function () {
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertSuccessful()
-        ->assertSee('data-dashboard-key="it"', false)
-        ->assertSee('IT Dashboard')
+        ->assertSee('data-dashboard-key="admin"', false)
+        ->assertSee('Administrator Dashboard')
         ->assertSee('User Accounts')
-        ->assertDontSee('Administrator Dashboard')
-        ->assertDontSee('Canvass Open');
+        ->assertSee('Canvass Open')
+        ->assertDontSee('IT Dashboard');
 });
 
-it('shows the executive dashboard for MD department users', function () {
-    $user = makeDashboardUser('general-manager', [
+it('shows the administrator dashboard for it-manager', function () {
+    $user = makeDashboardUser('it-manager', [
+        'name' => 'Information Technology',
+        'code' => '7056',
+        'alias' => 'IT',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertSee('data-dashboard-key="admin"', false)
+        ->assertSee('Administrator Dashboard');
+});
+
+it('shows the executive dashboard for MD department users without general-manager role', function () {
+    $department = Department::query()->create([
         'name' => 'Office Of The Managing Director',
         'code' => '7054',
         'alias' => 'MD',
     ]);
+
+    $user = User::query()->create([
+        'name' => 'MD Staff',
+        'username' => 'md-staff-'.uniqid(),
+        'email' => 'md-staff-'.uniqid().'@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $department->id,
+        'role' => 'Staff',
+    ]);
+    $user->assignRole('purchasing-staff');
 
     $this->actingAs($user)
         ->get(route('dashboard'))
@@ -187,7 +232,7 @@ it('shows the executive dashboard for MD department users', function () {
         ->assertDontSee('Administrator Dashboard');
 });
 
-it('shows the default department dashboard for other departments', function () {
+it('shows the default department dashboard with sws metrics', function () {
     $qa = Department::query()->create([
         'name' => 'Quality Assurance',
         'code' => '7044',
@@ -214,13 +259,30 @@ it('shows the default department dashboard for other departments', function () {
         'is_capex' => false,
     ]);
 
+    DB::table('store_withdrawals')->insert([
+        'sws_number' => 'QA-SWS-001',
+        'sws_date' => now()->toDateString(),
+        'department_id' => $qa->id,
+        'department_code' => '7044',
+        'type' => 'normal',
+        'created_by' => $user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertSuccessful()
         ->assertSee('data-dashboard-key="default"', false)
         ->assertSee('Department Dashboard')
         ->assertSee('QA-ONLY-001')
+        ->assertSee('QA-SWS-001')
         ->assertSee('Open PRS')
+        ->assertSee('SWS Open')
+        ->assertSee('Monthly Department PRS')
+        ->assertSee('Department PRS Status')
+        ->assertSee('Recent Department SWS')
+        ->assertDontSee('SWS Approved')
         ->assertDontSee('User Accounts')
         ->assertDontSee('Canvass Open');
 });
@@ -232,5 +294,49 @@ it('falls back to the default dashboard when the user has no department', functi
         ->get(route('dashboard'))
         ->assertSuccessful()
         ->assertSee('data-dashboard-key="default"', false)
-        ->assertSee('Department Dashboard');
+        ->assertSee('Department Dashboard')
+        ->assertSee('SWS Open');
+});
+
+it('limits po status chart data to approved and pending approval', function () {
+    $user = makeDashboardUser('purchasing-staff', [
+        'name' => 'Purchasing',
+        'code' => '7050',
+        'alias' => 'PUR',
+    ]);
+
+    $supplier = \App\Models\Supplier::query()->create([
+        'code' => 'SUP-DASH-PO',
+        'name' => 'Dashboard PO Supplier',
+        'created_by' => $user->id,
+    ]);
+
+    PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'created_by' => $user->id,
+        'status' => 'APPROVED',
+        'total' => 1000,
+        'approved_at' => now(),
+    ]);
+    PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'created_by' => $user->id,
+        'status' => 'PENDING_APPROVAL',
+        'total' => 500,
+    ]);
+    PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'created_by' => $user->id,
+        'status' => 'DRAFT',
+        'total' => 250,
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response->assertSuccessful();
+
+    $poStatus = $response->viewData('dashboardData')['po_status'];
+
+    expect($poStatus['labels'])->toBe(['PENDING APPROVAL', 'APPROVED'])
+        ->and($poStatus['series'])->toBe([1, 1]);
 });

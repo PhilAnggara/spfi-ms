@@ -1,9 +1,7 @@
 @extends('pages.dashboard.layout')
 
 @section('dashboard-content')
-    @include('pages.dashboard.partials.quick-links', ['links' => $dashboard['quick_links']])
-
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-3 dashboard-kpi-row">
         @include('pages.dashboard.partials.kpi-card', [
             'label' => 'User Accounts',
             'value' => $metrics['user_accounts'] ?? 0,
@@ -41,12 +39,9 @@
     <div class="row g-3">
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent Users',
+            'icon' => 'fa-users',
             'col' => 'col-12',
-            'rows' => collect($dashboard['lists']['recent_users'] ?? [])->map(fn ($item) => [
-                $item->name,
-                $item->username,
-                $item->department?->alias ?? '—',
-            ])->all(),
+            'items' => $dashboard['lists']['recent_users'] ?? [],
         ])
     </div>
 @endsection
