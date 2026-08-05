@@ -119,7 +119,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/purchasing-lead-time', [PurchasingReportController::class, 'purchasingLeadTime'])->name('procurement.reports.purchasing-lead-time');
     });
 
-    Route::middleware('role:administrator|purchasing-manager')->prefix('accounting')->group(function () {
+    Route::middleware('role:administrator|finance-manager|finance-supervisor|finance-staff|accounting-manager|accounting-supervisor|accounting-staff')->prefix('accounting')->group(function () {
         Route::get('/reports', [AccountingReportController::class, 'index'])->name('accounting.reports.index');
         Route::post('/reports/stock-card', [AccountingReportController::class, 'stockCard'])->name('accounting.reports.stock-card');
         Route::post('/reports/transaction', [AccountingReportController::class, 'transaction'])->name('accounting.reports.transaction');
@@ -139,7 +139,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/delivery-register', [ImReportController::class, 'deliveryRegister'])->name('im.reports.delivery-register');
     });
 
-    Route::middleware('role:administrator|accounting-manager|accounting-supervisor|accounting-staff')
+    Route::middleware('role:administrator|finance-manager|finance-supervisor|finance-staff|accounting-manager|accounting-supervisor|accounting-staff')
         ->prefix('accounting')
         ->name('accounting.')
         ->group(function () {
@@ -154,7 +154,7 @@ Route::middleware('auth')->group(function () {
             Route::put('doc-entries/{transaction}', [AccountingDocEntryController::class, 'update'])->name('doc-entries.update');
         });
 
-    Route::middleware('role:administrator|accounting-manager|accounting-supervisor')
+    Route::middleware('role:administrator|finance-manager|finance-supervisor|accounting-manager|accounting-supervisor')
         ->prefix('accounting')
         ->name('accounting.')
         ->group(function () {
