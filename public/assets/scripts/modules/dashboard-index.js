@@ -1,152 +1,143 @@
 document.addEventListener('DOMContentLoaded', function () {
     const dashboardData = window.dashboardData || {};
-    const monthlyPrs = dashboardData.monthly_prs || {};
-    const prsStatus = dashboardData.prs_status || {};
-    const topSuppliers = dashboardData.top_suppliers || {};
-    const poStatus = dashboardData.po_status || {};
 
-    const monthlyPrsLabels = Array.isArray(monthlyPrs.labels) ? monthlyPrs.labels : [];
-    const monthlyPrsSeries = Array.isArray(monthlyPrs.series) ? monthlyPrs.series : [];
-
-    const prsStatusLabels = Array.isArray(prsStatus.labels) ? prsStatus.labels : [];
-    const prsStatusSeries = Array.isArray(prsStatus.series) ? prsStatus.series : [];
-
-    const topSuppliersLabels = Array.isArray(topSuppliers.labels) ? topSuppliers.labels : [];
-    const topSuppliersSeries = Array.isArray(topSuppliers.series) ? topSuppliers.series : [];
-
-    const poStatusLabels = Array.isArray(poStatus.labels) ? poStatus.labels : [];
-    const poStatusSeries = Array.isArray(poStatus.series) ? poStatus.series : [];
-
-    const optionsProfileVisit = {
-        annotations: {
-            position: 'back',
-        },
-        dataLabels: {
-            enabled: false,
-        },
-        chart: {
-            type: 'bar',
-            height: 300,
-        },
-        fill: {
-            opacity: 1,
-        },
-        plotOptions: {},
-        series: [
-            {
-                name: 'PRS',
-                data: monthlyPrsSeries,
-            },
-        ],
-        colors: '#435ebe',
-        xaxis: {
-            categories: monthlyPrsLabels,
-        },
-    };
-
-    const optionsVisitorsProfile = {
-        series: prsStatusSeries,
-        labels: prsStatusLabels,
-        colors: ['#435ebe', '#55c6e8'],
-        chart: {
-            type: 'donut',
-            width: '100%',
-            height: '350px',
-        },
-        legend: {
-            position: 'bottom',
-        },
-        plotOptions: {
-            pie: {
-                donut: {
-                    size: '30%',
-                },
-            },
-        },
-    };
-
-    const optionsTopSuppliers = {
-        series: [
-            {
-                name: 'PO Value',
-                data: topSuppliersSeries,
-            },
-        ],
-        chart: {
-            type: 'bar',
-            height: 360,
-        },
-        colors: ['#1f9d8f'],
-        plotOptions: {
-            bar: {
-                borderRadius: 6,
-                horizontal: true,
-            },
-        },
-        dataLabels: {
-            enabled: false,
-        },
-        xaxis: {
-            categories: topSuppliersLabels,
-            labels: {
-                formatter: function (value) {
-                    return new Intl.NumberFormat('id-ID').format(value);
-                },
-            },
-        },
-    };
-
-    const optionsPoStatus = {
-        series: poStatusSeries,
-        labels: poStatusLabels,
-        chart: {
-            type: 'donut',
-            width: '100%',
-            height: 320,
-        },
-        legend: {
-            position: 'bottom',
-        },
-        dataLabels: {
-            enabled: true,
-        },
-    };
-
-    if (window.ApexCharts) {
-        const chartProfileVisitEl = document.querySelector('#chart-profile-visit');
-        if (chartProfileVisitEl) {
-            const chartProfileVisit = new window.ApexCharts(
-                chartProfileVisitEl,
-                optionsProfileVisit
-            );
-            chartProfileVisit.render();
-        }
-
-        const chartVisitorsProfileEl = document.getElementById('chart-visitors-profile');
-        if (chartVisitorsProfileEl) {
-            const chartVisitorsProfile = new window.ApexCharts(
-                chartVisitorsProfileEl,
-                optionsVisitorsProfile
-            );
-            chartVisitorsProfile.render();
-        }
-
-        const chartTopSuppliersEl = document.querySelector('#chart-top-suppliers');
-        if (chartTopSuppliersEl) {
-            const chartTopSuppliers = new window.ApexCharts(
-                chartTopSuppliersEl,
-                optionsTopSuppliers
-            );
-            chartTopSuppliers.render();
-        }
-
-        const chartPoStatusEl = document.querySelector('#chart-po-status');
-        if (chartPoStatusEl) {
-            const chartPoStatus = new window.ApexCharts(
-                chartPoStatusEl,
-                optionsPoStatus
-            );
-            chartPoStatus.render();
-        }
+    function seriesPayload(key) {
+        const payload = dashboardData[key] || {};
+        return {
+            labels: Array.isArray(payload.labels) ? payload.labels : [],
+            series: Array.isArray(payload.series) ? payload.series : [],
+        };
     }
+
+    function renderIfPresent(selector, optionsFactory) {
+        if (!window.ApexCharts) {
+            return;
+        }
+
+        const el = typeof selector === 'string'
+            ? document.querySelector(selector)
+            : selector;
+
+        if (!el) {
+            return;
+        }
+
+        const chart = new window.ApexCharts(el, optionsFactory());
+        chart.render();
+    }
+
+    const monthlyPrs = seriesPayload('monthly_prs');
+    const prsStatus = seriesPayload('prs_status');
+    const topSuppliers = seriesPayload('top_suppliers');
+    const poStatus = seriesPayload('po_status');
+    const monthlyRr = seriesPayload('monthly_rr');
+    const monthlyOutbound = seriesPayload('monthly_outbound');
+    const monthlyPoValue = seriesPayload('monthly_po_value');
+    const usersByDepartment = seriesPayload('users_by_department');
+
+    renderIfPresent('#chart-profile-visit', function () {
+        return {
+            annotations: { position: 'back' },
+            dataLabels: { enabled: false },
+            chart: { type: 'bar', height: 300 },
+            fill: { opacity: 1 },
+            series: [{ name: 'PRS', data: monthlyPrs.series }],
+            colors: '#435ebe',
+            xaxis: { categories: monthlyPrs.labels },
+        };
+    });
+
+    renderIfPresent('#chart-visitors-profile', function () {
+        return {
+            series: prsStatus.series,
+            labels: prsStatus.labels,
+            colors: ['#435ebe', '#55c6e8', '#1f9d8f', '#f59e0b', '#ef4444', '#8b5cf6'],
+            chart: { type: 'donut', width: '100%', height: '350px' },
+            legend: { position: 'bottom' },
+            plotOptions: {
+                pie: {
+                    donut: { size: '30%' },
+                },
+            },
+        };
+    });
+
+    renderIfPresent('#chart-top-suppliers', function () {
+        return {
+            series: [{ name: 'PO Value', data: topSuppliers.series }],
+            chart: { type: 'bar', height: 360 },
+            colors: ['#1f9d8f'],
+            plotOptions: {
+                bar: { borderRadius: 6, horizontal: true },
+            },
+            dataLabels: { enabled: false },
+            xaxis: {
+                categories: topSuppliers.labels,
+                labels: {
+                    formatter: function (value) {
+                        return new Intl.NumberFormat('id-ID').format(value);
+                    },
+                },
+            },
+        };
+    });
+
+    renderIfPresent('#chart-po-status', function () {
+        return {
+            series: poStatus.series,
+            labels: poStatus.labels,
+            chart: { type: 'donut', width: '100%', height: 320 },
+            legend: { position: 'bottom' },
+            dataLabels: { enabled: true },
+        };
+    });
+
+    renderIfPresent('#chart-monthly-rr', function () {
+        return {
+            chart: { type: 'area', height: 300 },
+            dataLabels: { enabled: false },
+            stroke: { curve: 'smooth', width: 2 },
+            colors: ['#435ebe'],
+            series: [{ name: 'RR', data: monthlyRr.series }],
+            xaxis: { categories: monthlyRr.labels },
+        };
+    });
+
+    renderIfPresent('#chart-monthly-outbound', function () {
+        return {
+            chart: { type: 'bar', height: 300 },
+            dataLabels: { enabled: false },
+            colors: ['#1f9d8f'],
+            series: [{ name: 'Outbound', data: monthlyOutbound.series }],
+            xaxis: { categories: monthlyOutbound.labels },
+        };
+    });
+
+    renderIfPresent('#chart-monthly-po-value', function () {
+        return {
+            chart: { type: 'area', height: 300 },
+            dataLabels: { enabled: false },
+            stroke: { curve: 'smooth', width: 2 },
+            colors: ['#16a34a'],
+            series: [{ name: 'PO Value', data: monthlyPoValue.series }],
+            xaxis: { categories: monthlyPoValue.labels },
+            yaxis: {
+                labels: {
+                    formatter: function (value) {
+                        return new Intl.NumberFormat('id-ID').format(value);
+                    },
+                },
+            },
+        };
+    });
+
+    renderIfPresent('#chart-users-by-department', function () {
+        return {
+            chart: { type: 'bar', height: 320 },
+            dataLabels: { enabled: false },
+            colors: ['#7c3aed'],
+            series: [{ name: 'Users', data: usersByDepartment.series }],
+            xaxis: { categories: usersByDepartment.labels },
+        };
+    });
 });
