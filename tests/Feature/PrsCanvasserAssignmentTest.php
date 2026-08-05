@@ -12,7 +12,10 @@ use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
+use App\Services\NotificationRecipientService;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Contracts\Notifications\Dispatcher;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
@@ -367,4 +370,81 @@ it('reassigns only open items on a partially ordered prs', function () {
 
     expect($items[0]->fresh()->canvasser_id)->toBe($this->canvasser->id)
         ->and($items[1]->fresh()->canvasser_id)->toBe($this->replacementCanvasser->id);
+});
+
+it('reports and continues when a recipient notification fails', function () {
+    Exceptions::fake();
+
+    $dispatcher = \Mockery::mock(Dispatcher::class);
+    $dispatcher->shouldReceive('send')->andThrow(new \RuntimeException('broadcast failed'));
+    $dispatcher->shouldReceive('sendNow')->andThrow(new \RuntimeException('broadcast failed'));
+    $this->app->instance(Dispatcher::class, $dispatcher);
+
+    app(NotificationRecipientService::class)->notify(collect([$this->canvasser, $this->manager]), [
+        'title' => 'Test',
+        'message' => 'Hello',
+    ]);
+
+    Exceptions::assertReported(fn (\RuntimeException $e): bool => $e->getMessage() === 'broadcast failed');
+});
+
+it('assigns canvasser even when notification delivery fails', function () {
+    Exceptions::fake();
+
+    $dispatcher = \Mockery::mock(Dispatcher::class);
+    $dispatcher->shouldReceive('send')->andThrow(new \RuntimeException('queue connection refused'));
+    $dispatcher->shouldReceive('sendNow')->andThrow(new \RuntimeException('queue connection refused'));
+    $this->app->instance(Dispatcher::class, $dispatcher);
+
+    $prs = createRequestedPrsWithItems(1);
+    $item = $prs->items()->first();
+
+    $this->actingAs($this->manager)
+        ->from(route('prs.approval.index'))
+        ->post(route('prs.approve', $prs), [
+            'items' => [
+                [
+                    'prs_item_id' => $item->id,
+                    'canvasser_id' => $this->canvasser->id,
+                ],
+            ],
+        ])
+        ->assertRedirect(route('prs.approval.index'))
+        ->assertSessionHas('success')
+        ->assertSessionHasNoErrors();
+
+    expect($prs->fresh()->status)->toBe('CANVASSING')
+        ->and($item->fresh()->canvasser_id)->toBe($this->canvasser->id);
+
+    Exceptions::assertReported(\RuntimeException::class);
+});
+
+it('reassigns canvasser even when notification delivery fails', function () {
+    Exceptions::fake();
+
+    $prs = assignPrsToCanvassing(createRequestedPrsWithItems(1), $this->canvasser);
+    $item = $prs->items()->first();
+
+    $dispatcher = \Mockery::mock(Dispatcher::class);
+    $dispatcher->shouldReceive('send')->andThrow(new \RuntimeException('reverb unavailable'));
+    $dispatcher->shouldReceive('sendNow')->andThrow(new \RuntimeException('reverb unavailable'));
+    $this->app->instance(Dispatcher::class, $dispatcher);
+
+    $this->actingAs($this->manager)
+        ->from(route('prs.approval.index'))
+        ->post(route('prs.reassign', $prs), [
+            'items' => [
+                [
+                    'prs_item_id' => $item->id,
+                    'canvasser_id' => $this->replacementCanvasser->id,
+                ],
+            ],
+        ])
+        ->assertRedirect(route('prs.approval.index'))
+        ->assertSessionHas('success')
+        ->assertSessionHasNoErrors();
+
+    expect($item->fresh()->canvasser_id)->toBe($this->replacementCanvasser->id);
+
+    Exceptions::assertReported(\RuntimeException::class);
 });

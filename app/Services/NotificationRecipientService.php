@@ -6,6 +6,7 @@ use App\Models\PurchaseOrder;
 use App\Models\User;
 use App\Notifications\ProcessNotification;
 use Illuminate\Support\Collection;
+use Throwable;
 
 class NotificationRecipientService
 {
@@ -52,12 +53,20 @@ class NotificationRecipientService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function notify(Collection $recipients, array $payload): void
     {
         foreach ($recipients as $recipient) {
-            $recipient->notify(new ProcessNotification($payload));
+            if (! $recipient instanceof User) {
+                continue;
+            }
+
+            try {
+                $recipient->notify(new ProcessNotification($payload));
+            } catch (Throwable $exception) {
+                report($exception);
+            }
         }
     }
 }
