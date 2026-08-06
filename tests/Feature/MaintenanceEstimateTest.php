@@ -38,3 +38,14 @@ it('hides estimate and countdown when retryAfter is not provided', function () {
         ->not->toContain('Time remaining')
         ->not->toContain('data-ends-at="');
 });
+
+it('uses host-relative asset paths so prerendered styles work on other machines', function () {
+    $html = view('maintenance')->render();
+
+    expect($html)
+        ->toContain('href="'.parse_url(url('assets/compiled/css/app.css'), PHP_URL_PATH).'"')
+        ->toContain('href="'.parse_url(url('assets/compiled/css/error.css'), PHP_URL_PATH).'"')
+        ->toContain('src="'.parse_url(url('assets/compiled/svg/maintenance-3.svg'), PHP_URL_PATH).'"')
+        ->not->toContain('href="http://')
+        ->not->toContain('src="http://');
+});

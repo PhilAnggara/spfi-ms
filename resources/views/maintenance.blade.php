@@ -5,17 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Maintenance - SPFI-MS</title>
-    <link rel="shortcut icon" href="{{ url('assets/images/favicon.png') }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ url('assets/compiled/css/app.css') }}">
-    <link rel="stylesheet" href="{{ url('assets/compiled/css/error.css') }}">
+    {{-- Root-relative paths so prerendered HTML works from any host (not APP_URL/localhost). --}}
+    <link rel="shortcut icon" href="{{ parse_url(url('assets/images/favicon.png'), PHP_URL_PATH) }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ parse_url(url('assets/compiled/css/app.css'), PHP_URL_PATH) }}">
+    <link rel="stylesheet" href="{{ parse_url(url('assets/compiled/css/error.css'), PHP_URL_PATH) }}">
 </head>
 <body>
-    <script src="{{ url('assets/static/js/initTheme.js') }}"></script>
+    <script src="{{ parse_url(url('assets/static/js/initTheme.js'), PHP_URL_PATH) }}"></script>
     <div id="error">
         <div class="error-page container">
             <div class="col-md-8 col-12 offset-md-2">
                 <div class="text-center">
-                    <img class="img-error" src="{{ url('assets/compiled/svg/maintenance-3.svg') }}" alt="Service Unavailable">
+                    <img class="img-error" src="{{ parse_url(url('assets/compiled/svg/maintenance-3.svg'), PHP_URL_PATH) }}" alt="Service Unavailable">
                     <h1 class="error-title">Under Maintenance</h1>
                     <p class="fs-5 text-gray-600">We are currently performing maintenance on the system. Please try again shortly.</p>
 

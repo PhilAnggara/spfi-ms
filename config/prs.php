@@ -14,6 +14,7 @@ return [
     */
 
     'operations_approval_department_prefixes' => [
+        '7031',
         '7033',
         '7034',
         '7035',
