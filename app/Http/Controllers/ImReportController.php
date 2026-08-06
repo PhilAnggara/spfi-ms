@@ -47,6 +47,16 @@ class ImReportController extends Controller
         'others' => 'Others',
     ];
 
+    /**
+     * Report dropdown labels that differ from stored item_categories.name values.
+     *
+     * @var array<string, list<string>>
+     */
+    private const CATEGORY_NAME_ALIASES = [
+        'SPARE PARTS' => ['SPARE PARTS', 'PARTS'],
+        'CHEMICAL' => ['CHEMICAL', 'CHEM'],
+    ];
+
     public function index(): View
     {
         $departments = Department::query()
@@ -62,6 +72,8 @@ class ImReportController extends Controller
 
     public function stockInventory(Request $request): Response
     {
+        set_time_limit(300);
+
         $validated = $request->validate([
             'as_of' => ['required', 'date'],
             'category' => ['required', 'in:'.implode(',', self::CATEGORIES)],
@@ -285,7 +297,7 @@ class ImReportController extends Controller
             ->whereNull('rri.deleted_at')
             ->whereDate('rr.received_date', '>=', $dateFrom)
             ->whereDate('rr.received_date', '<=', $dateTo)
-            ->where('ic.name', $category)
+            ->whereIn('ic.name', $this->categoryNamesForFilter($category))
             ->where('rri.qty_good', '>', 0)
             ->select([
                 'i.code as item_code',
@@ -306,7 +318,7 @@ class ImReportController extends Controller
             ->whereNull('tsi.deleted_at')
             ->whereDate('ts.ts_date', '>=', $dateFrom)
             ->whereDate('ts.ts_date', '<=', $dateTo)
-            ->where('ic.name', $category)
+            ->whereIn('ic.name', $this->categoryNamesForFilter($category))
             ->where('tsi.quantity', '>', 0)
             ->select([
                 'i.code as item_code',
@@ -327,7 +339,7 @@ class ImReportController extends Controller
             ->whereNull('di.deleted_at')
             ->whereDate('d.dr_date', '>=', $dateFrom)
             ->whereDate('d.dr_date', '<=', $dateTo)
-            ->where('ic.name', $category)
+            ->whereIn('ic.name', $this->categoryNamesForFilter($category))
             ->where('di.quantity', '>', 0)
             ->select([
                 'i.code as item_code',
@@ -650,11 +662,12 @@ class ImReportController extends Controller
     private function stockInventoryRows(string $asOf, string $category): Collection
     {
         $monthStart = Carbon::parse($asOf)->startOfMonth()->toDateString();
+        $categoryNames = $this->categoryNamesForFilter($category);
 
         $items = Item::query()
             ->with(['unit:id,name'])
-            ->whereHas('category', function ($query) use ($category) {
-                $query->where('name', $category);
+            ->whereHas('category', function ($query) use ($categoryNames) {
+                $query->whereIn('name', $categoryNames);
             })
             ->orderBy('code')
             ->get(['id', 'name', 'code', 'unit_of_measure_id']);
@@ -663,16 +676,17 @@ class ImReportController extends Controller
             return collect();
         }
 
-        $itemIds = $items->pluck('id');
-
-        $beginnings = $this->stockBalanceBeginnings($itemIds, $monthStart, $asOf);
-        $movements = $this->stockBalanceMovements($itemIds, $monthStart, $asOf);
-        $endings = $this->stockBalanceEndings($itemIds, $asOf);
-        $inventoryBalances = DB::table('stock_inventories')
-            ->whereIn('item_id', $itemIds)
-            ->where('is_delete', false)
-            ->groupBy('item_id')
-            ->selectRaw('item_id, COALESCE(SUM(balance), 0) as balance')
+        $beginnings = $this->stockBalanceBeginnings($categoryNames, $monthStart, $asOf);
+        $movements = $this->stockBalanceMovements($categoryNames, $monthStart, $asOf);
+        $endings = $this->stockBalanceEndings($categoryNames, $asOf);
+        $inventoryBalances = DB::table('stock_inventories as si')
+            ->join('items as i', 'i.id', '=', 'si.item_id')
+            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->whereNull('i.deleted_at')
+            ->whereIn('ic.name', $categoryNames)
+            ->where('si.is_delete', false)
+            ->groupBy('si.item_id')
+            ->selectRaw('si.item_id, COALESCE(SUM(si.balance), 0) as balance')
             ->pluck('balance', 'item_id');
 
         return $items
@@ -708,20 +722,23 @@ class ImReportController extends Controller
     }
 
     /**
-     * @param  Collection<int, int|string>  $itemIds
+     * @param  list<string>  $categoryNames
      * @return Collection<int|string, float>
      */
-    private function stockBalanceBeginnings(Collection $itemIds, string $monthStart, string $asOf): Collection
+    private function stockBalanceBeginnings(array $categoryNames, string $monthStart, string $asOf): Collection
     {
-        $endColumn = DB::getQueryGrammar()->wrap('end');
-        $beginColumn = DB::getQueryGrammar()->wrap('begin');
+        $endColumn = DB::getQueryGrammar()->wrap('sb.end');
+        $beginColumn = DB::getQueryGrammar()->wrap('sb.begin');
 
         $priorEnds = DB::query()
             ->fromSub(
-                DB::table('stock_balances')
-                    ->selectRaw("item_id, wh_code, {$endColumn} as ending_qty, ROW_NUMBER() OVER (PARTITION BY item_id, wh_code ORDER BY date DESC, id DESC) as rn")
-                    ->whereIn('item_id', $itemIds)
-                    ->whereDate('date', '<', $monthStart),
+                DB::table('stock_balances as sb')
+                    ->join('items as i', 'i.id', '=', 'sb.item_id')
+                    ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+                    ->whereNull('i.deleted_at')
+                    ->whereIn('ic.name', $categoryNames)
+                    ->whereDate('sb.date', '<', $monthStart)
+                    ->selectRaw("sb.item_id, sb.wh_code, {$endColumn} as ending_qty, ROW_NUMBER() OVER (PARTITION BY sb.item_id, sb.wh_code ORDER BY sb.date DESC, sb.id DESC) as rn"),
                 'ranked'
             )
             ->where('rn', 1)
@@ -731,65 +748,79 @@ class ImReportController extends Controller
             ->groupBy('item_id')
             ->map(fn (Collection $rows) => (float) $rows->sum('ending_qty'));
 
-        $missingItemIds = $itemIds->reject(fn ($id) => $beginnings->has($id))->values();
-
-        if ($missingItemIds->isEmpty()) {
-            return $beginnings;
-        }
-
         $monthBegins = DB::query()
             ->fromSub(
-                DB::table('stock_balances')
-                    ->selectRaw("item_id, wh_code, {$beginColumn} as beginning_qty, ROW_NUMBER() OVER (PARTITION BY item_id, wh_code ORDER BY date ASC, id ASC) as rn")
-                    ->whereIn('item_id', $missingItemIds)
-                    ->whereDate('date', '>=', $monthStart)
-                    ->whereDate('date', '<=', $asOf),
+                DB::table('stock_balances as sb')
+                    ->join('items as i', 'i.id', '=', 'sb.item_id')
+                    ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+                    ->whereNull('i.deleted_at')
+                    ->whereIn('ic.name', $categoryNames)
+                    ->whereDate('sb.date', '>=', $monthStart)
+                    ->whereDate('sb.date', '<=', $asOf)
+                    ->selectRaw("sb.item_id, sb.wh_code, {$beginColumn} as beginning_qty, ROW_NUMBER() OVER (PARTITION BY sb.item_id, sb.wh_code ORDER BY sb.date ASC, sb.id ASC) as rn"),
                 'ranked'
             )
             ->where('rn', 1)
             ->get()
             ->groupBy('item_id')
-            ->map(fn (Collection $rows) => (float) $rows->sum('beginning_qty'));
+            ->map(fn (Collection $rows) => (float) $rows->sum('beginning_qty'))
+            ->reject(fn ($_, $itemId) => $beginnings->has($itemId));
 
         return $beginnings->union($monthBegins);
     }
 
     /**
-     * @param  Collection<int, int|string>  $itemIds
+     * @param  list<string>  $categoryNames
      * @return Collection<int|string, object{rr: float|int|string, ts: float|int|string, dr: float|int|string}>
      */
-    private function stockBalanceMovements(Collection $itemIds, string $monthStart, string $asOf): Collection
+    private function stockBalanceMovements(array $categoryNames, string $monthStart, string $asOf): Collection
     {
-        return DB::table('stock_balances')
-            ->whereIn('item_id', $itemIds)
-            ->whereDate('date', '>=', $monthStart)
-            ->whereDate('date', '<=', $asOf)
-            ->groupBy('item_id')
-            ->selectRaw('item_id, COALESCE(SUM(qty_in1), 0) as rr, COALESCE(SUM(qty_out1), 0) as ts, COALESCE(SUM(qty_out3), 0) as dr')
+        return DB::table('stock_balances as sb')
+            ->join('items as i', 'i.id', '=', 'sb.item_id')
+            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->whereNull('i.deleted_at')
+            ->whereIn('ic.name', $categoryNames)
+            ->whereDate('sb.date', '>=', $monthStart)
+            ->whereDate('sb.date', '<=', $asOf)
+            ->groupBy('sb.item_id')
+            ->selectRaw('sb.item_id, COALESCE(SUM(sb.qty_in1), 0) as rr, COALESCE(SUM(sb.qty_out1), 0) as ts, COALESCE(SUM(sb.qty_out3), 0) as dr')
             ->get()
             ->keyBy('item_id');
     }
 
     /**
-     * @param  Collection<int, int|string>  $itemIds
+     * @param  list<string>  $categoryNames
      * @return Collection<int|string, float>
      */
-    private function stockBalanceEndings(Collection $itemIds, string $asOf): Collection
+    private function stockBalanceEndings(array $categoryNames, string $asOf): Collection
     {
-        $endColumn = DB::getQueryGrammar()->wrap('end');
+        $endColumn = DB::getQueryGrammar()->wrap('sb.end');
 
         return DB::query()
             ->fromSub(
-                DB::table('stock_balances')
-                    ->selectRaw("item_id, wh_code, {$endColumn} as ending_qty, ROW_NUMBER() OVER (PARTITION BY item_id, wh_code ORDER BY date DESC, id DESC) as rn")
-                    ->whereIn('item_id', $itemIds)
-                    ->whereDate('date', '<=', $asOf),
+                DB::table('stock_balances as sb')
+                    ->join('items as i', 'i.id', '=', 'sb.item_id')
+                    ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+                    ->whereNull('i.deleted_at')
+                    ->whereIn('ic.name', $categoryNames)
+                    ->whereDate('sb.date', '<=', $asOf)
+                    ->selectRaw("sb.item_id, sb.wh_code, {$endColumn} as ending_qty, ROW_NUMBER() OVER (PARTITION BY sb.item_id, sb.wh_code ORDER BY sb.date DESC, sb.id DESC) as rn"),
                 'ranked'
             )
             ->where('rn', 1)
             ->get()
             ->groupBy('item_id')
             ->map(fn (Collection $rows) => (float) $rows->sum('ending_qty'));
+    }
+
+    /**
+     * Resolve report category labels to one or more stored item_categories.name values.
+     *
+     * @return list<string>
+     */
+    private function categoryNamesForFilter(string $category): array
+    {
+        return self::CATEGORY_NAME_ALIASES[$category] ?? [$category];
     }
 
     private function exportReport(

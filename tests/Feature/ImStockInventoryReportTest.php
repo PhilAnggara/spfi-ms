@@ -217,6 +217,23 @@ it('exports stock inventory pdf successfully', function () {
     expect($response->headers->get('content-type'))->toContain('application/pdf');
 });
 
+it('resolves spare parts filter to stored PARTS category name', function () {
+    $this->category->update(['name' => 'PARTS', 'code' => 'PARTS']);
+
+    $response = $this->actingAs($this->user)->post(route('im.reports.stock-inventory'), [
+        'as_of' => '2026-06-30',
+        'category' => 'SPARE PARTS',
+        'format' => 'excel',
+    ]);
+
+    $response->assertSuccessful();
+    $sheet = loadStockInventorySheet($response);
+
+    expect($sheet->getCell('A8')->getValue())->toBe('Bearing 6205');
+    expect($sheet->getCell('B8')->getValue())->toBe('SP-6205');
+    expect((float) $sheet->getCell('D8')->getValue())->toBe(100.0);
+});
+
 it('forbids unrelated roles from exporting stock inventory', function () {
     $outsider = User::query()->create([
         'name' => 'Purchasing Outsider',
