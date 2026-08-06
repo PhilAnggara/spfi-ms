@@ -354,17 +354,40 @@
     background: #94a3b8;
 }
 
-.as-action-login .as-timeline-dot {
+.as-action-login .as-timeline-dot,
+.as-action-created .as-timeline-dot,
+.as-action-approved .as-timeline-dot,
+.as-action-submitted .as-timeline-dot {
     background: #10b981;
 }
 
 .as-action-logout .as-timeline-dot,
-.as-action-force_logout .as-timeline-dot {
+.as-action-force_logout .as-timeline-dot,
+.as-action-deleted .as-timeline-dot,
+.as-action-rejected .as-timeline-dot,
+.as-action-cancelled .as-timeline-dot,
+.as-action-withdrawn .as-timeline-dot {
     background: #ef4444;
 }
 
-.as-action-active .as-timeline-dot {
+.as-action-active .as-timeline-dot,
+.as-action-updated .as-timeline-dot,
+.as-action-held .as-timeline-dot,
+.as-action-reassigned .as-timeline-dot,
+.as-action-requested_changes .as-timeline-dot {
     background: #3b82f6;
+}
+
+.as-subject-id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-weight: 600;
+    color: #475569;
+}
+
+.as-subject-id::before {
+    content: "· ";
+    font-weight: 400;
+    color: #94a3b8;
 }
 
 .as-timeline-head {

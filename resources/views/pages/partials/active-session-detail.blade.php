@@ -68,8 +68,17 @@
                 @if ($log->action === 'force_logout' && $log->actor)
                     <div class="small">by {{ $log->actor->name }}</div>
                 @endif
-                @if (! empty($log->meta['route']) || ! empty($log->meta['path']))
-                    <div class="small text-muted">{{ $log->meta['path'] ?? $log->meta['route'] }}</div>
+                @if ($log->pageLabel())
+                    <div class="small text-muted">
+                        <i class="fa-regular fa-file-lines me-1"></i>{{ $log->pageLabel() }}
+                        @if ($log->subjectLabel())
+                            <span class="as-subject-id">{{ $log->subjectLabel() }}</span>
+                        @endif
+                    </div>
+                @elseif ($log->subjectLabel())
+                    <div class="small text-muted">
+                        <span class="as-subject-id">{{ $log->subjectLabel() }}</span>
+                    </div>
                 @endif
                 @if (! empty($log->meta['message']))
                     <div class="small">{{ $log->meta['message'] }}</div>

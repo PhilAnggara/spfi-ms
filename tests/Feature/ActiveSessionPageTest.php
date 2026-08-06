@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\Currency;
 use App\Models\Department;
+use App\Models\PurchaseOrder;
 use App\Models\Session;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Models\UserActivityLog;
 use Database\Seeders\RolePermissionSeeder;
@@ -163,6 +166,92 @@ it('shows activity history in the detail panel', function () {
         ->assertSee('203.0.113.50');
 });
 
+it('shows a friendly page name instead of a raw path in activity detail', function () {
+    UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_ACTIVE,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => [
+            'route' => 'prs.index',
+            'path' => '/prs',
+            'page' => 'Purchase Requisitions',
+        ],
+    ]);
+
+    UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_ACTIVE,
+        'ip_address' => '203.0.113.51',
+        'user_agent' => 'Chrome',
+        'meta' => [
+            'route' => 'notifications.recent',
+            'path' => '/notifications/recent',
+        ],
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get(route('active-sessions.show', $this->monitoredUser))
+        ->assertSuccessful()
+        ->assertSee('Visited page')
+        ->assertSee('Purchase Requisitions')
+        ->assertSee('Notifications refresh')
+        ->assertDontSee('/notifications/recent');
+});
+
+it('does not create activity logs for notification polling endpoints', function () {
+    $this->actingAs($this->monitoredUser)
+        ->get(route('notifications.recent'))
+        ->assertSuccessful();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->exists())->toBeFalse();
+});
+
+it('logs distinct page visits even within the last-seen throttle window', function () {
+    $this->admin->forceFill([
+        'last_seen_at' => now()->subSeconds(10),
+    ])->save();
+
+    $this->actingAs($this->admin)
+        ->get(route('prs.index'))
+        ->assertSuccessful();
+
+    $this->actingAs($this->admin)
+        ->get(route('purchase-orders.approval'))
+        ->assertSuccessful();
+
+    $pages = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->latest('id')
+        ->limit(5)
+        ->get()
+        ->pluck('meta.page')
+        ->all();
+
+    expect($pages)->toContain('Purchase Requisitions')
+        ->and($pages)->toContain('PO Approval');
+});
+
+it('does not duplicate the same page visit within five minutes', function () {
+    $this->actingAs($this->admin)
+        ->get(route('purchase-orders.approval'))
+        ->assertSuccessful();
+
+    $this->actingAs($this->admin)
+        ->get(route('purchase-orders.approval'))
+        ->assertSuccessful();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where('meta->route', 'purchase-orders.approval')
+        ->count())->toBe(1);
+});
+
 it('force logs out a user and records the activity', function () {
     insertSession($this->monitoredUser, now()->timestamp);
 
@@ -221,4 +310,249 @@ it('renders status data attributes for realtime client filtering', function () {
         ->assertSee('as-filter-reset', false)
         ->assertSee('Activity detail', false)
         ->assertSee('Force logout', false);
+});
+
+it('logs successful create activity without a subject id', function () {
+    $this->actingAs($this->admin)
+        ->post(route('currency.store'), [
+            'code' => 'TST',
+            'name' => 'Test Currency',
+            'symbol' => 'T',
+        ])
+        ->assertRedirect();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_CREATED)
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['route'] ?? null)->toBe('currency.store')
+        ->and($log->meta['page'] ?? null)->toBe('Currencies')
+        ->and($log->meta['subject'] ?? null)->toBeNull()
+        ->and($log->meta['subject_id'] ?? null)->toBeNull();
+});
+
+it('does not log crud activity for login or broadcasting auth posts', function () {
+    $this->post('/login', [
+        'username' => 'monitored-user',
+        'password' => 'password',
+    ])->assertRedirect(route('dashboard', absolute: false));
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_CREATED)
+        ->exists())->toBeFalse();
+
+    $this->actingAs($this->admin)
+        ->post('/broadcasting/auth', [
+            'channel_name' => 'private-App.Models.User.'.$this->admin->id,
+        ]);
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_CREATED)
+        ->exists())->toBeFalse();
+});
+
+it('logs successful update activity with subject id from the route', function () {
+    $currency = Currency::query()->create([
+        'code' => 'UPD',
+        'name' => 'Update Currency',
+        'symbol' => 'U',
+        'created_by' => $this->admin->id,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->put(route('currency.update', $currency), [
+            'code' => 'UPD',
+            'name' => 'Updated Currency',
+            'symbol' => 'U',
+        ])
+        ->assertRedirect();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_UPDATED)
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['subject_id'] ?? null)->toBe($currency->id)
+        ->and($log->meta['subject'] ?? null)->toBe('#'.$currency->id)
+        ->and($log->subjectLabel())->toBe('#'.$currency->id);
+});
+
+it('logs successful delete activity with subject id from the model', function () {
+    $currency = Currency::query()->create([
+        'code' => 'DEL',
+        'name' => 'Delete Currency',
+        'symbol' => 'D',
+        'created_by' => $this->admin->id,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->delete(route('currency.destroy', $currency))
+        ->assertRedirect();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_DELETED)
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['subject_id'] ?? null)->toBe($currency->id)
+        ->and($log->meta['subject'] ?? null)->toBe('#'.$currency->id);
+});
+
+it('does not log crud activity when validation fails', function () {
+    $before = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->whereIn('action', [
+            UserActivityLog::ACTION_CREATED,
+            UserActivityLog::ACTION_UPDATED,
+            UserActivityLog::ACTION_DELETED,
+        ])
+        ->count();
+
+    $this->actingAs($this->admin)
+        ->from(route('currency.index'))
+        ->post(route('currency.store'), [
+            'code' => '',
+            'name' => '',
+        ])
+        ->assertRedirect(route('currency.index'))
+        ->assertSessionHasErrors(['code', 'name']);
+
+    $after = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->whereIn('action', [
+            UserActivityLog::ACTION_CREATED,
+            UserActivityLog::ACTION_UPDATED,
+            UserActivityLog::ACTION_DELETED,
+        ])
+        ->count();
+
+    expect($after)->toBe($before);
+});
+
+it('does not log crud activity for notification mutating noise endpoints', function () {
+    $before = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->whereIn('action', [
+            UserActivityLog::ACTION_CREATED,
+            UserActivityLog::ACTION_UPDATED,
+            UserActivityLog::ACTION_DELETED,
+        ])
+        ->count();
+
+    $this->actingAs($this->admin)
+        ->post(route('notifications.mark-all-read'))
+        ->assertRedirect();
+
+    $after = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->whereIn('action', [
+            UserActivityLog::ACTION_CREATED,
+            UserActivityLog::ACTION_UPDATED,
+            UserActivityLog::ACTION_DELETED,
+        ])
+        ->count();
+
+    expect($after)->toBe($before);
+});
+
+it('shows subject id in the activity detail timeline', function () {
+    UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_UPDATED,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => [
+            'route' => 'prs.update',
+            'path' => '/prs/12',
+            'page' => 'Purchase Requisitions',
+            'method' => 'PUT',
+            'subject' => '#12',
+            'subject_type' => 'prs',
+            'subject_id' => 12,
+        ],
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get(route('active-sessions.show', $this->monitoredUser))
+        ->assertSuccessful()
+        ->assertSee('Updated')
+        ->assertSee('Purchase Requisitions')
+        ->assertSee('#12');
+});
+
+it('logs purchase order approval activity with subject id', function () {
+    $manager = User::query()->create([
+        'name' => 'Purchasing Manager Activity',
+        'username' => 'po-approve-manager',
+        'email' => 'po-approve-manager@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $this->purchasingStaff->department_id,
+        'role' => 'Manager',
+    ]);
+    $manager->assignRole('purchasing-manager');
+
+    $currency = Currency::query()->create([
+        'code' => 'IDR',
+        'name' => 'Indonesian Rupiah',
+        'symbol' => 'Rp',
+        'created_by' => $manager->id,
+    ]);
+
+    $supplier = Supplier::query()->create([
+        'code' => 'SUP-ACT-001',
+        'name' => 'Activity Supplier',
+        'created_by' => $manager->id,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'currency_id' => $currency->id,
+        'created_by' => $manager->id,
+        'status' => 'PENDING_APPROVAL',
+        'po_number' => 'PO-ACT-001',
+        'subtotal' => 1000,
+        'discount_amount' => 0,
+        'ppn_amount' => 0,
+        'pph_amount' => 0,
+        'fees' => 0,
+        'total' => 1000,
+    ]);
+
+    $this->actingAs($manager)
+        ->post(route('purchase-orders.approve', $purchaseOrder))
+        ->assertRedirect();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $manager->id)
+        ->where('action', UserActivityLog::ACTION_APPROVED)
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['route'] ?? null)->toBe('purchase-orders.approve')
+        ->and($log->meta['page'] ?? null)->toBe('PO Approval')
+        ->and($log->meta['subject_id'] ?? null)->toBe($purchaseOrder->id)
+        ->and($log->meta['subject'] ?? null)->toBe('#'.$purchaseOrder->id)
+        ->and($log->label())->toBe('Approved');
+});
+
+it('refreshes the active sessions list without a full page reload', function () {
+    $response = $this->actingAs($this->admin)
+        ->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])
+        ->get(route('active-sessions.index'));
+
+    $response->assertSuccessful()
+        ->assertSee('as-list', false)
+        ->assertSee('Monitored User')
+        ->assertDontSee('<h3 class="mb-0">Active Users / Sessions</h3>', false)
+        ->assertDontSee('id="as-search"', false);
 });

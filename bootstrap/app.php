@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', [
             \App\Http\Middleware\BlockTransactionalWritesDuringReconcile::class,
             \App\Http\Middleware\TrackUserLastSeen::class,
+            \App\Http\Middleware\LogUserCrudActivity::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -1,20 +1,25 @@
 document.addEventListener('DOMContentLoaded', function () {
+    const page = document.getElementById('active-sessions-page');
     const searchInput = document.getElementById('as-search');
     const statusSelect = document.getElementById('as-status');
     const sortSelect = document.getElementById('as-sort');
     const resetButton = document.getElementById('as-filter-reset');
-    const list = document.getElementById('as-list');
-    const emptyState = document.getElementById('as-empty');
+    const refreshButton = document.getElementById('as-refresh');
+    const refreshIcon = document.getElementById('as-refresh-icon');
+    const liveRegion = document.getElementById('as-live');
     const visibleCount = document.getElementById('as-visible-count');
     const detailBody = document.getElementById('as-detail-body');
     const detailTitle = document.getElementById('as-detail-title');
     const offcanvasEl = document.getElementById('as-detail-offcanvas');
 
-    if (!searchInput || !statusSelect || !sortSelect || !resetButton || !list || !emptyState || !visibleCount) {
+    if (!page || !searchInput || !statusSelect || !sortSelect || !resetButton || !liveRegion || !visibleCount) {
         return;
     }
 
-    const rows = Array.from(list.querySelectorAll('[data-as-row="true"]'));
+    let rows = [];
+    let list = null;
+    let emptyState = null;
+    let refreshing = false;
 
     const loadingHtml = `
         <div class="as-detail-loading text-center text-muted py-5">
@@ -74,6 +79,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function applyFilters() {
+        if (!list || !emptyState) {
+            return;
+        }
+
         const query = normalizeText(searchInput.value);
         const status = statusSelect.value;
         const sort = sortSelect.value;
@@ -107,6 +116,114 @@ document.addEventListener('DOMContentLoaded', function () {
         emptyState.classList.toggle('d-none', shown.length !== 0);
     }
 
+    function bindDetailButtons() {
+        liveRegion.querySelectorAll('.as-btn-detail').forEach(function (button) {
+            button.addEventListener('click', async function () {
+                const url = button.dataset.detailUrl;
+                const name = button.dataset.userName || 'User Activity';
+
+                if (!url || !offcanvasEl || !window.bootstrap) {
+                    return;
+                }
+
+                detailTitle.textContent = name;
+                detailBody.innerHTML = loadingHtml;
+
+                const canvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+                canvas.show();
+
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            Accept: 'text/html',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to load detail');
+                    }
+
+                    detailBody.innerHTML = await response.text();
+                } catch (error) {
+                    detailBody.innerHTML = `
+                        <div class="text-danger text-center py-5">
+                            Unable to load activity history.
+                        </div>
+                    `;
+                }
+            });
+        });
+    }
+
+    function bindTooltips() {
+        if (!window.bootstrap || !window.bootstrap.Tooltip) {
+            return;
+        }
+
+        liveRegion.querySelectorAll('[data-bstooltip-toggle="tooltip"]').forEach(function (el) {
+            if (!window.bootstrap.Tooltip.getInstance(el)) {
+                new window.bootstrap.Tooltip(el);
+            }
+        });
+    }
+
+    function refreshDomRefs() {
+        list = document.getElementById('as-list');
+        emptyState = document.getElementById('as-empty');
+        rows = list ? Array.from(list.querySelectorAll('[data-as-row="true"]')) : [];
+        bindDetailButtons();
+        bindTooltips();
+        applyFilters();
+    }
+
+    async function refreshList() {
+        if (refreshing) {
+            return;
+        }
+
+        const url = page.dataset.listUrl;
+        if (!url) {
+            return;
+        }
+
+        refreshing = true;
+        if (refreshButton) {
+            refreshButton.disabled = true;
+        }
+        if (refreshIcon) {
+            refreshIcon.classList.add('fa-spin');
+        }
+
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    Accept: 'text/html',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to refresh list');
+            }
+
+            liveRegion.innerHTML = await response.text();
+            refreshDomRefs();
+        } catch (error) {
+            if (window.console) {
+                console.error(error);
+            }
+        } finally {
+            refreshing = false;
+            if (refreshButton) {
+                refreshButton.disabled = false;
+            }
+            if (refreshIcon) {
+                refreshIcon.classList.remove('fa-spin');
+            }
+        }
+    }
+
     let searchTimer;
     searchInput.addEventListener('input', function () {
         window.clearTimeout(searchTimer);
@@ -124,51 +241,9 @@ document.addEventListener('DOMContentLoaded', function () {
         searchInput.focus();
     });
 
-    document.querySelectorAll('.as-btn-detail').forEach(function (button) {
-        button.addEventListener('click', async function () {
-            const url = button.dataset.detailUrl;
-            const name = button.dataset.userName || 'User Activity';
-
-            if (!url || !offcanvasEl || !window.bootstrap) {
-                return;
-            }
-
-            detailTitle.textContent = name;
-            detailBody.innerHTML = loadingHtml;
-
-            const canvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
-            canvas.show();
-
-            try {
-                const response = await fetch(url, {
-                    headers: {
-                        Accept: 'text/html',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to load detail');
-                }
-
-                detailBody.innerHTML = await response.text();
-            } catch (error) {
-                detailBody.innerHTML = `
-                    <div class="text-danger text-center py-5">
-                        Unable to load activity history.
-                    </div>
-                `;
-            }
-        });
-    });
-
-    if (window.bootstrap && window.bootstrap.Tooltip) {
-        document.querySelectorAll('[data-bstooltip-toggle="tooltip"]').forEach(function (el) {
-            if (!window.bootstrap.Tooltip.getInstance(el)) {
-                new window.bootstrap.Tooltip(el);
-            }
-        });
+    if (refreshButton) {
+        refreshButton.addEventListener('click', refreshList);
     }
 
-    applyFilters();
+    refreshDomRefs();
 });

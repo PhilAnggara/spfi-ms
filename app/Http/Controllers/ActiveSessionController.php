@@ -14,7 +14,7 @@ class ActiveSessionController extends Controller
 {
     public function __construct(private UserActivityLogger $activityLogger) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $onlineThreshold = now()->timestamp - Session::ONLINE_THRESHOLD_SECONDS;
 
@@ -44,12 +44,18 @@ class ActiveSessionController extends Controller
         $onlineCount = $users->where('is_online', true)->count();
         $totalCount = $users->count();
 
-        return view('pages.active-sessions', [
+        $data = [
             'users' => $users,
             'onlineCount' => $onlineCount,
             'offlineCount' => $totalCount - $onlineCount,
             'totalCount' => $totalCount,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('pages.partials.active-session-list', $data);
+        }
+
+        return view('pages.active-sessions', $data);
     }
 
     public function show(User $user): View
