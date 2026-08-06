@@ -19,7 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'reconcile.freeze' => \App\Http\Middleware\BlockTransactionalWritesDuringReconcile::class,
         ]);
 
-        $middleware->appendToGroup('web', \App\Http\Middleware\BlockTransactionalWritesDuringReconcile::class);
+        $middleware->appendToGroup('web', [
+            \App\Http\Middleware\BlockTransactionalWritesDuringReconcile::class,
+            \App\Http\Middleware\TrackUserLastSeen::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

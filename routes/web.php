@@ -7,6 +7,7 @@ use App\Http\Controllers\Accounting\BsGroupingController;
 use App\Http\Controllers\Accounting\CurrencyExchangeRateController;
 use App\Http\Controllers\Accounting\GroupingController;
 use App\Http\Controllers\AccountingReportController;
+use App\Http\Controllers\ActiveSessionController;
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CanvassingController;
@@ -74,6 +75,9 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role:administrator|it-staff')->prefix('master')->group(function () {
         Route::resource('user', UserController::class);
+        Route::get('active-sessions', [ActiveSessionController::class, 'index'])->name('active-sessions.index');
+        Route::get('active-sessions/{user}', [ActiveSessionController::class, 'show'])->name('active-sessions.show');
+        Route::delete('active-sessions/{user}/sessions', [ActiveSessionController::class, 'destroySessions'])->name('active-sessions.destroy-sessions');
         Route::get('employees/id-cards/print', [EmployeeController::class, 'printIdCards'])->name('employees.id-cards.print');
         Route::resource('employees', EmployeeController::class)->except(['create', 'show', 'edit']);
         Route::delete('supplier/{supplier}', [SupplierController::class, 'destroy'])->name('supplier.destroy');

@@ -52,7 +52,42 @@ it('shows the full administrator dashboard regardless of department', function (
         ->assertSee('SWS Open')
         ->assertSee('TS Pending')
         ->assertSee('Deliveries')
+        ->assertSee('Users Online')
+        ->assertSee('Active Users')
+        ->assertSee('View all')
         ->assertDontSee('dashboard-quick-link', false);
+});
+
+it('shows active users widget data for online sessions on admin dashboard', function () {
+    $admin = makeDashboardUser('administrator', [
+        'name' => 'Information Technology',
+        'code' => '7056',
+        'alias' => 'IT',
+    ]);
+
+    $onlineUser = makeDashboardUser('purchasing-staff', [
+        'name' => 'Purchasing',
+        'code' => '7050',
+        'alias' => 'PUR',
+    ]);
+
+    DB::table('sessions')->insert([
+        'id' => 'dash-online-session-1',
+        'user_id' => $onlineUser->id,
+        'ip_address' => '203.0.113.40',
+        'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'payload' => base64_encode('payload'),
+        'last_activity' => now()->timestamp,
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertSee('Active Users')
+        ->assertSee($onlineUser->name)
+        ->assertSee('@'.$onlineUser->username, false)
+        ->assertSee('Chrome on Windows')
+        ->assertSee('1 online');
 });
 
 it('shows the full administrator dashboard for general-manager', function () {

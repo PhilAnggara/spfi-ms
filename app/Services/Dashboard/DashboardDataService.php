@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Prs;
 use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
+use App\Models\Session;
 use App\Models\TransferSlip;
 use App\Models\User;
 use Carbon\Carbon;
@@ -55,6 +56,8 @@ class DashboardDataService
      */
     private function forAdmin(User $user, Carbon $monthStart, Carbon $monthEnd, string $monthLabel): array
     {
+        $activeUsers = $this->activeUsersSnapshot();
+
         return $this->payload(
             key: 'admin',
             title: 'Administrator Dashboard',
@@ -65,6 +68,10 @@ class DashboardDataService
                 $this->purchasingMetrics($monthStart, $monthEnd),
                 $this->imMetrics($monthStart, $monthEnd),
                 $this->itMetrics(),
+                [
+                    'users_online' => $activeUsers['online_count'],
+                    'active_sessions' => $activeUsers['session_count'],
+                ],
             ),
             charts: array_merge(
                 $this->purchasingCharts(),
@@ -75,6 +82,7 @@ class DashboardDataService
                 'recent_po' => $this->recentPurchaseOrders(),
                 'recent_rr' => $this->recentReceivingReports(),
                 'recent_users' => $this->recentUsers(),
+                'active_users' => $activeUsers['items'],
             ],
         );
     }
@@ -818,6 +826,68 @@ class DashboardDataService
                 status: 'ACTIVE',
                 tone: 'secondary',
             ));
+    }
+
+    /**
+     * @return array{
+     *     online_count: int,
+     *     session_count: int,
+     *     items: Collection<int, array{name: string, username: string, department: string, last_seen: string, device: string, avatar: string}>
+     * }
+     */
+    private function activeUsersSnapshot(): array
+    {
+        $threshold = now()->timestamp - Session::ONLINE_THRESHOLD_SECONDS;
+
+        $sessions = DB::table('sessions')
+            ->whereNotNull('user_id')
+            ->where('last_activity', '>=', $threshold)
+            ->orderByDesc('last_activity')
+            ->get(['user_id', 'last_activity', 'ip_address', 'user_agent']);
+
+        $sessionCount = $sessions->count();
+        $latestByUser = $sessions->unique('user_id')->values();
+
+        $users = User::query()
+            ->with('department:id,name,alias')
+            ->whereIn('id', $latestByUser->pluck('user_id'))
+            ->get(['id', 'name', 'username', 'role', 'department_id'])
+            ->keyBy('id');
+
+        $items = $latestByUser
+            ->take(8)
+            ->map(function ($session) use ($users) {
+                $user = $users->get($session->user_id);
+
+                if ($user === null) {
+                    return null;
+                }
+
+                $avatar = match ($user->role) {
+                    'General Manager' => 'c2410c',
+                    'Manager' => '4338ca',
+                    'Supervisor' => '0e7490',
+                    'Programmer' => '0284c7',
+                    default => '475569',
+                };
+
+                return [
+                    'name' => (string) $user->name,
+                    'username' => (string) $user->username,
+                    'department' => (string) ($user->department?->alias ?? $user->department?->name ?? '—'),
+                    'last_seen' => Carbon::createFromTimestamp((int) $session->last_activity)->diffForHumans(),
+                    'device' => User::deviceLabelFromUserAgent($session->user_agent),
+                    'avatar' => $avatar,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        return [
+            'online_count' => $latestByUser->count(),
+            'session_count' => $sessionCount,
+            'items' => $items,
+        ];
     }
 
     /**

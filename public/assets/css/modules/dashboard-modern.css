@@ -1,3 +1,7 @@
+.dashboard-page .card {
+    margin-bottom: 0;
+}
+
 .dashboard-page .dashboard-meta {
     display: flex;
     flex-direction: column;
@@ -123,4 +127,61 @@
 
 .dashboard-page .bg-light-primary {
     background: #dbeafe !important;
+}
+
+.dashboard-page .dashboard-online-icon {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.dashboard-page .dashboard-active-users-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.75rem;
+}
+
+.dashboard-page .dashboard-active-user {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.85rem;
+    background: #f8fafc;
+}
+
+.dashboard-page .dashboard-active-user-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.dashboard-page .dashboard-active-user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    object-fit: cover;
+}
+
+.dashboard-page .dashboard-active-user-dot {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #10b981;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.dashboard-page .dashboard-active-user-name {
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.dashboard-page .dashboard-active-user-meta {
+    color: #64748b;
+    font-size: 0.78rem;
+    margin-top: 0.1rem;
 }

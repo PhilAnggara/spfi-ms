@@ -84,10 +84,10 @@
             'tone' => 'green',
         ])
         @include('pages.dashboard.partials.kpi-card', [
-            'label' => 'Users With Department',
-            'value' => $metrics['users_with_department'] ?? 0,
-            'icon' => 'fa-user-check',
-            'tone' => 'red',
+            'label' => 'Users Online',
+            'value' => $metrics['users_online'] ?? 0,
+            'icon' => 'fa-circle',
+            'tone' => 'green',
         ])
     </div>
 
@@ -127,6 +127,15 @@
             'title' => 'Monthly Outbound (TS + Delivery)',
             'chartId' => 'chart-monthly-outbound',
             'col' => 'col-12 col-lg-6',
+        ])
+    </div>
+
+    <div class="row g-3 mb-3">
+        @include('pages.dashboard.partials.active-users-widget', [
+            'items' => $dashboard['lists']['active_users'] ?? collect(),
+            'onlineCount' => $metrics['users_online'] ?? 0,
+            'sessionCount' => $metrics['active_sessions'] ?? 0,
+            'canManage' => auth()->user()?->hasAnyRole(['administrator', 'it-staff']) ?? false,
         ])
     </div>
 

@@ -88,6 +88,9 @@
                                             <li class="subsubmenu-item ">
                                                 <a href="{{ route('user.index') }}" class="subsubmenu-link">User</a>
                                             </li>
+                                            <li class="subsubmenu-item ">
+                                                <a href="{{ route('active-sessions.index') }}" class="subsubmenu-link">Active Sessions</a>
+                                            </li>
                                         </ul>
                                     </li>
 
