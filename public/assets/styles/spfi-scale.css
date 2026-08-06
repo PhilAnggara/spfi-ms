@@ -2,30 +2,55 @@
  * Responsive scaling tiers.
  * Applied before first paint (loaded in <head> before app.css) — no FOUC.
  *
- * To adjust density, change only the values in this file.
+ * HOW TO CHANGE SCALE / DENSITY
+ * -----------------------------
+ * Edit ONLY this file for global density. Keep --spfi-scale and html font-size
+ * in sync for each tier (e.g. 0.75 with 75%, 0.80 with 80%).
+ *
+ * Current tiers:
+ *   <= 1440px       → 75%  + sidebar 20rem (~240px)
+ *   1441px–1600px   → 80%  + sidebar 20rem (~256px)
+ *   > 1600px        → 100% + sidebar 18.75rem (~300px)
+ *
+ * Sidebar width (--spfi-sidebar-width) can be set independently per tier so
+ * menu text is not clipped when font-size is reduced. Main content margin
+ * follows the same token automatically.
+ *
+ * Example — make small screens denser:
+ *   :root { --spfi-scale: 0.70; --spfi-sidebar-width: 21rem; }
+ *   html { font-size: 70%; }
+ *
+ * Because Bootstrap/Mazer use rem, changing html font-size scales typography,
+ * padding, buttons, forms, tables, modals, and spacing automatically.
+ *
+ * For other specific sizes (navbar height, column utilities), edit
+ * spfi-tokens.css.
  */
 
 :root {
-    --spfi-scale: 0.85;
+    --spfi-scale: 0.75;
+    --spfi-sidebar-width: 20rem; /* ~240px at 75% */
 }
 
 html {
-    font-size: 85%;
+    font-size: 75%;
 }
 
 @media (min-width: 1441px) {
     :root {
-        --spfi-scale: 0.92;
+        --spfi-scale: 0.80;
+        --spfi-sidebar-width: 20rem; /* ~256px at 80% */
     }
 
     html {
-        font-size: 92%;
+        font-size: 80%;
     }
 }
 
 @media (min-width: 1601px) {
     :root {
         --spfi-scale: 1;
+        --spfi-sidebar-width: 18.75rem; /* ~300px at 100% */
     }
 
     html {

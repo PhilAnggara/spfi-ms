@@ -34,6 +34,7 @@ it('loads spfi scaling stylesheets on the dashboard', function () {
         ->assertSee('spfi-scale.css', false)
         ->assertSee('spfi-layout.css', false)
         ->assertSee('spfi-components.css', false)
+        ->assertSee('id="sidebar"', false)
         ->assertDontSee('set-font-size.js', false);
 });
 

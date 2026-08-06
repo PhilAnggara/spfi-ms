@@ -114,3 +114,18 @@
 .spfi-col-min-narrow {
     min-width: var(--spfi-col-select);
 }
+
+/* Sidebar submenu: keep labels on one line; hover shift without layout reflow */
+.sidebar-wrapper .menu .submenu .submenu-item a {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.sidebar-wrapper .menu .submenu .submenu-item a:hover {
+    margin-left: 0;
+    transform: translateX(0.25rem);
+    color: #435ebe;
+}
+

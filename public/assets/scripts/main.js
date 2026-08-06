@@ -255,10 +255,40 @@ applySidebarStateEarly();
     syncDesktopSidebarState();
   };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initSidebarToggle);
-  } else {
+  /**
+   * Prevent href="#" submenu toggles from navigating/hash-jumping (which can
+   * look like a page reset on AJAX list pages). Also stop nested leaf clicks
+   * from bubbling to parent .has-sub handlers.
+   */
+  const initSidebarSubmenuGuards = () => {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) {
+      return;
+    }
+
+    sidebar.querySelectorAll(
+      '.sidebar-item.has-sub > .sidebar-link[href="#"], .submenu-item.has-sub > .submenu-link[href="#"]'
+    ).forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+      });
+    });
+
+    sidebar.querySelectorAll('.submenu-item.has-sub .submenu .submenu-link').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.stopPropagation();
+      });
+    });
+  };
+
+  const initSidebarEnhancements = () => {
     initSidebarToggle();
+    initSidebarSubmenuGuards();
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSidebarEnhancements);
+  } else {
+    initSidebarEnhancements();
   }
 })();
-// ...existing code...
