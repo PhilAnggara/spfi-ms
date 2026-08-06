@@ -102,7 +102,7 @@
 
 .prs-cart-layout {
     display: grid;
-    grid-template-columns: minmax(240px, 0.95fr) minmax(0, 1.35fr);
+    grid-template-columns: minmax(var(--spfi-col-narrow), 0.95fr) minmax(0, 1.35fr);
     gap: 0.75rem;
     min-height: 100%;
 }
@@ -743,7 +743,7 @@
 
 .prs-detail-summary {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr));
     gap: 0.75rem;
 }
 
@@ -997,7 +997,7 @@
     }
 
     .prs-detail-item-name {
-        min-width: 180px;
+        min-width: var(--spfi-col-select);
     }
 
     .assign-canvasser-table thead th,

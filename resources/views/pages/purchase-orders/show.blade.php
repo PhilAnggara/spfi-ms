@@ -111,7 +111,7 @@
                             <div class="col-12 col-md-8">
                                 <label class="form-label">Remark</label>
                                 <div class="input-group">
-                                    <select name="remark_type" class="form-select" style="max-width: 180px;">
+                                    <select name="remark_type" class="form-select spfi-col-select">
                                         <option value="Normal" @selected($purchaseOrder->remark_type === 'Normal')>Normal</option>
                                         <option value="Confirmatory" @selected($purchaseOrder->remark_type === 'Confirmatory')>Confirmatory</option>
                                     </select>
@@ -121,7 +121,7 @@
                             <div class="col-12 col-lg-5">
                                 <label class="form-label">Term of Payment Type <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <select name="term_of_payment_type" class="form-select" style="max-width: 120px;" required>
+                                    <select name="term_of_payment_type" class="form-select spfi-col-select-sm" required>
                                         <option value="">Select</option>
                                         <option value="cash" @selected($termOfPaymentType === 'cash')>Cash</option>
                                         <option value="credit" @selected($termOfPaymentType === 'credit')>Credit</option>
@@ -158,7 +158,7 @@
                                         <th class="text-end">Amount</th>
                                         <th>Notes</th>
                                         @if ($canEdit)
-                                            <th class="text-center" style="width: 56px;"></th>
+                                            <th class="text-center spfi-col-action"></th>
                                         @endif
                                     </tr>
                                 </thead>

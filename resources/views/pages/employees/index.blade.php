@@ -133,7 +133,7 @@
                             <table class="table table-striped align-middle po-table text-nowrap" id="employees-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 44px;">
+                                        <th class="spfi-col-icon">
                                             <input type="checkbox" class="form-check-input employee-select-all-checkbox" id="employee-select-all-checkbox">
                                         </th>
                                         <th>Employee ID</th>

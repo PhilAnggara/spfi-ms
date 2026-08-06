@@ -1,0 +1,58 @@
+/*
+ * Layout shell overrides for Mazer fixed-px dimensions.
+ * Uses --spfi-* tokens so sidebar / navbar / main content scale with root font-size.
+ */
+
+.sidebar-wrapper {
+    width: var(--spfi-sidebar-width);
+}
+
+#sidebar .sidebar-wrapper {
+    left: var(--spfi-sidebar-offscreen);
+}
+
+#sidebar.inactive .sidebar-wrapper {
+    left: var(--spfi-sidebar-offscreen);
+}
+
+#sidebar.active .sidebar-wrapper {
+    left: 0;
+}
+
+#main {
+    margin-left: var(--spfi-sidebar-width);
+}
+
+@media screen and (max-width: 1199px) {
+    #main {
+        margin-left: 0;
+    }
+}
+
+@media screen and (min-width: 1200px) {
+    #sidebar .sidebar-wrapper {
+        left: 0;
+    }
+
+    #sidebar ~ #main {
+        margin-left: var(--spfi-sidebar-width);
+    }
+
+    #sidebar.inactive ~ #main {
+        margin-left: 0;
+    }
+}
+
+.layout-navbar,
+.navbar.navbar-top {
+    --navbar-height: var(--spfi-navbar-height);
+}
+
+#main #main-content,
+#main-content {
+    padding: var(--spfi-main-padding);
+}
+
+#sidebar .sidebar-wrapper .sidebar-header .logo a img {
+    height: 1.75rem;
+}

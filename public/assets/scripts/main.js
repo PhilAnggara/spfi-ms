@@ -149,6 +149,8 @@ function copyToClipboard(text) {
 // Sidebar Desktop Toggle State Persistence
 const SIDEBAR_STORAGE_KEY = 'desktop-sidebar-state';
 const SIDEBAR_BREAKPOINT = '(min-width: 1200px)';
+const SIDEBAR_WIDTH = 'var(--spfi-sidebar-width)';
+const SIDEBAR_OFFSCREEN = 'var(--spfi-sidebar-offscreen)';
 
 // Apply stored sidebar state early - with inline style to force correct layout
 const applySidebarStateEarly = () => {
@@ -171,12 +173,13 @@ const applySidebarStateEarly = () => {
   sidebar.classList.remove('active', 'inactive');
   sidebar.classList.add(shouldShow ? 'active' : 'inactive');
 
-  // Force with inline styles to override any component defaults
+  // Force with inline styles to override any component defaults.
+  // Use CSS tokens so margin stays in sync with scaled sidebar width.
   if (shouldShow) {
     wrapper.style.left = '0';
-    if (main) main.style.marginLeft = '300px';
+    if (main) main.style.marginLeft = SIDEBAR_WIDTH;
   } else {
-    wrapper.style.left = '-300px';
+    wrapper.style.left = SIDEBAR_OFFSCREEN;
     if (main) main.style.marginLeft = '0';
   }
 };
@@ -202,12 +205,12 @@ applySidebarStateEarly();
       sidebar.classList.toggle('active', isVisible);
       sidebar.classList.toggle('inactive', !isVisible);
 
-      // Force inline styles
+      // Force inline styles using CSS tokens (keeps margin aligned with scaled sidebar)
       if (isVisible) {
         wrapper.style.left = '0';
-        if (main) main.style.marginLeft = '300px';
+        if (main) main.style.marginLeft = SIDEBAR_WIDTH;
       } else {
-        wrapper.style.left = '-300px';
+        wrapper.style.left = SIDEBAR_OFFSCREEN;
         if (main) main.style.marginLeft = '0';
       }
 

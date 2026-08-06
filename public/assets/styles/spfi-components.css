@@ -1,0 +1,116 @@
+/*
+ * Global component sizing bridged to --spfi-* tokens.
+ * Bootstrap rem-based defaults already scale with html font-size;
+ * these overrides keep padding / density consistent and provide utilities
+ * for former hardcoded px values in Blade.
+ */
+
+/* Buttons */
+.btn {
+    padding: var(--spfi-btn-padding-y) var(--spfi-btn-padding-x);
+}
+
+.btn-sm {
+    padding: var(--spfi-btn-sm-padding-y) var(--spfi-btn-sm-padding-x);
+}
+
+/* Forms */
+.form-control,
+.form-select {
+    padding: var(--spfi-input-padding-y) var(--spfi-input-padding-x);
+    font-size: var(--spfi-input-font-size);
+}
+
+/* Tables */
+.table {
+    font-size: var(--spfi-table-font-size);
+}
+
+.table > :not(caption) > * > * {
+    padding: var(--spfi-table-cell-padding-y) var(--spfi-table-cell-padding-x);
+}
+
+/* Modals */
+.modal-header {
+    padding: var(--spfi-modal-header-padding);
+}
+
+.modal-body {
+    padding: var(--spfi-modal-body-padding);
+}
+
+/* Navbar notification dropdown */
+.notification-dropdown {
+    min-width: var(--spfi-dropdown-min-width);
+    max-height: var(--spfi-dropdown-max-height);
+    overflow-y: auto;
+}
+
+/* Avatar */
+.avatar.avatar-md {
+    width: var(--spfi-avatar-md);
+    height: var(--spfi-avatar-md);
+}
+
+/* Icon button (replaces 24×24px inline styles) */
+.spfi-icon-btn {
+    width: var(--spfi-icon-btn-size);
+    height: var(--spfi-icon-btn-size);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+}
+
+/* Large icon block (replaces 48×48px) */
+.spfi-icon-lg {
+    width: var(--spfi-icon-lg-size);
+    height: var(--spfi-icon-lg-size);
+}
+
+/* Progress bar thin */
+.spfi-progress-sm {
+    height: var(--spfi-progress-height);
+}
+
+/* Column / cell width utilities (replaces inline max-width / width px) */
+.spfi-col-narrow {
+    max-width: var(--spfi-col-narrow);
+}
+
+.spfi-col-medium {
+    max-width: var(--spfi-col-medium);
+}
+
+.spfi-col-select {
+    max-width: var(--spfi-col-select);
+}
+
+.spfi-col-select-sm {
+    max-width: var(--spfi-col-select-sm);
+}
+
+.spfi-col-select-xs {
+    max-width: var(--spfi-col-select-xs);
+}
+
+.spfi-col-icon {
+    width: var(--spfi-col-icon);
+}
+
+.spfi-col-check {
+    width: var(--spfi-col-check);
+}
+
+.spfi-col-num {
+    width: var(--spfi-col-num);
+}
+
+.spfi-col-action {
+    width: var(--spfi-col-action);
+}
+
+.spfi-col-min-narrow {
+    min-width: var(--spfi-col-select);
+}

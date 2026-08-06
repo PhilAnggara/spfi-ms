@@ -383,8 +383,8 @@
 }
 
 .supplier-summary-body .supplier-summary-card {
-    min-width: min(100%, 240px);
-    flex: 1 1 240px;
+    min-width: min(100%, var(--spfi-col-narrow));
+    flex: 1 1 var(--spfi-col-narrow);
 }
 
 .supplier-summary-body--stacked .supplier-summary-card {

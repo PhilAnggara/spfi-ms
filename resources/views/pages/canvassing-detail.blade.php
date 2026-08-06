@@ -138,7 +138,7 @@
                                         </div>
                                         <div class="supplier-name px-3 py-2 rounded border bg-light-primary w-100 cursor-pointer d-flex justify-content-between align-items-center mb-3" data-placeholder="Not selected" role="button" tabindex="0">
                                             <span class="supplier-name-text flex-grow-1">{{ $canvassing?->supplier ? ($canvassing->supplier->code . ' · ' . $canvassing->supplier->name) : 'Not selected' }}</span>
-                                            <button type="button" class="btn btn-sm p-0 ms-2 clear-supplier" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; display: none;" title="Clear supplier">
+                                            <button type="button" class="btn btn-sm p-0 ms-2 clear-supplier spfi-icon-btn" style="display: none;" title="Clear supplier">
                                                 <i class="fa-duotone fa-solid fa-xmark"></i>
                                             </button>
                                         </div>
@@ -163,7 +163,7 @@
                                             <div class="col-12 col-lg-5">
                                                 <label class="form-label" for="term-payment-type-{{ $prsItem->id }}-{{ $index }}">Term of Payment</label>
                                                 <div class="input-group">
-                                                    <select id="term-payment-type-{{ $prsItem->id }}-{{ $index }}" name="suppliers[{{ $index }}][term_of_payment_type]" class="form-select" style="max-width: 100px;">
+                                                    <select id="term-payment-type-{{ $prsItem->id }}-{{ $index }}" name="suppliers[{{ $index }}][term_of_payment_type]" class="form-select spfi-col-select-xs">
                                                         <option value="" @selected(! ($canvassing?->term_of_payment_type))>Select</option>
                                                         <option value="cash" @selected($canvassing?->term_of_payment_type === 'cash')>Cash</option>
                                                         <option value="credit" @selected($canvassing?->term_of_payment_type === 'credit')>Credit</option>
@@ -202,7 +202,7 @@
                                 </div>
                                 <div class="supplier-name px-3 py-2 rounded border bg-light-primary w-100 cursor-pointer d-flex justify-content-between align-items-center mb-3" data-placeholder="Not selected" role="button" tabindex="0">
                                     <span class="supplier-name-text flex-grow-1">Not selected</span>
-                                    <button type="button" class="btn btn-sm p-0 ms-2 clear-supplier" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; display: none;" title="Clear supplier">
+                                    <button type="button" class="btn btn-sm p-0 ms-2 clear-supplier spfi-icon-btn" style="display: none;" title="Clear supplier">
                                         <i class="fa-duotone fa-solid fa-xmark"></i>
                                     </button>
                                 </div>
@@ -227,7 +227,7 @@
                                     <div class="col-12 col-lg-5">
                                         <label class="form-label" for="term-payment-type-{{ $prsItem->id }}-__INDEX__">Term of Payment</label>
                                         <div class="input-group">
-                                            <select id="term-payment-type-{{ $prsItem->id }}-__INDEX__" name="suppliers[__INDEX__][term_of_payment_type]" class="form-select" style="max-width: 100px;">
+                                            <select id="term-payment-type-{{ $prsItem->id }}-__INDEX__" name="suppliers[__INDEX__][term_of_payment_type]" class="form-select spfi-col-select-xs">
                                                 <option value="" selected>Select</option>
                                                 <option value="cash">Cash</option>
                                                 <option value="credit">Credit</option>

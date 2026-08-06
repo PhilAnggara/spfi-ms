@@ -99,7 +99,7 @@
                                 <table class="table table-striped align-middle po-table text-nowrap" id="canvassing-table">
                                     <thead>
                                         <tr>
-                                            <th style="width: 44px;">
+                                            <th class="spfi-col-icon">
                                                 <input type="checkbox" class="form-check-input" id="canvassing-select-page-checkbox" title="Select printable items on this page">
                                             </th>
                                             <th>PRS Number</th>

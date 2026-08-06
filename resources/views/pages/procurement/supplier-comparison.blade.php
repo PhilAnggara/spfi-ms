@@ -124,7 +124,7 @@
                                             <table class="table align-middle po-table sc-table">
                                                 <thead>
                                                     <tr>
-                                                        <th class="text-center" style="width: 76px;">Select</th>
+                                                        <th class="text-center spfi-col-num">Select</th>
                                                         <th>Supplier</th>
                                                         <th class="text-end">Unit Price</th>
                                                         <th class="text-center">Lead Time</th>

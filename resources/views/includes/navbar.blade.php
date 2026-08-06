@@ -26,7 +26,7 @@
                             </span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end notification-dropdown shadow"
-                            aria-labelledby="dropdownMenuButton" style="min-width: 350px; max-height: 500px; overflow-y: auto;">
+                            aria-labelledby="dropdownMenuButton">
 
                             <!-- Header -->
                             <li class="dropdown-header d-flex justify-content-between align-items-center">

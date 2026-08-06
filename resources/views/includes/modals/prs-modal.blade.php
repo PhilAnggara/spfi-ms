@@ -84,7 +84,7 @@
                     <span class="fw-semibold text-muted">Progress {{ $headerProgress }}%</span>
                 </div>
 
-                <div class="progress mb-4" style="height: 10px;">
+                <div class="progress mb-4 spfi-progress-sm">
                     <div class="progress-bar {{ $headerProgressClass }}" role="progressbar" style="width: {{ $headerProgress }}%" aria-valuenow="{{ $headerProgress }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
 

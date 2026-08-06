@@ -165,7 +165,7 @@
                                         </td>
                                         <td>{{ number_format((int) ($transferSlip->item_count ?? 0)) }}</td>
                                         <td>{{ number_format((float) ($transferSlip->total_quantity ?? 0), 3) }}</td>
-                                        <td class="text-wrap" style="max-width: 240px;">{{ $transferSlip->remarks ?: '-' }}</td>
+                                        <td class="text-wrap spfi-col-narrow">{{ $transferSlip->remarks ?: '-' }}</td>
                                         <td>{{ $transferSlip->created_by_name ?? '-' }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
@@ -415,7 +415,7 @@
                                                                 <th class="text-end">SWS Qty</th>
                                                                 <th class="text-end">Other TS</th>
                                                                 <th class="text-end">Available</th>
-                                                                <th style="min-width: 180px;">Qty Out</th>
+                                                                <th class="spfi-col-min-narrow">Qty Out</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -615,7 +615,7 @@
                                             <th class="text-end">SWS Qty</th>
                                             <th class="text-end">Transferred</th>
                                             <th class="text-end">Remaining</th>
-                                            <th style="min-width: 180px;">Qty Out</th>
+                                            <th class="spfi-col-min-narrow">Qty Out</th>
                                         </tr>
                                     </thead>
                                     <tbody id="create-ts-items-body">

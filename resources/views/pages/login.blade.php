@@ -6,9 +6,13 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>SPFI-MS | Login</title>
     <link rel="shortcut icon" href="{{ url('assets/images/favicon.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url('assets/styles/spfi-tokens.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/styles/spfi-scale.css') }}">
     <link rel="stylesheet" href="{{ url('assets/compiled/css/app.css') }}">
     <link rel="stylesheet" href="{{ url('assets/compiled/css/app-dark.css') }}">
     <link rel="stylesheet" href="{{ url('assets/compiled/css/auth.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/styles/spfi-layout.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/styles/spfi-components.css') }}">
     <link rel="stylesheet" href="{{ url('assets/styles/main.css') }}">
 </head>
 <body>
@@ -75,6 +79,5 @@
 
     </div>
 
-    <script src="{{ url('assets/scripts/set-font-size.js') }}"></script>
 </body>
 </html>

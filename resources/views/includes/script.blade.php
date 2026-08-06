@@ -52,7 +52,6 @@
         })();
     </script>
 
-    <script src="{{ url('assets/scripts/set-font-size.js') }}"></script>
     <script src="{{ url('assets/scripts/main.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/realtime-notifications.js') }}"></script>
 

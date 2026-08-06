@@ -1,0 +1,34 @@
+/*
+ * Responsive scaling tiers.
+ * Applied before first paint (loaded in <head> before app.css) — no FOUC.
+ *
+ * To adjust density, change only the values in this file.
+ */
+
+:root {
+    --spfi-scale: 0.85;
+}
+
+html {
+    font-size: 85%;
+}
+
+@media (min-width: 1441px) {
+    :root {
+        --spfi-scale: 0.92;
+    }
+
+    html {
+        font-size: 92%;
+    }
+}
+
+@media (min-width: 1601px) {
+    :root {
+        --spfi-scale: 1;
+    }
+
+    html {
+        font-size: 100%;
+    }
+}

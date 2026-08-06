@@ -50,8 +50,7 @@
                                     <!-- Icon & Content -->
                                     <div class="d-flex align-items-start flex-grow-1">
                                         <div class="notification-icon {{ $notification->data['icon_color'] ?? 'bg-primary' }} me-3
-                                             d-flex align-items-center justify-content-center rounded-circle"
-                                             style="width: 48px; height: 48px;">
+                                             d-flex align-items-center justify-content-center rounded-circle spfi-icon-lg">
                                             <i class="{{ $notification->data['icon'] ?? 'bi-bell' }} text-white"></i>
                                         </div>
 

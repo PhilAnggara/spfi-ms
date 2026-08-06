@@ -110,11 +110,11 @@
                                             <i class="fa-duotone fa-solid fa-calendar-days text-danger"></i>
                                             {{ \Carbon\Carbon::parse($delivery->dr_date)->format('d M Y') }}
                                         </td>
-                                        <td class="text-wrap" style="max-width: 200px;">
+                                        <td class="text-wrap spfi-col-medium">
                                             <div class="fw-semibold">{{ $delivery->from_name }}</div>
                                             <small class="text-muted">{{ $delivery->from_location ?: '-' }}</small>
                                         </td>
-                                        <td class="text-wrap" style="max-width: 200px;">
+                                        <td class="text-wrap spfi-col-medium">
                                             <div class="fw-semibold">{{ $delivery->to_name ?: '-' }}</div>
                                             <small class="text-muted">{{ $delivery->to_location ?: '-' }}</small>
                                         </td>

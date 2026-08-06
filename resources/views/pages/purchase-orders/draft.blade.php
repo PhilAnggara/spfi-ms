@@ -164,7 +164,7 @@
                                                 <table class="table table-striped align-middle po-table po-draft-table text-nowrap">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 40px;"></th>
+                                                            <th class="spfi-col-check"></th>
                                                             <th>PRS</th>
                                                             <th>Item</th>
                                                             <th>Qty</th>

@@ -1,0 +1,56 @@
+:root {
+    /* Scale multiplier — set by spfi-scale.css per breakpoint */
+    --spfi-scale: 1;
+
+    /* Base reference (does not change) */
+    --spfi-base-font: 16px;
+
+    /* Layout shell — rem-based, scales with root font-size */
+    --spfi-sidebar-width: 18.75rem;   /* 300px @ scale 1 */
+    --spfi-navbar-height: 5.625rem;   /* 90px @ scale 1 */
+    --spfi-main-padding: 2rem;
+    --spfi-sidebar-offscreen: calc(-1 * var(--spfi-sidebar-width));
+
+    /* Spacing scale */
+    --spfi-space-xs: 0.25rem;
+    --spfi-space-sm: 0.5rem;
+    --spfi-space-md: 1rem;
+    --spfi-space-lg: 1.5rem;
+    --spfi-space-xl: 2rem;
+
+    /* Component tokens */
+    --spfi-btn-padding-y: 0.375rem;
+    --spfi-btn-padding-x: 0.75rem;
+    --spfi-btn-sm-padding-y: 0.25rem;
+    --spfi-btn-sm-padding-x: 0.5rem;
+    --spfi-input-padding-y: 0.375rem;
+    --spfi-input-padding-x: 0.75rem;
+    --spfi-input-font-size: 1rem;
+    --spfi-table-cell-padding-y: 0.5rem;
+    --spfi-table-cell-padding-x: 0.5rem;
+    --spfi-table-font-size: 0.875rem;
+    --spfi-modal-header-padding: 1rem;
+    --spfi-modal-body-padding: 1rem;
+    --spfi-dropdown-min-width: 21.875rem;  /* 350px @ scale 1 */
+    --spfi-dropdown-max-height: 31.25rem;  /* 500px @ scale 1 */
+    --spfi-avatar-md: 2.4375rem;           /* 39px @ scale 1 */
+    --spfi-icon-btn-size: 1.5rem;          /* 24px @ scale 1 */
+    --spfi-icon-lg-size: 3rem;             /* 48px @ scale 1 */
+    --spfi-progress-height: 0.625rem;      /* 10px @ scale 1 */
+
+    /* Column / cell width utilities */
+    --spfi-col-narrow: 15rem;      /* 240px @ scale 1 */
+    --spfi-col-medium: 12.5rem;    /* 200px @ scale 1 */
+    --spfi-col-select: 11.25rem;   /* 180px @ scale 1 */
+    --spfi-col-select-sm: 7.5rem;  /* 120px @ scale 1 */
+    --spfi-col-select-xs: 6.25rem; /* 100px @ scale 1 */
+    --spfi-col-icon: 2.75rem;      /* 44px @ scale 1 */
+    --spfi-col-check: 2.5rem;      /* 40px @ scale 1 */
+    --spfi-col-num: 4.75rem;       /* 76px @ scale 1 */
+    --spfi-col-action: 3.5rem;     /* 56px @ scale 1 */
+
+    /* Breakpoints (reference for documentation; media queries use literals) */
+    --spfi-bp-sidebar: 1200px;
+    --spfi-bp-scale-sm: 1440px;
+    --spfi-bp-scale-md: 1600px;
+}

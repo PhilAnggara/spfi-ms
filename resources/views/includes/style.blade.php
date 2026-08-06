@@ -32,9 +32,13 @@
 
     @stack('prepend-style')
 
+    <link rel="stylesheet" href="{{ url('assets/styles/spfi-tokens.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/styles/spfi-scale.css') }}">
     <link rel="stylesheet" href="{{ url('assets/compiled/css/app.css') }}">
     <link rel="stylesheet" href="{{ url('assets/compiled/css/app-dark.css') }}">
     <link rel="stylesheet" href="{{ url('assets/vendors/aos/aos.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/styles/spfi-layout.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/styles/spfi-components.css') }}">
     <link rel="stylesheet" href="{{ url('assets/styles/main.css') }}">
 
     @stack('addon-style')

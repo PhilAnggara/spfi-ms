@@ -17,7 +17,7 @@
 .dashboard-page .dashboard-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: var(--spfi-space-sm);
     padding: 0.4rem 0.85rem;
     border-radius: 999px;
     background: #eff6ff;
@@ -136,7 +136,7 @@
 
 .dashboard-page .dashboard-active-users-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--spfi-col-narrow), 1fr));
     gap: 0.75rem;
 }
 
@@ -156,9 +156,9 @@
 }
 
 .dashboard-page .dashboard-active-user-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
+    width: var(--spfi-col-check);
+    height: var(--spfi-col-check);
+    border-radius: 0.75rem;
     object-fit: cover;
 }
 
@@ -166,8 +166,8 @@
     position: absolute;
     right: -1px;
     bottom: -1px;
-    width: 10px;
-    height: 10px;
+    width: var(--spfi-progress-height);
+    height: var(--spfi-progress-height);
     border-radius: 50%;
     background: #10b981;
     border: 2px solid #fff;
