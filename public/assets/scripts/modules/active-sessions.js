@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const visibleCount = document.getElementById('as-visible-count');
     const detailBody = document.getElementById('as-detail-body');
     const detailTitle = document.getElementById('as-detail-title');
+    const detailRefreshButton = document.getElementById('as-detail-refresh');
+    const detailRefreshIcon = document.getElementById('as-detail-refresh-icon');
     const offcanvasEl = document.getElementById('as-detail-offcanvas');
 
     if (!page || !searchInput || !statusSelect || !sortSelect || !resetButton || !liveRegion || !visibleCount) {
@@ -20,6 +22,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let list = null;
     let emptyState = null;
     let refreshing = false;
+    let detailRefreshing = false;
+    let currentDetailUrl = null;
 
     const loadingHtml = `
         <div class="as-detail-loading text-center text-muted py-5">
@@ -116,6 +120,50 @@ document.addEventListener('DOMContentLoaded', function () {
         emptyState.classList.toggle('d-none', shown.length !== 0);
     }
 
+    function setDetailRefreshEnabled(enabled) {
+        if (!detailRefreshButton) {
+            return;
+        }
+
+        detailRefreshButton.disabled = !enabled;
+    }
+
+    async function loadDetail(url, options) {
+        const showLoading = !options || options.showLoading !== false;
+
+        if (!url || !detailBody) {
+            return;
+        }
+
+        currentDetailUrl = url;
+        setDetailRefreshEnabled(true);
+
+        if (showLoading) {
+            detailBody.innerHTML = loadingHtml;
+        }
+
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    Accept: 'text/html',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load detail');
+            }
+
+            detailBody.innerHTML = await response.text();
+        } catch (error) {
+            detailBody.innerHTML = `
+                <div class="text-danger text-center py-5">
+                    Unable to load activity history.
+                </div>
+            `;
+        }
+    }
+
     function bindDetailButtons() {
         liveRegion.querySelectorAll('.as-btn-detail').forEach(function (button) {
             button.addEventListener('click', async function () {
@@ -127,31 +175,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 detailTitle.textContent = name;
-                detailBody.innerHTML = loadingHtml;
 
                 const canvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
                 canvas.show();
 
-                try {
-                    const response = await fetch(url, {
-                        headers: {
-                            Accept: 'text/html',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                    });
-
-                    if (!response.ok) {
-                        throw new Error('Failed to load detail');
-                    }
-
-                    detailBody.innerHTML = await response.text();
-                } catch (error) {
-                    detailBody.innerHTML = `
-                        <div class="text-danger text-center py-5">
-                            Unable to load activity history.
-                        </div>
-                    `;
-                }
+                await loadDetail(url, { showLoading: true });
             });
         });
     }
@@ -224,6 +252,30 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    async function refreshDetail() {
+        if (detailRefreshing || !currentDetailUrl) {
+            return;
+        }
+
+        detailRefreshing = true;
+        if (detailRefreshButton) {
+            detailRefreshButton.disabled = true;
+        }
+        if (detailRefreshIcon) {
+            detailRefreshIcon.classList.add('fa-spin');
+        }
+
+        try {
+            await loadDetail(currentDetailUrl, { showLoading: true });
+        } finally {
+            detailRefreshing = false;
+            setDetailRefreshEnabled(Boolean(currentDetailUrl));
+            if (detailRefreshIcon) {
+                detailRefreshIcon.classList.remove('fa-spin');
+            }
+        }
+    }
+
     let searchTimer;
     searchInput.addEventListener('input', function () {
         window.clearTimeout(searchTimer);
@@ -243,6 +295,57 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (refreshButton) {
         refreshButton.addEventListener('click', refreshList);
+    }
+
+    if (detailRefreshButton) {
+        detailRefreshButton.addEventListener('click', refreshDetail);
+    }
+
+    const resetLogsButton = document.getElementById('as-reset-logs');
+    const resetLogsForm = document.getElementById('as-reset-logs-form');
+    const resetPasswordInput = document.getElementById('as-reset-password-input');
+
+    if (resetLogsButton && resetLogsForm && resetPasswordInput && window.Swal) {
+        resetLogsButton.addEventListener('click', function () {
+            Swal.fire({
+                title: 'Reset activity logs?',
+                html: 'This permanently deletes all activity history, resets log IDs to start from 1, and logs out every user including you.',
+                icon: 'warning',
+                input: 'password',
+                inputLabel: 'Reset password',
+                inputPlaceholder: 'Enter reset password',
+                inputAttributes: {
+                    autocapitalize: 'off',
+                    autocomplete: 'off',
+                },
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                confirmButtonText: 'Yes, reset!',
+                cancelButtonText: 'Cancel',
+                preConfirm: function (password) {
+                    if (!password) {
+                        Swal.showValidationMessage('Reset password is required.');
+                        return false;
+                    }
+
+                    return password;
+                },
+            }).then(function (result) {
+                if (!result.isConfirmed) {
+                    return;
+                }
+
+                resetPasswordInput.value = result.value;
+                resetLogsForm.submit();
+            });
+        });
+    }
+
+    if (offcanvasEl) {
+        offcanvasEl.addEventListener('hidden.bs.offcanvas', function () {
+            currentDetailUrl = null;
+            setDetailRefreshEnabled(false);
+        });
     }
 
     refreshDomRefs();

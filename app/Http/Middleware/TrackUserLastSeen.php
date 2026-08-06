@@ -23,6 +23,22 @@ class TrackUserLastSeen
         'notifications.mark-all-read',
         'notifications.destroy',
         'notifications.clear-read',
+        'active-sessions.index',
+        'active-sessions.show',
+    ];
+
+    /**
+     * Infrastructure path prefixes that are not real page visits.
+     *
+     * @var list<string>
+     */
+    private const IGNORED_PATH_PREFIXES = [
+        'broadcasting',
+        'livewire',
+        'sanctum',
+        'horizon',
+        'telescope',
+        '_debugbar',
     ];
 
     public function __construct(private UserActivityLogger $logger) {}
@@ -97,12 +113,20 @@ class TrackUserLastSeen
 
     private function shouldSkipActivityLog(Request $request): bool
     {
-        if ($request->ajax()) {
+        if (! $request->isMethod('GET')) {
             return true;
         }
 
         if ($request->routeIs(...self::IGNORED_ACTIVITY_ROUTES)) {
             return true;
+        }
+
+        $path = trim($request->path(), '/');
+
+        foreach (self::IGNORED_PATH_PREFIXES as $prefix) {
+            if ($path === $prefix || str_starts_with($path, $prefix.'/')) {
+                return true;
+            }
         }
 
         $routeName = (string) $request->route()?->getName();
@@ -113,6 +137,12 @@ class TrackUserLastSeen
             || str_ends_with($routeName, '.unread-count')
             || str_ends_with($routeName, '.recent')
         )) {
+            return true;
+        }
+
+        // Keep Active Users list/detail AJAX refreshes out of visit history,
+        // but allow AJAX page navigations (e.g. PO list filters) to log once.
+        if ($request->ajax() && $request->routeIs('active-sessions.index', 'active-sessions.show')) {
             return true;
         }
 

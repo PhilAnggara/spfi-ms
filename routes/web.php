@@ -76,6 +76,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:administrator|it-staff')->prefix('master')->group(function () {
         Route::resource('user', UserController::class);
         Route::get('active-sessions', [ActiveSessionController::class, 'index'])->name('active-sessions.index');
+        Route::delete('active-sessions/activity-logs', [ActiveSessionController::class, 'resetActivityLogs'])->name('active-sessions.reset-activity-logs');
         Route::get('active-sessions/{user}', [ActiveSessionController::class, 'show'])->name('active-sessions.show');
         Route::delete('active-sessions/{user}/sessions', [ActiveSessionController::class, 'destroySessions'])->name('active-sessions.destroy-sessions');
         Route::get('employees/id-cards/print', [EmployeeController::class, 'printIdCards'])->name('employees.id-cards.print');

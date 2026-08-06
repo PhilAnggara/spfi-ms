@@ -103,4 +103,32 @@ class ActiveSessionController extends Controller
 
         return back();
     }
+
+    public function resetActivityLogs(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()?->hasRole('administrator'), 403);
+
+        $request->validate([
+            'reset_password' => ['required', 'string'],
+        ], [
+            'reset_password.required' => 'Reset password is required.',
+        ]);
+
+        if (! hash_equals((string) config('active-sessions.reset_password'), (string) $request->input('reset_password'))) {
+            toast('Incorrect reset password.', 'error');
+
+            return back();
+        }
+
+        UserActivityLog::query()->truncate();
+        Session::query()->delete();
+
+        auth()->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        toast('Activity logs cleared. All users have been logged out.');
+
+        return redirect()->route('login');
+    }
 }

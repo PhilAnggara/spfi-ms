@@ -556,3 +556,127 @@ it('refreshes the active sessions list without a full page reload', function () 
         ->assertDontSee('<h3 class="mb-0">Active Users / Sessions</h3>', false)
         ->assertDontSee('id="as-search"', false);
 });
+
+it('does not log broadcasting auth as a page visit', function () {
+    $this->actingAs($this->admin)
+        ->post('/broadcasting/auth', [
+            'channel_name' => 'private-App.Models.User.'.$this->admin->id,
+        ]);
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where(function ($query) {
+            $query->where('meta->page', 'Broadcasting')
+                ->orWhere('meta->path', 'like', '%broadcasting%');
+        })
+        ->exists())->toBeFalse();
+});
+
+it('logs purchase order list visits including ajax filter navigations', function () {
+    $this->actingAs($this->admin)
+        ->get(route('purchase-orders.index'))
+        ->assertSuccessful();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where('meta->route', 'purchase-orders.index')
+        ->exists())->toBeTrue();
+
+    UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->delete();
+
+    $this->actingAs($this->admin)
+        ->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])
+        ->get(route('purchase-orders.index', ['status' => 'APPROVED']))
+        ->assertSuccessful();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where('meta->route', 'purchase-orders.index')
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['page'] ?? null)->toBe('Purchase Orders');
+});
+
+it('allows administrators to reset activity logs and logout everyone', function () {
+    insertSession($this->monitoredUser, now()->timestamp);
+    insertSession($this->admin, now()->timestamp);
+
+    UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_ACTIVE,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => ['page' => 'Purchase Orders'],
+    ]);
+
+    $this->actingAs($this->admin)
+        ->delete(route('active-sessions.reset-activity-logs'), [
+            'reset_password' => 'Administrator123',
+        ])
+        ->assertRedirect(route('login'));
+
+    expect(UserActivityLog::query()->count())->toBe(0)
+        ->and(Session::query()->count())->toBe(0)
+        ->and(auth()->check())->toBeFalse();
+
+    $this->actingAs($this->admin);
+
+    $fresh = UserActivityLog::query()->create([
+        'user_id' => $this->admin->id,
+        'action' => UserActivityLog::ACTION_LOGIN,
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'Chrome',
+        'meta' => null,
+    ]);
+
+    expect($fresh->id)->toBe(1);
+});
+
+it('rejects activity log reset when the password is wrong', function () {
+    UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_ACTIVE,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => ['page' => 'Purchase Orders'],
+    ]);
+
+    $this->actingAs($this->admin)
+        ->from(route('active-sessions.index'))
+        ->delete(route('active-sessions.reset-activity-logs'), [
+            'reset_password' => 'wrong-password',
+        ])
+        ->assertRedirect(route('active-sessions.index'));
+
+    expect(UserActivityLog::query()->count())->toBe(1)
+        ->and(auth()->check())->toBeTrue();
+});
+
+it('forbids it-staff from resetting activity logs', function () {
+    $this->actingAs($this->itStaff)
+        ->delete(route('active-sessions.reset-activity-logs'))
+        ->assertForbidden();
+
+    expect(UserActivityLog::query()->count())->toBeGreaterThanOrEqual(0);
+});
+
+it('shows the reset activity logs control only to administrators', function () {
+    $this->actingAs($this->admin)
+        ->get(route('active-sessions.index'))
+        ->assertSuccessful()
+        ->assertSee('Reset activity logs')
+        ->assertSee('as-detail-refresh', false);
+
+    $this->actingAs($this->itStaff)
+        ->get(route('active-sessions.index'))
+        ->assertSuccessful()
+        ->assertDontSee('Reset activity logs');
+});

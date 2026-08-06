@@ -24,6 +24,7 @@ class LogUserCrudActivity
         'password.update',
         'verification.send',
         'active-sessions.destroy-sessions',
+        'active-sessions.reset-activity-logs',
         'notifications.recent',
         'notifications.unread-count',
         'notifications.read',

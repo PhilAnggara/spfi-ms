@@ -10,7 +10,18 @@
                 <h3 class="mb-0">Active Users / Sessions</h3>
                 <small class="text-muted">Monitor presence, devices, and recent activity across all accounts</small>
             </div>
-            <div class="col-auto">
+            <div class="col-auto d-flex flex-wrap gap-2">
+                @if (auth()->user()?->hasRole('administrator'))
+                    <button type="button" id="as-reset-logs" class="btn btn-outline-danger icon icon-left">
+                        <i class="fa-duotone fa-solid fa-trash-can"></i>
+                        Reset activity logs
+                    </button>
+                    <form action="{{ route('active-sessions.reset-activity-logs') }}" id="as-reset-logs-form" method="POST" class="d-none">
+                        @csrf
+                        @method('DELETE')
+                        <input type="hidden" name="reset_password" id="as-reset-password-input" value="">
+                    </form>
+                @endif
                 <button type="button" id="as-refresh" class="btn btn-outline-primary icon icon-left">
                     <i class="fa-duotone fa-solid fa-arrows-rotate" id="as-refresh-icon"></i>
                     Refresh
@@ -66,7 +77,16 @@
 <div class="offcanvas offcanvas-end as-offcanvas" tabindex="-1" id="as-detail-offcanvas" aria-labelledby="as-detail-title">
     <div class="offcanvas-header border-bottom">
         <h5 class="offcanvas-title" id="as-detail-title">User Activity</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button"
+                    id="as-detail-refresh"
+                    class="btn btn-sm btn-outline-primary icon"
+                    title="Refresh activity"
+                    disabled>
+                <i class="fa-duotone fa-solid fa-arrows-rotate" id="as-detail-refresh-icon"></i>
+            </button>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
     </div>
     <div class="offcanvas-body" id="as-detail-body">
         <div class="as-detail-loading text-center text-muted py-5">
