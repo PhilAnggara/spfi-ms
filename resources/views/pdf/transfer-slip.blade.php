@@ -6,12 +6,78 @@
     @php
         $pageWidthMm = $pageWidthMm ?? 215;
         $pageHeightMm = $pageHeightMm ?? 105;
-        $fieldFontSize = 8;
-        $numberFontSize = 9;
-        $cellFontSize = 8;
-        $checkFontSize = 7;
-        $remarksFontSize = 8;
-        $itemCellMaxHeight = 2.6;
+        $fieldFontSize = 9;
+        $numberFontSize = 10;
+        $cellFontSize = 10;
+        $checkFontSize = 8;
+        $remarksFontSize = 9;
+        $itemLineHeight = 1.1;
+        $lineHeightMm = round(($cellFontSize * $itemLineHeight) * (25.4 / 72), 2);
+        $rowGapMm = 0.25;
+        $minRowHeightMm = max(3.2, $lineHeightMm + $rowGapMm);
+        $itemNameWidthMm = 73;
+        // Courier monospace (~0.6em); estimate chars for the item name column.
+        $itemNameCharsPerLine = max(18, (int) floor(($itemNameWidthMm * (72 / 25.4)) / max(1.0, $cellFontSize * 0.6)));
+        $wrapItemName = static function (string $text, int $charsPerLine, ?int $maxLines = null): array {
+            $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+            if ($text === '') {
+                return ['text' => '(item unavailable)', 'line_count' => 1];
+            }
+
+            $words = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $lines = [];
+            $current = '';
+
+            $pushLine = static function (string $line) use (&$lines, $maxLines): bool {
+                if ($line === '') {
+                    return $maxLines !== null && count($lines) >= $maxLines;
+                }
+                if ($maxLines !== null && count($lines) >= $maxLines) {
+                    return true;
+                }
+                $lines[] = $line;
+
+                return $maxLines !== null && count($lines) >= $maxLines;
+            };
+
+            foreach ($words as $word) {
+                while (mb_strlen($word) > $charsPerLine) {
+                    if ($current !== '' && $pushLine($current)) {
+                        return ['text' => implode("\n", $lines), 'line_count' => count($lines)];
+                    }
+                    $current = '';
+                    if ($pushLine(mb_substr($word, 0, $charsPerLine))) {
+                        return ['text' => implode("\n", $lines), 'line_count' => count($lines)];
+                    }
+                    $word = mb_substr($word, $charsPerLine);
+                }
+
+                if ($word === '') {
+                    continue;
+                }
+
+                $candidate = $current === '' ? $word : $current.' '.$word;
+                if (mb_strlen($candidate) <= $charsPerLine) {
+                    $current = $candidate;
+                    continue;
+                }
+
+                if ($pushLine($current)) {
+                    return ['text' => implode("\n", $lines), 'line_count' => count($lines)];
+                }
+                $current = $word;
+            }
+
+            if ($current !== '') {
+                $pushLine($current);
+            }
+
+            if ($lines === []) {
+                return ['text' => '(item unavailable)', 'line_count' => 1];
+            }
+
+            return ['text' => implode("\n", $lines), 'line_count' => count($lines)];
+        };
     @endphp
     <style>
         @page {
@@ -21,7 +87,7 @@
 
         body {
             margin: 0;
-            font-family: DejaVu Sans, sans-serif;
+            font-family: Courier, monospace;
             color: #111827;
             background: transparent;
         }
@@ -70,7 +136,7 @@
         .cell {
             position: absolute;
             font-size: {{ $cellFontSize }}pt;
-            line-height: 1.05;
+            line-height: {{ $itemLineHeight }};
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
@@ -78,12 +144,13 @@
         }
 
         .item-cell {
-            white-space: normal;
+            white-space: pre-line;
             text-overflow: clip;
-            line-height: 1;
-            max-height: {{ $itemCellMaxHeight }}mm;
-            overflow-wrap: anywhere;
-            word-break: break-word;
+            line-height: {{ $itemLineHeight }};
+            overflow: visible;
+            overflow-wrap: normal;
+            word-break: normal;
+            /* font-weight: normal; */
         }
 
         .check {
@@ -160,9 +227,40 @@
 
         // Page-mm coordinates calibrated against Blank TS.jpg (215 x 105).
         $rowStartTopMm = 48.4;
-        $rowHeightMm = 3.1;
-        $maxRows = 8;
-        $rows = collect($items)->take($maxRows)->values();
+        $itemsBottomLimitMm = 76.5;
+        $layoutRows = [];
+        $currentTop = $rowStartTopMm;
+
+        foreach (collect($items) as $detail) {
+            $remainingMm = $itemsBottomLimitMm - $currentTop;
+            if ($remainingMm < $minRowHeightMm) {
+                break;
+            }
+
+            $rawName = (string) ($detail->item_name ?? '(item unavailable)');
+            $wrapped = $wrapItemName($rawName, $itemNameCharsPerLine);
+            $lineCount = max(1, (int) $wrapped['line_count']);
+            $rowHeight = max($minRowHeightMm, ($lineCount * $lineHeightMm) + $rowGapMm);
+
+            if ($rowHeight > $remainingMm) {
+                $maxLinesThatFit = max(1, (int) floor(($remainingMm - $rowGapMm) / max(0.01, $lineHeightMm)));
+                $wrapped = $wrapItemName($rawName, $itemNameCharsPerLine, $maxLinesThatFit);
+                $lineCount = max(1, (int) $wrapped['line_count']);
+                $rowHeight = max($minRowHeightMm, ($lineCount * $lineHeightMm) + $rowGapMm);
+                if ($rowHeight > $remainingMm) {
+                    break;
+                }
+            }
+
+            $layoutRows[] = [
+                'top' => $currentTop,
+                'name' => $wrapped['text'],
+                'code' => $detail->item_code ?? $detail->product_code ?? '-',
+                'qty' => (float) ($detail->quantity ?? 0),
+                'uom' => $detail->sws_uom ?? $detail->item_uom_name ?? 'PCS',
+            ];
+            $currentTop = round($currentTop + $rowHeight, 2);
+        }
 
         $tsDateText = $transferSlip->ts_date
             ? \Carbon\Carbon::parse($transferSlip->ts_date)->locale('id')->translatedFormat('d M Y')
@@ -208,16 +306,11 @@
             <div class="check" style="left: 92.5mm; top: 39.8mm; width: 5mm;">X</div>
         @endif --}}
 
-        @foreach ($rows as $index => $detail)
-            @php
-                $top = $rowStartTopMm + ($index * $rowHeightMm);
-                $qty = (float) ($detail->quantity ?? 0);
-                $uom = $detail->sws_uom ?? $detail->item_uom_name ?? 'PCS';
-            @endphp
-            <div class="cell item-cell" style="left: 12.5mm; top: {{ $top }}mm; width: 73mm;">{{ $detail->item_name ?? '(item unavailable)' }}</div>
-            <div class="cell center" style="left: 89mm; top: {{ $top }}mm; width: 34mm;">{{ $detail->item_code ?? $detail->product_code ?? '-' }}</div>
-            <div class="cell right" style="left: 126mm; top: {{ $top }}mm; width: 35mm;">{{ \App\Support\PdfFormatters::qty($qty) }}</div>
-            <div class="cell center" style="left: 165mm; top: {{ $top }}mm; width: 32mm;">{{ $uom }}</div>
+        @foreach ($layoutRows as $row)
+            <div class="cell item-cell" style="left: 12.5mm; top: {{ $row['top'] }}mm; width: 73mm;">{{ $row['name'] }}</div>
+            <div class="cell center" style="left: 89mm; top: {{ $row['top'] }}mm; width: 34mm;">{{ $row['code'] }}</div>
+            <div class="cell right" style="left: 126mm; top: {{ $row['top'] }}mm; width: 35mm;">{{ \App\Support\PdfFormatters::qty($row['qty']) }}</div>
+            <div class="cell center" style="left: 165mm; top: {{ $row['top'] }}mm; width: 32mm;">{{ $row['uom'] }}</div>
         @endforeach
 
         <div class="field center" style="left: 8mm; top: 78mm; width: 34mm;">{{ $transferSlip->created_by_name ?? '' }}</div>

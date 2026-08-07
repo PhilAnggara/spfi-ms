@@ -181,11 +181,12 @@ it('uses 215mm by 160mm page dimensions in receiving report view', function () {
         ->toContain('size: 215mm 160mm')
         ->toContain('width: 215mm')
         ->toContain('height: 160mm')
-        ->toContain('font-family: Arial, sans-serif')
-        ->not->toContain('DejaVu Sans');
+        ->toContain('font-family: Courier, monospace')
+        ->not->toContain('DejaVu Sans')
+        ->not->toContain('font-family: Arial');
 });
 
-it('keeps long item names to two full lines without truncating the second line', function () {
+it('uses flexible item row heights so a long name pushes the next row down', function () {
     $unit = UnitOfMeasure::query()->create(['name' => 'Pieces', 'code' => 'PCS']);
     $category = ItemCategory::query()->create(['name' => 'Spare Parts', 'code' => 'SPR']);
     $longName = 'HEAVY DUTY INDUSTRIAL GRADE STAINLESS STEEL BEARING HOUSING ASSEMBLY WITH EXTENDED SHAFT AND SEALED LUBRICATION PORT FOR HIGH SPEED APPLICATIONS';
@@ -270,22 +271,175 @@ it('keeps long item names to two full lines without truncating the second line',
     ])->render();
 
     expect($html)
-        ->toContain("line-height: 1.2;\n            height: 9.91mm;\n            max-height: 9.91mm;")
         ->toContain('white-space: pre-line')
+        ->toContain('overflow: visible')
+        ->toContain('font-weight: bold')
+        ->toContain('line-height: 1.12')
         ->toContain($shortName)
-        ->not->toContain($longName)
+        ->not->toContain('max-height:')
         ->not->toContain('…');
 
     preg_match_all('/class="cell item-cell"[^>]*>(.*?)<\/div>/s', $html, $matches);
     $itemCells = $matches[1] ?? [];
 
     expect($itemCells)->toHaveCount(2);
-    expect(substr_count($itemCells[0], "\n"))->toBe(1);
+    expect(substr_count($itemCells[0], "\n"))->toBeGreaterThanOrEqual(2);
 
     $longLines = explode("\n", html_entity_decode($itemCells[0]));
-    expect($longLines)->toHaveCount(2);
     expect($longLines[0])->not->toEndWith('…');
-    expect($longLines[1])->not->toEndWith('…');
     expect($longLines[1])->not->toBeEmpty();
-    expect($itemCells[1])->toBe($shortName);
+    expect(html_entity_decode($itemCells[1]))->toBe($shortName);
+
+    preg_match_all('/class="cell item-cell" style="left: [^;]+; top: ([0-9.]+)mm/', $html, $topMatches);
+    $tops = array_map('floatval', $topMatches[1] ?? []);
+
+    expect($tops)->toHaveCount(2);
+    expect($tops[1])->toBeGreaterThan($tops[0] + 3);
+});
+
+it('keeps three single-line rr items from overlapping', function () {
+    $unit = UnitOfMeasure::query()->create(['name' => 'Pieces', 'code' => 'PCS']);
+    $category = ItemCategory::query()->create(['name' => 'Spare Parts', 'code' => 'SPR']);
+    $purchaseOrder = $this->receivingReport->purchaseOrder;
+
+    $names = ['BOLT M8', 'NUT M8', 'WASHER M8'];
+
+    foreach ($names as $index => $name) {
+        $item = Item::query()->create([
+            'name' => $name,
+            'code' => 'SHORT-'.$index,
+            'unit_of_measure_id' => $unit->id,
+            'category_id' => $category->id,
+            'type' => 'Raw Material',
+            'stock_on_hand' => 0,
+            'is_active' => true,
+        ]);
+
+        $poItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'item_id' => $item->id,
+            'quantity' => 1,
+            'unit_price' => 10,
+            'total' => 10,
+            'line_subtotal' => 10,
+            'discount_amount' => 0,
+            'ppn_rate' => 0,
+            'ppn_amount' => 0,
+            'pph_rate' => 0,
+            'pph_amount' => 0,
+        ]);
+
+        ReceivingReportItem::query()->create([
+            'receiving_report_id' => $this->receivingReport->id,
+            'purchase_order_item_id' => $poItem->id,
+            'qty_good' => 1,
+            'qty_bad' => 0,
+        ]);
+    }
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $this->receivingReport->fresh()->load([
+            'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
+            'createdBy',
+        ]),
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    preg_match_all('/class="cell item-cell" style="left: [^;]+; top: ([0-9.]+)mm/', $html, $topMatches);
+    $tops = array_map('floatval', $topMatches[1] ?? []);
+
+    expect($tops)->toHaveCount(3);
+
+    $pitch = $tops[1] - $tops[0];
+
+    // Antar item 1-baris: cukup agar tidak overlap, tapi lebih rapat dari 1 full line-box kosong.
+    expect($pitch)->toBeGreaterThanOrEqual(3.0);
+    expect($pitch)->toBeLessThan(4.5);
+    expect($tops[2] - $tops[1])->toEqualWithDelta($pitch, 0.05);
+});
+
+it('packs space after multi-line item names tighter than a full wrap stride', function () {
+    $unit = UnitOfMeasure::query()->create(['name' => 'Pieces', 'code' => 'PCS']);
+    $category = ItemCategory::query()->create(['name' => 'Spare Parts', 'code' => 'SPR']);
+    $purchaseOrder = $this->receivingReport->purchaseOrder;
+    $longName = 'HEAVY DUTY INDUSTRIAL GRADE STAINLESS STEEL BEARING HOUSING ASSEMBLY WITH EXTENDED SHAFT';
+
+    foreach (['A', 'B'] as $suffix) {
+        $item = Item::query()->create([
+            'name' => $longName.' '.$suffix,
+            'code' => 'LONG-'.$suffix,
+            'unit_of_measure_id' => $unit->id,
+            'category_id' => $category->id,
+            'type' => 'Raw Material',
+            'stock_on_hand' => 0,
+            'is_active' => true,
+        ]);
+
+        $poItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'item_id' => $item->id,
+            'quantity' => 1,
+            'unit_price' => 10,
+            'total' => 10,
+            'line_subtotal' => 10,
+            'discount_amount' => 0,
+            'ppn_rate' => 0,
+            'ppn_amount' => 0,
+            'pph_rate' => 0,
+            'pph_amount' => 0,
+        ]);
+
+        ReceivingReportItem::query()->create([
+            'receiving_report_id' => $this->receivingReport->id,
+            'purchase_order_item_id' => $poItem->id,
+            'qty_good' => 1,
+            'qty_bad' => 0,
+        ]);
+    }
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $this->receivingReport->fresh()->load([
+            'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
+            'createdBy',
+        ]),
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    preg_match_all('/class="cell item-cell"[^>]*>(.*?)<\/div>/s', $html, $cellMatches);
+    $firstCell = html_entity_decode($cellMatches[1][0] ?? '');
+    $lineCount = substr_count($firstCell, "\n") + 1;
+
+    expect($lineCount)->toBeGreaterThan(1);
+
+    preg_match_all('/class="cell item-cell" style="left: [^;]+; top: ([0-9.]+)mm/', $html, $topMatches);
+    $tops = array_map('floatval', $topMatches[1] ?? []);
+    expect($tops)->toHaveCount(2);
+
+    $advance = $tops[1] - $tops[0];
+    $cellFontSize = round(16 * (160 / 210), 1);
+    $wrapStrideMm = round(($cellFontSize * 1.12) * (25.4 / 72), 2);
+    $glyphHeightMm = round(($cellFontSize * 0.72) * (25.4 / 72), 2);
+    $naiveFullAdvance = $glyphHeightMm + (($lineCount - 1) * $wrapStrideMm) + 0.35;
+
+    // Multi-line harus lebih rapat dari rumus full stride tanpa tail-pack.
+    expect($advance)->toBeLessThan($naiveFullAdvance - 0.5);
+    expect($advance)->toBeGreaterThan($glyphHeightMm + (($lineCount - 2) * $wrapStrideMm));
 });

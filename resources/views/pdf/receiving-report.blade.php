@@ -14,23 +14,44 @@
         $sy = static fn (float $mm): float => round($mm * $scaleY, 2);
         $mmX = static fn (float $mm): string => $sx($mm).'mm';
         $mmY = static fn (float $mm): string => $sy($mm).'mm';
-        $fieldFontSize = round(14.5 * $scaleY, 1);
+        $fieldFontSize = round(15.5 * $scaleY, 1);
         $poNumberFontSize = round(24 * $scaleY, 1);
         $capexFontSize = round(22 * $scaleY, 1);
-        $cellFontSize = round(14.5 * $scaleY, 1);
-        $acctCellFontSize = round(14.5 * $scaleY, 1);
-        // DomPDF treats CSS px roughly as pt (1/72"), so size the row for 2 full text lines.
-        $itemLineHeight = 1.2;
-        $twoLineTextHeightMm = round(($cellFontSize * $itemLineHeight * 2) * (25.4 / 72), 2);
-        $rowHeightMm = max($sy(11), $twoLineTextHeightMm + 0.8);
-        $itemCellHeightMm = $rowHeightMm - 0.2;
-        $itemNameWidthMm = $sx(65);
-        // Slightly conservative char width so the 2nd line stays fully readable.
-        $itemNameCharsPerLine = max(18, (int) floor(($itemNameWidthMm * (96 / 25.4)) / max(1.0, $cellFontSize * 0.62)));
-        $fitItemNameToRows = static function (string $text, int $charsPerLine, int $maxLines = 2): string {
+        $cellFontSize = round(16 * $scaleY, 1);
+        $acctCellFontSize = round(15.5 * $scaleY, 1);
+
+        // --- Item name column width (base coords on 297mm design width) ---
+        // Widen here, then keep code column from overlapping (nameLeft + nameWidth + gap).
+        $itemNameLeftBaseMm = 15;
+        $itemNameWidthBaseMm = 65; // <-- ubah ini untuk melebarkan kolom nama item
+        $itemCodeLeftBaseMm = 83; // geser ke kanan jika nameWidth diperbesar
+        $itemNameWidthMm = $sx($itemNameWidthBaseMm);
+
+        // --- Row spacing ---
+        // 1) Dalam 1 item (nama wrap): line-height CSS.
+        $itemLineHeight = 1.12;
+        $wrapStrideMm = round(($cellFontSize * $itemLineHeight) * (25.4 / 72), 2);
+        // 2) Antar item 1-baris: tinggi glyph + gap (sudah pas).
+        $glyphHeightMm = round(($cellFontSize * 0.72) * (25.4 / 72), 2);
+        $interItemGapMm = 0.35;
+        // 3) Antar item multi-baris: tarik item berikutnya (sisa line-box terakhir membuat jarak terlalu jauh).
+        $multiLineTailPackMm = round(($cellFontSize * 0.38) * (25.4 / 72), 2);
+        $minRowHeightMm = $glyphHeightMm + $interItemGapMm;
+        $rowHeightForLines = static function (int $lineCount) use ($glyphHeightMm, $wrapStrideMm, $interItemGapMm, $multiLineTailPackMm, $minRowHeightMm): float {
+            $lineCount = max(1, $lineCount);
+            $height = $glyphHeightMm + (($lineCount - 1) * $wrapStrideMm) + $interItemGapMm;
+            if ($lineCount > 1) {
+                $height -= $multiLineTailPackMm;
+            }
+
+            return round(max($minRowHeightMm, $height), 2);
+        };
+        // Courier is monospace (~0.6em wide); estimate chars that fit the item name column.
+        $itemNameCharsPerLine = max(12, (int) floor(($itemNameWidthMm * (72 / 25.4)) / max(1.0, $cellFontSize * 0.6)));
+        $wrapItemName = static function (string $text, int $charsPerLine, ?int $maxLines = null): array {
             $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
             if ($text === '') {
-                return '-';
+                return ['text' => '-', 'line_count' => 1];
             }
 
             $words = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
@@ -38,22 +59,25 @@
             $current = '';
 
             $pushLine = static function (string $line) use (&$lines, $maxLines): bool {
-                if ($line === '' || count($lines) >= $maxLines) {
-                    return count($lines) >= $maxLines;
+                if ($line === '') {
+                    return $maxLines !== null && count($lines) >= $maxLines;
+                }
+                if ($maxLines !== null && count($lines) >= $maxLines) {
+                    return true;
                 }
                 $lines[] = $line;
 
-                return count($lines) >= $maxLines;
+                return $maxLines !== null && count($lines) >= $maxLines;
             };
 
             foreach ($words as $word) {
                 while (mb_strlen($word) > $charsPerLine) {
                     if ($current !== '' && $pushLine($current)) {
-                        return implode("\n", $lines);
+                        return ['text' => implode("\n", $lines), 'line_count' => count($lines)];
                     }
                     $current = '';
                     if ($pushLine(mb_substr($word, 0, $charsPerLine))) {
-                        return implode("\n", $lines);
+                        return ['text' => implode("\n", $lines), 'line_count' => count($lines)];
                     }
                     $word = mb_substr($word, $charsPerLine);
                 }
@@ -69,7 +93,7 @@
                 }
 
                 if ($pushLine($current)) {
-                    return implode("\n", $lines);
+                    return ['text' => implode("\n", $lines), 'line_count' => count($lines)];
                 }
                 $current = $word;
             }
@@ -78,7 +102,11 @@
                 $pushLine($current);
             }
 
-            return implode("\n", $lines);
+            if ($lines === []) {
+                return ['text' => '-', 'line_count' => 1];
+            }
+
+            return ['text' => implode("\n", $lines), 'line_count' => count($lines)];
         };
     @endphp
     <style>
@@ -89,7 +117,7 @@
 
         body {
             margin: 0;
-            font-family: Arial, sans-serif;
+            font-family: Courier, monospace;
             color: #111827;
         }
 
@@ -134,7 +162,7 @@
         .cell {
             position: absolute;
             font-size: {{ $cellFontSize }}px;
-            line-height: 1.2;
+            line-height: {{ $itemLineHeight }};
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
@@ -145,11 +173,10 @@
             white-space: pre-line;
             text-overflow: clip;
             line-height: {{ $itemLineHeight }};
-            height: {{ $itemCellHeightMm }}mm;
-            max-height: {{ $itemCellHeightMm }}mm;
-            overflow: hidden;
+            overflow: visible;
             overflow-wrap: normal;
             word-break: normal;
+            /* font-weight: normal; */
         }
 
         .right {
@@ -170,6 +197,10 @@
             font-weight: bold;
         }
 
+        .summary-label {
+            font-weight: bold;
+        }
+
     </style>
 </head>
 <body>
@@ -178,9 +209,6 @@
         $rowStartTopMm = $sy(73);
         // Leave space before the accounting block (starts around base-y 166).
         $itemsBottomLimitMm = $sy(152);
-        $maxRows = max(1, (int) floor(($itemsBottomLimitMm - $rowStartTopMm) / $rowHeightMm));
-        $rows = $receivingReport->items->take($maxRows)->values();
-        $rowCount = $rows->count();
         $allItems = $receivingReport->items;
         $supplierName = trim((string) ($po?->supplier?->name ?? ''));
         $supplierCode = trim((string) ($po?->supplier?->code ?? ''));
@@ -227,13 +255,54 @@
         $formatTaxRate = static function (float $rate): string {
             return rtrim(rtrim(number_format($rate, 2, '.', ''), '0'), '.');
         };
+
+        $layoutRows = [];
+        $currentTop = $rowStartTopMm;
+        foreach ($allItems as $rrItem) {
+            $poItem = $rrItem->purchaseOrderItem;
+            $item = $poItem?->item;
+            $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
+            $lineAmounts = $resolveReceivedLineAmounts($poItem, $qtyTotal);
+            $remainingMm = $itemsBottomLimitMm - $currentTop;
+            if ($remainingMm < $minRowHeightMm) {
+                break;
+            }
+
+            $wrapped = $wrapItemName((string) ($item?->name ?? '-'), $itemNameCharsPerLine);
+            $lineCount = max(1, (int) $wrapped['line_count']);
+            $rowHeight = $rowHeightForLines($lineCount);
+
+            if ($rowHeight > $remainingMm) {
+                $maxLinesThatFit = max(1, (int) floor(($remainingMm - $interItemGapMm - $glyphHeightMm + $multiLineTailPackMm) / max(0.01, $wrapStrideMm)) + 1);
+                $wrapped = $wrapItemName((string) ($item?->name ?? '-'), $itemNameCharsPerLine, $maxLinesThatFit);
+                $lineCount = max(1, (int) $wrapped['line_count']);
+                $rowHeight = $rowHeightForLines($lineCount);
+                if ($rowHeight > $remainingMm) {
+                    break;
+                }
+            }
+
+            $layoutRows[] = [
+                'top' => $currentTop,
+                'name' => $wrapped['text'],
+                'code' => $item?->code ?? '-',
+                'department_code' => $poItem?->prsItem?->prs?->department?->code ?? '-',
+                'qty_total' => $qtyTotal,
+                'unit' => $item?->unit?->name ?? 'PCS',
+                'unit_cost' => $convertAmount($lineAmounts['discounted_unit_cost']),
+                'amount' => $convertAmount($lineAmounts['base_amount']),
+            ];
+            $currentTop = round($currentTop + $rowHeight, 2);
+        }
+
+        $rowCount = count($layoutRows);
         $hasPph = $displayPphTotal > 0;
         $hasPpn = $displayPpnTotal > 0;
         $showSubTotal = $rowCount > 1;
         $showFinalTotal = $hasPpn || $hasPph;
         $subTotalPlusPpn = $displaySubTotal + $displayPpnTotal;
         $displayGrandTotal = (float) ($rrAccountingPayload['display']['grand_total'] ?? ($subTotalPlusPpn - $displayPphTotal));
-        $summaryBaseTop = $rowCount > 0 ? $rowStartTopMm + ($rowCount * $rowHeightMm) + $sy(0.8) : 0;
+        $summaryBaseTop = $rowCount > 0 ? $currentTop + $sy(0.8) : 0;
         $subTotalTop = $summaryBaseTop + $sy(1.2);
         $ppnTop = $subTotalTop + $sy(5);
         $intermediateTop = ($displayPpnTotal > 0 ? $ppnTop : $subTotalTop) + $sy(5);
@@ -265,47 +334,36 @@
         <div class="field po-number" style="left: {{ $mmX(161) }}; top: {{ $mmY(38) }}; width: {{ $mmX(48) }};">{{ $po?->po_number ?? '-' }}</div>
         <div class="field" style="left: {{ $mmX(160) }}; top: {{ $mmY(49) }}; width: {{ $mmX(48) }};">{{ $poDateText }}</div>
 
-        @foreach($rows as $index => $rrItem)
-            @php
-                $poItem = $rrItem->purchaseOrderItem;
-                $item = $poItem?->item;
-                $departmentCode = $poItem?->prsItem?->prs?->department?->code ?? '-';
-                $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
-                $lineAmounts = $resolveReceivedLineAmounts($poItem, $qtyTotal);
-                $unitCost = $convertAmount($lineAmounts['discounted_unit_cost']);
-                $amount = $convertAmount($lineAmounts['base_amount']);
-                $top = $rowStartTopMm + ($index * $rowHeightMm);
-            @endphp
-
-            <div class="cell item-cell" style="left: {{ $mmX(15) }}; top: {{ $top }}mm; width: {{ $mmX(65) }};">{{ $fitItemNameToRows((string) ($item?->name ?? '-'), $itemNameCharsPerLine) }}</div>
-            <div class="cell center" style="left: {{ $mmX(83) }}; top: {{ $top }}mm; width: {{ $mmX(20) }};">{{ $item?->code ?? '-' }}</div>
-            <div class="cell center" style="left: {{ $mmX(108) }}; top: {{ $top }}mm; width: {{ $mmX(25) }};">{{ $departmentCode }}</div>
-            <div class="cell right" style="left: {{ $mmX(138) }}; top: {{ $top }}mm; width: {{ $mmX(23) }};">{{ \App\Support\PdfFormatters::qty($qtyTotal) }}</div>
-            <div class="cell center" style="left: {{ $mmX(163) }}; top: {{ $top }}mm; width: {{ $mmX(23) }};">{{ $item?->unit?->name ?? 'PCS' }}</div>
-            <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $top }}mm; width: {{ $mmX(35) }};">{{ number_format($unitCost, 2, '.', ',') }}</div>
-            <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $top }}mm; width: {{ $mmX(50) }};">{{ number_format($amount, 2, '.', ',') }}</div>
+        @foreach($layoutRows as $row)
+            <div class="cell item-cell" style="left: {{ $mmX($itemNameLeftBaseMm) }}; top: {{ $row['top'] }}mm; width: {{ $mmX($itemNameWidthBaseMm) }};">{{ $row['name'] }}</div>
+            <div class="cell center" style="left: {{ $mmX($itemCodeLeftBaseMm) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(20) }};">{{ $row['code'] }}</div>
+            <div class="cell center" style="left: {{ $mmX(108) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(25) }};">{{ $row['department_code'] }}</div>
+            <div class="cell right" style="left: {{ $mmX(138) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(23) }};">{{ \App\Support\PdfFormatters::qty($row['qty_total']) }}</div>
+            <div class="cell center" style="left: {{ $mmX(163) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(23) }};">{{ $row['unit'] }}</div>
+            <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(35) }};">{{ number_format($row['unit_cost'], 2, '.', ',') }}</div>
+            <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(50) }};">{{ number_format($row['amount'], 2, '.', ',') }}</div>
         @endforeach
 
         @if ($rowCount > 0)
             @if ($showSubTotal)
                 <div style="position: absolute; left: {{ $mmX(189) }}; top: {{ $summaryBaseTop }}mm; width: {{ $mmX(89) }}; border-top: 1px solid #111827;"></div>
-                <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $subTotalTop }}mm; width: {{ $mmX(35) }}; font-weight: bold;">Sub Total</div>
-                <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $subTotalTop }}mm; width: {{ $mmX(50) }}; font-weight: bold;">{{ number_format($displaySubTotal, 2, '.', ',') }}</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $subTotalTop }}mm; width: {{ $mmX(35) }};">Sub Total</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $subTotalTop }}mm; width: {{ $mmX(50) }};">{{ number_format($displaySubTotal, 2, '.', ',') }}</div>
             @endif
             @if ($hasPpn)
-                <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $ppnTop }}mm; width: {{ $mmX(35) }}; font-weight: bold;">PPn {{ $formatTaxRate($displayPpnRate) }}%</div>
-                <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $ppnTop }}mm; width: {{ $mmX(50) }}; font-weight: bold;">{{ number_format($displayPpnTotal, 2, '.', ',') }}</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $ppnTop }}mm; width: {{ $mmX(35) }};">PPn {{ $formatTaxRate($displayPpnRate) }}%</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $ppnTop }}mm; width: {{ $mmX(50) }};">{{ number_format($displayPpnTotal, 2, '.', ',') }}</div>
             @endif
             @if ($hasPph)
                 <div style="position: absolute; left: {{ $mmX(228) }}; top: {{ $intermediateTop - $sy(1.2) }}mm; width: {{ $mmX(50) }}; border-top: 1px solid #111827;"></div>
-                <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $intermediateTop }}mm; width: {{ $mmX(50) }}; font-weight: bold;">{{ number_format($subTotalPlusPpn, 2, '.', ',') }}</div>
-                <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $pphTop }}mm; width: {{ $mmX(35) }}; font-weight: bold;">PPh {{ $formatTaxRate($displayPphRate) }}%</div>
-                <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $pphTop }}mm; width: {{ $mmX(50) }}; font-weight: bold;">{{ number_format($displayPphTotal, 2, '.', ',') }}</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $intermediateTop }}mm; width: {{ $mmX(50) }};">{{ number_format($subTotalPlusPpn, 2, '.', ',') }}</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $pphTop }}mm; width: {{ $mmX(35) }};">PPh {{ $formatTaxRate($displayPphRate) }}%</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $pphTop }}mm; width: {{ $mmX(50) }};">{{ number_format($displayPphTotal, 2, '.', ',') }}</div>
             @endif
             @if ($showFinalTotal)
                 <div style="position: absolute; left: {{ $mmX(228) }}; top: {{ $summaryTotalTop - $sy(1.2) }}mm; width: {{ $mmX(50) }}; border-top: 1px solid #111827;"></div>
-                <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $summaryTotalTop }}mm; width: {{ $mmX(35) }}; font-weight: bold;">Total</div>
-                <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $summaryTotalTop }}mm; width: {{ $mmX(50) }}; font-weight: bold;">{{ number_format($hasPph ? $displayGrandTotal : $subTotalPlusPpn, 2, '.', ',') }}</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $summaryTotalTop }}mm; width: {{ $mmX(35) }};">Total</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $summaryTotalTop }}mm; width: {{ $mmX(50) }};">{{ number_format($hasPph ? $displayGrandTotal : $subTotalPlusPpn, 2, '.', ',') }}</div>
             @endif
         @endif
 

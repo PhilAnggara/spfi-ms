@@ -293,6 +293,8 @@ it('uses 215mm by 105mm page dimensions in transfer slip view', function () {
         ->toContain('size: 215mm 105mm')
         ->toContain('width: 215mm')
         ->toContain('height: 105mm')
+        ->toContain('font-family: Courier, monospace')
+        ->not->toContain('DejaVu Sans')
         ->toContain('class="ts-bg"')
         ->toContain('data:image/jpeg;base64,')
         ->toContain('left: 25mm; top: 25.2mm')
@@ -300,6 +302,114 @@ it('uses 215mm by 105mm page dimensions in transfer slip view', function () {
         ->toContain('Inventory Management')
         ->toContain('Production Floor')
         ->toContain('Transfer Print Item');
+});
+
+it('uses flexible item row heights so a long name pushes the next row down', function () {
+    $now = now();
+    $longName = 'HEAVY DUTY INDUSTRIAL GRADE STAINLESS STEEL BEARING HOUSING ASSEMBLY WITH EXTENDED SHAFT AND SEALED LUBRICATION PORT';
+
+    $longItem = Item::query()->create([
+        'name' => $longName,
+        'code' => 'TS-LONG-001',
+        'unit_of_measure_id' => $this->item->unit_of_measure_id,
+        'category_id' => $this->item->category_id,
+        'type' => 'Consumable',
+        'stock_on_hand' => 10,
+        'is_active' => true,
+    ]);
+
+    $longStoreWithdrawalItemId = (int) DB::table('store_withdrawal_items')->insertGetId([
+        'store_withdrawal_id' => $this->storeWithdrawalId,
+        'item_id' => $longItem->id,
+        'product_code' => $longItem->code,
+        'quantity' => 2,
+        'uom' => 'PCS',
+        'created_by' => $this->user->id,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    DB::table('transfer_slip_items')->where('transfer_slip_id', $this->transferSlipId)->delete();
+
+    DB::table('transfer_slip_items')->insert([
+        [
+            'transfer_slip_id' => $this->transferSlipId,
+            'store_withdrawal_item_id' => $longStoreWithdrawalItemId,
+            'item_id' => $longItem->id,
+            'product_code' => $longItem->code,
+            'quantity' => 2,
+            'created_by' => $this->user->id,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ],
+        [
+            'transfer_slip_id' => $this->transferSlipId,
+            'store_withdrawal_item_id' => $this->storeWithdrawalItemId,
+            'item_id' => $this->item->id,
+            'product_code' => $this->item->code,
+            'quantity' => 1,
+            'created_by' => $this->user->id,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ],
+    ]);
+
+    $transferSlip = DB::table('transfer_slips as ts')
+        ->leftJoin('store_withdrawals as sw', 'sw.id', '=', 'ts.store_withdrawal_id')
+        ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
+        ->leftJoin('users as creator', 'creator.id', '=', 'ts.created_by')
+        ->where('ts.id', $this->transferSlipId)
+        ->select([
+            'ts.*',
+            'sw.sws_number',
+            'sw.department_code',
+            'd.name as department_name',
+            'creator.name as created_by_name',
+        ])
+        ->first();
+
+    $items = DB::table('transfer_slip_items as tsi')
+        ->leftJoin('items as i', 'i.id', '=', 'tsi.item_id')
+        ->where('tsi.transfer_slip_id', $this->transferSlipId)
+        ->orderBy('tsi.id')
+        ->select([
+            'tsi.*',
+            'i.name as item_name',
+            'i.code as item_code',
+            'i.type as item_type',
+        ])
+        ->get();
+
+    $html = view('pdf.transfer-slip', [
+        'transferSlip' => $transferSlip,
+        'items' => $items,
+        'isPreview' => true,
+        'backgroundImageSrc' => null,
+        'backgroundWidthPt' => 215 * 2.834645669,
+        'backgroundHeightPt' => 105 * 2.834645669,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 105,
+    ])->render();
+
+    expect($html)
+        ->toContain('white-space: pre-line')
+        ->toContain('overflow: visible')
+        ->toContain('font-weight: bold')
+        ->toContain('Transfer Print Item')
+        ->not->toContain('max-height:');
+
+    preg_match_all('/class="cell item-cell"[^>]*>(.*?)<\/div>/s', $html, $matches);
+    $itemCells = $matches[1] ?? [];
+
+    expect($itemCells)->toHaveCount(2);
+    expect(substr_count($itemCells[0], "\n"))->toBeGreaterThanOrEqual(1);
+
+    preg_match_all('/class="cell item-cell" style="left: [^;]+; top: ([0-9.]+)mm/', $html, $topMatches);
+    $tops = array_map('floatval', $topMatches[1] ?? []);
+
+    expect($tops)->toHaveCount(2);
+    expect($tops[0])->toBe(48.4);
+    expect($tops[1])->toBeGreaterThan(48.4 + 3.1);
 });
 
 it('embeds blank form background only in preview mode', function () {
