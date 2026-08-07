@@ -50,11 +50,14 @@ it('shows the full administrator dashboard regardless of department', function (
         ->assertSee('User Accounts')
         ->assertSee('Canvass Open')
         ->assertSee('SWS Open')
-        ->assertSee('TS Pending')
+        ->assertSee('Doc Entry Pending')
+        ->assertSee('Open PRS by Department')
         ->assertSee('Deliveries')
         ->assertSee('Users Online')
         ->assertSee('Active Users')
         ->assertSee('View all')
+        ->assertDontSee('TS Pending')
+        ->assertDontSee('My Department')
         ->assertDontSee('dashboard-quick-link', false);
 });
 
@@ -120,10 +123,20 @@ it('shows the purchasing dashboard for PUR department users', function () {
         ->assertSuccessful()
         ->assertSee('data-dashboard-key="purchasing"', false)
         ->assertSee('Purchasing Dashboard')
+        ->assertSee('PRS to Assign')
         ->assertSee('Canvass Open')
         ->assertSee('PO Pending Approval')
-        ->assertDontSee('Administrator Dashboard')
-        ->assertDontSee('SWS Open');
+        ->assertSee('PO Changes Requested')
+        ->assertSee('Open PRS by Department')
+        ->assertSee('Dept Open PRS')
+        ->assertSee('Dept Total PRS')
+        ->assertSee('Dept SWS Open')
+        ->assertSee('Monthly Department PRS')
+        ->assertSee('Department PRS Status')
+        ->assertSee('Recent Department PRS')
+        ->assertSee('Recent SWS')
+        ->assertDontSee('My Department')
+        ->assertDontSee('Administrator Dashboard');
 });
 
 it('shows the inventory dashboard for IM department users', function () {
@@ -139,7 +152,14 @@ it('shows the inventory dashboard for IM department users', function () {
         ->assertSee('data-dashboard-key="im"', false)
         ->assertSee('Inventory Management Dashboard')
         ->assertSee('SWS Open')
-        ->assertSee('TS Pending')
+        ->assertSee('Dept Open PRS')
+        ->assertSee('Dept Completed PRS')
+        ->assertSee('Dept SWS Open')
+        ->assertSee('Monthly Department PRS')
+        ->assertSee('Recent Department PRS')
+        ->assertSee('Recent SWS')
+        ->assertDontSee('My Department')
+        ->assertDontSee('TS Pending')
         ->assertDontSee('User Accounts');
 });
 
@@ -155,7 +175,14 @@ it('shows the finance dashboard for FIN department users', function () {
         ->assertSuccessful()
         ->assertSee('data-dashboard-key="finance"', false)
         ->assertSee('Finance Dashboard')
-        ->assertSee('Approved PO Value');
+        ->assertSee('Approved PO Value')
+        ->assertSee('Doc Entry Pending')
+        ->assertSee('Open PRS by Department')
+        ->assertSee('Dept Open PRS')
+        ->assertSee('Monthly Department PRS')
+        ->assertSee('Recent Department PRS')
+        ->assertSee('Recent SWS')
+        ->assertDontSee('My Department');
 });
 
 it('shows the engineering dashboard filtered to engineering department prs', function () {
@@ -207,6 +234,8 @@ it('shows the engineering dashboard filtered to engineering department prs', fun
         ->assertSee('data-dashboard-key="engineering"', false)
         ->assertSee('Engineering Dashboard')
         ->assertSee('ENG-PRS-001')
+        ->assertSee('PRS On Hold')
+        ->assertSee('Recent Department SWS')
         ->assertDontSee('QA-PRS-001');
 });
 
@@ -264,6 +293,15 @@ it('shows the executive dashboard for MD department users without general-manage
         ->assertSee('data-dashboard-key="md"', false)
         ->assertSee('Executive Dashboard')
         ->assertSee('Approved PO Value')
+        ->assertSee('Canvass Open')
+        ->assertSee('PO Pending Approval')
+        ->assertSee('Open PRS by Department')
+        ->assertSee('Dept Open PRS')
+        ->assertSee('Dept SWS Open')
+        ->assertSee('Monthly Department PRS')
+        ->assertSee('Recent Department PRS')
+        ->assertSee('Recent SWS')
+        ->assertDontSee('My Department')
         ->assertDontSee('Administrator Dashboard');
 });
 
@@ -313,11 +351,13 @@ it('shows the default department dashboard with sws metrics', function () {
         ->assertSee('QA-ONLY-001')
         ->assertSee('QA-SWS-001')
         ->assertSee('Open PRS')
+        ->assertSee('PRS On Hold')
         ->assertSee('SWS Open')
         ->assertSee('Monthly Department PRS')
         ->assertSee('Department PRS Status')
         ->assertSee('Recent Department SWS')
         ->assertDontSee('SWS Approved')
+        ->assertDontSee('My Department')
         ->assertDontSee('User Accounts')
         ->assertDontSee('Canvass Open');
 });
@@ -374,4 +414,49 @@ it('limits po status chart data to approved and pending approval', function () {
 
     expect($poStatus['labels'])->toBe(['PENDING APPROVAL', 'APPROVED'])
         ->and($poStatus['series'])->toBe([1, 1]);
+});
+
+it('builds open prs heatmap series for purchasing dashboard', function () {
+    $user = makeDashboardUser('purchasing-staff', [
+        'name' => 'Purchasing',
+        'code' => '7050',
+        'alias' => 'PUR',
+    ]);
+
+    $other = Department::query()->create([
+        'name' => 'Quality Assurance',
+        'code' => '7044',
+        'alias' => 'QA',
+    ]);
+
+    Prs::query()->create([
+        'prs_number' => 'PUR-HEAT-001',
+        'prs_date' => now()->toDateString(),
+        'date_needed' => now()->addDays(3)->toDateString(),
+        'user_id' => $user->id,
+        'department_id' => $user->department_id,
+        'status' => 'REQUESTED',
+        'is_capex' => false,
+    ]);
+
+    Prs::query()->create([
+        'prs_number' => 'QA-HEAT-001',
+        'prs_date' => now()->toDateString(),
+        'date_needed' => now()->addDays(3)->toDateString(),
+        'user_id' => $user->id,
+        'department_id' => $other->id,
+        'status' => 'CANVASSING',
+        'is_capex' => false,
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response->assertSuccessful();
+
+    $heatmap = $response->viewData('dashboardData')['open_prs_heatmap'];
+
+    expect($heatmap['categories'])->toContain('PUR')
+        ->and($heatmap['categories'])->toContain('QA')
+        ->and($heatmap['series'])->not->toBeEmpty()
+        ->and(collect($heatmap['series'])->pluck('name')->all())->toContain('REQUESTED');
 });

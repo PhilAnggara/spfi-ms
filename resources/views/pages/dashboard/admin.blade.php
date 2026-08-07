@@ -56,9 +56,9 @@
             'delay' => 100,
         ])
         @include('pages.dashboard.partials.kpi-card', [
-            'label' => 'TS Pending',
-            'value' => $metrics['ts_pending'] ?? 0,
-            'icon' => 'fa-right-left',
+            'label' => 'Doc Entry Pending',
+            'value' => $metrics['doc_entry_pending'] ?? 0,
+            'icon' => 'fa-file-pen',
             'tone' => 'red',
             'delay' => 150,
         ])
@@ -139,7 +139,15 @@
         ])
     </div>
 
-    <div class="row g-3">
+    <div class="row g-3 mb-3">
+        @include('pages.dashboard.partials.chart-card', [
+            'title' => 'Open PRS by Department',
+            'chartId' => 'chart-open-prs-heatmap',
+            'col' => 'col-12',
+        ])
+    </div>
+
+    <div class="row g-3 dashboard-recent-row">
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent PRS',
             'icon' => 'fa-cart-shopping',

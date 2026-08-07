@@ -29,6 +29,29 @@
         ])
     </div>
 
+    <div class="row g-3 mb-3 dashboard-kpi-row">
+        @include('pages.dashboard.partials.kpi-card', [
+            'label' => 'Canvass Open',
+            'value' => $metrics['canvass_open'] ?? 0,
+            'icon' => 'fa-scale-balanced',
+            'tone' => 'purple',
+        ])
+        @include('pages.dashboard.partials.kpi-card', [
+            'label' => 'PO Pending Approval',
+            'value' => $metrics['po_pending_approval'] ?? 0,
+            'icon' => 'fa-hourglass-half',
+            'tone' => 'red',
+        ])
+        @include('pages.dashboard.partials.kpi-card', [
+            'label' => 'SWS Open',
+            'value' => $metrics['sws_open'] ?? 0,
+            'icon' => 'fa-warehouse',
+            'tone' => 'blue',
+        ])
+    </div>
+
+    @include('pages.dashboard.partials.department-kpis')
+
     <div class="row g-3 mb-3">
         @include('pages.dashboard.partials.chart-card', [
             'title' => 'Monthly PRS Trend (Last 12 Months)',
@@ -48,9 +71,16 @@
             'chartId' => 'chart-po-status',
             'col' => 'col-12 col-lg-6',
         ])
+        @include('pages.dashboard.partials.chart-card', [
+            'title' => 'Open PRS by Department',
+            'chartId' => 'chart-open-prs-heatmap',
+            'col' => 'col-12 col-lg-6',
+        ])
     </div>
 
-    <div class="row g-3">
+    @include('pages.dashboard.partials.department-charts')
+
+    <div class="row g-3 dashboard-recent-row">
         @include('pages.dashboard.partials.recent-list', [
             'title' => 'Recent PRS',
             'icon' => 'fa-cart-shopping',
@@ -60,6 +90,16 @@
             'title' => 'Recent Purchase Orders',
             'icon' => 'fa-file-invoice',
             'items' => $dashboard['lists']['recent_po'] ?? [],
+        ])
+        @include('pages.dashboard.partials.recent-list', [
+            'title' => 'Recent Department PRS',
+            'icon' => 'fa-cart-shopping',
+            'items' => $dashboard['lists']['dept_recent_prs'] ?? [],
+        ])
+        @include('pages.dashboard.partials.recent-list', [
+            'title' => 'Recent SWS',
+            'icon' => 'fa-warehouse',
+            'items' => $dashboard['lists']['dept_recent_sws'] ?? [],
         ])
     </div>
 @endsection

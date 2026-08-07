@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const monthlyOutbound = seriesPayload('monthly_outbound');
     const monthlyPoValue = seriesPayload('monthly_po_value');
     const usersByDepartment = seriesPayload('users_by_department');
+    const deptMonthlyPrs = seriesPayload('dept_monthly_prs');
+    const deptPrsStatus = seriesPayload('dept_prs_status');
+    const openPrsHeatmap = dashboardData.open_prs_heatmap || {};
 
     renderIfPresent('#chart-profile-visit', function () {
         return {
@@ -47,6 +50,18 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     });
 
+    renderIfPresent('#chart-dept-monthly-prs', function () {
+        return {
+            annotations: { position: 'back' },
+            dataLabels: { enabled: false },
+            chart: { type: 'bar', height: 300 },
+            fill: { opacity: 1 },
+            series: [{ name: 'PRS', data: deptMonthlyPrs.series }],
+            colors: '#435ebe',
+            xaxis: { categories: deptMonthlyPrs.labels },
+        };
+    });
+
     renderIfPresent('#chart-visitors-profile', function () {
         return {
             series: prsStatus.series,
@@ -57,6 +72,104 @@ document.addEventListener('DOMContentLoaded', function () {
             plotOptions: {
                 pie: {
                     donut: { size: '30%' },
+                },
+            },
+        };
+    });
+
+    renderIfPresent('#chart-dept-prs-status', function () {
+        return {
+            series: deptPrsStatus.series,
+            labels: deptPrsStatus.labels,
+            colors: ['#435ebe', '#55c6e8', '#1f9d8f', '#f59e0b', '#ef4444', '#8b5cf6'],
+            chart: { type: 'donut', width: '100%', height: '350px' },
+            legend: { position: 'bottom' },
+            plotOptions: {
+                pie: {
+                    donut: { size: '30%' },
+                },
+            },
+        };
+    });
+
+    renderIfPresent('#chart-open-prs-heatmap', function () {
+        const categories = Array.isArray(openPrsHeatmap.categories) ? openPrsHeatmap.categories : [];
+        const series = Array.isArray(openPrsHeatmap.series) ? openPrsHeatmap.series : [];
+
+        let maxValue = 0;
+        series.forEach(function (row) {
+            (row.data || []).forEach(function (value) {
+                const numeric = typeof value === 'number' ? value : Number(value?.y ?? 0);
+                if (numeric > maxValue) {
+                    maxValue = numeric;
+                }
+            });
+        });
+
+        const palette = ['#f1f5f9', '#dbeafe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8', '#1e3a8a'];
+
+        function buildHeatmapRanges(max) {
+            if (max <= 0) {
+                return [{ from: 0, to: 0, color: palette[0], name: '0' }];
+            }
+
+            let tiers;
+            if (max <= 20) {
+                tiers = [0, 2, 5, 10, 15, max];
+            } else if (max <= 100) {
+                tiers = [0, 10, 25, 50, 75, max];
+            } else if (max <= 300) {
+                tiers = [0, 25, 50, 100, 175, 250, max];
+            } else {
+                tiers = [0, 50, 100, 200, 350, 500, max];
+            }
+
+            const edges = [];
+            tiers.forEach(function (tier) {
+                const value = Math.min(max, Math.max(0, tier));
+                if (edges.length === 0 || value > edges[edges.length - 1]) {
+                    edges.push(value);
+                }
+            });
+            if (edges[edges.length - 1] < max) {
+                edges.push(max);
+            }
+
+            const ranges = [{ from: 0, to: 0, color: palette[0], name: '0' }];
+            for (let i = 1; i < edges.length; i += 1) {
+                const from = edges[i - 1] + 1;
+                const to = edges[i];
+                if (from > to) {
+                    continue;
+                }
+                const isLast = i === edges.length - 1;
+                ranges.push({
+                    from: from,
+                    to: isLast ? 100000 : to,
+                    color: palette[Math.min(i, palette.length - 1)],
+                    name: isLast ? (from + '+') : (from === to ? String(from) : (from + '-' + to)),
+                });
+            }
+
+            return ranges;
+        }
+
+        return {
+            chart: {
+                type: 'heatmap',
+                height: Math.max(280, 48 + (series.length * 42)),
+            },
+            dataLabels: { enabled: true },
+            colors: ['#435ebe'],
+            series: series,
+            xaxis: { categories: categories },
+            plotOptions: {
+                heatmap: {
+                    shadeIntensity: 0.5,
+                    radius: 4,
+                    colorScale: {
+                        ranges: buildHeatmapRanges(maxValue),
+                    },
                 },
             },
         };

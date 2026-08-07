@@ -2,7 +2,7 @@
     $title = $title ?? 'Recent';
     $items = $items ?? [];
     $empty = $empty ?? 'No recent records yet.';
-    $col = $col ?? 'col-12 col-lg-6';
+    $col = $col ?? 'col-12 col-md-6 col-lg-4';
     $icon = $icon ?? 'fa-clock';
 @endphp
 

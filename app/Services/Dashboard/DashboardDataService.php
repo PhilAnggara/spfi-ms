@@ -10,6 +10,7 @@ use App\Models\ReceivingReport;
 use App\Models\Session;
 use App\Models\TransferSlip;
 use App\Models\User;
+use App\Services\Accounting\AccountingDocTransactionService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -69,6 +70,7 @@ class DashboardDataService
                 $this->imMetrics($monthStart, $monthEnd),
                 $this->itMetrics(),
                 [
+                    'doc_entry_pending' => $this->docEntryPendingCount(),
                     'users_online' => $activeUsers['online_count'],
                     'active_sessions' => $activeUsers['session_count'],
                 ],
@@ -76,6 +78,7 @@ class DashboardDataService
             charts: array_merge(
                 $this->purchasingCharts(),
                 $this->imCharts($monthStart),
+                ['open_prs_heatmap' => $this->openPrsHeatmapChart()],
             ),
             lists: [
                 'recent_prs' => $this->recentPrs(),
@@ -92,18 +95,27 @@ class DashboardDataService
      */
     private function forPurchasing(User $user, Carbon $monthStart, Carbon $monthEnd, string $monthLabel): array
     {
+        $merged = $this->mergeDepartmentBaseline($user, $monthStart, $monthEnd, [
+            'metrics' => $this->purchasingMetrics($monthStart, $monthEnd),
+            'charts' => array_merge(
+                $this->purchasingCharts(),
+                ['open_prs_heatmap' => $this->openPrsHeatmapChart()],
+            ),
+            'lists' => [
+                'recent_prs' => $this->recentPrs(),
+                'recent_po' => $this->recentPurchaseOrders(),
+            ],
+        ]);
+
         return $this->payload(
             key: 'purchasing',
             title: 'Purchasing Dashboard',
             subtitle: 'Track PRS intake, canvassing workload, and purchase order pipeline.',
             user: $user,
             monthLabel: $monthLabel,
-            metrics: $this->purchasingMetrics($monthStart, $monthEnd),
-            charts: $this->purchasingCharts(),
-            lists: [
-                'recent_prs' => $this->recentPrs(),
-                'recent_po' => $this->recentPurchaseOrders(),
-            ],
+            metrics: $merged['metrics'],
+            charts: $merged['charts'],
+            lists: $merged['lists'],
         );
     }
 
@@ -112,19 +124,25 @@ class DashboardDataService
      */
     private function forIm(User $user, Carbon $monthStart, Carbon $monthEnd, string $monthLabel): array
     {
+        $merged = $this->mergeDepartmentBaseline($user, $monthStart, $monthEnd, [
+            'metrics' => $this->imMetrics($monthStart, $monthEnd),
+            'charts' => $this->imCharts($monthStart),
+            'lists' => [
+                'recent_rr' => $this->recentReceivingReports(),
+                'recent_ts' => $this->recentTransferSlips(),
+                'recent_deliveries' => $this->recentDeliveries(),
+            ],
+        ]);
+
         return $this->payload(
             key: 'im',
             title: 'Inventory Management Dashboard',
             subtitle: 'Monitor receiving, withdrawals, transfers, and outbound deliveries.',
             user: $user,
             monthLabel: $monthLabel,
-            metrics: $this->imMetrics($monthStart, $monthEnd),
-            charts: $this->imCharts($monthStart),
-            lists: [
-                'recent_rr' => $this->recentReceivingReports(),
-                'recent_ts' => $this->recentTransferSlips(),
-                'recent_deliveries' => $this->recentDeliveries(),
-            ],
+            metrics: $merged['metrics'],
+            charts: $merged['charts'],
+            lists: $merged['lists'],
         );
     }
 
@@ -133,26 +151,34 @@ class DashboardDataService
      */
     private function forFinance(User $user, Carbon $monthStart, Carbon $monthEnd, string $monthLabel): array
     {
+        $merged = $this->mergeDepartmentBaseline($user, $monthStart, $monthEnd, [
+            'metrics' => [
+                'po_approved_value_this_month' => $this->poApprovedValue($monthStart, $monthEnd),
+                'po_pending_approval' => $this->poPendingApprovalCount(),
+                'rr_this_month' => $this->rrThisMonth($monthStart, $monthEnd),
+                'prs_this_month' => $this->prsThisMonth($monthStart, $monthEnd),
+                'doc_entry_pending' => $this->docEntryPendingCount(),
+            ],
+            'charts' => [
+                'monthly_po_value' => $this->monthlyPoValueChart(),
+                'po_status' => $this->poStatusChart(),
+                'open_prs_heatmap' => $this->openPrsHeatmapChart(),
+            ],
+            'lists' => [
+                'recent_po' => $this->recentPurchaseOrders(),
+                'recent_rr' => $this->recentReceivingReports(),
+            ],
+        ]);
+
         return $this->payload(
             key: 'finance',
             title: 'Finance Dashboard',
             subtitle: 'Review approved purchase values and receiving activity for the period.',
             user: $user,
             monthLabel: $monthLabel,
-            metrics: [
-                'po_approved_value_this_month' => $this->poApprovedValue($monthStart, $monthEnd),
-                'po_pending_approval' => $this->poPendingApprovalCount(),
-                'rr_this_month' => $this->rrThisMonth($monthStart, $monthEnd),
-                'prs_this_month' => $this->prsThisMonth($monthStart, $monthEnd),
-            ],
-            charts: [
-                'monthly_po_value' => $this->monthlyPoValueChart(),
-                'po_status' => $this->poStatusChart(),
-            ],
-            lists: [
-                'recent_po' => $this->recentPurchaseOrders(),
-                'recent_rr' => $this->recentReceivingReports(),
-            ],
+            metrics: $merged['metrics'],
+            charts: $merged['charts'],
+            lists: $merged['lists'],
         );
     }
 
@@ -161,21 +187,21 @@ class DashboardDataService
      */
     private function forEngineering(User $user, Carbon $monthStart, Carbon $monthEnd, string $monthLabel): array
     {
-        $departmentId = $user->department_id;
+        $merged = $this->mergeDepartmentBaseline($user, $monthStart, $monthEnd, [
+            'metrics' => [],
+            'charts' => [],
+            'lists' => [],
+        ]);
 
         return $this->payload(
             key: 'engineering',
             title: 'Engineering Dashboard',
-            subtitle: 'Follow Engineering purchase requests from open through completion.',
+            subtitle: 'Follow Engineering purchase requests and stores withdrawals.',
             user: $user,
             monthLabel: $monthLabel,
-            metrics: $this->departmentPrsMetrics($departmentId, $monthStart, $monthEnd),
-            charts: [
-                'prs_status' => $this->prsStatusChart($departmentId),
-            ],
-            lists: [
-                'recent_prs' => $this->recentPrs($departmentId),
-            ],
+            metrics: $merged['metrics'],
+            charts: $merged['charts'],
+            lists: $merged['lists'],
         );
     }
 
@@ -205,27 +231,37 @@ class DashboardDataService
      */
     private function forMd(User $user, Carbon $monthStart, Carbon $monthEnd, string $monthLabel): array
     {
+        $merged = $this->mergeDepartmentBaseline($user, $monthStart, $monthEnd, [
+            'metrics' => [
+                'prs_this_month' => $this->prsThisMonth($monthStart, $monthEnd),
+                'po_approved_value_this_month' => $this->poApprovedValue($monthStart, $monthEnd),
+                'rr_this_month' => $this->rrThisMonth($monthStart, $monthEnd),
+                'deliveries_this_month' => $this->deliveriesThisMonth($monthStart, $monthEnd),
+                'canvass_open' => Prs::query()->where('status', 'CANVASSING')->count(),
+                'po_pending_approval' => $this->poPendingApprovalCount(),
+                'sws_open' => $this->swsOpenCount(),
+            ],
+            'charts' => [
+                'monthly_prs' => $this->monthlyPrsChart(),
+                'prs_status' => $this->prsStatusChart(),
+                'po_status' => $this->poStatusChart(),
+                'open_prs_heatmap' => $this->openPrsHeatmapChart(),
+            ],
+            'lists' => [
+                'recent_prs' => $this->recentPrs(),
+                'recent_po' => $this->recentPurchaseOrders(),
+            ],
+        ]);
+
         return $this->payload(
             key: 'md',
             title: 'Executive Dashboard',
             subtitle: 'High-level procurement and inventory activity across the organization.',
             user: $user,
             monthLabel: $monthLabel,
-            metrics: [
-                'prs_this_month' => $this->prsThisMonth($monthStart, $monthEnd),
-                'po_approved_value_this_month' => $this->poApprovedValue($monthStart, $monthEnd),
-                'rr_this_month' => $this->rrThisMonth($monthStart, $monthEnd),
-                'deliveries_this_month' => $this->deliveriesThisMonth($monthStart, $monthEnd),
-            ],
-            charts: [
-                'monthly_prs' => $this->monthlyPrsChart(),
-                'prs_status' => $this->prsStatusChart(),
-                'po_status' => $this->poStatusChart(),
-            ],
-            lists: [
-                'recent_prs' => $this->recentPrs(),
-                'recent_po' => $this->recentPurchaseOrders(),
-            ],
+            metrics: $merged['metrics'],
+            charts: $merged['charts'],
+            lists: $merged['lists'],
         );
     }
 
@@ -234,8 +270,8 @@ class DashboardDataService
      */
     private function forDefault(User $user, Carbon $monthStart, Carbon $monthEnd, string $monthLabel): array
     {
-        $departmentId = $user->department_id;
         $departmentName = $user->department?->name ?? 'Your department';
+        $baseline = $this->departmentBaseline($user->department_id, $monthStart, $monthEnd);
 
         return $this->payload(
             key: 'default',
@@ -243,18 +279,9 @@ class DashboardDataService
             subtitle: "Purchase requests and stores withdrawals for {$departmentName}.",
             user: $user,
             monthLabel: $monthLabel,
-            metrics: array_merge(
-                $this->departmentPrsMetrics($departmentId, $monthStart, $monthEnd),
-                $this->departmentSwsMetrics($departmentId, $monthStart, $monthEnd),
-            ),
-            charts: [
-                'monthly_prs' => $this->monthlyPrsChart($departmentId),
-                'prs_status' => $this->prsStatusChart($departmentId),
-            ],
-            lists: [
-                'recent_prs' => $this->recentPrs($departmentId),
-                'recent_sws' => $this->recentStoreWithdrawals($departmentId),
-            ],
+            metrics: $baseline['metrics'],
+            charts: $baseline['charts'],
+            lists: $baseline['lists'],
         );
     }
 
@@ -294,8 +321,10 @@ class DashboardDataService
     {
         return [
             'prs_this_month' => $this->prsThisMonth($monthStart, $monthEnd),
+            'prs_to_assign' => Prs::query()->whereIn('status', ['REQUESTED', 'REVISED'])->count(),
             'canvass_open' => Prs::query()->where('status', 'CANVASSING')->count(),
             'po_pending_approval' => $this->poPendingApprovalCount(),
+            'po_changes_requested' => PurchaseOrder::query()->where('status', 'CHANGES_REQUESTED')->count(),
             'po_approved_value_this_month' => $this->poApprovedValue($monthStart, $monthEnd),
         ];
     }
@@ -307,12 +336,88 @@ class DashboardDataService
     {
         return [
             'rr_this_month' => $this->rrThisMonth($monthStart, $monthEnd),
-            'sws_open' => (int) DB::table('store_withdrawals')
-                ->whereNull('deleted_at')
-                ->whereNull('approved_at')
-                ->count(),
-            'ts_pending' => TransferSlip::query()->whereNull('approved_at')->count(),
+            'sws_open' => $this->swsOpenCount(),
             'deliveries_this_month' => $this->deliveriesThisMonth($monthStart, $monthEnd),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     metrics: array<string, int|float>,
+     *     charts: array<string, mixed>,
+     *     lists: array<string, Collection>
+     * }
+     */
+    private function departmentBaseline(?int $departmentId, Carbon $monthStart, Carbon $monthEnd): array
+    {
+        $prs = $this->departmentPrsMetrics($departmentId, $monthStart, $monthEnd);
+        $sws = $this->departmentSwsMetrics($departmentId, $monthStart, $monthEnd);
+
+        return [
+            'metrics' => [
+                'dept_prs_this_month' => $prs['prs_this_month'],
+                'dept_prs_open' => $prs['prs_open'],
+                'dept_prs_on_hold' => $prs['prs_on_hold'],
+                'dept_prs_completed' => $prs['prs_completed'],
+                'dept_prs_total' => $prs['prs_total'],
+                'dept_sws_this_month' => $sws['sws_this_month'],
+                'dept_sws_open' => $sws['sws_open'],
+            ],
+            'charts' => [
+                'dept_monthly_prs' => $this->monthlyPrsChart($departmentId),
+                'dept_prs_status' => $this->prsStatusChart($departmentId),
+            ],
+            'lists' => [
+                'dept_recent_prs' => $this->recentPrs($departmentId),
+                'dept_recent_sws' => $this->recentStoreWithdrawals($departmentId),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array{
+     *     metrics: array<string, int|float>,
+     *     charts: array<string, mixed>,
+     *     lists: array<string, Collection>
+     * }  $payload
+     * @return array{
+     *     metrics: array<string, int|float>,
+     *     charts: array<string, mixed>,
+     *     lists: array<string, Collection>
+     * }
+     */
+    private function mergeDepartmentBaseline(User $user, Carbon $monthStart, Carbon $monthEnd, array $payload): array
+    {
+        if ($user->department_id === null) {
+            return $payload;
+        }
+
+        $baseline = $this->departmentBaseline($user->department_id, $monthStart, $monthEnd);
+
+        return [
+            'metrics' => array_merge($payload['metrics'], $baseline['metrics']),
+            'charts' => array_merge($payload['charts'], $baseline['charts']),
+            'lists' => array_merge($payload['lists'], $baseline['lists']),
+        ];
+    }
+
+    /**
+     * @return array<string, int|float>
+     */
+    private function departmentPrsMetrics(?int $departmentId, Carbon $monthStart, Carbon $monthEnd): array
+    {
+        $base = Prs::query()->when($departmentId, fn ($q) => $q->where('department_id', $departmentId));
+
+        $openStatuses = ['REQUESTED', 'CANVASSING', 'CANVASSER_HOLD', 'ON_HOLD', 'REVISED'];
+
+        return [
+            'prs_this_month' => (clone $base)
+                ->whereBetween('prs_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+                ->count(),
+            'prs_open' => (clone $base)->whereIn('status', $openStatuses)->count(),
+            'prs_on_hold' => (clone $base)->whereIn('status', ['ON_HOLD', 'CANVASSER_HOLD'])->count(),
+            'prs_completed' => (clone $base)->where('status', 'PO_CREATED')->count(),
+            'prs_total' => (clone $base)->count(),
         ];
     }
 
@@ -332,25 +437,6 @@ class DashboardDataService
     /**
      * @return array<string, int|float>
      */
-    private function departmentPrsMetrics(?int $departmentId, Carbon $monthStart, Carbon $monthEnd): array
-    {
-        $base = Prs::query()->when($departmentId, fn ($q) => $q->where('department_id', $departmentId));
-
-        $openStatuses = ['REQUESTED', 'CANVASSING', 'CANVASSER_HOLD', 'ON_HOLD', 'REVISED'];
-
-        return [
-            'prs_this_month' => (clone $base)
-                ->whereBetween('prs_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-                ->count(),
-            'prs_open' => (clone $base)->whereIn('status', $openStatuses)->count(),
-            'prs_completed' => (clone $base)->where('status', 'PO_CREATED')->count(),
-            'prs_total' => (clone $base)->count(),
-        ];
-    }
-
-    /**
-     * @return array<string, int|float>
-     */
     private function departmentSwsMetrics(?int $departmentId, Carbon $monthStart, Carbon $monthEnd): array
     {
         $base = DB::table('store_withdrawals')
@@ -363,6 +449,87 @@ class DashboardDataService
                 ->count(),
             'sws_open' => (clone $base)->whereNull('approved_at')->count(),
         ];
+    }
+
+    private function swsOpenCount(?int $departmentId = null): int
+    {
+        return (int) DB::table('store_withdrawals')
+            ->whereNull('deleted_at')
+            ->whereNull('approved_at')
+            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->count();
+    }
+
+    private function docEntryPendingCount(): int
+    {
+        return (int) app(AccountingDocTransactionService::class)->summarizeStatuses()['pending'];
+    }
+
+    /**
+     * ApexCharts heatmap: categories = department aliases, series = open statuses.
+     *
+     * @return array{categories: array<int, string>, series: array<int, array{name: string, data: array<int, int>}>}
+     */
+    private function openPrsHeatmapChart(int $topDepartments = 12): array
+    {
+        $openStatuses = ['REQUESTED', 'CANVASSING', 'CANVASSER_HOLD', 'ON_HOLD', 'REVISED'];
+
+        $totals = Prs::query()
+            ->whereIn('status', $openStatuses)
+            ->whereNotNull('department_id')
+            ->selectRaw('department_id, COUNT(*) as total')
+            ->groupBy('department_id')
+            ->orderByDesc('total')
+            ->limit($topDepartments)
+            ->pluck('total', 'department_id');
+
+        if ($totals->isEmpty()) {
+            return [
+                'categories' => [],
+                'series' => collect($openStatuses)->map(fn (string $status) => [
+                    'name' => str_replace('_', ' ', $status),
+                    'data' => [],
+                ])->values()->all(),
+            ];
+        }
+
+        $orderedIds = $totals->keys()->all();
+
+        $rows = Prs::query()
+            ->whereIn('status', $openStatuses)
+            ->whereIn('department_id', $orderedIds)
+            ->selectRaw('department_id, status, COUNT(*) as total')
+            ->groupBy('department_id', 'status')
+            ->get();
+
+        $aliases = Department::query()
+            ->whereIn('id', $orderedIds)
+            ->pluck('alias', 'id');
+
+        $categories = array_map(
+            fn ($id) => (string) ($aliases[$id] ?? '#'.$id),
+            $orderedIds,
+        );
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[strtoupper((string) $row->status)][(int) $row->department_id] = (int) $row->total;
+        }
+
+        $series = [];
+        foreach ($openStatuses as $status) {
+            $data = [];
+            foreach ($orderedIds as $departmentId) {
+                $data[] = (int) ($map[$status][$departmentId] ?? 0);
+            }
+
+            $series[] = [
+                'name' => str_replace('_', ' ', $status),
+                'data' => $data,
+            ];
+        }
+
+        return compact('categories', 'series');
     }
 
     /**

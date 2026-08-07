@@ -5,7 +5,7 @@
     $tone = $tone ?? 'blue';
     $prefix = $prefix ?? '';
     $delay = $delay ?? 0;
-    $col = $col ?? 'col-6 col-lg-3';
+    $col = $col ?? 'col-6 col-md';
 @endphp
 
 <div class="{{ $col }}" data-aos="fade-up" data-aos-delay="{{ $delay }}">
