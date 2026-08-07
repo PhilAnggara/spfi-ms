@@ -45,3 +45,12 @@ it('loads spfi scaling stylesheets on the login page', function () {
         ->assertSee('spfi-scale.css', false)
         ->assertDontSee('set-font-size.js', false);
 });
+
+it('loads spfi scaling stylesheets on the 404 error page', function () {
+    $this->get('/this-route-does-not-exist-for-scaling-test')
+        ->assertNotFound()
+        ->assertSee('spfi-tokens.css', false)
+        ->assertSee('spfi-scale.css', false)
+        ->assertSee('spfi-error.css', false)
+        ->assertDontSee('set-font-size.js', false);
+});

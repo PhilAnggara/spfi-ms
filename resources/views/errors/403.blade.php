@@ -6,8 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>403 - SPFI-MS</title>
     <link rel="shortcut icon" href="{{ url('assets/images/favicon.png') }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ url('assets/compiled/css/app.css') }}">
-    <link rel="stylesheet" href="{{ url('assets/compiled/css/error.css') }}">
+    @include('includes.error-style')
 </head>
 <body>
     <script src="{{ url('assets/static/js/initTheme.js') }}"></script>

@@ -7,8 +7,7 @@
     <title>Maintenance - SPFI-MS</title>
     {{-- Root-relative paths so prerendered HTML works from any host (not APP_URL/localhost). --}}
     <link rel="shortcut icon" href="{{ parse_url(url('assets/images/favicon.png'), PHP_URL_PATH) }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ parse_url(url('assets/compiled/css/app.css'), PHP_URL_PATH) }}">
-    <link rel="stylesheet" href="{{ parse_url(url('assets/compiled/css/error.css'), PHP_URL_PATH) }}">
+    @include('includes.error-style', ['rootRelative' => true])
 </head>
 <body>
     <script src="{{ parse_url(url('assets/static/js/initTheme.js'), PHP_URL_PATH) }}"></script>

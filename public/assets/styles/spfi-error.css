@@ -1,0 +1,11 @@
+/*
+ * Error / maintenance page overrides.
+ * Keep illustrations at a fixed pixel size so they do not shrink with root scale.
+ * Typography and spacing still follow html font-size from spfi-scale.css.
+ */
+
+#error .img-error {
+    height: 435px;
+    max-width: 100%;
+    object-fit: contain;
+}
