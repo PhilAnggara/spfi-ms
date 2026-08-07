@@ -28,6 +28,7 @@ return [
     |
     | skip            — report only, do not import IMS copy
     | import-as-alias — keep spfi_ms row; import IMS copy under a new number
+    | prefer-ims      — retire conflicting spfi_ms row, then import IMS under the IMS number
     |
     */
     'conflict' => env('RECONCILE_CONFLICT', 'import-as-alias'),

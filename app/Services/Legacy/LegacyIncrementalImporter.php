@@ -104,6 +104,43 @@ class LegacyIncrementalImporter
         ];
     }
 
+    public function importCanonicalDocument(string $type, string $legacyNumber, string $spfiNumber, bool $forceStock = true): ?int
+    {
+        $type = trim($type);
+        $legacyNumber = trim($legacyNumber);
+        $spfiNumber = trim($spfiNumber);
+
+        if ($type === '' || $legacyNumber === '' || $spfiNumber === '') {
+            return null;
+        }
+
+        $this->prepareLegacyUserLookup();
+        $this->prepareLegacyDepartmentLookup();
+        $this->importedReceivingReportIds = [];
+        $this->importedTransferSlipIds = [];
+        $this->logs = [];
+
+        if (! $this->importOneDocument($type, $legacyNumber, $spfiNumber, null)) {
+            return null;
+        }
+
+        $id = $this->findByNumber($this->tableNameForType($type), $this->numberColumnForType($type), $spfiNumber);
+        if ($id === null) {
+            return null;
+        }
+
+        if (in_array($type, ['rr', 'ts'], true)) {
+            [$posted, $failed] = $this->postStockForImported($forceStock);
+            if ($failed > 0 || $posted === 0) {
+                return null;
+            }
+        }
+
+        $this->persistLogs();
+
+        return $id;
+    }
+
     /**
      * @param  list<array{code?: string}>  $rows
      * @return array{imported: int, skipped: int, aliased: int}
@@ -260,6 +297,17 @@ class LegacyIncrementalImporter
                 continue;
             }
 
+            if ($conflict === 'prefer-ims') {
+                $ok = $this->replaceConflictingDocumentWithIms($type, $imsNumber);
+                if ($ok) {
+                    $imported++;
+                } else {
+                    $skipped++;
+                }
+
+                continue;
+            }
+
             $existingMap = DB::table('reconciliation_number_maps')
                 ->where('document_type', $type)
                 ->where('ims_number', $imsNumber)
@@ -297,6 +345,53 @@ class LegacyIncrementalImporter
         }
 
         return ['imported' => $imported, 'skipped' => $skipped, 'aliased' => $aliased];
+    }
+
+    private function replaceConflictingDocumentWithIms(string $type, string $imsNumber): bool
+    {
+        $table = $this->tableNameForType($type);
+        $numberColumn = $this->numberColumnForType($type);
+        $existingId = $this->findByNumber($table, $numberColumn, $imsNumber);
+
+        if ($existingId !== null) {
+            $this->retireDocumentForImsCanonical($type, $existingId);
+        }
+
+        $ok = $this->importOneDocument($type, $imsNumber, $imsNumber, null);
+        if (! $ok) {
+            return false;
+        }
+
+        $mapQuery = DB::table('reconciliation_number_maps')
+            ->where('document_type', $type)
+            ->where('ims_number', $imsNumber)
+            ->where('spfi_number', $imsNumber);
+
+        if ($mapQuery->exists()) {
+            $mapQuery->update([
+                'existing_spfi_number' => $existingId ? 'DELETED-'.$existingId : null,
+                'resolution' => 'ims_canonical',
+                'ims_fingerprint' => null,
+                'spfi_fingerprint' => null,
+                'meta' => json_encode(['imported_at' => now()->toDateTimeString(), 'conflict' => 'prefer-ims']),
+                'updated_at' => now(),
+            ]);
+        } else {
+            DB::table('reconciliation_number_maps')->insert([
+                'document_type' => $type,
+                'ims_number' => $imsNumber,
+                'spfi_number' => $imsNumber,
+                'existing_spfi_number' => $existingId ? 'DELETED-'.$existingId : null,
+                'resolution' => 'ims_canonical',
+                'ims_fingerprint' => null,
+                'spfi_fingerprint' => null,
+                'meta' => json_encode(['imported_at' => now()->toDateTimeString(), 'conflict' => 'prefer-ims']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return true;
     }
 
     private function importOneDocument(string $type, string $legacyNumber, string $spfiNumber, ?string $aliasedFrom): bool
@@ -1054,6 +1149,61 @@ class LegacyIncrementalImporter
         }
 
         return $imsNumber;
+    }
+
+    private function tableNameForType(string $type): string
+    {
+        return match ($type) {
+            'prs' => 'prs',
+            'po' => 'purchase_orders',
+            'rr' => 'receiving_reports',
+            'sws' => 'store_withdrawals',
+            'ts' => 'transfer_slips',
+            'dr' => 'deliveries',
+            default => throw new \InvalidArgumentException("Unsupported document type [{$type}]"),
+        };
+    }
+
+    private function numberColumnForType(string $type): string
+    {
+        return match ($type) {
+            'prs' => 'prs_number',
+            'po' => 'po_number',
+            'rr' => 'rr_number',
+            'sws' => 'sws_number',
+            'ts' => 'ts_number',
+            'dr' => 'dr_number',
+            default => throw new \InvalidArgumentException("Unsupported document type [{$type}]"),
+        };
+    }
+
+    private function retireDocumentForImsCanonical(string $type, int $id): void
+    {
+        $table = $this->tableNameForType($type);
+        $numberColumn = $this->numberColumnForType($type);
+
+        if ($type === 'rr') {
+            $this->stockService->purgeDocumentMovements(StockService::REF_RECEIVING_REPORT, $id);
+        }
+
+        if ($type === 'ts') {
+            $this->stockService->purgeDocumentMovements(StockService::REF_TRANSFER_SLIP, $id);
+        }
+
+        if ($type === 'dr') {
+            $this->stockService->purgeDocumentMovements(StockService::REF_DELIVERY, $id);
+        }
+
+        $payload = [
+            $numberColumn => 'DELETED-'.$id,
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn($table, 'deleted_at')) {
+            $payload['deleted_at'] = now();
+        }
+
+        DB::table($table)->where('id', $id)->update($payload);
     }
 
     private function findByNumber(string $table, string $column, string $number, bool $includeTrashed = false): ?int

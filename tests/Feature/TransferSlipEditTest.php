@@ -179,12 +179,14 @@ it('updates header and quantities and adjusts stock', function () {
         ->and((float) StockInventory::query()->where('item_id', $this->itemB->id)->value('balance'))->toBe(97.0);
 
     $swsNumber = DB::table('store_withdrawals')->where('id', $storeWithdrawalId)->value('sws_number');
+    $currentTsNumber = (string) DB::table('transfer_slips')->where('id', $transferSlipId)->value('ts_number');
     $newDate = $now->copy()->addDay()->toDateString();
 
     $response = $this->actingAs($this->user)
         ->from(route('transfer-slips.index'))
         ->put(route('transfer-slips.update', $transferSlipId), [
             '_edit_transfer_slip_id' => $transferSlipId,
+            'ts_number' => $currentTsNumber,
             'ts_date' => $newDate,
             'for_production' => '1',
             'remarks' => 'Updated TS',
@@ -211,6 +213,7 @@ it('updates header and quantities and adjusts stock', function () {
     $response->assertSessionHas('success', "Transfer slip {$transferSlip->ts_number} has been updated successfully.");
 
     expect($transferSlip)->not->toBeNull()
+        ->and((string) $transferSlip->ts_number)->toBe($currentTsNumber)
         ->and((string) $transferSlip->ts_date)->toStartWith($newDate)
         ->and((int) $transferSlip->for_production)->toBe(1)
         ->and($transferSlip->remarks)->toBe('Updated TS');
@@ -258,6 +261,7 @@ it('rejects quantity that exceeds remaining after excluding the current transfer
         ->from(route('transfer-slips.index'))
         ->put(route('transfer-slips.update', $firstTsId), [
             '_edit_transfer_slip_id' => $firstTsId,
+            'ts_number' => (string) DB::table('transfer_slips')->where('id', $firstTsId)->value('ts_number'),
             'ts_date' => $now->toDateString(),
             'for_production' => '0',
             'sws_number' => $swsNumber,
@@ -302,6 +306,7 @@ it('removes an item and adds another from the same sws while adjusting stock', f
         ->from(route('transfer-slips.index'))
         ->put(route('transfer-slips.update', $transferSlipId), [
             '_edit_transfer_slip_id' => $transferSlipId,
+            'ts_number' => (string) DB::table('transfer_slips')->where('id', $transferSlipId)->value('ts_number'),
             'ts_date' => $now->toDateString(),
             'for_production' => '0',
             'sws_number' => $swsNumber,
@@ -365,6 +370,7 @@ it('forbids update without update-transfer permission', function () {
     $response = $this->actingAs($viewer)
         ->put(route('transfer-slips.update', $transferSlipId), [
             '_edit_transfer_slip_id' => $transferSlipId,
+            'ts_number' => (string) DB::table('transfer_slips')->where('id', $transferSlipId)->value('ts_number'),
             'ts_date' => $now->toDateString(),
             'for_production' => '0',
             'sws_number' => $swsNumber,
@@ -428,6 +434,7 @@ it('allows confirmatory transfer slip edit when stock becomes more negative', fu
         ->from(route('transfer-slips.index'))
         ->put(route('transfer-slips.update', $transferSlipId), [
             '_edit_transfer_slip_id' => $transferSlipId,
+            'ts_number' => (string) DB::table('transfer_slips')->where('id', $transferSlipId)->value('ts_number'),
             'ts_date' => $now->toDateString(),
             'for_production' => '0',
             'sws_number' => 'SWS-CONF-EDIT-001',
@@ -446,4 +453,113 @@ it('allows confirmatory transfer slip edit when stock becomes more negative', fu
 
     expect(netQtyOut1($transferSlipId))->toBe(7.0)
         ->and((float) StockInventory::query()->where('item_id', $this->itemA->id)->value('balance'))->toBe(-7.0);
+});
+
+it('allows editing the transfer slip number', function () {
+    [$storeWithdrawalId, $swsItemA, $swsItemB, $now] = createNormalSwsWithTwoItems($this);
+    $swsNumber = DB::table('store_withdrawals')->where('id', $storeWithdrawalId)->value('sws_number');
+
+    $transferSlipId = createTransferSlip($this, $storeWithdrawalId, [
+        [
+            'store_withdrawal_item_id' => $swsItemA,
+            'item_id' => $this->itemA->id,
+            'quantity' => 2,
+        ],
+    ], $now->toDateString());
+
+    $response = $this->actingAs($this->user)
+        ->from(route('transfer-slips.index'))
+        ->put(route('transfer-slips.update', $transferSlipId), [
+            '_edit_transfer_slip_id' => $transferSlipId,
+            'ts_number' => 'TS-EDITED-NUMBER-001',
+            'ts_date' => $now->toDateString(),
+            'for_production' => '0',
+            'remarks' => 'Renamed TS',
+            'sws_number' => $swsNumber,
+            'store_withdrawal_id' => $storeWithdrawalId,
+            'items' => [
+                [
+                    'store_withdrawal_item_id' => $swsItemA,
+                    'item_id' => $this->itemA->id,
+                    'quantity' => 2,
+                ],
+            ],
+        ]);
+
+    $response->assertRedirect(route('transfer-slips.index'));
+    $response->assertSessionHasNoErrors();
+    $response->assertSessionHas('success', 'Transfer slip TS-EDITED-NUMBER-001 has been updated successfully.');
+
+    expect((string) DB::table('transfer_slips')->where('id', $transferSlipId)->value('ts_number'))
+        ->toBe('TS-EDITED-NUMBER-001');
+});
+
+it('rejects duplicate transfer slip number on edit', function () {
+    [$storeWithdrawalId, $swsItemA, $swsItemB, $now] = createNormalSwsWithTwoItems($this, 10, 10);
+    $swsNumber = DB::table('store_withdrawals')->where('id', $storeWithdrawalId)->value('sws_number');
+
+    $firstTsId = createTransferSlip($this, $storeWithdrawalId, [
+        [
+            'store_withdrawal_item_id' => $swsItemA,
+            'item_id' => $this->itemA->id,
+            'quantity' => 2,
+        ],
+    ], $now->toDateString());
+
+    $secondTsId = createTransferSlip($this, $storeWithdrawalId, [
+        [
+            'store_withdrawal_item_id' => $swsItemB,
+            'item_id' => $this->itemB->id,
+            'quantity' => 2,
+        ],
+    ], $now->toDateString());
+
+    $firstTsNumber = (string) DB::table('transfer_slips')->where('id', $firstTsId)->value('ts_number');
+
+    $response = $this->actingAs($this->user)
+        ->from(route('transfer-slips.index'))
+        ->put(route('transfer-slips.update', $secondTsId), [
+            '_edit_transfer_slip_id' => $secondTsId,
+            'ts_number' => $firstTsNumber,
+            'ts_date' => $now->toDateString(),
+            'for_production' => '0',
+            'sws_number' => $swsNumber,
+            'store_withdrawal_id' => $storeWithdrawalId,
+            'items' => [
+                [
+                    'store_withdrawal_item_id' => $swsItemB,
+                    'item_id' => $this->itemB->id,
+                    'quantity' => 2,
+                ],
+            ],
+        ]);
+
+    $response->assertRedirect(route('transfer-slips.index'));
+    $response->assertSessionHasErrors('ts_number');
+
+    expect((string) DB::table('transfer_slips')->where('id', $secondTsId)->value('ts_number'))
+        ->not->toBe($firstTsNumber);
+});
+
+it('renders editable ts number field in the edit modal', function () {
+    [$storeWithdrawalId, $swsItemA, $swsItemB, $now] = createNormalSwsWithTwoItems($this);
+
+    $transferSlipId = createTransferSlip($this, $storeWithdrawalId, [
+        [
+            'store_withdrawal_item_id' => $swsItemA,
+            'item_id' => $this->itemA->id,
+            'quantity' => 1,
+        ],
+    ], $now->toDateString());
+
+    $tsNumber = (string) DB::table('transfer_slips')->where('id', $transferSlipId)->value('ts_number');
+
+    $response = $this->actingAs($this->user)
+        ->get(route('transfer-slips.index'));
+
+    $response->assertSuccessful();
+    $response->assertSee('name="ts_number"', false);
+    $response->assertSee('id="edit_ts_number_'.$transferSlipId.'"', false);
+    $response->assertSee($tsNumber);
+    $response->assertDontSee('value="'.$tsNumber.'" readonly', false);
 });

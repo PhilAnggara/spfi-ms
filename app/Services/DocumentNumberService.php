@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class DocumentNumberService
@@ -204,6 +205,8 @@ class DocumentNumberService
             $query->whereNull('deleted_at');
         }
 
+        $this->excludeReconcileAliasNumbers($type, $query, $config['table'], $config['column']);
+
         $lastNumber = $query
             ->orderByDesc('created_at')
             ->orderByDesc('id')
@@ -250,6 +253,36 @@ class DocumentNumberService
         }
 
         return $query->exists();
+    }
+
+    private function excludeReconcileAliasNumbers(string $type, mixed $query, string $table, string $column): void
+    {
+        $documentType = strtolower(trim($type));
+
+        if (Schema::hasTable('reconciliation_number_maps')) {
+            $aliasNumbers = DB::table('reconciliation_number_maps')
+                ->where('document_type', $documentType)
+                ->where('resolution', 'import_as_alias')
+                ->pluck('spfi_number')
+                ->filter()
+                ->values()
+                ->all();
+
+            if ($aliasNumbers !== []) {
+                $query->whereNotIn($column, $aliasNumbers);
+            }
+        }
+
+        if (Schema::hasColumn($table, 'meta')) {
+            $query->where(function ($inner) use ($table): void {
+                $inner->whereNull("{$table}.meta")
+                    ->orWhere(function ($metaQuery) use ($table): void {
+                        $metaQuery->where("{$table}.meta", 'not like', '%"aliased_from":"%')
+                            ->orWhere("{$table}.meta", 'like', '%"aliased_from":null%')
+                            ->orWhere("{$table}.meta", 'like', '%"aliased_from":""%');
+                    });
+            });
+        }
     }
 
     private function hasSoftDeleteColumn(string $table): bool

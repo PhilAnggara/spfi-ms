@@ -330,8 +330,22 @@
 
                                                 <div class="row g-3 mb-3">
                                                     <div class="col-md-4">
-                                                        <label class="form-label">TS Number</label>
-                                                        <input type="text" class="form-control" value="{{ $transferSlip->ts_number }}" readonly>
+                                                        <label for="edit_ts_number_{{ $transferSlip->id }}" class="form-label">TS Number</label>
+                                                        <input
+                                                            type="text"
+                                                            class="form-control @error('ts_number'){{ $isEditingThis ? ' is-invalid' : '' }}@enderror"
+                                                            id="edit_ts_number_{{ $transferSlip->id }}"
+                                                            name="ts_number"
+                                                            value="{{ $isEditingThis ? old('ts_number', $transferSlip->ts_number) : $transferSlip->ts_number }}"
+                                                            maxlength="50"
+                                                            required
+                                                        >
+                                                        <div class="form-text">Editable if using existing pre-numbered forms.</div>
+                                                        @if ($isEditingThis)
+                                                            @error('ts_number')
+                                                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                                                            @enderror
+                                                        @endif
                                                     </div>
                                                     <div class="col-md-4">
                                                         <label for="edit_ts_date_{{ $transferSlip->id }}" class="form-label">TS Date</label>

@@ -372,6 +372,7 @@ class TransferSlipController extends Controller
         }
 
         $validated = $request->validate([
+            'ts_number' => ['required', 'string', 'max:50'],
             'ts_date' => ['required', 'date'],
             'remarks' => ['nullable', 'string'],
             'for_production' => ['required', 'in:0,1'],
@@ -384,6 +385,17 @@ class TransferSlipController extends Controller
         ]);
 
         $validated['sws_number'] = $this->normalizeSwsNumber($validated['sws_number']);
+        $validated['ts_number'] = trim((string) $validated['ts_number']);
+        $currentTsNumber = trim((string) $existing->ts_number);
+        $tsNumber = $validated['ts_number'] !== '' ? $validated['ts_number'] : $currentTsNumber;
+
+        if ($tsNumber !== $currentTsNumber) {
+            try {
+                app(DocumentNumberService::class)->assertUnique('TS', $tsNumber, $transferSlipId);
+            } catch (ValidationException $exception) {
+                return redirect()->back()->withInput()->withErrors($exception->errors());
+            }
+        }
 
         if ((int) $validated['store_withdrawal_id'] !== (int) $existing->store_withdrawal_id) {
             return redirect()->back()->withInput()->withErrors([
@@ -469,7 +481,6 @@ class TransferSlipController extends Controller
 
         $authUserId = Auth::id();
         $now = now();
-        $tsNumber = (string) $existing->ts_number;
 
         try {
             DB::transaction(function () use (
@@ -481,7 +492,8 @@ class TransferSlipController extends Controller
                 $allowNegativeBalance,
                 $existing,
                 $transferSlipId,
-                $storeWithdrawal
+                $storeWithdrawal,
+                $tsNumber
             ): void {
                 $previousStockLines = DB::table('transfer_slip_items')
                     ->where('transfer_slip_id', $transferSlipId)
@@ -519,6 +531,7 @@ class TransferSlipController extends Controller
                     ->where('id', $transferSlipId)
                     ->whereNull('deleted_at')
                     ->update([
+                        'ts_number' => $tsNumber,
                         'ts_date' => $validated['ts_date'],
                         'for_production' => ((string) $validated['for_production']) === '1',
                         'remarks' => $validated['remarks'] ?? null,
@@ -576,6 +589,14 @@ class TransferSlipController extends Controller
             });
         } catch (ValidationException $exception) {
             return redirect()->back()->withInput()->withErrors($exception->errors());
+        } catch (QueryException $exception) {
+            if (app(DocumentNumberService::class)->isDuplicateNumberException($exception)) {
+                return redirect()->back()->withInput()->withErrors([
+                    'ts_number' => "The TS Number {$tsNumber} has already been used.",
+                ]);
+            }
+
+            throw $exception;
         }
 
         return redirect()

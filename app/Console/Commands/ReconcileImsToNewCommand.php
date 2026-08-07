@@ -14,7 +14,7 @@ class ReconcileImsToNewCommand extends Command
                             {--apply : Import IMS-only / conflict docs into spfi_ms}
                             {--since= : Cutoff date (default from config/reconcile.php)}
                             {--only= : Comma-separated datasets (supplier,product,prs,canvassing,po,rr,sws,ts,dr,stock)}
-                            {--conflict= : skip|import-as-alias (default from config)}
+                            {--conflict= : skip|import-as-alias|prefer-ims (default from config)}
                             {--no-stock : Skip StockService posting for imported RR/TS}
                             {--force-stock : Allow negative balances when posting stock (default true on --apply)}';
 
@@ -29,8 +29,8 @@ class ReconcileImsToNewCommand extends Command
         $apply = (bool) $this->option('apply');
         $conflict = (string) ($this->option('conflict') ?: config('reconcile.conflict', 'import-as-alias'));
 
-        if (! in_array($conflict, ['skip', 'import-as-alias'], true)) {
-            $this->error('Invalid --conflict. Use skip or import-as-alias.');
+        if (! in_array($conflict, ['skip', 'import-as-alias', 'prefer-ims'], true)) {
+            $this->error('Invalid --conflict. Use skip, import-as-alias, or prefer-ims.');
 
             return self::FAILURE;
         }

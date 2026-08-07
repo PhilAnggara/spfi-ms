@@ -39,8 +39,9 @@ php artisan reconcile:ims-to-new --apply --since=2026-07-15
 ```
 
 | Flag | Meaning |
-|------|---------|
+| ---- | ------- |
 | `--conflict=import-as-alias` | Default: pertahankan baris SPFI-MS; salin versi IMS dengan nomor alias + map |
+| `--conflict=prefer-ims` | Rilis nomor SPFI yang bentrok, lalu import ulang versi IMS dengan nomor IMS asli |
 | `--conflict=skip` | Laporkan mismatch, jangan import salinan IMS yang bentrok |
 | `--no-stock` | Lewati posting `StockService` untuk RR/TS yang baru diimpor |
 | `--only=` | Batasi dataset |
@@ -55,6 +56,25 @@ Karena **kedua sisi production**:
 - Versi IMS diimpor dengan **nomor alias** unik.
 - Mapping di `reconciliation_number_maps` (`ims_number` → `spfi_number`).
 - Jejak insert/skip/error di `reconciliation_import_logs`.
+
+Jika nomor dokumen produksi harus selalu mengikuti nomor form/IMS, pakai `--conflict=prefer-ims` atau jalankan alignment setelah rekonsiliasi.
+
+## Align nomor dokumen ke IMS (sejak 1 Juli)
+
+Jika isi dokumen SPFI-MS sama dengan IMS tetapi nomor berbeda, atau hasil reconcile lama membuat alias seperti `011xxx`, selaraskan nomor resmi supaya kembali mengikuti nomor IMS:
+
+```bash
+# Audit dulu
+php artisan reconcile:align-ims-numbers --report --since=2026-07-01
+
+# Apply alignment
+php artisan reconcile:align-ims-numbers --apply --since=2026-07-01
+
+# Wajib rebuild stok sesudah apply, agar RR/TS/DR memakai reference yang canonical
+php artisan stock:backfill-current-month --from=2026-07-01 --rebuild --force
+```
+
+Command ini mencakup `PRS`, `PO`, `SWS`, `RR`, `TS`, dan `DR`. Dokumen yang hanya ada di SPFI-MS dan tidak ditemukan di IMS tidak diubah.
 
 ## Freeze banner
 
