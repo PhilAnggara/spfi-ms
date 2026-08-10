@@ -81,8 +81,6 @@ Route::middleware('auth')->group(function () {
         Route::delete('active-sessions/activity-logs', [ActiveSessionController::class, 'resetActivityLogs'])->name('active-sessions.reset-activity-logs');
         Route::get('active-sessions/{user}', [ActiveSessionController::class, 'show'])->name('active-sessions.show');
         Route::delete('active-sessions/{user}/sessions', [ActiveSessionController::class, 'destroySessions'])->name('active-sessions.destroy-sessions');
-        Route::get('employees/id-cards/print', [EmployeeController::class, 'printIdCards'])->name('employees.id-cards.print');
-        Route::resource('employees', EmployeeController::class)->except(['create', 'show', 'edit']);
         Route::delete('supplier/{supplier}', [SupplierController::class, 'destroy'])->name('supplier.destroy');
         Route::resource('product-category', ItemCategoryController::class);
         Route::resource('unit-of-measurement', UnitOfMeasureController::class);
@@ -102,6 +100,11 @@ Route::middleware('auth')->group(function () {
             Route::get('balance-sheet/datatables', [BsGroupingController::class, 'datatable'])->name('balance-sheet.datatables');
             Route::resource('balance-sheet', BsGroupingController::class)->except(['create', 'show', 'edit']);
         });
+    });
+
+    Route::middleware('role:administrator|it-staff|hrd-manager|hrd-supervisor|hrd-staff')->prefix('master')->group(function () {
+        Route::get('employees/id-cards/print', [EmployeeController::class, 'printIdCards'])->name('employees.id-cards.print');
+        Route::resource('employees', EmployeeController::class)->except(['create', 'show', 'edit']);
     });
     Route::middleware('role:administrator|purchasing-manager|purchasing-staff')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');

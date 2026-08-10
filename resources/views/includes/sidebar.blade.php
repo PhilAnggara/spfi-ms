@@ -145,6 +145,15 @@
                             </li>
                         @endrole
 
+                        @role('hrd-manager|hrd-supervisor|hrd-staff')
+                            <li class="sidebar-item {{ Request::is('master/employees*') ? 'active' : '' }}">
+                                <a href="{{ route('employees.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-id-card {{ Request::is('master/employees*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Employee</span>
+                                </a>
+                            </li>
+                        @endrole
+
                         @role('administrator')
                             <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
                                 <a href="{{ route('dashboard') }}" class='sidebar-link'>

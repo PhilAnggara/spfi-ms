@@ -23,6 +23,7 @@ class UserController extends Controller
             'Fixed Labeling' => 'production-manager',
             'Quality Assurance' => 'production-manager',
             'Engineering' => 'engineering-manager',
+            'Human Resources Development' => 'hrd-manager',
         ],
         'Supervisor' => [
             'Purchasing' => 'purchasing-staff',
@@ -34,6 +35,7 @@ class UserController extends Controller
             'Fixed Labeling' => 'production-manager',
             'Quality Assurance' => 'production-manager',
             'Engineering' => 'production-manager',
+            'Human Resources Development' => 'hrd-supervisor',
         ],
         'Staff' => [
             'Purchasing' => 'purchasing-staff',
@@ -45,6 +47,7 @@ class UserController extends Controller
             'Fixed Labeling' => 'production-manager',
             'Quality Assurance' => 'production-manager',
             'Engineering' => 'production-manager',
+            'Human Resources Development' => 'hrd-staff',
         ],
     ];
 

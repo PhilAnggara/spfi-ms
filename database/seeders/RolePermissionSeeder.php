@@ -107,6 +107,9 @@ class RolePermissionSeeder extends Seeder
             'engineering-manager',
             'engineering-supervisor',
             'engineering-staff',
+            'hrd-manager',
+            'hrd-supervisor',
+            'hrd-staff',
         ];
 
         foreach ($roles as $role) {
@@ -271,6 +274,18 @@ class RolePermissionSeeder extends Seeder
             'engineering-staff' => [
                 'view-prs',
                 'view-po',
+                'view-dashboard',
+                'print-document',
+            ],
+            'hrd-manager' => [
+                'view-dashboard',
+                'print-document',
+            ],
+            'hrd-supervisor' => [
+                'view-dashboard',
+                'print-document',
+            ],
+            'hrd-staff' => [
                 'view-dashboard',
                 'print-document',
             ],
