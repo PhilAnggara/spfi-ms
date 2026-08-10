@@ -14,10 +14,12 @@
             </div>
             <div class="col-12 col-lg-5">
                 <div class="prs-top-actions">
+                    @role('administrator|it-manager|it-staff|purchasing-manager|purchasing-staff|finance-manager|finance-supervisor|finance-staff')
                     <button type="button" class="btn btn-outline-primary icon icon-left" data-bs-toggle="modal" data-bs-target="#export-modal">
                         <i class="fa-duotone fa-solid fa-file-pdf"></i>
                         Export PDF
                     </button>
+                    @endrole
                     <button type="button" class="btn btn-outline-secondary icon icon-left" data-bs-toggle="modal" data-bs-target="#export-by-department-modal">
                         <i class="fa-duotone fa-solid fa-building"></i>
                         PRS per Department
@@ -229,7 +231,9 @@
 </div>
 <div id="prs-page-modals">
     @include('includes.modals.prs-modal')
+    @role('administrator|it-manager|it-staff|purchasing-manager|purchasing-staff|finance-manager|finance-supervisor|finance-staff')
     @include('includes.modals.prs-export')
+    @endrole
     @include('includes.modals.prs-export-by-department')
 </div>
 </div>

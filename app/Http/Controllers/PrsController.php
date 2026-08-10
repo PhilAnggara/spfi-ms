@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\PrsByDepartmentSpreadsheet;
+use App\Exports\PrsListSpreadsheet;
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -13,6 +15,7 @@ use App\Services\DocumentNumberService;
 use App\Services\NotificationRecipientService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\UsesSmartCatalogSearch;
+use App\Support\PdfReport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -21,7 +24,6 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PrsController extends Controller
 {
@@ -426,35 +428,112 @@ class PrsController extends Controller
     }
 
     /**
-     * Export PRS list to PDF by month range.
+     * Roles allowed to run the full PRS list export (PDF/Excel).
+     *
+     * @var list<string>
+     */
+    private const PRS_LIST_EXPORT_ROLES = [
+        'administrator',
+        'it-manager',
+        'it-staff',
+        'purchasing-manager',
+        'purchasing-staff',
+        'finance-manager',
+        'finance-supervisor',
+        'finance-staff',
+    ];
+
+    /**
+     * Export PRS list by month range (PDF or Excel).
      */
     public function export(Request $request)
     {
+        $user = $request->user() ?? Auth::user();
+        abort_unless(
+            $user && $user->hasAnyRole(self::PRS_LIST_EXPORT_ROLES),
+            403
+        );
+
         $validated = $request->validate([
             'start_month' => ['required', 'date_format:Y-m'],
             'end_month' => ['required', 'date_format:Y-m', 'after_or_equal:start_month'],
+            'format' => ['required', 'in:pdf,excel'],
         ]);
 
         $start = Carbon::createFromFormat('Y-m', $validated['start_month'])->startOfMonth();
         $end = Carbon::createFromFormat('Y-m', $validated['end_month'])->endOfMonth();
 
-        $prs = Prs::with(['department', 'items.item'])
+        $rows = [];
+        $prsNumber = 0;
+
+        $prsList = Prs::with(['department', 'items.item.unit'])
             ->whereBetween('prs_date', [$start, $end])
             ->orderByDesc('prs_date')
+            ->orderBy('id')
             ->get();
 
+        foreach ($prsList as $prs) {
+            $prsNumber++;
+            $items = $prs->items;
+
+            if ($items->isEmpty()) {
+                $rows[] = [
+                    'is_prs_start' => true,
+                    'row_number' => $prsNumber,
+                    'prs_number' => $prs->prs_number,
+                    'department_name' => $prs->department?->name ?? '-',
+                    'prs_date' => $prs->prs_date,
+                    'date_needed' => $prs->date_needed,
+                    'item_code' => '-',
+                    'item_name' => '-',
+                    'quantity' => 0,
+                    'unit' => '-',
+                    'remarks' => $prs->remarks ?? '',
+                ];
+
+                continue;
+            }
+
+            foreach ($items->values() as $itemIndex => $prsItem) {
+                $isStart = $itemIndex === 0;
+                $rows[] = [
+                    'is_prs_start' => $isStart,
+                    'row_number' => $isStart ? $prsNumber : null,
+                    'prs_number' => $isStart ? $prs->prs_number : null,
+                    'department_name' => $isStart ? ($prs->department?->name ?? '-') : null,
+                    'prs_date' => $isStart ? $prs->prs_date : null,
+                    'date_needed' => $isStart ? $prs->date_needed : null,
+                    'item_code' => $prsItem->item?->code ?? '-',
+                    'item_name' => $prsItem->item?->name ?? '-',
+                    'quantity' => (float) $prsItem->quantity,
+                    'unit' => $prsItem->item?->unit?->name ?? '-',
+                    'remarks' => $isStart ? ($prs->remarks ?? '') : null,
+                ];
+            }
+        }
+
         $data = [
-            'prsList' => $prs,
-            'start' => $start,
-            'end' => $end,
-            'generated_at' => now(),
+            'company' => PdfReport::DEFAULT_COMPANY,
+            'title' => 'Purchase Requisition Slip Report',
+            'date_from' => $start->toDateString(),
+            'date_to' => $end->toDateString(),
+            'printed_at' => now()->format('d-m-Y H:i'),
+            'rows' => $rows,
         ];
 
-        $filename = sprintf('prs-%s-to-%s.pdf', $start->format('Ym'), $end->format('Ym'));
+        $filePrefix = sprintf('prs-%s-to-%s', $start->format('Ym'), $end->format('Ym'));
 
-        return Pdf::loadView('pdf.prs-report', $data)
-            ->setPaper('a4', 'portrait')
-            ->stream($filename);
+        if ($validated['format'] === 'excel') {
+            return (new PrsListSpreadsheet($data))->download(
+                sprintf('%s-%s.xlsx', $filePrefix, now()->format('Ymd-His'))
+            );
+        }
+
+        return PdfReport::analytical(
+            'pdf.reports.prs-list',
+            $data,
+            sprintf('%s-%s.pdf', $filePrefix, now()->format('Ymd-His'))
+        );
     }
 
     /**
@@ -492,7 +571,8 @@ class PrsController extends Controller
         $prsQuery = Prs::with(['department', 'user', 'items.item.unit', 'items.canvasser', 'items.purchaseOrder'])
             ->whereBetween('prs_date', [$start, $end])
             ->orderBy('department_id')
-            ->orderByDesc('prs_date');
+            ->orderByDesc('prs_date')
+            ->orderBy('id');
 
         if ($departmentId) {
             $prsQuery->where('department_id', $departmentId);
@@ -504,53 +584,93 @@ class PrsController extends Controller
             ->groupBy('department_id')
             ->map(function ($prsList, $deptId) {
                 $department = $prsList->first()?->department;
+                $rows = [];
+
+                foreach ($prsList as $prs) {
+                    $items = $prs->items->values();
+
+                    if ($items->isEmpty()) {
+                        $rows[] = [
+                            'is_prs_start' => true,
+                            'prs_number' => $prs->prs_number,
+                            'prs_date' => $prs->prs_date,
+                            'date_needed' => $prs->date_needed,
+                            'requestor' => $prs->user?->name ?? '-',
+                            'status' => $prs->status,
+                            'is_capex' => (bool) $prs->is_capex,
+                            'item_code' => '-',
+                            'item_name' => '-',
+                            'quantity' => 0,
+                            'unit' => '-',
+                            'canvasser' => '-',
+                            'po_number' => '-',
+                            'remarks' => $prs->remarks ?? '',
+                        ];
+
+                        continue;
+                    }
+
+                    foreach ($items as $itemIndex => $prsItem) {
+                        $isStart = $itemIndex === 0;
+                        $rows[] = [
+                            'is_prs_start' => $isStart,
+                            'prs_number' => $isStart ? $prs->prs_number : null,
+                            'prs_date' => $isStart ? $prs->prs_date : null,
+                            'date_needed' => $isStart ? $prs->date_needed : null,
+                            'requestor' => $isStart ? ($prs->user?->name ?? '-') : null,
+                            'status' => $isStart ? $prs->status : null,
+                            'is_capex' => $isStart ? (bool) $prs->is_capex : null,
+                            'item_code' => $prsItem->item?->code ?? '-',
+                            'item_name' => $prsItem->item?->name ?? '-',
+                            'quantity' => (float) $prsItem->quantity,
+                            'unit' => $prsItem->item?->unit?->name ?? '-',
+                            'canvasser' => $prsItem->canvasser?->name ?? '-',
+                            'po_number' => $prsItem->purchaseOrder?->po_number ?? '-',
+                            'remarks' => $isStart ? ($prs->remarks ?? '') : null,
+                        ];
+                    }
+                }
 
                 return [
                     'department_id' => (int) $deptId,
                     'department_code' => $department?->code ?? 'UNKNOWN',
                     'department_name' => $department?->name ?? 'Unknown Department',
-                    'prs_list' => $prsList->values(),
+                    'rows' => $rows,
                 ];
             })
             ->sortBy('department_code')
-            ->values();
+            ->values()
+            ->all();
 
         $scopedDepartment = $departmentId
             ? Department::query()->find($departmentId)
             : null;
 
         $data = [
-            'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
+            'company' => PdfReport::DEFAULT_COMPANY,
             'title' => 'Purchase Requisition Slip Report per Department',
-            'start' => $start,
-            'end' => $end,
-            'generated_at' => now(),
+            'date_from' => $start->toDateString(),
+            'date_to' => $end->toDateString(),
+            'printed_at' => now()->format('d-m-Y H:i'),
             'groups' => $groups,
-            'scoped_department' => $scopedDepartment,
+            'scoped_department_label' => $scopedDepartment
+                ? sprintf('[%s] %s', $scopedDepartment->code, $scopedDepartment->name)
+                : null,
         ];
 
         $filePrefix = sprintf('prs-by-department-%s-to-%s', $start->format('Ym'), $end->format('Ym'));
 
         if ($validated['format'] === 'excel') {
-            return $this->streamPrsExcel($filePrefix, 'exports.prs-by-department', $data);
+            return (new PrsByDepartmentSpreadsheet($data))->download(
+                sprintf('%s-%s.xlsx', $filePrefix, now()->format('Ymd-His'))
+            );
         }
 
-        $filename = sprintf('%s.pdf', $filePrefix);
-
-        return Pdf::loadView('pdf.prs-report-by-department', $data)
-            ->setPaper('a4', 'landscape')
-            ->stream($filename);
-    }
-
-    private function streamPrsExcel(string $filePrefix, string $view, array $data): StreamedResponse
-    {
-        $filename = sprintf('%s-%s.xls', $filePrefix, now()->format('Ymd-His'));
-
-        return response()->streamDownload(function () use ($view, $data) {
-            echo view($view, $data)->render();
-        }, $filename, [
-            'Content-Type' => 'application/vnd.ms-excel',
-        ]);
+        return PdfReport::analytical(
+            'pdf.reports.prs-by-department',
+            $data,
+            sprintf('%s-%s.pdf', $filePrefix, now()->format('Ymd-His'))
+        );
     }
 
     // Sinkron dengan sistem lama: {DEPTCODE}{#######}, urutan naik per department code.
