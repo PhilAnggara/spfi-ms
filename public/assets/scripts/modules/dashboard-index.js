@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const usersByDepartment = seriesPayload('users_by_department');
     const deptMonthlyPrs = seriesPayload('dept_monthly_prs');
     const deptPrsStatus = seriesPayload('dept_prs_status');
-    const openPrsHeatmap = dashboardData.open_prs_heatmap || {};
 
     renderIfPresent('#chart-profile-visit', function () {
         return {
@@ -92,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     });
 
-    renderIfPresent('#chart-open-prs-heatmap', function () {
+    function buildOpenPrsHeatmapOptions(openPrsHeatmap) {
         const categories = Array.isArray(openPrsHeatmap.categories) ? openPrsHeatmap.categories : [];
         const series = Array.isArray(openPrsHeatmap.series) ? openPrsHeatmap.series : [];
 
@@ -173,7 +172,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
             },
         };
-    });
+    }
+
+    const heatmapEl = document.querySelector('#chart-open-prs-heatmap');
+    if (heatmapEl && window.dashboardHeatmapUrl) {
+        fetch(window.dashboardHeatmapUrl, {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Heatmap request failed');
+                }
+
+                return response.json();
+            })
+            .then(function (payload) {
+                renderIfPresent(heatmapEl, function () {
+                    return buildOpenPrsHeatmapOptions(payload || {});
+                });
+            })
+            .catch(function () {
+                // Leave the chart card empty if heatmap data cannot be loaded.
+            });
+    }
 
     renderIfPresent('#chart-top-suppliers', function () {
         return {

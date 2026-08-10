@@ -42,6 +42,7 @@
 @push('addon-script')
     <script>
         window.dashboardData = @json($dashboardData);
+        window.dashboardHeatmapUrl = @json(route('dashboard.charts.open-prs-heatmap'));
     </script>
     <script src="{{ url('assets/extensions/apexcharts/apexcharts.min.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/dashboard-index.js') }}"></script>

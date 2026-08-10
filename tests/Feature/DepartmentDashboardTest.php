@@ -416,7 +416,7 @@ it('limits po status chart data to approved and pending approval', function () {
         ->and($poStatus['series'])->toBe([1, 1]);
 });
 
-it('builds open prs heatmap series for purchasing dashboard', function () {
+it('builds open prs heatmap series via authenticated json endpoint', function () {
     $user = makeDashboardUser('purchasing-staff', [
         'name' => 'Purchasing',
         'code' => '7050',
@@ -449,14 +449,30 @@ it('builds open prs heatmap series for purchasing dashboard', function () {
         'is_capex' => false,
     ]);
 
-    $response = $this->actingAs($user)->get(route('dashboard'));
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertSee('Open PRS by Department')
+        ->assertSee('dashboardHeatmapUrl', false);
 
-    $response->assertSuccessful();
-
-    $heatmap = $response->viewData('dashboardData')['open_prs_heatmap'];
+    $heatmap = $this->actingAs($user)
+        ->getJson(route('dashboard.charts.open-prs-heatmap'))
+        ->assertSuccessful()
+        ->assertJsonStructure([
+            'categories',
+            'series' => [
+                '*' => ['name', 'data'],
+            ],
+        ])
+        ->json();
 
     expect($heatmap['categories'])->toContain('PUR')
         ->and($heatmap['categories'])->toContain('QA')
         ->and($heatmap['series'])->not->toBeEmpty()
         ->and(collect($heatmap['series'])->pluck('name')->all())->toContain('REQUESTED');
+});
+
+it('requires authentication for the open prs heatmap endpoint', function () {
+    $this->getJson(route('dashboard.charts.open-prs-heatmap'))
+        ->assertUnauthorized();
 });

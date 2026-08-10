@@ -10,14 +10,16 @@ use App\Models\ReceivingReport;
 use App\Models\Session;
 use App\Models\TransferSlip;
 use App\Models\User;
-use App\Services\Accounting\AccountingDocTransactionService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
 class DashboardDataService
 {
+    private const CACHE_TTL_SECONDS = 600;
+
     /**
      * @return array{
      *     key: string,
@@ -33,23 +35,44 @@ class DashboardDataService
      */
     public function build(User $user, string $key): array
     {
-        $now = now();
-        $monthStart = $now->copy()->startOfMonth();
-        $monthEnd = $now->copy()->endOfMonth();
-        $monthLabel = Carbon::parse($monthStart)->translatedFormat('F Y');
-
         $user->loadMissing('department');
 
-        return match ($key) {
-            'admin' => $this->forAdmin($user, $monthStart, $monthEnd, $monthLabel),
-            'purchasing' => $this->forPurchasing($user, $monthStart, $monthEnd, $monthLabel),
-            'im' => $this->forIm($user, $monthStart, $monthEnd, $monthLabel),
-            'finance' => $this->forFinance($user, $monthStart, $monthEnd, $monthLabel),
-            'engineering' => $this->forEngineering($user, $monthStart, $monthEnd, $monthLabel),
-            'it' => $this->forIt($user, $monthStart, $monthEnd, $monthLabel),
-            'md' => $this->forMd($user, $monthStart, $monthEnd, $monthLabel),
-            default => $this->forDefault($user, $monthStart, $monthEnd, $monthLabel),
-        };
+        $cacheKey = sprintf(
+            'dashboard.v1.%s.%d.%s',
+            $key,
+            $user->id,
+            $user->department_id ?? 'none',
+        );
+
+        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($user, $key): array {
+            $now = now();
+            $monthStart = $now->copy()->startOfMonth();
+            $monthEnd = $now->copy()->endOfMonth();
+            $monthLabel = Carbon::parse($monthStart)->translatedFormat('F Y');
+
+            return match ($key) {
+                'admin' => $this->forAdmin($user, $monthStart, $monthEnd, $monthLabel),
+                'purchasing' => $this->forPurchasing($user, $monthStart, $monthEnd, $monthLabel),
+                'im' => $this->forIm($user, $monthStart, $monthEnd, $monthLabel),
+                'finance' => $this->forFinance($user, $monthStart, $monthEnd, $monthLabel),
+                'engineering' => $this->forEngineering($user, $monthStart, $monthEnd, $monthLabel),
+                'it' => $this->forIt($user, $monthStart, $monthEnd, $monthLabel),
+                'md' => $this->forMd($user, $monthStart, $monthEnd, $monthLabel),
+                default => $this->forDefault($user, $monthStart, $monthEnd, $monthLabel),
+            };
+        });
+    }
+
+    /**
+     * @return array{categories: array<int, string>, series: array<int, array{name: string, data: array<int, int>}>}
+     */
+    public function openPrsHeatmapCached(): array
+    {
+        return Cache::remember(
+            'dashboard.heatmap.open_prs',
+            self::CACHE_TTL_SECONDS,
+            fn (): array => $this->openPrsHeatmapChart(),
+        );
     }
 
     /**
@@ -78,7 +101,6 @@ class DashboardDataService
             charts: array_merge(
                 $this->purchasingCharts(),
                 $this->imCharts($monthStart),
-                ['open_prs_heatmap' => $this->openPrsHeatmapChart()],
             ),
             lists: [
                 'recent_prs' => $this->recentPrs(),
@@ -97,10 +119,7 @@ class DashboardDataService
     {
         $merged = $this->mergeDepartmentBaseline($user, $monthStart, $monthEnd, [
             'metrics' => $this->purchasingMetrics($monthStart, $monthEnd),
-            'charts' => array_merge(
-                $this->purchasingCharts(),
-                ['open_prs_heatmap' => $this->openPrsHeatmapChart()],
-            ),
+            'charts' => $this->purchasingCharts(),
             'lists' => [
                 'recent_prs' => $this->recentPrs(),
                 'recent_po' => $this->recentPurchaseOrders(),
@@ -162,7 +181,6 @@ class DashboardDataService
             'charts' => [
                 'monthly_po_value' => $this->monthlyPoValueChart(),
                 'po_status' => $this->poStatusChart(),
-                'open_prs_heatmap' => $this->openPrsHeatmapChart(),
             ],
             'lists' => [
                 'recent_po' => $this->recentPurchaseOrders(),
@@ -245,7 +263,6 @@ class DashboardDataService
                 'monthly_prs' => $this->monthlyPrsChart(),
                 'prs_status' => $this->prsStatusChart(),
                 'po_status' => $this->poStatusChart(),
-                'open_prs_heatmap' => $this->openPrsHeatmapChart(),
             ],
             'lists' => [
                 'recent_prs' => $this->recentPrs(),
@@ -319,12 +336,29 @@ class DashboardDataService
      */
     private function purchasingMetrics(Carbon $monthStart, Carbon $monthEnd): array
     {
+        $monthStartDate = $monthStart->toDateString();
+        $monthEndDate = $monthEnd->toDateString();
+
+        $prs = Prs::query()
+            ->selectRaw(
+                'SUM(CASE WHEN prs_date >= ? AND prs_date <= ? THEN 1 ELSE 0 END) as prs_this_month',
+                [$monthStartDate, $monthEndDate],
+            )
+            ->selectRaw("SUM(CASE WHEN status IN ('REQUESTED', 'REVISED') THEN 1 ELSE 0 END) as prs_to_assign")
+            ->selectRaw("SUM(CASE WHEN status = 'CANVASSING' THEN 1 ELSE 0 END) as canvass_open")
+            ->first();
+
+        $po = PurchaseOrder::query()
+            ->selectRaw("SUM(CASE WHEN status = 'PENDING_APPROVAL' THEN 1 ELSE 0 END) as po_pending_approval")
+            ->selectRaw("SUM(CASE WHEN status = 'CHANGES_REQUESTED' THEN 1 ELSE 0 END) as po_changes_requested")
+            ->first();
+
         return [
-            'prs_this_month' => $this->prsThisMonth($monthStart, $monthEnd),
-            'prs_to_assign' => Prs::query()->whereIn('status', ['REQUESTED', 'REVISED'])->count(),
-            'canvass_open' => Prs::query()->where('status', 'CANVASSING')->count(),
-            'po_pending_approval' => $this->poPendingApprovalCount(),
-            'po_changes_requested' => PurchaseOrder::query()->where('status', 'CHANGES_REQUESTED')->count(),
+            'prs_this_month' => (int) ($prs->prs_this_month ?? 0),
+            'prs_to_assign' => (int) ($prs->prs_to_assign ?? 0),
+            'canvass_open' => (int) ($prs->canvass_open ?? 0),
+            'po_pending_approval' => (int) ($po->po_pending_approval ?? 0),
+            'po_changes_requested' => (int) ($po->po_changes_requested ?? 0),
             'po_approved_value_this_month' => $this->poApprovedValue($monthStart, $monthEnd),
         ];
     }
@@ -406,18 +440,27 @@ class DashboardDataService
      */
     private function departmentPrsMetrics(?int $departmentId, Carbon $monthStart, Carbon $monthEnd): array
     {
-        $base = Prs::query()->when($departmentId, fn ($q) => $q->where('department_id', $departmentId));
+        $monthStartDate = $monthStart->toDateString();
+        $monthEndDate = $monthEnd->toDateString();
 
-        $openStatuses = ['REQUESTED', 'CANVASSING', 'CANVASSER_HOLD', 'ON_HOLD', 'REVISED'];
+        $row = Prs::query()
+            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->selectRaw('COUNT(*) as prs_total')
+            ->selectRaw(
+                'SUM(CASE WHEN prs_date >= ? AND prs_date <= ? THEN 1 ELSE 0 END) as prs_this_month',
+                [$monthStartDate, $monthEndDate],
+            )
+            ->selectRaw("SUM(CASE WHEN status IN ('REQUESTED', 'CANVASSING', 'CANVASSER_HOLD', 'ON_HOLD', 'REVISED') THEN 1 ELSE 0 END) as prs_open")
+            ->selectRaw("SUM(CASE WHEN status IN ('ON_HOLD', 'CANVASSER_HOLD') THEN 1 ELSE 0 END) as prs_on_hold")
+            ->selectRaw("SUM(CASE WHEN status = 'PO_CREATED' THEN 1 ELSE 0 END) as prs_completed")
+            ->first();
 
         return [
-            'prs_this_month' => (clone $base)
-                ->whereBetween('prs_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-                ->count(),
-            'prs_open' => (clone $base)->whereIn('status', $openStatuses)->count(),
-            'prs_on_hold' => (clone $base)->whereIn('status', ['ON_HOLD', 'CANVASSER_HOLD'])->count(),
-            'prs_completed' => (clone $base)->where('status', 'PO_CREATED')->count(),
-            'prs_total' => (clone $base)->count(),
+            'prs_this_month' => (int) ($row->prs_this_month ?? 0),
+            'prs_open' => (int) ($row->prs_open ?? 0),
+            'prs_on_hold' => (int) ($row->prs_on_hold ?? 0),
+            'prs_completed' => (int) ($row->prs_completed ?? 0),
+            'prs_total' => (int) ($row->prs_total ?? 0),
         ];
     }
 
@@ -439,15 +482,22 @@ class DashboardDataService
      */
     private function departmentSwsMetrics(?int $departmentId, Carbon $monthStart, Carbon $monthEnd): array
     {
-        $base = DB::table('store_withdrawals')
+        $monthStartDate = $monthStart->toDateString();
+        $monthEndDate = $monthEnd->toDateString();
+
+        $row = DB::table('store_withdrawals')
             ->whereNull('deleted_at')
-            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId));
+            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->selectRaw(
+                'SUM(CASE WHEN sws_date >= ? AND sws_date <= ? THEN 1 ELSE 0 END) as sws_this_month',
+                [$monthStartDate, $monthEndDate],
+            )
+            ->selectRaw('SUM(CASE WHEN approved_at IS NULL THEN 1 ELSE 0 END) as sws_open')
+            ->first();
 
         return [
-            'sws_this_month' => (clone $base)
-                ->whereBetween('sws_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-                ->count(),
-            'sws_open' => (clone $base)->whereNull('approved_at')->count(),
+            'sws_this_month' => (int) ($row->sws_this_month ?? 0),
+            'sws_open' => (int) ($row->sws_open ?? 0),
         ];
     }
 
@@ -462,7 +512,33 @@ class DashboardDataService
 
     private function docEntryPendingCount(): int
     {
-        return (int) app(AccountingDocTransactionService::class)->summarizeStatuses()['pending'];
+        return (int) Cache::remember('dashboard.doc_entry_pending', self::CACHE_TTL_SECONDS, function (): int {
+            $rrPending = (int) DB::table('receiving_reports as rr')
+                ->leftJoin('accounting_doc_transactions as adt', function ($join): void {
+                    $join->on('adt.doc_number', '=', 'rr.rr_number')
+                        ->where('adt.doc_type', '=', 'RR');
+                })
+                ->whereNull('rr.deleted_at')
+                ->where(function ($query): void {
+                    $query->whereNull('adt.status')
+                        ->orWhere('adt.status', '!=', 'encoded');
+                })
+                ->count();
+
+            $drPending = (int) DB::table('deliveries as dr')
+                ->leftJoin('accounting_doc_transactions as adt', function ($join): void {
+                    $join->on('adt.doc_number', '=', 'dr.dr_number')
+                        ->where('adt.doc_type', '=', 'DR');
+                })
+                ->whereNull('dr.deleted_at')
+                ->where(function ($query): void {
+                    $query->whereNull('adt.status')
+                        ->orWhere('adt.status', '!=', 'encoded');
+                })
+                ->count();
+
+            return $rrPending + $drPending;
+        });
     }
 
     /**

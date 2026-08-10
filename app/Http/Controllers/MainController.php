@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Dashboard\DashboardDataService;
 use App\Services\Dashboard\DashboardResolver;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -24,6 +25,11 @@ class MainController extends Controller
             'dashboardData' => $dashboard['charts'],
             'dashboardMonthLabel' => $dashboard['month_label'],
         ]);
+    }
+
+    public function openPrsHeatmap(DashboardDataService $dataService): JsonResponse
+    {
+        return response()->json($dataService->openPrsHeatmapCached());
     }
 
     public function cekCsv()

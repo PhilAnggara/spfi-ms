@@ -49,6 +49,8 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
 
     Route::get('/', [MainController::class, 'dashboard'])->name('dashboard');
+    Route::get('/dashboard/charts/open-prs-heatmap', [MainController::class, 'openPrsHeatmap'])
+        ->name('dashboard.charts.open-prs-heatmap');
 
     Route::middleware('role:administrator|it-staff|purchasing-staff|purchasing-manager|engineering-managersss|im-manager|im-supervisor')->prefix('master')->group(function () {
         Route::get('product', [ProductController::class, 'index'])->name('product.index');
