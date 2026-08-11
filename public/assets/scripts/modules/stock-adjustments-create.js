@@ -13,23 +13,34 @@ document.addEventListener('DOMContentLoaded', function () {
     const submitBtn = document.getElementById('sa-submit-btn');
     let index = 0;
 
+    function clearDelta(deltaEl) {
+        if (!deltaEl) {
+            return;
+        }
+        deltaEl.textContent = '-';
+        deltaEl.classList.remove('is-up', 'is-down', 'is-zero');
+        deltaEl.classList.add('sc-delta', 'sa-delta', 'is-zero');
+    }
+
     function refreshRow(row) {
         const balance = parseFloat(row.dataset.balance || '0');
         const newInput = row.querySelector('.sa-new-balance');
         const currentEl = row.querySelector('.sa-current');
         const deltaEl = row.querySelector('.sa-delta');
 
-        currentEl.textContent = StockCorrectionItemSearch.formatNumber(balance);
+        currentEl.textContent = row.querySelector('.sc-item-id')?.value
+            ? StockCorrectionItemSearch.formatNumber(balance)
+            : '0.00';
 
-        if (newInput.value === '' && row.querySelector('.sc-item-id').value) {
-            newInput.value = Number(balance).toFixed(5);
+        if (newInput.value === '') {
+            clearDelta(deltaEl);
+            updateSubmitState();
+            return;
         }
 
         const neu = parseFloat(newInput.value || '0');
         const delta = neu - balance;
-        const prefix = delta > 0 ? '+' : '';
-        deltaEl.textContent = prefix + StockCorrectionItemSearch.formatNumber(delta);
-        deltaEl.className = 'sc-delta ' + StockCorrectionItemSearch.deltaClass(delta);
+        StockCorrectionItemSearch.applyDeltaBadge(deltaEl, delta, 'sa-delta');
         updateSubmitState();
     }
 
@@ -37,9 +48,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const rows = Array.from(tbody.querySelectorAll('tr'));
         const hasDelta = rows.some((row) => {
             const itemId = row.querySelector('.sc-item-id')?.value;
-            if (!itemId) return false;
+            const raw = row.querySelector('.sa-new-balance')?.value;
+            if (!itemId || raw === '') return false;
             const balance = parseFloat(row.dataset.balance || '0');
-            const neu = parseFloat(row.querySelector('.sa-new-balance')?.value || '0');
+            const neu = parseFloat(raw || '0');
             return Math.abs(neu - balance) >= 0.00001;
         });
         submitBtn.disabled = !hasDelta;
@@ -54,10 +66,11 @@ document.addEventListener('DOMContentLoaded', function () {
             searchUrl,
             csrf,
             onSelect(item, selectedRow) {
+                selectedRow.querySelector('.sa-new-balance').value = '';
                 if (item) {
-                    selectedRow.querySelector('.sa-new-balance').value = Number(item.balance || 0).toFixed(5);
+                    selectedRow.dataset.balance = String(item.balance ?? 0);
                 } else {
-                    selectedRow.querySelector('.sa-new-balance').value = '';
+                    selectedRow.dataset.balance = '0';
                 }
                 refreshRow(selectedRow);
             },
@@ -78,7 +91,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('sa-create-form').addEventListener('submit', function (event) {
         Array.from(tbody.querySelectorAll('tr')).forEach(function (row) {
             const itemId = row.querySelector('.sc-item-id')?.value;
-            if (!itemId) {
+            const raw = row.querySelector('.sa-new-balance')?.value;
+            if (!itemId || raw === '') {
                 row.remove();
             }
         });

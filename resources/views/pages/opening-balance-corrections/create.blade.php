@@ -81,16 +81,10 @@
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-transparent d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <span class="fw-semibold">Items</span>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary icon icon-left" id="obc-preview-btn">
-                        <i class="fa-regular fa-eye"></i>
-                        Preview Impact
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary icon icon-left" id="obc-add-row">
-                        <i class="fa-regular fa-plus"></i>
-                        Add Item
-                    </button>
-                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary icon icon-left" id="obc-add-row">
+                    <i class="fa-regular fa-plus"></i>
+                    Add Item
+                </button>
             </div>
             <div class="sc-preview-summary" id="obc-preview-summary">
                 <span class="sc-preview-pill">Total delta: <span id="obc-summary-delta">0.00</span></span>
@@ -103,7 +97,7 @@
                             <th style="min-width: 320px;">Item</th>
                             <th class="text-end">Current On-hand</th>
                             <th class="text-end" style="min-width: 140px;">New Beginning</th>
-                            <th class="text-end">Implied Begin</th>
+                            <th class="text-end" title="Beginning currently implied by the system = on-hand minus net movements since period start">Implied Begin</th>
                             <th class="text-end">Delta</th>
                             <th class="text-end">Replay</th>
                             <th></th>

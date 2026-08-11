@@ -20,6 +20,17 @@ window.StockCorrectionItemSearch = (function () {
         return 'is-zero';
     }
 
+    function applyDeltaBadge(el, delta, hookClass) {
+        if (!el) {
+            return;
+        }
+
+        const prefix = delta > 0 ? '+' : '';
+        el.textContent = prefix + formatNumber(delta);
+        el.classList.remove('is-up', 'is-down', 'is-zero');
+        el.classList.add('sc-delta', hookClass, deltaClass(delta));
+    }
+
     function bindPicker(row, options) {
         const searchUrl = options.searchUrl;
         const csrf = options.csrf;
@@ -172,6 +183,7 @@ window.StockCorrectionItemSearch = (function () {
         debounce,
         formatNumber,
         deltaClass,
+        applyDeltaBadge,
         bindPicker,
     };
 })();
