@@ -8,7 +8,7 @@
             <div class="col-12 col-lg-7">
                 <div class="po-hero">
                     <h3 class="mb-1">Stock Adjustments</h3>
-                    <p class="text-muted mb-0">Correct current on-hand stock. Each change is posted to the ledger as ADJ without rewriting RR/TS/DR history.</p>
+                    <p class="text-muted mb-0">Correct current on-hand stock. Each change posts to the ledger as ADJ without rewriting RR/TS/DR history.</p>
                 </div>
             </div>
             @can('create-stock-adjustment')
@@ -54,7 +54,7 @@
 
         <div class="card shadow-sm border-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
+                <table class="table table-hover mb-0 align-middle sc-index-table">
                     <thead>
                         <tr>
                             <th>SA Number</th>
@@ -90,7 +90,7 @@
                             <tr>
                                 <td colspan="6">
                                     <div class="sc-empty-state">
-                                        <div><i class="fa-duotone fa-solid fa-sliders"></i></div>
+                                        <div class="sc-empty-icon"><i class="fa-duotone fa-solid fa-sliders"></i></div>
                                         <div class="fw-semibold mb-1">No stock adjustments yet</div>
                                         <p class="text-muted mb-3">Create an adjustment when on-hand stock needs a ledger correction.</p>
                                         @can('create-stock-adjustment')
@@ -104,7 +104,7 @@
                 </table>
             </div>
             @if ($adjustments->hasPages())
-                <div class="card-footer">{{ $adjustments->links() }}</div>
+                <div class="card-footer bg-transparent">{{ $adjustments->links() }}</div>
             @endif
         </div>
     </section>

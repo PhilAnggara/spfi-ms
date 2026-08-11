@@ -57,6 +57,19 @@ document.addEventListener('DOMContentLoaded', function () {
         submitBtn.disabled = !hasDelta;
     }
 
+    function updateRemoveButtons() {
+        const rows = tbody.querySelectorAll('tr');
+        const onlyOne = rows.length <= 1;
+        rows.forEach(function (row) {
+            const btn = row.querySelector('.sa-remove-row');
+            if (!btn) {
+                return;
+            }
+            btn.disabled = onlyOne;
+            btn.title = onlyOne ? 'At least one item row is required' : 'Remove row';
+        });
+    }
+
     function addRow() {
         const html = template.replaceAll('__INDEX__', String(index++));
         tbody.insertAdjacentHTML('beforeend', html);
@@ -80,11 +93,16 @@ document.addEventListener('DOMContentLoaded', function () {
             refreshRow(row);
         });
         row.querySelector('.sa-remove-row').addEventListener('click', function () {
+            if (tbody.querySelectorAll('tr').length <= 1) {
+                return;
+            }
             row.remove();
+            updateRemoveButtons();
             updateSubmitState();
         });
 
         refreshRow(row);
+        updateRemoveButtons();
     }
 
     document.getElementById('sa-add-row').addEventListener('click', addRow);

@@ -12,7 +12,7 @@
             <div class="col-12 col-lg-7">
                 <div class="po-hero">
                     <h3 class="mb-1">Create Stock Adjustment</h3>
-                    <p class="text-muted mb-0">Search items, set the new on-hand balance, and post the difference to the ledger.</p>
+                    <p class="text-muted mb-0">Search items, set the new on-hand balance, and post the difference to the ledger as ADJ.</p>
                 </div>
             </div>
             <div class="col-12 col-lg-5">
@@ -24,6 +24,15 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="sc-callout mb-3">
+        <div class="fw-semibold">When to use</div>
+        <ul>
+            <li>Correct current on-hand without rewriting RR / TS / DR history</li>
+            <li>Each line posts the delta to the ADJ ledger bucket</li>
+            <li>Later movements stay as-is if you reverse — only on-hand is adjusted back</li>
+        </ul>
     </div>
 
     @if ($errors->any())
@@ -41,7 +50,7 @@
         @csrf
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-transparent">
-                <span class="fw-semibold">Document</span>
+                <span class="sc-section-title"><i class="fa-regular fa-file-lines"></i> Document</span>
             </div>
             <div class="card-body">
                 <div class="row g-3">
@@ -64,7 +73,7 @@
 
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
-                <span class="fw-semibold">Items</span>
+                <span class="sc-section-title"><i class="fa-regular fa-boxes-stacked"></i> Items</span>
                 <button type="button" class="btn btn-sm btn-outline-primary icon icon-left" id="sa-add-row">
                     <i class="fa-regular fa-plus"></i>
                     Add Item

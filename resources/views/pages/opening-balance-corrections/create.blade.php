@@ -33,6 +33,7 @@
             <li>Purges ledger rows for each selected item from the month start (including SA in that window)</li>
             <li>Sets the new beginning balance</li>
             <li>Replays RR / TS / DR chronologically so the stock card stays consistent</li>
+            <li>Reverse later rebuilds again — including documents created after this correction</li>
         </ul>
     </div>
 
@@ -51,7 +52,7 @@
         @csrf
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-transparent">
-                <span class="fw-semibold">Document</span>
+                <span class="sc-section-title"><i class="fa-regular fa-file-lines"></i> Document</span>
             </div>
             <div class="card-body">
                 <div class="row g-3">
@@ -80,7 +81,7 @@
 
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-transparent d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span class="fw-semibold">Items</span>
+                <span class="sc-section-title"><i class="fa-regular fa-boxes-stacked"></i> Items</span>
                 <button type="button" class="btn btn-sm btn-outline-primary icon icon-left" id="obc-add-row">
                     <i class="fa-regular fa-plus"></i>
                     Add Item

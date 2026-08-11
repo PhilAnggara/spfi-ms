@@ -13,6 +13,9 @@
 
         return 'is-zero';
     };
+
+    $netDelta = (float) $correction->items->sum('delta_qty');
+    $replayTotal = (int) $correction->items->sum('replayed_movements');
 @endphp
 <div class="page-heading po-page sc-page">
     <div class="page-title mb-4">
@@ -25,7 +28,9 @@
                         <span class="sc-meta-chip"><i class="fa-regular fa-user"></i> {{ $correction->createdBy?->name ?? '-' }}</span>
                         <span class="sc-meta-chip"><i class="fa-regular fa-list"></i> {{ $correction->items->count() }} lines</span>
                         @if ($correction->isReversed())
-                            <span class="badge bg-secondary">Reversed</span>
+                            <span class="sc-status-badge is-reversed">Reversed</span>
+                        @else
+                            <span class="sc-status-badge is-posted">Posted</span>
                         @endif
                     </div>
                 </div>
@@ -37,12 +42,16 @@
                 </a>
                 @can('delete-opening-balance-correction')
                     @unless ($correction->isReversed())
-                        <form method="POST" action="{{ route('opening-balance-corrections.reverse', $correction) }}" onsubmit="return confirm('Reverse this correction? Stock will be rebuilt to the previous beginning and OBC ADJ ledger rows will be removed.');">
+                        <button
+                            type="button"
+                            class="btn btn-outline-danger icon icon-left"
+                            onclick="hapusData({{ $correction->id }}, 'Reverse Opening Correction', 'Movements since period start will be rebuilt (including docs after this OBC). Beginning restores to previous; OBC ADJ ledger is cleared. Document stays as Reversed history.', 'Yes, reverse!')"
+                        >
+                            <i class="fa-regular fa-rotate-left"></i>
+                            Reverse Correction
+                        </button>
+                        <form action="{{ route('opening-balance-corrections.reverse', $correction) }}" id="hapus-{{ $correction->id }}" method="POST" class="d-none">
                             @csrf
-                            <button type="submit" class="btn btn-outline-danger icon icon-left">
-                                <i class="fa-regular fa-rotate-left"></i>
-                                Reverse Correction
-                            </button>
                         </form>
                     @endunless
                 @endcan
@@ -54,17 +63,47 @@
         <div class="alert alert-success shadow-sm border-0">{{ session('success') }}</div>
     @endif
 
+    @if ($errors->has('correction'))
+        <div class="alert alert-danger shadow-sm border-0">{{ $errors->first('correction') }}</div>
+    @endif
+
     @if ($correction->isReversed())
-        <div class="alert alert-secondary shadow-sm border-0">
-            Reversed on {{ $correction->reversed_at?->format('Y-m-d H:i') }}
-            by {{ $correction->reversedBy?->name ?? '-' }}.
-            Document kept for history; opening ADJ ledger for this OBC was cleared.
+        <div class="sc-reversed-banner mb-4">
+            <div class="fw-semibold mb-1">Reversed</div>
+            <div>
+                Reversed on {{ $correction->reversed_at?->format('Y-m-d H:i') }}
+                by {{ $correction->reversedBy?->name ?? '-' }}.
+                Document kept for history; opening ADJ ledger for this OBC was cleared.
+            </div>
         </div>
     @endif
 
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="sc-summary-strip">
+        <div class="sc-summary-card">
+            <div class="label">Period</div>
+            <div class="value">{{ $correction->period_month?->format('Y-m') }}</div>
+        </div>
+        <div class="sc-summary-card">
+            <div class="label">Lines</div>
+            <div class="value">{{ $correction->items->count() }}</div>
+        </div>
+        <div class="sc-summary-card">
+            <div class="label">Net Delta</div>
+            <div class="value">
+                <span class="sc-delta {{ $deltaClass($netDelta) }}">
+                    {{ ($netDelta > 0 ? '+' : '').number_format($netDelta, 2) }}
+                </span>
+            </div>
+        </div>
+        <div class="sc-summary-card">
+            <div class="label">Replayed</div>
+            <div class="value">{{ $replayTotal }}</div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 sc-reason-panel mb-4">
         <div class="card-body">
-            <div class="fw-semibold mb-1">Reason</div>
+            <div class="label">Reason</div>
             <div>{{ $correction->reason }}</div>
             @if ($correction->allow_negative_balance)
                 <div class="mt-2 text-warning small">Replay allowed negative balances.</div>
@@ -73,6 +112,9 @@
     </div>
 
     <div class="card shadow-sm border-0">
+        <div class="card-header bg-transparent">
+            <span class="sc-section-title"><i class="fa-regular fa-boxes-stacked"></i> Line Items</span>
+        </div>
         <div class="table-responsive">
             <table class="table mb-0 align-middle sc-lines-table">
                 <thead>

@@ -1,7 +1,29 @@
 /* Stock Adjustment & Opening Balance Correction UI */
 
+/* Keep page titles aligned with po-page / other modules — no boxed hero panel. */
 .sc-page .po-hero p {
-    max-width: 42rem;
+    max-width: 46rem;
+}
+
+.sc-page .card {
+    border-radius: 1rem;
+}
+
+.sc-page .card-header {
+    border-bottom-color: #eef2f7;
+}
+
+.sc-section-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    color: inherit;
+}
+
+.sc-section-title i {
+    color: #1f7a8c;
+    font-size: 0.95rem;
 }
 
 .sc-doc-badge {
@@ -14,6 +36,28 @@
     font-weight: 600;
     background: #eef2ff;
     color: #3730a3;
+}
+
+.sc-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.sc-status-badge.is-posted {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+}
+
+.sc-status-badge.is-reversed {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
 }
 
 .sc-meta-chips {
@@ -33,13 +77,65 @@
     font-size: 0.82rem;
 }
 
+.sc-summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
+}
+
+.sc-summary-card {
+    background: #fff;
+    border: 1px solid #e8edf5;
+    border-radius: 0.95rem;
+    padding: 0.95rem 1.05rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.sc-summary-card .label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.35rem;
+}
+
+.sc-summary-card .value {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+
+.sc-reason-panel {
+    border-radius: 1rem;
+}
+
+.sc-reason-panel .label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.4rem;
+}
+
+.sc-reversed-banner {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.85rem;
+    background: #f8fafc;
+    color: #334155;
+    padding: 1rem 1.15rem;
+}
+
 .sc-delta {
     display: inline-flex;
     min-width: 4.5rem;
     justify-content: flex-end;
-    padding: 0.2rem 0.55rem;
+    padding: 0.25rem 0.6rem;
     border-radius: 999px;
-    font-weight: 600;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
 
@@ -69,6 +165,14 @@
     margin-bottom: 0.75rem;
 }
 
+.sc-empty-state .sc-empty-icon {
+    margin-bottom: 0.75rem;
+}
+
+.sc-empty-state .sc-empty-icon i {
+    margin: 0;
+}
+
 .sc-callout {
     border: 0;
     border-left: 4px solid #f59e0b;
@@ -87,7 +191,7 @@
 }
 
 .sc-preview-summary {
-    display: none;
+    display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
     padding: 0.85rem 1rem;
@@ -95,20 +199,17 @@
     background: #f8fafc;
 }
 
-.sc-preview-summary.is-visible {
-    display: flex;
-}
-
 .sc-preview-pill {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.35rem 0.7rem;
+    padding: 0.4rem 0.75rem;
     border-radius: 999px;
     background: #fff;
-    border: 1px solid #e5e7eb;
+    border: 1px solid #e2e8f0;
     font-size: 0.82rem;
     font-weight: 600;
+    color: #334155;
 }
 
 .sc-item-picker {
@@ -134,8 +235,8 @@
     overflow: auto;
     background: #fff;
     border: 1px solid #d1d5db;
-    border-radius: 0.65rem;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+    border-radius: 0.75rem;
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
     display: none;
 }
 
@@ -154,8 +255,49 @@
     overflow: visible;
 }
 
+.sc-page .sc-lines-table thead th {
+    border-bottom-width: 1px;
+    border-color: #e3e8f0;
+    color: #506078;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.045em;
+    font-weight: 800;
+    background: #f8fafc;
+    white-space: nowrap;
+}
+
 .sc-page .sc-lines-table tbody tr {
     position: relative;
+    transition: background-color 0.15s ease;
+}
+
+.sc-page .sc-lines-table tbody tr:nth-child(even) {
+    background: #fcfdff;
+}
+
+.sc-page .sc-lines-table tbody tr:hover {
+    background: #f5faff;
+}
+
+.sc-page .sc-index-table thead th {
+    border-bottom-width: 1px;
+    border-color: #e3e8f0;
+    color: #506078;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.045em;
+    font-weight: 800;
+    background: #f8fafc;
+    white-space: nowrap;
+}
+
+.sc-page .sc-index-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+.sc-page .sc-index-table tbody tr:hover {
+    background: #f5faff;
 }
 
 .sc-page .sc-lines-table tbody tr:has(.sc-item-picker.is-open) {
@@ -176,7 +318,7 @@
 
 .sc-item-result:hover,
 .sc-item-result.is-active {
-    background: #f5f7ff;
+    background: #f0f9fa;
 }
 
 .sc-item-result:last-child {
@@ -250,9 +392,19 @@
     text-overflow: ellipsis;
 }
 
+@media (max-width: 991.98px) {
+    .sc-summary-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 767.98px) {
     .sc-sticky-footer {
         position: static;
         box-shadow: none;
+    }
+
+    .sc-summary-strip {
+        grid-template-columns: 1fr;
     }
 }

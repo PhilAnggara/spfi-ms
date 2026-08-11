@@ -13,6 +13,8 @@
 
         return 'is-zero';
     };
+
+    $netDelta = (float) $adjustment->items->sum('delta_qty');
 @endphp
 <div class="page-heading po-page sc-page">
     <div class="page-title mb-4">
@@ -33,13 +35,17 @@
                     Back
                 </a>
                 @can('delete-stock-adjustment')
-                    <form method="POST" action="{{ route('stock-adjustments.destroy', $adjustment) }}" onsubmit="return confirm('Delete this adjustment and reverse stock?');">
+                    <button
+                        type="button"
+                        class="btn btn-outline-danger icon icon-left"
+                        onclick="hapusData({{ $adjustment->id }}, 'Delete & Reverse SA', 'Later RR/TS/DR stay. On-hand will be adjusted back by this SA delta. The SA document will be deleted.', 'Yes, reverse!')"
+                    >
+                        <i class="fa-regular fa-trash"></i>
+                        Delete & Reverse
+                    </button>
+                    <form action="{{ route('stock-adjustments.destroy', $adjustment) }}" id="hapus-{{ $adjustment->id }}" method="POST" class="d-none">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-outline-danger icon icon-left">
-                            <i class="fa-regular fa-trash"></i>
-                            Delete & Reverse
-                        </button>
                     </form>
                 @endcan
             </div>
@@ -50,14 +56,40 @@
         <div class="alert alert-success shadow-sm border-0">{{ session('success') }}</div>
     @endif
 
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="sc-summary-strip">
+        <div class="sc-summary-card">
+            <div class="label">Date</div>
+            <div class="value">{{ $adjustment->sa_date?->format('Y-m-d') }}</div>
+        </div>
+        <div class="sc-summary-card">
+            <div class="label">Lines</div>
+            <div class="value">{{ $adjustment->items->count() }}</div>
+        </div>
+        <div class="sc-summary-card">
+            <div class="label">Net Delta</div>
+            <div class="value">
+                <span class="sc-delta {{ $deltaClass($netDelta) }}">
+                    {{ ($netDelta > 0 ? '+' : '').number_format($netDelta, 2) }}
+                </span>
+            </div>
+        </div>
+        <div class="sc-summary-card">
+            <div class="label">Created By</div>
+            <div class="value">{{ $adjustment->createdBy?->name ?? '-' }}</div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 sc-reason-panel mb-4">
         <div class="card-body">
-            <div class="fw-semibold mb-1">Reason</div>
+            <div class="label">Reason</div>
             <div>{{ $adjustment->reason }}</div>
         </div>
     </div>
 
     <div class="card shadow-sm border-0">
+        <div class="card-header bg-transparent">
+            <span class="sc-section-title"><i class="fa-regular fa-boxes-stacked"></i> Line Items</span>
+        </div>
         <div class="table-responsive">
             <table class="table mb-0 align-middle sc-lines-table">
                 <thead>

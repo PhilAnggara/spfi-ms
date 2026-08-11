@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', function () {
         || '';
     const tbody = document.getElementById('obc-lines');
     const template = document.getElementById('obc-row-template').innerHTML;
-    const summary = document.getElementById('obc-preview-summary');
     const summaryDelta = document.getElementById('obc-summary-delta');
     const summaryReplay = document.getElementById('obc-summary-replay');
     const periodInput = document.getElementById('obc-period');
@@ -36,27 +35,19 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateSummary() {
         let totalDelta = 0;
         let totalReplay = 0;
-        let hasData = false;
 
         tbody.querySelectorAll('tr').forEach(function (row) {
             if (row.dataset.implied === '' || row.dataset.implied === undefined) {
                 return;
             }
-            hasData = true;
             if (row.dataset.delta !== '') {
                 totalDelta += parseFloat(row.dataset.delta || '0');
             }
             totalReplay += parseInt(row.dataset.replay || '0', 10);
         });
 
-        if (!hasData) {
-            summary.classList.remove('is-visible');
-            return;
-        }
-
         summaryDelta.textContent = (totalDelta > 0 ? '+' : '') + StockCorrectionItemSearch.formatNumber(totalDelta);
         summaryReplay.textContent = String(totalReplay);
-        summary.classList.add('is-visible');
     }
 
     async function fetchRowPreview(row) {
@@ -149,6 +140,19 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function updateRemoveButtons() {
+        const rows = tbody.querySelectorAll('tr');
+        const onlyOne = rows.length <= 1;
+        rows.forEach(function (row) {
+            const btn = row.querySelector('.obc-remove-row');
+            if (!btn) {
+                return;
+            }
+            btn.disabled = onlyOne;
+            btn.title = onlyOne ? 'At least one item row is required' : 'Remove row';
+        });
+    }
+
     function addRow() {
         const html = template.replaceAll('__INDEX__', String(index++));
         tbody.insertAdjacentHTML('beforeend', html);
@@ -179,9 +183,15 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         row.querySelector('.obc-remove-row').addEventListener('click', function () {
+            if (tbody.querySelectorAll('tr').length <= 1) {
+                return;
+            }
             row.remove();
+            updateRemoveButtons();
             updateSummary();
         });
+
+        updateRemoveButtons();
     }
 
     periodInput.addEventListener('change', refreshAllRows);

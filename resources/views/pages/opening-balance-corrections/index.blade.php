@@ -8,7 +8,7 @@
             <div class="col-12 col-lg-7">
                 <div class="po-hero">
                     <h3 class="mb-1">Opening Balance Corrections</h3>
-                    <p class="text-muted mb-0">Set period beginning stock and rebuild RR/TS/DR movements from that month start. Use for migration fixes.</p>
+                    <p class="text-muted mb-0">Set period beginning stock and rebuild RR/TS/DR from that month start. Use for migration fixes.</p>
                 </div>
             </div>
             @can('create-opening-balance-correction')
@@ -54,7 +54,7 @@
 
         <div class="card shadow-sm border-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
+                <table class="table table-hover mb-0 align-middle sc-index-table">
                     <thead>
                         <tr>
                             <th>OBC Number</th>
@@ -76,9 +76,9 @@
                                 </td>
                                 <td>
                                     @if ($correction->isReversed())
-                                        <span class="badge bg-secondary">Reversed</span>
+                                        <span class="sc-status-badge is-reversed">Reversed</span>
                                     @else
-                                        <span class="badge bg-light-success text-success">Posted</span>
+                                        <span class="sc-status-badge is-posted">Posted</span>
                                     @endif
                                 </td>
                                 <td>
@@ -96,7 +96,7 @@
                             <tr>
                                 <td colspan="7">
                                     <div class="sc-empty-state">
-                                        <div><i class="fa-duotone fa-solid fa-calendar-pen"></i></div>
+                                        <div class="sc-empty-icon"><i class="fa-duotone fa-solid fa-calendar-pen"></i></div>
                                         <div class="fw-semibold mb-1">No opening corrections yet</div>
                                         <p class="text-muted mb-3">Correct period beginning when migration stock does not match Excel.</p>
                                         @can('create-opening-balance-correction')
@@ -110,7 +110,7 @@
                 </table>
             </div>
             @if ($corrections->hasPages())
-                <div class="card-footer">{{ $corrections->links() }}</div>
+                <div class="card-footer bg-transparent">{{ $corrections->links() }}</div>
             @endif
         </div>
     </section>

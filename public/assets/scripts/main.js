@@ -60,7 +60,7 @@ function confirmWithdrawPo(formId) {
   })
 }
 
-function hapusData(id, title, text) {
+function hapusData(id, title, text, confirmButtonText = 'Yes, delete!') {
   Swal.fire({
     title: title,
     text: text,
@@ -68,7 +68,7 @@ function hapusData(id, title, text) {
     showCancelButton: true,
     confirmButtonColor: '#dc3545',
     // cancelButtonColor: '#d33',
-    confirmButtonText: 'Yes, delete!',
+    confirmButtonText: confirmButtonText,
     cancelButtonText: 'Cancel'
   }).then((result) => {
     if (result.isConfirmed) {
