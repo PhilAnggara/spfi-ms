@@ -281,6 +281,96 @@ it('exports transaction pdf successfully', function () {
     expect($response->headers->get('content-type'))->toContain('application/pdf');
 });
 
+it('orders transaction item groups alphabetically by item name', function () {
+    $zebra = Item::query()->create([
+        'name' => 'Zebra Gasket',
+        'code' => 'A-001',
+        'unit_of_measure_id' => $this->unit->id,
+        'category_id' => $this->category->id,
+        'type' => 'Spare Parts',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    $apple = Item::query()->create([
+        'name' => 'Apple Washer',
+        'code' => 'Z-001',
+        'unit_of_measure_id' => $this->unit->id,
+        'category_id' => $this->category->id,
+        'type' => 'Spare Parts',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    $supplier = Supplier::query()->where('code', 'SUP-TXN-001')->firstOrFail();
+
+    $purchaseOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'created_by' => $this->user->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-TXN-SORT',
+    ]);
+
+    $zebraPoItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $zebra->id,
+        'quantity' => 5,
+        'unit_price' => 1,
+        'line_subtotal' => 5,
+        'total' => 5,
+    ]);
+
+    $applePoItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $apple->id,
+        'quantity' => 5,
+        'unit_price' => 1,
+        'line_subtotal' => 5,
+        'total' => 5,
+    ]);
+
+    $rr = ReceivingReport::query()->create([
+        'rr_number' => 'RR-TXN-SORT',
+        'purchase_order_id' => $purchaseOrder->id,
+        'received_date' => '2026-06-11',
+        'created_by' => $this->user->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $rr->id,
+        'purchase_order_item_id' => $zebraPoItem->id,
+        'qty_good' => 5,
+        'qty_bad' => 0,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $rr->id,
+        'purchase_order_item_id' => $applePoItem->id,
+        'qty_good' => 5,
+        'qty_bad' => 0,
+    ]);
+
+    $response = $this->actingAs($this->user)->post(route('im.reports.transaction'), [
+        'date_from' => '2026-06-01',
+        'date_to' => '2026-06-30',
+        'category' => 'SPARE PARTS',
+        'format' => 'excel',
+    ]);
+
+    $response->assertSuccessful();
+    $sheet = loadTransactionSheet($response);
+
+    $itemNames = [];
+    for ($row = 7; $row <= 30; $row++) {
+        $name = $sheet->getCell('B'.$row)->getValue();
+        if (is_string($name) && $name !== '' && ! in_array($name, $itemNames, true)) {
+            $itemNames[] = $name;
+        }
+    }
+
+    expect($itemNames)->toBe(['Apple Washer', 'Bearing 6205', 'Zebra Gasket']);
+});
+
 it('does not use rowspan in the transaction pdf markup so page breaks keep columns aligned', function () {
     $groups = collect([
         [

@@ -235,6 +235,58 @@ it('resolves spare parts filter to stored PARTS category name', function () {
     expect((float) $sheet->getCell('D8')->getValue())->toBe(100.0);
 });
 
+it('orders stock inventory rows alphabetically by item name', function () {
+    StockBalance::query()->delete();
+    StockInventory::query()->delete();
+
+    $zebra = Item::query()->create([
+        'name' => 'Zebra Gasket',
+        'code' => 'A-001',
+        'unit_of_measure_id' => $this->unit->id,
+        'category_id' => $this->category->id,
+        'type' => 'Spare Parts',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    $apple = Item::query()->create([
+        'name' => 'Apple Washer',
+        'code' => 'Z-001',
+        'unit_of_measure_id' => $this->unit->id,
+        'category_id' => $this->category->id,
+        'type' => 'Spare Parts',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    foreach ([$zebra, $apple] as $item) {
+        StockInventory::query()->create([
+            'item_id' => $item->id,
+            'product_code' => $item->code,
+            'wh_code' => 'MAIN',
+            'balance' => 10,
+            'start_balance' => 0,
+            'average_price' => 0,
+            'is_active' => true,
+            'is_delete' => false,
+        ]);
+    }
+
+    $response = $this->actingAs($this->user)->post(route('im.reports.stock-inventory'), [
+        'as_of' => '2026-06-30',
+        'category' => 'SPARE PARTS',
+        'format' => 'excel',
+    ]);
+
+    $response->assertSuccessful();
+    $sheet = loadStockInventorySheet($response);
+
+    expect($sheet->getCell('A8')->getValue())->toBe('Apple Washer');
+    expect($sheet->getCell('B8')->getValue())->toBe('Z-001');
+    expect($sheet->getCell('A9')->getValue())->toBe('Zebra Gasket');
+    expect($sheet->getCell('B9')->getValue())->toBe('A-001');
+});
+
 it('forbids unrelated roles from exporting stock inventory', function () {
     $outsider = User::query()->create([
         'name' => 'Purchasing Outsider',

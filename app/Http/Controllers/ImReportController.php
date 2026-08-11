@@ -364,7 +364,6 @@ class ImReportController extends Controller
                 'unit' => $row->unit ?: null,
             ])
             ->groupBy('item_code')
-            ->sortKeys()
             ->map(function (Collection $itemRows) use ($typeOrder) {
                 $first = $itemRows->first();
                 $sorted = $itemRows
@@ -388,6 +387,7 @@ class ImReportController extends Controller
                     'rows' => $sorted,
                 ];
             })
+            ->sortBy(fn (array $group) => mb_strtolower($group['item_name']))
             ->values();
     }
 
@@ -669,7 +669,7 @@ class ImReportController extends Controller
             ->whereHas('category', function ($query) use ($categoryNames) {
                 $query->whereIn('name', $categoryNames);
             })
-            ->orderBy('code')
+            ->orderBy('name')
             ->get(['id', 'name', 'code', 'unit_of_measure_id']);
 
         if ($items->isEmpty()) {
