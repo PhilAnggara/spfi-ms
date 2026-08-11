@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ImStockInventorySpreadsheet
 {
-    private const LAST_COLUMN = 'H';
+    private const LAST_COLUMN = 'I';
 
     private const TABLE_DATE_FORMAT = 'dd-mmm-yyyy';
 
@@ -29,6 +29,7 @@ class ImStockInventorySpreadsheet
         'F' => 12,
         'G' => 12,
         'H' => 12,
+        'I' => 12,
     ];
 
     public function __construct(
@@ -86,9 +87,9 @@ class ImStockInventorySpreadsheet
         $groups = [
             ['A', 'C', 'Item'],
             ['D', 'D', 'Beginning'],
-            ['E', 'E', 'Receipt'],
-            ['F', 'G', 'Issuances'],
-            ['H', 'H', 'Ending'],
+            ['E', 'F', 'Receipt / ADJ'],
+            ['G', 'H', 'Issuances'],
+            ['I', 'I', 'Ending'],
         ];
 
         foreach ($groups as [$from, $to, $label]) {
@@ -105,9 +106,10 @@ class ImStockInventorySpreadsheet
             'C' => 'Unit',
             'D' => 'Balance',
             'E' => 'RR',
-            'F' => 'TS',
-            'G' => 'DR',
-            'H' => 'Balance',
+            'F' => 'ADJ',
+            'G' => 'TS',
+            'H' => 'DR',
+            'I' => 'Balance',
         ];
 
         foreach ($columns as $col => $label) {
@@ -131,9 +133,10 @@ class ImStockInventorySpreadsheet
                 $sheet->setCellValue('C'.$rowIndex, $row['unit'] ?? '-');
                 $sheet->setCellValue('D'.$rowIndex, (float) ($row['beginning'] ?? 0));
                 $sheet->setCellValue('E'.$rowIndex, (float) ($row['rr'] ?? 0));
-                $sheet->setCellValue('F'.$rowIndex, (float) ($row['ts'] ?? 0));
-                $sheet->setCellValue('G'.$rowIndex, (float) ($row['dr'] ?? 0));
-                $sheet->setCellValue('H'.$rowIndex, (float) ($row['ending'] ?? 0));
+                $sheet->setCellValue('F'.$rowIndex, (float) ($row['adj'] ?? 0));
+                $sheet->setCellValue('G'.$rowIndex, (float) ($row['ts'] ?? 0));
+                $sheet->setCellValue('H'.$rowIndex, (float) ($row['dr'] ?? 0));
+                $sheet->setCellValue('I'.$rowIndex, (float) ($row['ending'] ?? 0));
                 $rowIndex++;
             }
             $lastDataRow = $rowIndex - 1;
@@ -143,9 +146,10 @@ class ImStockInventorySpreadsheet
             $sheet->mergeCells("A{$totalRow}:C{$totalRow}");
             $sheet->setCellValue('D'.$totalRow, (float) $rows->sum('beginning'));
             $sheet->setCellValue('E'.$totalRow, (float) $rows->sum('rr'));
-            $sheet->setCellValue('F'.$totalRow, (float) $rows->sum('ts'));
-            $sheet->setCellValue('G'.$totalRow, (float) $rows->sum('dr'));
-            $sheet->setCellValue('H'.$totalRow, (float) $rows->sum('ending'));
+            $sheet->setCellValue('F'.$totalRow, (float) $rows->sum('adj'));
+            $sheet->setCellValue('G'.$totalRow, (float) $rows->sum('ts'));
+            $sheet->setCellValue('H'.$totalRow, (float) $rows->sum('dr'));
+            $sheet->setCellValue('I'.$totalRow, (float) $rows->sum('ending'));
             $sheet->getStyle("A{$totalRow}:{$lastCol}{$totalRow}")->getFont()->setBold(true);
         }
 
@@ -187,10 +191,10 @@ class ImStockInventorySpreadsheet
         ]);
 
         $qtyEndRow = $totalRow ?? $lastDataRow;
-        $sheet->getStyle("D{$dataStartRow}:H{$qtyEndRow}")
+        $sheet->getStyle("D{$dataStartRow}:I{$qtyEndRow}")
             ->getNumberFormat()
             ->setFormatCode(self::QTY_FORMAT);
-        $sheet->getStyle("D{$dataStartRow}:H{$qtyEndRow}")
+        $sheet->getStyle("D{$dataStartRow}:I{$qtyEndRow}")
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
@@ -222,7 +226,7 @@ class ImStockInventorySpreadsheet
         $blocks = [
             ['A', 'B', 'Prepared by', $this->data['prepared_by_name'] ?? '', $this->data['prepared_by_title'] ?? ''],
             ['D', 'E', 'Checked by', $this->data['checked_by_name'] ?? '', $this->data['checked_by_title'] ?? ''],
-            ['G', 'H', 'Approved by', $this->data['approved_by_name'] ?? '', $this->data['approved_by_title'] ?? ''],
+            ['G', 'I', 'Approved by', $this->data['approved_by_name'] ?? '', $this->data['approved_by_title'] ?? ''],
         ];
 
         foreach ($blocks as [$from, $to, $label, $name, $title]) {

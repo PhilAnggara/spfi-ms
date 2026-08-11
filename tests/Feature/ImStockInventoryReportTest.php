@@ -141,14 +141,15 @@ it('exports stock inventory excel from stock_balances ledger', function () {
 
     $sheet = loadStockInventorySheet($response);
 
-    // Beginning 100, RR 50, TS 20, DR 10, Ending 120 (not inventory 999; not July moves)
+    // Beginning 100, RR 50, ADJ 0, TS 20, DR 10, Ending 120 (not inventory 999; not July moves)
     expect($sheet->getCell('A8')->getValue())->toBe('Bearing 6205');
     expect($sheet->getCell('B8')->getValue())->toBe('SP-6205');
     expect((float) $sheet->getCell('D8')->getValue())->toBe(100.0);
     expect((float) $sheet->getCell('E8')->getValue())->toBe(50.0);
-    expect((float) $sheet->getCell('F8')->getValue())->toBe(20.0);
-    expect((float) $sheet->getCell('G8')->getValue())->toBe(10.0);
-    expect((float) $sheet->getCell('H8')->getValue())->toBe(120.0);
+    expect((float) $sheet->getCell('F8')->getValue())->toBe(0.0);
+    expect((float) $sheet->getCell('G8')->getValue())->toBe(20.0);
+    expect((float) $sheet->getCell('H8')->getValue())->toBe(10.0);
+    expect((float) $sheet->getCell('I8')->getValue())->toBe(120.0);
     expect((float) $sheet->getCell('D8')->getValue())->not->toBe(999.0);
     expect((float) $sheet->getCell('E8')->getValue())->not->toBe(99.0);
 
@@ -203,7 +204,7 @@ it('falls back to stock_inventories balance when no ledger ending', function () 
 
     $sheet = loadStockInventorySheet($response);
 
-    expect((float) $sheet->getCell('H8')->getValue())->toBe(999.0);
+    expect((float) $sheet->getCell('I8')->getValue())->toBe(999.0);
 });
 
 it('exports stock inventory pdf successfully', function () {

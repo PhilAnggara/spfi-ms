@@ -53,7 +53,7 @@
                 <tr>
                     <th colspan="3" class="center section-head section-sep">Item</th>
                     <th colspan="1" class="center section-head section-sep">Beginning</th>
-                    <th colspan="1" class="center section-head section-sep">Receipt</th>
+                    <th colspan="2" class="center section-head section-sep">Receipt / ADJ</th>
                     <th colspan="2" class="center section-head section-sep">Issuances</th>
                     <th colspan="1" class="center section-head">Ending</th>
                 </tr>
@@ -62,7 +62,8 @@
                     <th class="section-col col-sep">Code</th>
                     <th class="section-col section-sep">Unit</th>
                     <th class="section-col section-start section-sep right">Balance</th>
-                    <th class="section-col section-start section-sep right">RR</th>
+                    <th class="section-col section-start col-sep right">RR</th>
+                    <th class="section-col section-sep right">ADJ</th>
                     <th class="section-col section-start col-sep right">TS</th>
                     <th class="section-col section-sep right">DR</th>
                     <th class="section-col section-start right">Balance</th>
@@ -76,6 +77,7 @@
                         <td>{{ $row['unit'] ?? '-' }}</td>
                         <td class="right">{{ $fmtQty($row['beginning']) }}</td>
                         <td class="right">{{ $fmtQty($row['rr']) }}</td>
+                        <td class="right">{{ $fmtQty($row['adj'] ?? 0) }}</td>
                         <td class="right">{{ $fmtQty($row['ts']) }}</td>
                         <td class="right">{{ $fmtQty($row['dr']) }}</td>
                         <td class="right">{{ $fmtQty($row['ending']) }}</td>
@@ -85,6 +87,7 @@
                     <td colspan="3" class="bold">GRAND TOTAL</td>
                     <td class="right bold">{{ $fmtQty($rows->sum('beginning')) }}</td>
                     <td class="right bold">{{ $fmtQty($rows->sum('rr')) }}</td>
+                    <td class="right bold">{{ $fmtQty($rows->sum('adj')) }}</td>
                     <td class="right bold">{{ $fmtQty($rows->sum('ts')) }}</td>
                     <td class="right bold">{{ $fmtQty($rows->sum('dr')) }}</td>
                     <td class="right bold">{{ $fmtQty($rows->sum('ending')) }}</td>

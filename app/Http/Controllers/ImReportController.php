@@ -657,7 +657,7 @@ class ImReportController extends Controller
     }
 
     /**
-     * @return Collection<int, array{name: string, code: string, unit: string|null, beginning: float, rr: float, ts: float, dr: float, ending: float}>
+     * @return Collection<int, array{name: string, code: string, unit: string|null, beginning: float, rr: float, adj: float, ts: float, dr: float, ending: float}>
      */
     private function stockInventoryRows(string $asOf, string $category): Collection
     {
@@ -694,6 +694,7 @@ class ImReportController extends Controller
                 $movement = $movements->get($item->id);
                 $beginning = (float) ($beginnings[$item->id] ?? 0);
                 $rr = (float) ($movement->rr ?? 0);
+                $adj = (float) ($movement->adj ?? 0);
                 $ts = (float) ($movement->ts ?? 0);
                 $dr = (float) ($movement->dr ?? 0);
                 $ending = $endings->has($item->id)
@@ -706,6 +707,7 @@ class ImReportController extends Controller
                     'unit' => $item->unit?->name,
                     'beginning' => $beginning,
                     'rr' => $rr,
+                    'adj' => $adj,
                     'ts' => $ts,
                     'dr' => $dr,
                     'ending' => $ending,
@@ -714,6 +716,7 @@ class ImReportController extends Controller
             ->filter(function (array $row) {
                 return $row['beginning'] != 0
                     || $row['rr'] != 0
+                    || $row['adj'] != 0
                     || $row['ts'] != 0
                     || $row['dr'] != 0
                     || $row['ending'] != 0;
@@ -771,7 +774,7 @@ class ImReportController extends Controller
 
     /**
      * @param  list<string>  $categoryNames
-     * @return Collection<int|string, object{rr: float|int|string, ts: float|int|string, dr: float|int|string}>
+     * @return Collection<int|string, object{rr: float|int|string, adj: float|int|string, ts: float|int|string, dr: float|int|string}>
      */
     private function stockBalanceMovements(array $categoryNames, string $monthStart, string $asOf): Collection
     {
@@ -783,7 +786,7 @@ class ImReportController extends Controller
             ->whereDate('sb.date', '>=', $monthStart)
             ->whereDate('sb.date', '<=', $asOf)
             ->groupBy('sb.item_id')
-            ->selectRaw('sb.item_id, COALESCE(SUM(sb.qty_in1), 0) as rr, COALESCE(SUM(sb.qty_out1), 0) as ts, COALESCE(SUM(sb.qty_out3), 0) as dr')
+            ->selectRaw('sb.item_id, COALESCE(SUM(sb.qty_in1), 0) as rr, COALESCE(SUM(sb.qty_in2) - SUM(sb.qty_out2), 0) as adj, COALESCE(SUM(sb.qty_out1), 0) as ts, COALESCE(SUM(sb.qty_out3), 0) as dr')
             ->get()
             ->keyBy('item_id');
     }

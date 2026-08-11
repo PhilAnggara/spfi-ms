@@ -418,6 +418,24 @@
                             </li>
                         @endcan
 
+                        @can('view-stock-adjustment')
+                            <li class="sidebar-item {{ Request::is('stock-adjustments*') ? 'active' : '' }}">
+                                <a href="{{ route('stock-adjustments.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-sliders {{ Request::is('stock-adjustments*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Stock Adjustments</span>
+                                </a>
+                            </li>
+                        @endcan
+
+                        @can('view-opening-balance-correction')
+                            <li class="sidebar-item {{ Request::is('opening-balance-corrections*') ? 'active' : '' }}">
+                                <a href="{{ route('opening-balance-corrections.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-calendar-pen {{ Request::is('opening-balance-corrections*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Opening Balance</span>
+                                </a>
+                            </li>
+                        @endcan
+
                     </ul>
                 </div>
             </div>

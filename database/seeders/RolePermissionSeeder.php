@@ -66,6 +66,18 @@ class RolePermissionSeeder extends Seeder
             'delete-delivery',
         ];
 
+        $permissions_stock_adjustment = [
+            'create-stock-adjustment',
+            'view-stock-adjustment',
+            'delete-stock-adjustment',
+        ];
+
+        $permissions_opening_balance = [
+            'create-opening-balance-correction',
+            'view-opening-balance-correction',
+            'delete-opening-balance-correction',
+        ];
+
         $permissions_general = [
             'view-dashboard',
             'export-report',
@@ -80,6 +92,8 @@ class RolePermissionSeeder extends Seeder
             $permissions_rr,
             $permissions_transfer,
             $permissions_delivery,
+            $permissions_stock_adjustment,
+            $permissions_opening_balance,
             $permissions_general
         ));
 
@@ -170,6 +184,12 @@ class RolePermissionSeeder extends Seeder
                 'view-delivery',
                 'update-delivery',
                 'delete-delivery',
+                'create-stock-adjustment',
+                'view-stock-adjustment',
+                'delete-stock-adjustment',
+                'create-opening-balance-correction',
+                'view-opening-balance-correction',
+                'delete-opening-balance-correction',
                 'view-po',
                 'view-dashboard',
                 'print-document',
@@ -186,6 +206,12 @@ class RolePermissionSeeder extends Seeder
                 'view-delivery',
                 'update-delivery',
                 'delete-delivery',
+                'create-stock-adjustment',
+                'view-stock-adjustment',
+                'delete-stock-adjustment',
+                'create-opening-balance-correction',
+                'view-opening-balance-correction',
+                'delete-opening-balance-correction',
                 'view-po',
                 'view-dashboard',
                 'print-document',
@@ -202,6 +228,12 @@ class RolePermissionSeeder extends Seeder
                 'view-delivery',
                 'update-delivery',
                 'delete-delivery',
+                'create-stock-adjustment',
+                'view-stock-adjustment',
+                'delete-stock-adjustment',
+                'create-opening-balance-correction',
+                'view-opening-balance-correction',
+                'delete-opening-balance-correction',
                 'view-po',
                 'view-dashboard',
                 'print-document',

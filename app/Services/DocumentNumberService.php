@@ -16,6 +16,8 @@ class DocumentNumberService
         'RR' => ['table' => 'receiving_reports', 'column' => 'rr_number', 'field' => 'rr_number'],
         'TS' => ['table' => 'transfer_slips', 'column' => 'ts_number', 'field' => 'ts_number'],
         'DR' => ['table' => 'deliveries', 'column' => 'dr_number', 'field' => 'dr_number'],
+        'SA' => ['table' => 'stock_adjustments', 'column' => 'sa_number', 'field' => 'sa_number'],
+        'OBC' => ['table' => 'opening_balance_corrections', 'column' => 'obc_number', 'field' => 'obc_number'],
     ];
 
     public function previewNext(string $type): string
@@ -85,6 +87,8 @@ class DocumentNumberService
             'RR' => 'RR Number',
             'TS' => 'TS Number',
             'DR' => 'DR Number',
+            'SA' => 'SA Number',
+            'OBC' => 'OBC Number',
             default => $config['field'],
         };
         $fallbackMessage = "The {$label} {$number} has already been used.";

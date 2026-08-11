@@ -21,6 +21,7 @@ use App\Http\Controllers\ImReportController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\MainController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OpeningBalanceCorrectionController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\PurchaseOrderApprovalController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchasingReportController;
 use App\Http\Controllers\ReceivingReportController;
+use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StoreWithdrawalController;
 use App\Http\Controllers\SupplierComparisonController;
 use App\Http\Controllers\SupplierController;
@@ -272,6 +274,37 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:delete-delivery')->prefix('deliveries')->name('deliveries.')->group(function () {
         Route::delete('/{delivery}', [DeliveryController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::middleware('permission:create-stock-adjustment')->prefix('stock-adjustments')->name('stock-adjustments.')->group(function () {
+        Route::get('/create', [StockAdjustmentController::class, 'create'])->name('create');
+        Route::get('/items/search', [StockAdjustmentController::class, 'searchItems'])->name('items.search');
+        Route::post('/', [StockAdjustmentController::class, 'store'])->name('store');
+    });
+
+    Route::middleware('permission:view-stock-adjustment')->prefix('stock-adjustments')->name('stock-adjustments.')->group(function () {
+        Route::get('/', [StockAdjustmentController::class, 'index'])->name('index');
+        Route::get('/{stockAdjustment}', [StockAdjustmentController::class, 'show'])->name('show');
+    });
+
+    Route::middleware('permission:delete-stock-adjustment')->prefix('stock-adjustments')->name('stock-adjustments.')->group(function () {
+        Route::delete('/{stockAdjustment}', [StockAdjustmentController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::middleware('permission:create-opening-balance-correction')->prefix('opening-balance-corrections')->name('opening-balance-corrections.')->group(function () {
+        Route::get('/create', [OpeningBalanceCorrectionController::class, 'create'])->name('create');
+        Route::get('/items/search', [OpeningBalanceCorrectionController::class, 'searchItems'])->name('items.search');
+        Route::post('/preview', [OpeningBalanceCorrectionController::class, 'preview'])->name('preview');
+        Route::post('/', [OpeningBalanceCorrectionController::class, 'store'])->name('store');
+    });
+
+    Route::middleware('permission:view-opening-balance-correction')->prefix('opening-balance-corrections')->name('opening-balance-corrections.')->group(function () {
+        Route::get('/', [OpeningBalanceCorrectionController::class, 'index'])->name('index');
+        Route::get('/{openingBalanceCorrection}', [OpeningBalanceCorrectionController::class, 'show'])->name('show');
+    });
+
+    Route::middleware('permission:delete-opening-balance-correction')->prefix('opening-balance-corrections')->name('opening-balance-corrections.')->group(function () {
+        Route::delete('/{openingBalanceCorrection}', [OpeningBalanceCorrectionController::class, 'destroy'])->name('destroy');
     });
 
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');
