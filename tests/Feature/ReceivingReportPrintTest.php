@@ -477,3 +477,69 @@ it('applies global overlay offset to receiving report field coordinates', functi
         ->toContain("left: {$expectedLeft}mm")
         ->toContain("top: {$expectedTop}mm");
 });
+
+it('renders full accounting entry debit and credit amounts without clipping large values', function () {
+    $unit = UnitOfMeasure::query()->create(['name' => 'Pieces', 'code' => 'PCS']);
+    $category = ItemCategory::query()->create(['name' => 'Spare Parts', 'code' => 'SPR']);
+    $item = Item::query()->create([
+        'name' => 'High Value Part',
+        'code' => 'HV-ITEM',
+        'unit_of_measure_id' => $unit->id,
+        'category_id' => $category->id,
+        'type' => 'Raw Material',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    $purchaseOrder = $this->receivingReport->purchaseOrder;
+
+    $poItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $item->id,
+        'quantity' => 1,
+        'unit_price' => 21360000,
+        'total' => 21360000,
+        'line_subtotal' => 21360000,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+        'meta' => ['term_of_payment_type' => 'credit'],
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $this->receivingReport->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 1,
+        'qty_bad' => 0,
+    ]);
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $this->receivingReport->fresh()->load([
+            'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
+            'createdBy',
+        ]),
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    expect($html)
+        ->toContain('.acct-amount-cell')
+        ->toContain('overflow: visible')
+        ->toContain('21,360,000.00');
+
+    preg_match_all('/class="acct-amount-cell right"[^>]*>([^<]+)</', $html, $amountMatches);
+    $amounts = $amountMatches[1] ?? [];
+
+    expect($amounts)->toContain('21,360,000.00');
+    expect(collect($amounts)->filter(fn (string $amount) => $amount === '1,360,000.00'))->toBeEmpty();
+});

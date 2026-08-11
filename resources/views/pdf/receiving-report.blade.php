@@ -32,6 +32,16 @@
         $itemCodeLeftBaseMm = 83; // geser ke kanan jika nameWidth diperbesar
         $itemNameWidthMm = $sx($itemNameWidthBaseMm);
 
+        // --- Accounting entry column layout (base coords on 297mm design width) ---
+        $acctCostCenterLeftBaseMm = 16;
+        $acctCostCenterWidthBaseMm = 20;
+        $acctAccountLeftBaseMm = 30;
+        $acctAccountWidthBaseMm = 18;
+        $acctDebitLeftBaseMm = 50;
+        $acctDebitWidthBaseMm = 30;
+        $acctCreditLeftBaseMm = 105;
+        $acctCreditWidthBaseMm = 30;
+
         // --- Row spacing ---
         // 1) Dalam 1 item (nama wrap): line-height CSS.
         $itemLineHeight = 1.12;
@@ -199,6 +209,15 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            font-weight: normal;
+        }
+
+        .acct-amount-cell {
+            position: absolute;
+            font-size: {{ $acctCellFontSize }}px;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: visible;
             font-weight: normal;
         }
 
@@ -392,10 +411,10 @@
 
         @foreach($entryRows as $entryIndex => $entry)
             @php $entryTop = $entryStartTop + ($entryIndex * $entryRowHeight); @endphp
-            <div class="acct-cell" style="left: {{ $mmX(16) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW(20) }};">{{ $entry['cost_center'] !== '' ? $entry['cost_center'] : '' }}</div>
-            <div class="acct-cell" style="left: {{ $mmX(30) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW(20) }};">{{ $entry['account'] !== '' ? $entry['account'] : '' }}</div>
-            <div class="acct-cell right" style="left: {{ $mmX(40) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW(30) }};">{{ $entry['debit'] !== null ? number_format((float) $entry['debit'], 2, '.', ',') : '' }}</div>
-            <div class="acct-cell right" style="left: {{ $mmX(70) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW(30) }};">{{ $entry['credit'] !== null ? number_format((float) $entry['credit'], 2, '.', ',') : '' }}</div>
+            <div class="acct-cell" style="left: {{ $mmX($acctCostCenterLeftBaseMm) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW($acctCostCenterWidthBaseMm) }};">{{ $entry['cost_center'] !== '' ? $entry['cost_center'] : '' }}</div>
+            <div class="acct-cell" style="left: {{ $mmX($acctAccountLeftBaseMm) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW($acctAccountWidthBaseMm) }};">{{ $entry['account'] !== '' ? $entry['account'] : '' }}</div>
+            <div class="acct-amount-cell right" style="left: {{ $mmX($acctDebitLeftBaseMm) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW($acctDebitWidthBaseMm) }};">{{ $entry['debit'] !== null ? number_format((float) $entry['debit'], 2, '.', ',') : '' }}</div>
+            <div class="acct-amount-cell right" style="left: {{ $mmX($acctCreditLeftBaseMm) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW($acctCreditWidthBaseMm) }};">{{ $entry['credit'] !== null ? number_format((float) $entry['credit'], 2, '.', ',') : '' }}</div>
         @endforeach
 
         <div style="position: absolute; left: {{ $mmX(30) }}; top: {{ $oy($totalLineTop) }}; width: {{ $mmW(12) }}; border-top: 1px solid #111827;"></div>
