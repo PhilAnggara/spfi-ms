@@ -9,6 +9,7 @@ use App\Models\StockAdjustmentItem;
 use App\Services\DocumentNumberService;
 use App\Services\StockService;
 use App\Support\Concerns\SearchesStockCorrectionItems;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,14 +62,6 @@ class StockAdjustmentController extends Controller
         DocumentNumberService $numberService,
         StockService $stockService
     ): RedirectResponse {
-        $resolved = $numberService->resolve(
-            'SA',
-            $request->input('sa_number'),
-            $request->input('sa_number_suggested')
-        );
-        $saNumber = $resolved['number'];
-        $numberService->assertUnique('SA', $saNumber);
-
         $lines = $this->buildAdjustmentLines($request->validated('items'), $stockService);
 
         if ($lines === []) {
@@ -77,51 +70,83 @@ class StockAdjustmentController extends Controller
             ]);
         }
 
-        try {
-            $adjustment = DB::transaction(function () use ($request, $saNumber, $lines, $stockService) {
-                $adjustment = StockAdjustment::query()->create([
-                    'sa_number' => $saNumber,
-                    'sa_date' => $request->validated('sa_date'),
-                    'reason' => $request->validated('reason'),
-                    'created_by' => $request->user()->id,
-                    'updated_by' => $request->user()->id,
-                ]);
+        $adjustment = null;
+        $maxAttempts = 2;
 
-                $postLines = [];
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $resolved = $numberService->resolve(
+                'SA',
+                $request->input('sa_number'),
+                $request->input('sa_number_suggested')
+            );
+            $saNumber = $resolved['number'];
+            $numberService->assertUnique('SA', $saNumber);
 
-                foreach ($lines as $line) {
-                    $item = StockAdjustmentItem::query()->create([
-                        'stock_adjustment_id' => $adjustment->id,
-                        'item_id' => $line['item_id'],
-                        'product_code' => $line['product_code'],
-                        'wh_code' => $line['wh_code'],
-                        'previous_balance' => $line['previous_balance'],
-                        'new_balance' => $line['new_balance'],
-                        'delta_qty' => $line['delta_qty'],
+            try {
+                $adjustment = DB::transaction(function () use ($request, $saNumber, $lines, $stockService) {
+                    $adjustment = StockAdjustment::query()->create([
+                        'sa_number' => $saNumber,
+                        'sa_date' => $request->validated('sa_date'),
+                        'reason' => $request->validated('reason'),
                         'created_by' => $request->user()->id,
                         'updated_by' => $request->user()->id,
                     ]);
 
-                    $postLines[] = [
-                        'item_id' => $line['item_id'],
-                        'product_code' => $line['product_code'],
-                        'delta_qty' => $line['delta_qty'],
-                        'reference_line_id' => $item->id,
-                        'wh_code' => $line['wh_code'],
-                    ];
+                    $postLines = [];
+
+                    foreach ($lines as $line) {
+                        $item = StockAdjustmentItem::query()->create([
+                            'stock_adjustment_id' => $adjustment->id,
+                            'item_id' => $line['item_id'],
+                            'product_code' => $line['product_code'],
+                            'wh_code' => $line['wh_code'],
+                            'previous_balance' => $line['previous_balance'],
+                            'new_balance' => $line['new_balance'],
+                            'delta_qty' => $line['delta_qty'],
+                            'created_by' => $request->user()->id,
+                            'updated_by' => $request->user()->id,
+                        ]);
+
+                        $postLines[] = [
+                            'item_id' => $line['item_id'],
+                            'product_code' => $line['product_code'],
+                            'delta_qty' => $line['delta_qty'],
+                            'reference_line_id' => $item->id,
+                            'wh_code' => $line['wh_code'],
+                        ];
+                    }
+
+                    $stockService->applyStockAdjustment(
+                        stockAdjustmentId: $adjustment->id,
+                        movementDate: (string) $request->validated('sa_date'),
+                        lines: $postLines,
+                        userId: $request->user()->id,
+                    );
+
+                    return $adjustment;
+                });
+                break;
+            } catch (ValidationException $exception) {
+                throw $exception;
+            } catch (QueryException $exception) {
+                $canRetry = $resolved['source'] === 'auto'
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception);
+
+                if ($canRetry) {
+                    continue;
                 }
 
-                $stockService->applyStockAdjustment(
-                    stockAdjustmentId: $adjustment->id,
-                    movementDate: (string) $request->validated('sa_date'),
-                    lines: $postLines,
-                    userId: $request->user()->id,
-                );
+                if ($numberService->isDuplicateNumberException($exception)) {
+                    $numberService->assertUnique('SA', $saNumber);
 
-                return $adjustment;
-            });
-        } catch (ValidationException $exception) {
-            throw $exception;
+                    throw ValidationException::withMessages([
+                        'sa_number' => "The SA Number {$saNumber} has already been used.",
+                    ]);
+                }
+
+                throw $exception;
+            }
         }
 
         return redirect()
@@ -143,6 +168,7 @@ class StockAdjustmentController extends Controller
         StockService $stockService
     ): RedirectResponse {
         $stockAdjustment->load('items');
+        $releasedNumber = $stockAdjustment->sa_number;
 
         DB::transaction(function () use ($stockAdjustment, $stockService) {
             $lines = $stockAdjustment->items->map(fn (StockAdjustmentItem $item): array => [
@@ -162,13 +188,14 @@ class StockAdjustmentController extends Controller
 
             $stockAdjustment->items()->delete();
             $stockAdjustment->updated_by = auth()->id();
+            $stockAdjustment->sa_number = 'DELETED-'.$stockAdjustment->id;
             $stockAdjustment->save();
             $stockAdjustment->delete();
         });
 
         return redirect()
             ->route('stock-adjustments.index')
-            ->with('success', "Stock adjustment {$stockAdjustment->sa_number} deleted and stock reversed.");
+            ->with('success', "Stock adjustment {$releasedNumber} deleted and stock reversed.");
     }
 
     /**

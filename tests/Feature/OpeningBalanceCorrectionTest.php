@@ -316,6 +316,72 @@ it('searches opening-balance items by name', function () {
     expect(collect($response->json('items'))->pluck('code'))->toContain('OBC-ITEM-001');
 });
 
+it('rejects a duplicate obc number with validation error instead of 500', function () {
+    OpeningBalanceCorrection::query()->create([
+        'obc_number' => 'OBC-TAKEN-001',
+        'period_month' => '2026-07-01',
+        'reason' => 'Existing',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->from(route('opening-balance-corrections.create'))
+        ->post(route('opening-balance-corrections.store'), [
+            'obc_number' => 'OBC-TAKEN-001',
+            'obc_number_suggested' => '000001',
+            'period_month' => '2026-08',
+            'reason' => 'Duplicate attempt',
+            'confirmed' => '1',
+            'items' => [
+                [
+                    'item_id' => $this->item->id,
+                    'new_beginning' => 150,
+                    'wh_code' => 'MAIN',
+                ],
+            ],
+        ])
+        ->assertRedirect(route('opening-balance-corrections.create'))
+        ->assertSessionHasErrors('obc_number');
+
+    expect(OpeningBalanceCorrection::query()->where('obc_number', 'OBC-TAKEN-001')->count())->toBe(1)
+        ->and((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(90.0);
+});
+
+it('rejects obc number still held by a soft-deleted row that was not released', function () {
+    $stale = OpeningBalanceCorrection::query()->create([
+        'obc_number' => 'OBC-STALE-001',
+        'period_month' => '2026-07-01',
+        'reason' => 'Stale soft delete',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+    $stale->delete();
+
+    expect(OpeningBalanceCorrection::withTrashed()->find($stale->id)?->obc_number)->toBe('OBC-STALE-001');
+
+    $this->actingAs($this->user)
+        ->from(route('opening-balance-corrections.create'))
+        ->post(route('opening-balance-corrections.store'), [
+            'obc_number' => 'OBC-STALE-001',
+            'obc_number_suggested' => '000001',
+            'period_month' => '2026-08',
+            'reason' => 'Should fail validation',
+            'confirmed' => '1',
+            'items' => [
+                [
+                    'item_id' => $this->item->id,
+                    'new_beginning' => 150,
+                    'wh_code' => 'MAIN',
+                ],
+            ],
+        ])
+        ->assertRedirect(route('opening-balance-corrections.create'))
+        ->assertSessionHasErrors('obc_number');
+
+    expect(app(\App\Services\DocumentNumberService::class)->previewNext('OBC'))->not->toBe('OBC-STALE-001');
+});
+
 it('reverses correction by restoring previous beginning and clearing OBC ADJ ledger', function () {
     $this->actingAs($this->user)->post(route('opening-balance-corrections.store'), [
         'period_month' => '2026-08',

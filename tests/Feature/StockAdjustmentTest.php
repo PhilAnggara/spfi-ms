@@ -136,6 +136,7 @@ it('reverses stock when adjustment is deleted', function () {
     ])->assertRedirect();
 
     $adjustment = StockAdjustment::query()->firstOrFail();
+    $originalNumber = $adjustment->sa_number;
 
     $this->actingAs($this->user)
         ->delete(route('stock-adjustments.destroy', $adjustment))
@@ -143,6 +144,123 @@ it('reverses stock when adjustment is deleted', function () {
 
     expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(100.0);
     expect(StockAdjustment::query()->count())->toBe(0);
+
+    $trashed = StockAdjustment::withTrashed()->find($adjustment->id);
+    expect($trashed)->not->toBeNull()
+        ->and($trashed->trashed())->toBeTrue()
+        ->and($trashed->sa_number)->toBe('DELETED-'.$adjustment->id);
+
+    app(\App\Services\DocumentNumberService::class)->assertUnique('SA', $originalNumber);
+});
+
+it('reuses sa number after delete and reverse', function () {
+    $this->actingAs($this->user)->post(route('stock-adjustments.store'), [
+        'sa_number' => '000007',
+        'sa_number_suggested' => '000001',
+        'sa_date' => now()->toDateString(),
+        'reason' => 'First SA',
+        'confirmed' => '1',
+        'items' => [
+            [
+                'item_id' => $this->item->id,
+                'new_balance' => 110,
+                'wh_code' => 'MAIN',
+            ],
+        ],
+    ])->assertRedirect();
+
+    $first = StockAdjustment::query()->where('sa_number', '000007')->firstOrFail();
+
+    $this->actingAs($this->user)
+        ->delete(route('stock-adjustments.destroy', $first))
+        ->assertRedirect();
+
+    expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(100.0);
+
+    $this->actingAs($this->user)->post(route('stock-adjustments.store'), [
+        'sa_number' => '000007',
+        'sa_number_suggested' => '000001',
+        'sa_date' => now()->toDateString(),
+        'reason' => 'Reuse SA number',
+        'confirmed' => '1',
+        'items' => [
+            [
+                'item_id' => $this->item->id,
+                'new_balance' => 105,
+                'wh_code' => 'MAIN',
+            ],
+        ],
+    ])->assertRedirect();
+
+    expect(StockAdjustment::query()->where('sa_number', '000007')->count())->toBe(1)
+        ->and((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(105.0);
+});
+
+it('rejects a duplicate sa number with validation error instead of 500', function () {
+    StockAdjustment::query()->create([
+        'sa_number' => 'SA-TAKEN-001',
+        'sa_date' => now()->toDateString(),
+        'reason' => 'Existing',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->from(route('stock-adjustments.create'))
+        ->post(route('stock-adjustments.store'), [
+            'sa_number' => 'SA-TAKEN-001',
+            'sa_number_suggested' => '000001',
+            'sa_date' => now()->toDateString(),
+            'reason' => 'Duplicate attempt',
+            'confirmed' => '1',
+            'items' => [
+                [
+                    'item_id' => $this->item->id,
+                    'new_balance' => 120,
+                    'wh_code' => 'MAIN',
+                ],
+            ],
+        ])
+        ->assertRedirect(route('stock-adjustments.create'))
+        ->assertSessionHasErrors('sa_number');
+
+    expect(StockAdjustment::query()->where('sa_number', 'SA-TAKEN-001')->count())->toBe(1)
+        ->and((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(100.0);
+});
+
+it('rejects sa number still held by a soft-deleted row that was not released', function () {
+    $stale = StockAdjustment::query()->create([
+        'sa_number' => 'SA-STALE-001',
+        'sa_date' => now()->toDateString(),
+        'reason' => 'Stale soft delete',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+    $stale->delete();
+
+    expect(StockAdjustment::query()->whereKey($stale->id)->exists())->toBeFalse();
+    expect(StockAdjustment::withTrashed()->find($stale->id)?->sa_number)->toBe('SA-STALE-001');
+
+    $this->actingAs($this->user)
+        ->from(route('stock-adjustments.create'))
+        ->post(route('stock-adjustments.store'), [
+            'sa_number' => 'SA-STALE-001',
+            'sa_number_suggested' => '000001',
+            'sa_date' => now()->toDateString(),
+            'reason' => 'Should fail validation',
+            'confirmed' => '1',
+            'items' => [
+                [
+                    'item_id' => $this->item->id,
+                    'new_balance' => 120,
+                    'wh_code' => 'MAIN',
+                ],
+            ],
+        ])
+        ->assertRedirect(route('stock-adjustments.create'))
+        ->assertSessionHasErrors('sa_number');
+
+    expect(app(\App\Services\DocumentNumberService::class)->previewNext('SA'))->not->toBe('SA-STALE-001');
 });
 
 it('rejects zero-delta adjustments', function () {

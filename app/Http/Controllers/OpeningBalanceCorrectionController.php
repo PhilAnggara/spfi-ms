@@ -8,10 +8,12 @@ use App\Services\DocumentNumberService;
 use App\Services\OpeningBalanceCorrectionService;
 use App\Support\Concerns\SearchesStockCorrectionItems;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class OpeningBalanceCorrectionController extends Controller
@@ -79,36 +81,64 @@ class OpeningBalanceCorrectionController extends Controller
         DocumentNumberService $numberService,
         OpeningBalanceCorrectionService $correctionService
     ): RedirectResponse {
-        $resolved = $numberService->resolve(
-            'OBC',
-            $request->input('obc_number'),
-            $request->input('obc_number_suggested')
-        );
-        $obcNumber = $resolved['number'];
-        $numberService->assertUnique('OBC', $obcNumber);
-
         $periodMonth = Carbon::createFromFormat('Y-m', $request->validated('period_month'))
             ->startOfMonth()
             ->toDateString();
 
-        $correction = DB::transaction(function () use ($request, $obcNumber, $periodMonth, $correctionService) {
-            $correction = OpeningBalanceCorrection::query()->create([
-                'obc_number' => $obcNumber,
-                'period_month' => $periodMonth,
-                'reason' => $request->validated('reason'),
-                'allow_negative_balance' => $request->boolean('allow_negative_balance'),
-                'created_by' => $request->user()->id,
-                'updated_by' => $request->user()->id,
-            ]);
+        $correction = null;
+        $maxAttempts = 2;
 
-            $correctionService->apply(
-                correction: $correction,
-                lines: $request->validated('items'),
-                userId: $request->user()->id,
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $resolved = $numberService->resolve(
+                'OBC',
+                $request->input('obc_number'),
+                $request->input('obc_number_suggested')
             );
+            $obcNumber = $resolved['number'];
+            $numberService->assertUnique('OBC', $obcNumber);
 
-            return $correction;
-        });
+            try {
+                $correction = DB::transaction(function () use ($request, $obcNumber, $periodMonth, $correctionService) {
+                    $correction = OpeningBalanceCorrection::query()->create([
+                        'obc_number' => $obcNumber,
+                        'period_month' => $periodMonth,
+                        'reason' => $request->validated('reason'),
+                        'allow_negative_balance' => $request->boolean('allow_negative_balance'),
+                        'created_by' => $request->user()->id,
+                        'updated_by' => $request->user()->id,
+                    ]);
+
+                    $correctionService->apply(
+                        correction: $correction,
+                        lines: $request->validated('items'),
+                        userId: $request->user()->id,
+                    );
+
+                    return $correction;
+                });
+                break;
+            } catch (ValidationException $exception) {
+                throw $exception;
+            } catch (QueryException $exception) {
+                $canRetry = $resolved['source'] === 'auto'
+                    && $attempt < $maxAttempts
+                    && $numberService->isDuplicateNumberException($exception);
+
+                if ($canRetry) {
+                    continue;
+                }
+
+                if ($numberService->isDuplicateNumberException($exception)) {
+                    $numberService->assertUnique('OBC', $obcNumber);
+
+                    throw ValidationException::withMessages([
+                        'obc_number' => "The OBC Number {$obcNumber} has already been used.",
+                    ]);
+                }
+
+                throw $exception;
+            }
+        }
 
         return redirect()
             ->route('opening-balance-corrections.show', $correction)

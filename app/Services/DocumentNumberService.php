@@ -61,15 +61,12 @@ class DocumentNumberService
     {
         $config = $this->config($type);
 
+        // Include soft-deleted rows: SQL unique indexes still occupy the number until released (DELETED-{id}).
         $query = DB::table($config['table'])
             ->where($config['column'], $number)
             ->when($ignoreId !== null, function ($query) use ($ignoreId) {
                 $query->where('id', '<>', $ignoreId);
             });
-
-        if ($this->hasSoftDeleteColumn($config['table'])) {
-            $query->whereNull('deleted_at');
-        }
 
         if ($query->exists()) {
             throw ValidationException::withMessages([
@@ -249,14 +246,10 @@ class DocumentNumberService
     {
         $config = $this->config($type);
 
-        $query = DB::table($config['table'])
-            ->where($config['column'], $number);
-
-        if ($this->hasSoftDeleteColumn($config['table'])) {
-            $query->whereNull('deleted_at');
-        }
-
-        return $query->exists();
+        // Match DB unique indexes: soft-deleted rows still block reuse until the number is released.
+        return DB::table($config['table'])
+            ->where($config['column'], $number)
+            ->exists();
     }
 
     private function excludeReconcileAliasNumbers(string $type, mixed $query, string $table, string $column): void
