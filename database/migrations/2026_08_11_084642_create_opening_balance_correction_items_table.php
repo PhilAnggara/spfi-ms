@@ -10,8 +10,10 @@ return new class extends Migration
     {
         Schema::create('opening_balance_correction_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('opening_balance_correction_id')
-                ->constrained('opening_balance_corrections')
+            $table->foreignId('opening_balance_correction_id');
+            $table->foreign('opening_balance_correction_id', 'obc_items_header_foreign')
+                ->references('id')
+                ->on('opening_balance_corrections')
                 ->onDelete(fk_on_delete('cascade'));
             $table->foreignId('item_id')->constrained('items')->onDelete(fk_on_delete('restrict'));
             $table->string('product_code', 100);
