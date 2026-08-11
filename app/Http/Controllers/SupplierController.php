@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Support\Concerns\PaginatesLegacySqlServer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -347,6 +348,37 @@ class SupplierController extends Controller
     public function create()
     {
         //
+    }
+
+    /**
+     * Check whether a supplier code is available for create or edit.
+     */
+    public function checkCode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string'],
+            'ignore_id' => ['nullable', 'integer', Rule::exists('suppliers', 'id')],
+        ]);
+
+        $code = $validated['code'];
+        $ignoreId = $validated['ignore_id'] ?? null;
+
+        $exists = Supplier::query()
+            ->where('code', $code)
+            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'available' => false,
+                'message' => 'This code has already been used.',
+            ]);
+        }
+
+        return response()->json([
+            'available' => true,
+            'message' => 'Code is available.',
+        ]);
     }
 
     /**

@@ -54,13 +54,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/charts/open-prs-heatmap', [MainController::class, 'openPrsHeatmap'])
         ->name('dashboard.charts.open-prs-heatmap');
 
-    Route::middleware('role:administrator|it-staff|purchasing-staff|purchasing-manager|engineering-managersss|im-manager|im-supervisor')->prefix('master')->group(function () {
+    Route::middleware('role:administrator|it-staff|purchasing-staff|purchasing-manager|engineering-manager|im-manager|im-supervisor')->prefix('master')->group(function () {
         Route::get('product', [ProductController::class, 'index'])->name('product.index');
         Route::get('product/datatables', [ProductController::class, 'datatable'])->name('product.datatables');
         Route::get('product/{item}/purchase-history', [ProductController::class, 'purchaseHistory'])->name('product.purchase-history');
     });
 
     Route::middleware('role:administrator|it-staff|engineering-manager|im-manager|im-supervisor')->prefix('master')->group(function () {
+        Route::get('product/check-code', [ProductController::class, 'checkCode'])->name('product.check-code');
         Route::post('product', [ProductController::class, 'store'])->name('product.store');
     });
 
@@ -72,6 +73,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:administrator|it-staff|purchasing-staff|purchasing-manager')->prefix('master')->group(function () {
         Route::get('supplier', [SupplierController::class, 'index'])->name('supplier.index');
         Route::get('supplier/datatables', [SupplierController::class, 'datatable'])->name('supplier.datatables');
+        Route::get('supplier/check-code', [SupplierController::class, 'checkCode'])->name('supplier.check-code');
         Route::get('supplier/{supplier}/purchase-history', [SupplierController::class, 'purchaseHistory'])->name('supplier.purchase-history');
         Route::post('supplier', [SupplierController::class, 'store'])->name('supplier.store');
         Route::put('supplier/{supplier}', [SupplierController::class, 'update'])->name('supplier.update');

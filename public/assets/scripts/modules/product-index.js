@@ -552,6 +552,34 @@ document.addEventListener('DOMContentLoaded', function () {
         historyModalElement.addEventListener('hidden.bs.modal', destroyHistoryTable);
     }
 
+    let createCodeValidation = null;
+    let editCodeValidation = null;
+
+    const createModalElement = document.getElementById('create-modal');
+    const createCodeInput = document.getElementById('code');
+    const editCodeInput = document.getElementById('edit-code');
+
+    if (typeof window.initMasterCodeValidation === 'function') {
+        if (canCreate && createCodeInput && createCodeInput.dataset.checkCodeUrl) {
+            createCodeValidation = window.initMasterCodeValidation({
+                input: createCodeInput,
+                checkUrl: createCodeInput.dataset.checkCodeUrl,
+                rules: { maxLength: 8, alphaNum: true },
+                modal: createModalElement,
+            });
+        }
+
+        if (canManage && editCodeInput && editCodeInput.dataset.checkCodeUrl) {
+            editCodeValidation = window.initMasterCodeValidation({
+                input: editCodeInput,
+                checkUrl: editCodeInput.dataset.checkCodeUrl,
+                ignoreId: editCodeInput.dataset.ignoreId || null,
+                rules: { maxLength: 8, alphaNum: true },
+                modal: editModalElement,
+            });
+        }
+    }
+
     if (canManage) {
         $('#product-table tbody').on('click', '.edit-product', function () {
             const button = $(this);
@@ -583,6 +611,12 @@ document.addEventListener('DOMContentLoaded', function () {
             setSelectValue('edit-category', button.data('category-id'));
             setSelectValue('edit-type', button.data('type'));
             document.getElementById('edit-form').setAttribute('action', updateUrl);
+
+            if (editCodeValidation) {
+                editCodeValidation.setIgnoreId(itemId);
+                editCodeValidation.reset();
+                editCodeValidation.recheck();
+            }
 
             const editLabel = document.getElementById('editProductLabel');
             if (editLabel) {

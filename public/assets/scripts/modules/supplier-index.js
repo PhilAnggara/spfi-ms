@@ -664,6 +664,32 @@ document.addEventListener('DOMContentLoaded', function () {
         historyModalElement.addEventListener('hidden.bs.modal', destroyHistoryTable);
     }
 
+    let createCodeValidation = null;
+    let editCodeValidation = null;
+
+    const createModalElement = document.getElementById('create-modal');
+    const createCodeInput = document.getElementById('code');
+    const editCodeInput = document.getElementById('edit-code');
+
+    if (typeof window.initMasterCodeValidation === 'function') {
+        if (canManage && createCodeInput && createCodeInput.dataset.checkCodeUrl) {
+            createCodeValidation = window.initMasterCodeValidation({
+                input: createCodeInput,
+                checkUrl: createCodeInput.dataset.checkCodeUrl,
+                modal: createModalElement,
+            });
+        }
+
+        if (canManage && editCodeInput && editCodeInput.dataset.checkCodeUrl) {
+            editCodeValidation = window.initMasterCodeValidation({
+                input: editCodeInput,
+                checkUrl: editCodeInput.dataset.checkCodeUrl,
+                ignoreId: editCodeInput.dataset.ignoreId || null,
+                modal: editModalElement,
+            });
+        }
+    }
+
     if (canManage) {
         $('#supplier-table tbody').on('click', '.edit-supplier', function () {
             const button = $(this);
@@ -679,6 +705,12 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('edit-contact-person').value = button.attr('data-contact-person') || '';
             document.getElementById('edit-remarks').value = button.attr('data-remarks') || '';
             document.getElementById('edit-form').setAttribute('action', updateUrl);
+
+            if (editCodeValidation) {
+                editCodeValidation.setIgnoreId(supplierId);
+                editCodeValidation.reset();
+                editCodeValidation.recheck();
+            }
 
             const editLabel = document.getElementById('editSupplierLabel');
             if (editLabel) {

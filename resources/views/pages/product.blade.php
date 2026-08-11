@@ -163,5 +163,6 @@
 @endpush
 
 @push('addon-script')
+    <script src="{{ url('assets/scripts/modules/master-code-validation.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/product-index.js') }}"></script>
 @endpush

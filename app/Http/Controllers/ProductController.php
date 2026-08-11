@@ -8,6 +8,7 @@ use App\Models\PurchaseOrderItem;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Support\Concerns\PaginatesLegacySqlServer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -328,6 +329,39 @@ class ProductController extends Controller
     public function create()
     {
         //
+    }
+
+    /**
+     * Check whether a product code is available for create or edit.
+     */
+    public function checkCode(Request $request): JsonResponse
+    {
+        abort_unless($this->userCanCreateProducts($request->user()), 403);
+
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:8', 'alpha_num'],
+            'ignore_id' => ['nullable', 'integer', Rule::exists('items', 'id')],
+        ]);
+
+        $code = $validated['code'];
+        $ignoreId = $validated['ignore_id'] ?? null;
+
+        $exists = Item::query()
+            ->where('code', $code)
+            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'available' => false,
+                'message' => 'This code has already been used.',
+            ]);
+        }
+
+        return response()->json([
+            'available' => true,
+            'message' => 'Code is available.',
+        ]);
     }
 
     /**
