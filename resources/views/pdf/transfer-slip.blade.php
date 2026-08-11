@@ -6,6 +6,10 @@
     @php
         $pageWidthMm = $pageWidthMm ?? 215;
         $pageHeightMm = $pageHeightMm ?? 105;
+        $offsetXMm = (float) ($offsetXMm ?? config('transfer-slip.offset_x_mm', 0));
+        $offsetYMm = (float) ($offsetYMm ?? config('transfer-slip.offset_y_mm', 0));
+        $lx = static fn (float $mm): string => round($mm + $offsetXMm, 2).'mm';
+        $ty = static fn (float $mm): string => round($mm + $offsetYMm, 2).'mm';
         $fieldFontSize = 9;
         $numberFontSize = 10;
         $cellFontSize = 10;
@@ -124,7 +128,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-weight: bold;
+            font-weight: normal;
         }
 
         .ts-number {
@@ -140,7 +144,7 @@
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
-            font-weight: bold;
+            font-weight: normal;
         }
 
         .item-cell {
@@ -150,25 +154,25 @@
             overflow: visible;
             overflow-wrap: normal;
             word-break: normal;
-            /* font-weight: normal; */
+            font-weight: normal;
         }
 
         .check {
             position: absolute;
             font-size: {{ $checkFontSize }}pt;
-            font-weight: bold;
+            font-weight: normal;
             line-height: 1;
             text-align: center;
         }
 
         .remarks {
             position: absolute;
-            left: 90mm;
-            top: 86mm;
+            left: {{ $lx(90) }};
+            top: {{ $ty(86) }};
             width: 34mm;
             height: 10mm;
             font-size: {{ $remarksFontSize }}pt;
-            font-weight: bold;
+            font-weight: normal;
             line-height: 1.15;
             white-space: normal;
             overflow: hidden;
@@ -283,44 +287,44 @@
         @if ($isPreview)
             @php $tsNumberText = trim((string) ($transferSlip->ts_number ?? '')); @endphp
             @if ($tsNumberText !== '')
-                <div class="field ts-number" style="left: 179mm; top: 12mm; width: 20mm;">{{ $tsNumberText }}</div>
+                <div class="field ts-number" style="left: {{ $lx(179) }}; top: {{ $ty(12) }}; width: 20mm;">{{ $tsNumberText }}</div>
             @endif
         @endif
 
-        <div class="field" style="left: 25mm; top: 25.2mm; width: 55mm;">{{ $fromText }}</div>
-        <div class="field" style="left: 25mm; top: 32.6mm; width: 55mm;">{{ $toText !== '' ? $toText : '-' }}</div>
+        <div class="field" style="left: {{ $lx(25) }}; top: {{ $ty(25.2) }}; width: 55mm;">{{ $fromText }}</div>
+        <div class="field" style="left: {{ $lx(25) }}; top: {{ $ty(32.6) }}; width: 55mm;">{{ $toText !== '' ? $toText : '-' }}</div>
 
         {{-- @if ($checkedTypes['finished_goods'])
-            <div class="check" style="left: 92.5mm; top: 25mm; width: 5mm;">X</div>
+            <div class="check" style="left: {{ $lx(92.5) }}; top: {{ $ty(25) }}; width: 5mm;">X</div>
         @endif
         @if ($checkedTypes['supplies'])
-            <div class="check" style="left: 162.5mm; top: 25mm; width: 5mm;">X</div>
+            <div class="check" style="left: {{ $lx(162.5) }}; top: {{ $ty(25) }}; width: 5mm;">X</div>
         @endif
         @if ($checkedTypes['raw_materials'])
-            <div class="check" style="left: 92.5mm; top: 32.8mm; width: 5mm;">X</div>
+            <div class="check" style="left: {{ $lx(92.5) }}; top: {{ $ty(32.8) }}; width: 5mm;">X</div>
         @endif
         @if ($checkedTypes['others'])
-            <div class="check" style="left: 162.5mm; top: 32.8mm; width: 5mm;">X</div>
+            <div class="check" style="left: {{ $lx(162.5) }}; top: {{ $ty(32.8) }}; width: 5mm;">X</div>
         @endif
         @if ($checkedTypes['spare_parts'])
-            <div class="check" style="left: 92.5mm; top: 39.8mm; width: 5mm;">X</div>
+            <div class="check" style="left: {{ $lx(92.5) }}; top: {{ $ty(39.8) }}; width: 5mm;">X</div>
         @endif --}}
 
         @foreach ($layoutRows as $row)
-            <div class="cell item-cell" style="left: 12.5mm; top: {{ $row['top'] }}mm; width: 73mm;">{{ $row['name'] }}</div>
-            <div class="cell center" style="left: 89mm; top: {{ $row['top'] }}mm; width: 34mm;">{{ $row['code'] }}</div>
-            <div class="cell right" style="left: 126mm; top: {{ $row['top'] }}mm; width: 35mm;">{{ \App\Support\PdfFormatters::qty($row['qty']) }}</div>
-            <div class="cell center" style="left: 165mm; top: {{ $row['top'] }}mm; width: 32mm;">{{ $row['uom'] }}</div>
+            <div class="cell item-cell" style="left: {{ $lx(12.5) }}; top: {{ $ty($row['top']) }}; width: 73mm;">{{ $row['name'] }}</div>
+            <div class="cell center" style="left: {{ $lx(89) }}; top: {{ $ty($row['top']) }}; width: 34mm;">{{ $row['code'] }}</div>
+            <div class="cell right" style="left: {{ $lx(126) }}; top: {{ $ty($row['top']) }}; width: 35mm;">{{ \App\Support\PdfFormatters::qty($row['qty']) }}</div>
+            <div class="cell center" style="left: {{ $lx(165) }}; top: {{ $ty($row['top']) }}; width: 32mm;">{{ $row['uom'] }}</div>
         @endforeach
 
-        <div class="field center" style="left: 8mm; top: 78mm; width: 34mm;">{{ $transferSlip->created_by_name ?? '' }}</div>
-        <div class="field center" style="left: 48mm; top: 78mm; width: 38mm;">{{ $transferSlip->noted_by_name ?? '' }}</div>
-        <div class="field center" style="left: 90mm; top: 78mm; width: 33mm;">{{ $transferSlip->approved_by_name ?? '' }}</div>
-        <div class="field center" style="left: 126mm; top: 78mm; width: 35mm;">{{ $transferSlip->received_by_name ?? '' }}</div>
-        <div class="field center" style="left: 165mm; top: 78mm; width: 32mm;">{{ $swsNumber }}</div>
+        <div class="field center" style="left: {{ $lx(8) }}; top: {{ $ty(78) }}; width: 34mm;">{{ $transferSlip->created_by_name ?? '' }}</div>
+        <div class="field center" style="left: {{ $lx(48) }}; top: {{ $ty(78) }}; width: 38mm;">{{ $transferSlip->noted_by_name ?? '' }}</div>
+        <div class="field center" style="left: {{ $lx(90) }}; top: {{ $ty(78) }}; width: 33mm;">{{ $transferSlip->approved_by_name ?? '' }}</div>
+        <div class="field center" style="left: {{ $lx(126) }}; top: {{ $ty(78) }}; width: 35mm;">{{ $transferSlip->received_by_name ?? '' }}</div>
+        <div class="field center" style="left: {{ $lx(165) }}; top: {{ $ty(78) }}; width: 32mm;">{{ $swsNumber }}</div>
 
         <div class="remarks">{{ $remarksText }}</div>
-        <div class="field center" style="left: 165mm; top: 92mm; width: 32mm;">{{ $tsDateText }}</div>
+        <div class="field center" style="left: {{ $lx(165) }}; top: {{ $ty(92) }}; width: 32mm;">{{ $tsDateText }}</div>
     </div>
 </body>
 </html>

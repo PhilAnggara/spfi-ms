@@ -273,11 +273,12 @@ it('uses flexible item row heights so a long name pushes the next row down', fun
     expect($html)
         ->toContain('white-space: pre-line')
         ->toContain('overflow: visible')
-        ->toContain('font-weight: bold')
+        ->toContain('font-weight: normal')
         ->toContain('line-height: 1.12')
         ->toContain($shortName)
         ->not->toContain('max-height:')
-        ->not->toContain('…');
+        ->not->toContain('…')
+        ->not->toContain('font-weight: bold');
 
     preg_match_all('/class="cell item-cell"[^>]*>(.*?)<\/div>/s', $html, $matches);
     $itemCells = $matches[1] ?? [];
@@ -442,4 +443,37 @@ it('packs space after multi-line item names tighter than a full wrap stride', fu
     // Multi-line harus lebih rapat dari rumus full stride tanpa tail-pack.
     expect($advance)->toBeLessThan($naiveFullAdvance - 0.5);
     expect($advance)->toBeGreaterThan($glyphHeightMm + (($lineCount - 2) * $wrapStrideMm));
+});
+
+it('applies global overlay offset to receiving report field coordinates', function () {
+    config([
+        'receiving-report.offset_x_mm' => 2,
+        'receiving-report.offset_y_mm' => 1.5,
+    ]);
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $this->receivingReport->load([
+            'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
+            'createdBy',
+        ]),
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    $scaleX = 215 / 297;
+    $scaleY = 160 / 210;
+    $expectedLeft = round(round(37 * $scaleX, 2) + 2, 2);
+    $expectedTop = round(round(41 * $scaleY, 2) + 1.5, 2);
+
+    expect($html)
+        ->toContain("left: {$expectedLeft}mm")
+        ->toContain("top: {$expectedTop}mm");
 });

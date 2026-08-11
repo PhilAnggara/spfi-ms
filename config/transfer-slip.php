@@ -18,4 +18,17 @@ return [
         'label' => 'TS Form 215 x 105 mm',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Overlay Offset
+    |--------------------------------------------------------------------------
+    |
+    | Shift all printed field coordinates to align with the physical blank
+    | form. Positive = right / down; negative = left / up. Units are mm.
+    |
+    */
+
+    'offset_x_mm' => 0,
+    'offset_y_mm' => 0,
+
 ];

@@ -394,9 +394,10 @@ it('uses flexible item row heights so a long name pushes the next row down', fun
     expect($html)
         ->toContain('white-space: pre-line')
         ->toContain('overflow: visible')
-        ->toContain('font-weight: bold')
+        ->toContain('font-weight: normal')
         ->toContain('Transfer Print Item')
-        ->not->toContain('max-height:');
+        ->not->toContain('max-height:')
+        ->not->toContain('font-weight: bold');
 
     preg_match_all('/class="cell item-cell"[^>]*>(.*?)<\/div>/s', $html, $matches);
     $itemCells = $matches[1] ?? [];
@@ -410,6 +411,56 @@ it('uses flexible item row heights so a long name pushes the next row down', fun
     expect($tops)->toHaveCount(2);
     expect($tops[0])->toBe(48.4);
     expect($tops[1])->toBeGreaterThan(48.4 + 3.1);
+});
+
+it('applies global overlay offset to transfer slip field coordinates', function () {
+    config([
+        'transfer-slip.offset_x_mm' => 2,
+        'transfer-slip.offset_y_mm' => 1,
+    ]);
+
+    $transferSlip = DB::table('transfer_slips as ts')
+        ->leftJoin('store_withdrawals as sw', 'sw.id', '=', 'ts.store_withdrawal_id')
+        ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
+        ->leftJoin('users as creator', 'creator.id', '=', 'ts.created_by')
+        ->where('ts.id', $this->transferSlipId)
+        ->select([
+            'ts.*',
+            'sw.sws_number',
+            'sw.department_code',
+            'd.name as department_name',
+            'creator.name as created_by_name',
+        ])
+        ->first();
+
+    $items = DB::table('transfer_slip_items as tsi')
+        ->leftJoin('items as i', 'i.id', '=', 'tsi.item_id')
+        ->where('tsi.transfer_slip_id', $this->transferSlipId)
+        ->select([
+            'tsi.*',
+            'i.name as item_name',
+            'i.code as item_code',
+            'i.type as item_type',
+        ])
+        ->get();
+
+    $html = view('pdf.transfer-slip', [
+        'transferSlip' => $transferSlip,
+        'items' => $items,
+        'isPreview' => true,
+        'backgroundImageSrc' => 'data:image/jpeg;base64,/9j/4AAQ',
+        'backgroundWidthPt' => 215 * 2.834645669,
+        'backgroundHeightPt' => 105 * 2.834645669,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 105,
+    ])->render();
+
+    expect($html)
+        ->toContain('left: 27mm; top: 26.2mm') // 25+2, 25.2+1
+        ->toContain('left: 14.5mm') // item name 12.5+2
+        ->toContain('class="ts-bg"')
+        ->toContain('top: 0') // background stays at origin
+        ->toContain('left: 0');
 });
 
 it('embeds blank form background only in preview mode', function () {

@@ -8,12 +8,17 @@
         $baseHeightMm = 210;
         $pageWidthMm = $pageWidthMm ?? 215;
         $pageHeightMm = $pageHeightMm ?? 160;
+        $offsetXMm = (float) ($offsetXMm ?? config('receiving-report.offset_x_mm', 0));
+        $offsetYMm = (float) ($offsetYMm ?? config('receiving-report.offset_y_mm', 0));
         $scaleX = $pageWidthMm / $baseWidthMm;
         $scaleY = $pageHeightMm / $baseHeightMm;
         $sx = static fn (float $mm): float => round($mm * $scaleX, 2);
         $sy = static fn (float $mm): float => round($mm * $scaleY, 2);
-        $mmX = static fn (float $mm): string => $sx($mm).'mm';
-        $mmY = static fn (float $mm): string => $sy($mm).'mm';
+        // Widths use scale only; left/top include global form offset.
+        $mmW = static fn (float $mm): string => $sx($mm).'mm';
+        $mmX = static fn (float $mm): string => round($sx($mm) + $offsetXMm, 2).'mm';
+        $mmY = static fn (float $mm): string => round($sy($mm) + $offsetYMm, 2).'mm';
+        $oy = static fn (float $mm): string => round($mm + $offsetYMm, 2).'mm';
         $fieldFontSize = round(15.5 * $scaleY, 1);
         $poNumberFontSize = round(24 * $scaleY, 1);
         $capexFontSize = round(22 * $scaleY, 1);
@@ -144,18 +149,18 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-weight: bold;
+            font-weight: normal;
         }
 
         .po-number {
             font-size: {{ $poNumberFontSize }}px;
-            font-weight: bold;
+            font-weight: normal;
             letter-spacing: 0.2px;
         }
 
         .capex-label {
             font-size: {{ $capexFontSize }}px;
-            font-weight: bold;
+            font-weight: normal;
             letter-spacing: 0.3px;
         }
 
@@ -166,7 +171,7 @@
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
-            font-weight: bold;
+            font-weight: normal;
         }
 
         .item-cell {
@@ -176,7 +181,7 @@
             overflow: visible;
             overflow-wrap: normal;
             word-break: normal;
-            /* font-weight: normal; */
+            font-weight: normal;
         }
 
         .right {
@@ -194,11 +199,11 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-weight: bold;
+            font-weight: normal;
         }
 
         .summary-label {
-            font-weight: bold;
+            font-weight: normal;
         }
 
     </style>
@@ -320,50 +325,50 @@
         @endif
 
         @if ($isCapex)
-            <div class="cell capex-label" style="left: {{ $mmX(15) }}; top: {{ $mmY(33) }}; width: {{ $mmX(40) }};">CAPEX</div>
+            <div class="cell capex-label" style="left: {{ $mmX(15) }}; top: {{ $mmY(33) }}; width: {{ $mmW(40) }};">CAPEX</div>
         @endif
 
         @if ($isPreview)
             @php $rrNumberText = trim((string) ($receivingReport->rr_number ?? '')); @endphp
             @if ($rrNumberText !== '')
-                <div class="field po-number" style="left: {{ $mmX(207) }}; top: {{ $mmY(28) }}; width: {{ $mmX(55) }}; text-align: right;">{{ $rrNumberText }}</div>
+                <div class="field po-number" style="left: {{ $mmX(207) }}; top: {{ $mmY(28) }}; width: {{ $mmW(55) }}; text-align: right;">{{ $rrNumberText }}</div>
             @endif
         @endif
 
-        <div class="field" style="left: {{ $mmX(37) }}; top: {{ $mmY(41) }}; width: {{ $mmX(100) }};">{{ $supplierDisplay }}</div>
-        <div class="field po-number" style="left: {{ $mmX(161) }}; top: {{ $mmY(38) }}; width: {{ $mmX(48) }};">{{ $po?->po_number ?? '-' }}</div>
-        <div class="field" style="left: {{ $mmX(160) }}; top: {{ $mmY(49) }}; width: {{ $mmX(48) }};">{{ $poDateText }}</div>
+        <div class="field" style="left: {{ $mmX(37) }}; top: {{ $mmY(41) }}; width: {{ $mmW(100) }};">{{ $supplierDisplay }}</div>
+        <div class="field po-number" style="left: {{ $mmX(161) }}; top: {{ $mmY(38) }}; width: {{ $mmW(48) }};">{{ $po?->po_number ?? '-' }}</div>
+        <div class="field" style="left: {{ $mmX(160) }}; top: {{ $mmY(49) }}; width: {{ $mmW(48) }};">{{ $poDateText }}</div>
 
         @foreach($layoutRows as $row)
-            <div class="cell item-cell" style="left: {{ $mmX($itemNameLeftBaseMm) }}; top: {{ $row['top'] }}mm; width: {{ $mmX($itemNameWidthBaseMm) }};">{{ $row['name'] }}</div>
-            <div class="cell center" style="left: {{ $mmX($itemCodeLeftBaseMm) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(20) }};">{{ $row['code'] }}</div>
-            <div class="cell center" style="left: {{ $mmX(108) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(25) }};">{{ $row['department_code'] }}</div>
-            <div class="cell right" style="left: {{ $mmX(138) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(23) }};">{{ \App\Support\PdfFormatters::qty($row['qty_total']) }}</div>
-            <div class="cell center" style="left: {{ $mmX(163) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(23) }};">{{ $row['unit'] }}</div>
-            <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(35) }};">{{ number_format($row['unit_cost'], 2, '.', ',') }}</div>
-            <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $row['top'] }}mm; width: {{ $mmX(50) }};">{{ number_format($row['amount'], 2, '.', ',') }}</div>
+            <div class="cell item-cell" style="left: {{ $mmX($itemNameLeftBaseMm) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW($itemNameWidthBaseMm) }};">{{ $row['name'] }}</div>
+            <div class="cell center" style="left: {{ $mmX($itemCodeLeftBaseMm) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(20) }};">{{ $row['code'] }}</div>
+            <div class="cell center" style="left: {{ $mmX(108) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(25) }};">{{ $row['department_code'] }}</div>
+            <div class="cell right" style="left: {{ $mmX(138) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(23) }};">{{ \App\Support\PdfFormatters::qty($row['qty_total']) }}</div>
+            <div class="cell center" style="left: {{ $mmX(163) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(23) }};">{{ $row['unit'] }}</div>
+            <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(35) }};">{{ number_format($row['unit_cost'], 2, '.', ',') }}</div>
+            <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(50) }};">{{ number_format($row['amount'], 2, '.', ',') }}</div>
         @endforeach
 
         @if ($rowCount > 0)
             @if ($showSubTotal)
-                <div style="position: absolute; left: {{ $mmX(189) }}; top: {{ $summaryBaseTop }}mm; width: {{ $mmX(89) }}; border-top: 1px solid #111827;"></div>
-                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $subTotalTop }}mm; width: {{ $mmX(35) }};">Sub Total</div>
-                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $subTotalTop }}mm; width: {{ $mmX(50) }};">{{ number_format($displaySubTotal, 2, '.', ',') }}</div>
+                <div style="position: absolute; left: {{ $mmX(189) }}; top: {{ $oy($summaryBaseTop) }}; width: {{ $mmW(89) }}; border-top: 1px solid #111827;"></div>
+                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $oy($subTotalTop) }}; width: {{ $mmW(35) }};">Sub Total</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $oy($subTotalTop) }}; width: {{ $mmW(50) }};">{{ number_format($displaySubTotal, 2, '.', ',') }}</div>
             @endif
             @if ($hasPpn)
-                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $ppnTop }}mm; width: {{ $mmX(35) }};">PPn {{ $formatTaxRate($displayPpnRate) }}%</div>
-                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $ppnTop }}mm; width: {{ $mmX(50) }};">{{ number_format($displayPpnTotal, 2, '.', ',') }}</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $oy($ppnTop) }}; width: {{ $mmW(35) }};">PPn {{ $formatTaxRate($displayPpnRate) }}%</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $oy($ppnTop) }}; width: {{ $mmW(50) }};">{{ number_format($displayPpnTotal, 2, '.', ',') }}</div>
             @endif
             @if ($hasPph)
-                <div style="position: absolute; left: {{ $mmX(228) }}; top: {{ $intermediateTop - $sy(1.2) }}mm; width: {{ $mmX(50) }}; border-top: 1px solid #111827;"></div>
-                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $intermediateTop }}mm; width: {{ $mmX(50) }};">{{ number_format($subTotalPlusPpn, 2, '.', ',') }}</div>
-                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $pphTop }}mm; width: {{ $mmX(35) }};">PPh {{ $formatTaxRate($displayPphRate) }}%</div>
-                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $pphTop }}mm; width: {{ $mmX(50) }};">{{ number_format($displayPphTotal, 2, '.', ',') }}</div>
+                <div style="position: absolute; left: {{ $mmX(228) }}; top: {{ $oy($intermediateTop - $sy(1.2)) }}; width: {{ $mmW(50) }}; border-top: 1px solid #111827;"></div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $oy($intermediateTop) }}; width: {{ $mmW(50) }};">{{ number_format($subTotalPlusPpn, 2, '.', ',') }}</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $oy($pphTop) }}; width: {{ $mmW(35) }};">PPh {{ $formatTaxRate($displayPphRate) }}%</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $oy($pphTop) }}; width: {{ $mmW(50) }};">{{ number_format($displayPphTotal, 2, '.', ',') }}</div>
             @endif
             @if ($showFinalTotal)
-                <div style="position: absolute; left: {{ $mmX(228) }}; top: {{ $summaryTotalTop - $sy(1.2) }}mm; width: {{ $mmX(50) }}; border-top: 1px solid #111827;"></div>
-                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $summaryTotalTop }}mm; width: {{ $mmX(35) }};">Total</div>
-                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $summaryTotalTop }}mm; width: {{ $mmX(50) }};">{{ number_format($hasPph ? $displayGrandTotal : $subTotalPlusPpn, 2, '.', ',') }}</div>
+                <div style="position: absolute; left: {{ $mmX(228) }}; top: {{ $oy($summaryTotalTop - $sy(1.2)) }}; width: {{ $mmW(50) }}; border-top: 1px solid #111827;"></div>
+                <div class="cell right summary-label" style="left: {{ $mmX(189) }}; top: {{ $oy($summaryTotalTop) }}; width: {{ $mmW(35) }};">Total</div>
+                <div class="cell right summary-label" style="left: {{ $mmX(228) }}; top: {{ $oy($summaryTotalTop) }}; width: {{ $mmW(50) }};">{{ number_format($hasPph ? $displayGrandTotal : $subTotalPlusPpn, 2, '.', ',') }}</div>
             @endif
         @endif
 
@@ -376,29 +381,29 @@
         @endphp
 
         @if (! empty($currencyConversion['rate_note']))
-            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmX(120) }}; font-size: {{ round(11 * $scaleY, 1) }}px; white-space: normal;">
+            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmW(120) }}; font-size: {{ round(11 * $scaleY, 1) }}px; white-space: normal;">
                 {{ $currencyConversion['rate_note'] }}
             </div>
         @elseif (($currencyConversion['po_currency_code'] ?? 'IDR') === 'USD' && empty($currencyConversion['rate_found']))
-            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmX(120) }}; font-size: {{ round(11 * $scaleY, 1) }}px; white-space: normal;">
+            <div class="field" style="left: {{ $mmX(16) }}; top: {{ $mmY(157) }}; width: {{ $mmW(120) }}; font-size: {{ round(11 * $scaleY, 1) }}px; white-space: normal;">
                 No USD exchange rate available.
             </div>
         @endif
 
         @foreach($entryRows as $entryIndex => $entry)
             @php $entryTop = $entryStartTop + ($entryIndex * $entryRowHeight); @endphp
-            <div class="acct-cell" style="left: {{ $mmX(16) }}; top: {{ $entryTop }}mm; width: {{ $mmX(20) }};">{{ $entry['cost_center'] !== '' ? $entry['cost_center'] : '' }}</div>
-            <div class="acct-cell" style="left: {{ $mmX(30) }}; top: {{ $entryTop }}mm; width: {{ $mmX(20) }};">{{ $entry['account'] !== '' ? $entry['account'] : '' }}</div>
-            <div class="acct-cell right" style="left: {{ $mmX(40) }}; top: {{ $entryTop }}mm; width: {{ $mmX(30) }};">{{ $entry['debit'] !== null ? number_format((float) $entry['debit'], 2, '.', ',') : '' }}</div>
-            <div class="acct-cell right" style="left: {{ $mmX(70) }}; top: {{ $entryTop }}mm; width: {{ $mmX(30) }};">{{ $entry['credit'] !== null ? number_format((float) $entry['credit'], 2, '.', ',') : '' }}</div>
+            <div class="acct-cell" style="left: {{ $mmX(16) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW(20) }};">{{ $entry['cost_center'] !== '' ? $entry['cost_center'] : '' }}</div>
+            <div class="acct-cell" style="left: {{ $mmX(30) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW(20) }};">{{ $entry['account'] !== '' ? $entry['account'] : '' }}</div>
+            <div class="acct-cell right" style="left: {{ $mmX(40) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW(30) }};">{{ $entry['debit'] !== null ? number_format((float) $entry['debit'], 2, '.', ',') : '' }}</div>
+            <div class="acct-cell right" style="left: {{ $mmX(70) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW(30) }};">{{ $entry['credit'] !== null ? number_format((float) $entry['credit'], 2, '.', ',') : '' }}</div>
         @endforeach
 
-        <div style="position: absolute; left: {{ $mmX(30) }}; top: {{ $totalLineTop }}mm; width: {{ $mmX(12) }}; border-top: 1px solid #111827;"></div>
-        <div class="acct-cell" style="left: {{ $mmX(30) }}; top: {{ $totalEntryTop }}mm; width: {{ $mmX(12) }}; font-weight: bold;">{{ $accountingCodeTotal }}</div>
+        <div style="position: absolute; left: {{ $mmX(30) }}; top: {{ $oy($totalLineTop) }}; width: {{ $mmW(12) }}; border-top: 1px solid #111827;"></div>
+        <div class="acct-cell" style="left: {{ $mmX(30) }}; top: {{ $oy($totalEntryTop) }}; width: {{ $mmW(12) }};">{{ $accountingCodeTotal }}</div>
 
-        <div class="field center" style="left: {{ $mmX(175) }}; top: {{ $mmY(168) }}; width: {{ $mmX(47) }};">{{ $receivingReport->createdBy?->name ?? '-' }}</div>
-        <div class="field center" style="left: {{ $mmX(233) }}; top: {{ $mmY(168) }}; width: {{ $mmX(45) }};">{{ $approvedByName ?? '-' }}</div>
-        <div class="field center" style="left: {{ $mmX(235) }}; top: {{ $mmY(185) }}; width: {{ $mmX(45) }};">{{ $rrDateText }}</div>
+        <div class="field center" style="left: {{ $mmX(175) }}; top: {{ $mmY(168) }}; width: {{ $mmW(47) }};">{{ $receivingReport->createdBy?->name ?? '-' }}</div>
+        <div class="field center" style="left: {{ $mmX(233) }}; top: {{ $mmY(168) }}; width: {{ $mmW(45) }};">{{ $approvedByName ?? '-' }}</div>
+        <div class="field center" style="left: {{ $mmX(235) }}; top: {{ $mmY(185) }}; width: {{ $mmW(45) }};">{{ $rrDateText }}</div>
     </div>
 </body>
 </html>
