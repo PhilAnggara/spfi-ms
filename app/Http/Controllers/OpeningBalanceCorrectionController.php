@@ -117,26 +117,30 @@ class OpeningBalanceCorrectionController extends Controller
 
     public function show(OpeningBalanceCorrection $openingBalanceCorrection): View
     {
-        $openingBalanceCorrection->load(['items.item:id,name,code', 'createdBy:id,name']);
+        $openingBalanceCorrection->load([
+            'items.item:id,name,code',
+            'createdBy:id,name',
+            'reversedBy:id,name',
+        ]);
 
         return view('pages.opening-balance-corrections.show', [
             'correction' => $openingBalanceCorrection,
         ]);
     }
 
-    public function destroy(OpeningBalanceCorrection $openingBalanceCorrection): RedirectResponse
-    {
+    public function reverse(
+        OpeningBalanceCorrection $openingBalanceCorrection,
+        OpeningBalanceCorrectionService $correctionService
+    ): RedirectResponse {
         $openingBalanceCorrection->load('items');
 
-        DB::transaction(function () use ($openingBalanceCorrection) {
-            $openingBalanceCorrection->items()->delete();
-            $openingBalanceCorrection->updated_by = auth()->id();
-            $openingBalanceCorrection->save();
-            $openingBalanceCorrection->delete();
-        });
+        $correctionService->reverse(
+            correction: $openingBalanceCorrection,
+            userId: auth()->id(),
+        );
 
         return redirect()
-            ->route('opening-balance-corrections.index')
-            ->with('success', "Opening balance correction {$openingBalanceCorrection->obc_number} archived. Stock balances were not reversed — create a new correction if needed.");
+            ->route('opening-balance-corrections.show', $openingBalanceCorrection)
+            ->with('success', "Opening balance correction {$openingBalanceCorrection->obc_number} reversed. Stock rebuilt to previous beginning and ADJ ledger cleared.");
     }
 }

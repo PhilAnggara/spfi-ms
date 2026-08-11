@@ -22,6 +22,8 @@ class OpeningBalanceCorrection extends Model
         'allow_negative_balance',
         'created_by',
         'updated_by',
+        'reversed_by',
+        'reversed_at',
         'meta',
     ];
 
@@ -29,8 +31,10 @@ class OpeningBalanceCorrection extends Model
         'id' => 'integer',
         'created_by' => 'integer',
         'updated_by' => 'integer',
+        'reversed_by' => 'integer',
         'period_month' => 'date',
         'allow_negative_balance' => 'boolean',
+        'reversed_at' => 'datetime',
         'meta' => 'array',
     ];
 
@@ -47,5 +51,15 @@ class OpeningBalanceCorrection extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function reversedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reversed_by');
+    }
+
+    public function isReversed(): bool
+    {
+        return $this->reversed_at !== null;
     }
 }

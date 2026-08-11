@@ -304,7 +304,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('permission:delete-opening-balance-correction')->prefix('opening-balance-corrections')->name('opening-balance-corrections.')->group(function () {
-        Route::delete('/{openingBalanceCorrection}', [OpeningBalanceCorrectionController::class, 'destroy'])->name('destroy');
+        Route::post('/{openingBalanceCorrection}/reverse', [OpeningBalanceCorrectionController::class, 'reverse'])->name('reverse');
     });
 
     Route::post('/change-password', [UserController::class, 'changePassword'])->name('password.change');

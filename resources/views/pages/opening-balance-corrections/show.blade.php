@@ -24,6 +24,9 @@
                         <span class="sc-meta-chip"><i class="fa-regular fa-calendar"></i> Period {{ $correction->period_month?->format('Y-m') }}</span>
                         <span class="sc-meta-chip"><i class="fa-regular fa-user"></i> {{ $correction->createdBy?->name ?? '-' }}</span>
                         <span class="sc-meta-chip"><i class="fa-regular fa-list"></i> {{ $correction->items->count() }} lines</span>
+                        @if ($correction->isReversed())
+                            <span class="badge bg-secondary">Reversed</span>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -33,14 +36,15 @@
                     Back
                 </a>
                 @can('delete-opening-balance-correction')
-                    <form method="POST" action="{{ route('opening-balance-corrections.destroy', $correction) }}" onsubmit="return confirm('Archive this correction document? Stock will NOT be reversed.');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-outline-danger icon icon-left">
-                            <i class="fa-regular fa-box-archive"></i>
-                            Archive Document
-                        </button>
-                    </form>
+                    @unless ($correction->isReversed())
+                        <form method="POST" action="{{ route('opening-balance-corrections.reverse', $correction) }}" onsubmit="return confirm('Reverse this correction? Stock will be rebuilt to the previous beginning and OBC ADJ ledger rows will be removed.');">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-danger icon icon-left">
+                                <i class="fa-regular fa-rotate-left"></i>
+                                Reverse Correction
+                            </button>
+                        </form>
+                    @endunless
                 @endcan
             </div>
         </div>
@@ -48,6 +52,14 @@
 
     @if (session('success'))
         <div class="alert alert-success shadow-sm border-0">{{ session('success') }}</div>
+    @endif
+
+    @if ($correction->isReversed())
+        <div class="alert alert-secondary shadow-sm border-0">
+            Reversed on {{ $correction->reversed_at?->format('Y-m-d H:i') }}
+            by {{ $correction->reversedBy?->name ?? '-' }}.
+            Document kept for history; opening ADJ ledger for this OBC was cleared.
+        </div>
     @endif
 
     <div class="card shadow-sm border-0 mb-4">

@@ -146,31 +146,54 @@ class OpeningBalanceCorrectionService
     }
 
     /**
-     * Soft-delete reversal is not a full historical restore; OBC is intentionally one-way.
-     * Deleting the document only reverses the opening adjustment delta and does not re-purge/replay.
+     * Rebuild each corrected item back to previous_beginning, remove OBC ADJ ledger rows
+     * (so IM report ADJ stays clean), replay RR/TS/DR, and mark the document as reversed history.
      */
-    public function reverseOpeningAdjustmentOnly(
-        OpeningBalanceCorrection $correction,
-        ?int $userId = null
-    ): void {
+    public function reverse(OpeningBalanceCorrection $correction, ?int $userId = null): void
+    {
+        if ($correction->isReversed()) {
+            throw ValidationException::withMessages([
+                'correction' => "Opening balance correction {$correction->obc_number} has already been reversed.",
+            ]);
+        }
+
+        $correction->loadMissing('items');
+
         $monthStart = Carbon::parse($correction->period_month)->startOfMonth()->toDateString();
-        $openingDate = Carbon::parse($monthStart)->subDay()->toDateString();
+        $to = now()->toDateString();
+        $allowNegative = (bool) $correction->allow_negative_balance;
 
-        $lines = $correction->items->map(fn (OpeningBalanceCorrectionItem $item): array => [
-            'item_id' => (int) $item->item_id,
-            'product_code' => (string) $item->product_code,
-            'delta_qty' => (float) $item->delta_qty,
-            'reference_line_id' => (int) $item->id,
-            'wh_code' => (string) $item->wh_code,
-        ])->all();
+        DB::transaction(function () use ($correction, $monthStart, $to, $allowNegative, $userId): void {
+            $replayQueues = [];
 
-        $this->stockService->reverseStockAdjustment(
-            stockAdjustmentId: $correction->id,
-            movementDate: $openingDate,
-            lines: $lines,
-            userId: $userId,
-            referenceType: StockService::REF_OPENING_BALANCE_CORRECTION,
-        );
+            foreach ($correction->items as $item) {
+                $itemId = (int) $item->item_id;
+                $whCode = (string) $item->wh_code;
+
+                $replayQueues[] = [
+                    'item_id' => $itemId,
+                    'wh_code' => $whCode,
+                    'jobs' => $this->collectReplayJobs($itemId, $monthStart, $to),
+                ];
+
+                $this->stockService->purgeItemMovementsFromDate($itemId, $whCode, $monthStart);
+            }
+
+            // Delete OBC-linked ADJ rows and undo inventory (no counter-post ADJ).
+            $this->stockService->purgeDocumentMovements(
+                StockService::REF_OPENING_BALANCE_CORRECTION,
+                (int) $correction->id,
+            );
+
+            foreach ($replayQueues as $queue) {
+                $this->replayJobs($queue['jobs'], $allowNegative);
+            }
+
+            $correction->reversed_at = now();
+            $correction->reversed_by = $userId;
+            $correction->updated_by = $userId;
+            $correction->save();
+        });
     }
 
     /**

@@ -316,6 +316,180 @@ it('searches opening-balance items by name', function () {
     expect(collect($response->json('items'))->pluck('code'))->toContain('OBC-ITEM-001');
 });
 
+it('reverses correction by restoring previous beginning and clearing OBC ADJ ledger', function () {
+    $this->actingAs($this->user)->post(route('opening-balance-corrections.store'), [
+        'period_month' => '2026-08',
+        'reason' => 'Align with Excel ending July',
+        'confirmed' => '1',
+        'items' => [
+            [
+                'item_id' => $this->item->id,
+                'new_beginning' => 150,
+                'wh_code' => 'MAIN',
+            ],
+        ],
+    ])->assertRedirect();
+
+    $correction = OpeningBalanceCorrection::query()->firstOrFail();
+
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_OPENING_BALANCE_CORRECTION)
+        ->where('reference_id', $correction->id)
+        ->count())->toBe(1);
+
+    $this->actingAs($this->user)
+        ->post(route('opening-balance-corrections.reverse', $correction))
+        ->assertRedirect(route('opening-balance-corrections.show', $correction));
+
+    $correction->refresh();
+
+    expect($correction->reversed_at)->not->toBeNull()
+        ->and($correction->reversed_by)->toBe($this->user->id)
+        ->and($correction->trashed())->toBeFalse();
+
+    expect(OpeningBalanceCorrection::query()->whereKey($correction->id)->exists())->toBeTrue();
+    expect($correction->items()->count())->toBe(1);
+
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_OPENING_BALANCE_CORRECTION)
+        ->where('reference_id', $correction->id)
+        ->count())->toBe(0);
+
+    expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(100.0);
+
+    $adjNet = (float) StockBalance::query()
+        ->where('item_id', $this->item->id)
+        ->selectRaw('COALESCE(SUM(qty_in2) - SUM(qty_out2), 0) as adj')
+        ->value('adj');
+
+    expect($adjNet)->toBe(0.0);
+});
+
+it('replays transfer slip after reverse so balance matches previous beginning minus issues', function () {
+    $now = now();
+
+    $tsId = (int) \Illuminate\Support\Facades\DB::table('transfer_slips')->insertGetId([
+        'ts_number' => 'TS-OBC-REV-001',
+        'ts_date' => '2026-08-07',
+        'store_withdrawal_id' => createMinimalSws($this->department->id, $this->user->id),
+        'remarks' => 'OBC reverse TS',
+        'created_by' => $this->user->id,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $tsiId = (int) \Illuminate\Support\Facades\DB::table('transfer_slip_items')->insertGetId([
+        'transfer_slip_id' => $tsId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 30,
+        'created_by' => $this->user->id,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    StockBalance::query()
+        ->where('reference_type', StockService::REF_TRANSFER_SLIP)
+        ->where('reference_id', 9002)
+        ->delete();
+
+    StockBalance::query()->create([
+        'date' => '2026-08-07',
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'wh_code' => 'MAIN',
+        'begin' => 120,
+        'qty_in1' => 0,
+        'qty_in2' => 0,
+        'qty_in3' => 0,
+        'qty_out1' => 30,
+        'qty_out2' => 0,
+        'qty_out3' => 0,
+        'end' => 90,
+        'acc_qty_in1' => 0,
+        'acc_average_price_in1' => 0,
+        'acc_qty_total' => 90,
+        'acc_average_price_total' => 10,
+        'reference_type' => StockService::REF_TRANSFER_SLIP,
+        'reference_id' => $tsId,
+        'reference_line_id' => $tsiId,
+    ]);
+
+    StockBalance::query()
+        ->where('reference_type', StockService::REF_RECEIVING_REPORT)
+        ->delete();
+
+    StockInventory::query()->where('item_id', $this->item->id)->update(['balance' => 70]);
+    Item::query()->whereKey($this->item->id)->update(['stock_on_hand' => 70]);
+
+    $this->actingAs($this->user)->post(route('opening-balance-corrections.store'), [
+        'period_month' => '2026-08',
+        'reason' => 'Rebuild with TS then reverse',
+        'confirmed' => '1',
+        'allow_negative_balance' => '1',
+        'items' => [
+            [
+                'item_id' => $this->item->id,
+                'new_beginning' => 150,
+                'wh_code' => 'MAIN',
+            ],
+        ],
+    ])->assertRedirect();
+
+    expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(120.0);
+
+    $correction = OpeningBalanceCorrection::query()->latest('id')->firstOrFail();
+
+    $this->actingAs($this->user)
+        ->post(route('opening-balance-corrections.reverse', $correction))
+        ->assertRedirect();
+
+    // previous beginning 100 - TS 30 = 70; no OBC ADJ left
+    expect((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(70.0);
+
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_OPENING_BALANCE_CORRECTION)
+        ->where('reference_id', $correction->id)
+        ->count())->toBe(0);
+
+    $tsLedger = StockBalance::query()
+        ->where('reference_type', StockService::REF_TRANSFER_SLIP)
+        ->where('reference_id', $tsId)
+        ->where('reference_line_id', $tsiId)
+        ->first();
+
+    expect($tsLedger)->not->toBeNull()
+        ->and((float) $tsLedger->begin)->toBe(100.0)
+        ->and((float) $tsLedger->end)->toBe(70.0);
+});
+
+it('rejects a second reverse on the same correction', function () {
+    $this->actingAs($this->user)->post(route('opening-balance-corrections.store'), [
+        'period_month' => '2026-08',
+        'reason' => 'First apply',
+        'confirmed' => '1',
+        'items' => [
+            [
+                'item_id' => $this->item->id,
+                'new_beginning' => 150,
+                'wh_code' => 'MAIN',
+            ],
+        ],
+    ])->assertRedirect();
+
+    $correction = OpeningBalanceCorrection::query()->firstOrFail();
+
+    $this->actingAs($this->user)
+        ->post(route('opening-balance-corrections.reverse', $correction))
+        ->assertRedirect();
+
+    $this->actingAs($this->user)
+        ->from(route('opening-balance-corrections.show', $correction))
+        ->post(route('opening-balance-corrections.reverse', $correction))
+        ->assertRedirect(route('opening-balance-corrections.show', $correction))
+        ->assertSessionHasErrors('correction');
+});
+
 function createMinimalSws(int $departmentId, int $userId): int
 {
     $now = now();

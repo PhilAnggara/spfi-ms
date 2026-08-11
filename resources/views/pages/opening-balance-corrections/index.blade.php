@@ -60,6 +60,7 @@
                             <th>OBC Number</th>
                             <th>Period</th>
                             <th>Reason</th>
+                            <th>Status</th>
                             <th>Lines</th>
                             <th>Created By</th>
                             <th class="text-end">Action</th>
@@ -74,6 +75,13 @@
                                     <div class="sc-reason-truncate" title="{{ $correction->reason }}">{{ $correction->reason }}</div>
                                 </td>
                                 <td>
+                                    @if ($correction->isReversed())
+                                        <span class="badge bg-secondary">Reversed</span>
+                                    @else
+                                        <span class="badge bg-light-success text-success">Posted</span>
+                                    @endif
+                                </td>
+                                <td>
                                     <span class="badge bg-light-primary text-primary">{{ $correction->items->count() }}</span>
                                 </td>
                                 <td>{{ $correction->createdBy?->name ?? '-' }}</td>
@@ -86,7 +94,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6">
+                                <td colspan="7">
                                     <div class="sc-empty-state">
                                         <div><i class="fa-duotone fa-solid fa-calendar-pen"></i></div>
                                         <div class="fw-semibold mb-1">No opening corrections yet</div>
