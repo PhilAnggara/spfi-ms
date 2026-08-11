@@ -25,7 +25,30 @@ document.addEventListener('DOMContentLoaded', function () {
         category: document.getElementById('filter-product-category'),
         unit: document.getElementById('filter-product-unit'),
         type: document.getElementById('filter-product-type'),
+        sort: document.getElementById('filter-product-sort'),
         reset: document.getElementById('reset-product-filter'),
+    };
+
+    const DEFAULT_SORT = 'name_asc';
+    const SORT_OPTIONS = {
+        name_asc: { column: 2, dir: 'asc' },
+        name_desc: { column: 2, dir: 'desc' },
+        code_asc: { column: 1, dir: 'asc' },
+        code_desc: { column: 1, dir: 'desc' },
+        category_asc: { column: 4, dir: 'asc' },
+        category_desc: { column: 4, dir: 'desc' },
+        avg_unit_price_asc: { column: 6, dir: 'asc' },
+        avg_unit_price_desc: { column: 6, dir: 'desc' },
+    };
+    const COLUMN_TO_SORT = {
+        '2:asc': 'name_asc',
+        '2:desc': 'name_desc',
+        '1:asc': 'code_asc',
+        '1:desc': 'code_desc',
+        '4:asc': 'category_asc',
+        '4:desc': 'category_desc',
+        '6:asc': 'avg_unit_price_asc',
+        '6:desc': 'avg_unit_price_desc',
     };
 
     const editModalElement = document.getElementById('edit-modal');
@@ -103,6 +126,7 @@ document.addEventListener('DOMContentLoaded', function () {
         setQueryParam(url.searchParams, 'category_id', filterElements.category?.value);
         setQueryParam(url.searchParams, 'unit_id', filterElements.unit?.value);
         setQueryParam(url.searchParams, 'type', filterElements.type?.value);
+        setQueryParam(url.searchParams, 'sort', resolveSortValue(filterElements.sort?.value));
 
         if (pushState) {
             window.history.pushState({}, '', url.toString());
@@ -110,6 +134,13 @@ document.addEventListener('DOMContentLoaded', function () {
             window.history.replaceState({}, '', url.toString());
         }
     };
+
+    const resolveSortValue = (value) => {
+        const normalized = String(value || '').trim();
+        return Object.prototype.hasOwnProperty.call(SORT_OPTIONS, normalized) ? normalized : DEFAULT_SORT;
+    };
+
+    const resolveSortOrder = (value) => SORT_OPTIONS[resolveSortValue(value)];
 
     const getFilterPayload = () => ({
         keyword: filterElements.keyword?.value?.trim() || '',
@@ -133,6 +164,39 @@ document.addEventListener('DOMContentLoaded', function () {
 
         clearTimeout(filterDebounceTimer);
         filterDebounceTimer = setTimeout(reload, 350);
+    };
+
+    const applySort = () => {
+        const sortOrder = resolveSortOrder(filterElements.sort?.value);
+        if (filterElements.sort) {
+            filterElements.sort.value = resolveSortValue(filterElements.sort.value);
+        }
+        syncFilterUrl(true);
+        if (productDataTable) {
+            productDataTable.order([[sortOrder.column, sortOrder.dir]]).draw();
+        }
+    };
+
+    const syncSortDropdownFromTable = () => {
+        if (!productDataTable || !filterElements.sort) {
+            return;
+        }
+
+        const order = productDataTable.order();
+        if (!Array.isArray(order) || !order.length) {
+            return;
+        }
+
+        const [column, dir] = order[0];
+        const sortValue = COLUMN_TO_SORT[`${column}:${dir}`];
+        if (!sortValue) {
+            return;
+        }
+
+        if (filterElements.sort.value !== sortValue) {
+            filterElements.sort.value = sortValue;
+            syncFilterUrl(true);
+        }
     };
 
     const destroyHistoryTable = () => {
@@ -252,6 +316,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
+    const initialSortOrder = resolveSortOrder(filterElements.sort?.value);
+
     productDataTable = table.DataTable({
         processing: true,
         serverSide: true,
@@ -280,7 +346,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 setLoading(false);
             },
         },
-        order: [[0, 'desc']],
+        order: [[initialSortOrder.column, initialSortOrder.dir]],
         columns: [
             {
                 data: 'id',
@@ -426,13 +492,22 @@ document.addEventListener('DOMContentLoaded', function () {
             filterElements.type.addEventListener('change', () => applyFilters(false));
         }
 
+        if (filterElements.sort) {
+            filterElements.sort.addEventListener('change', () => applySort());
+        }
+
+        table.on('order.dt', function () {
+            syncSortDropdownFromTable();
+        });
+
         if (filterElements.reset) {
             filterElements.reset.addEventListener('click', function () {
                 if (filterElements.keyword) filterElements.keyword.value = '';
                 if (filterElements.category) filterElements.category.value = '';
                 if (filterElements.unit) filterElements.unit.value = '';
                 if (filterElements.type) filterElements.type.value = '';
-                applyFilters(false);
+                if (filterElements.sort) filterElements.sort.value = DEFAULT_SORT;
+                applySort();
             });
         }
 
@@ -442,9 +517,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (filterElements.category) filterElements.category.value = url.searchParams.get('category_id') || '';
             if (filterElements.unit) filterElements.unit.value = url.searchParams.get('unit_id') || '';
             if (filterElements.type) filterElements.type.value = url.searchParams.get('type') || '';
-            if (productDataTable) {
-                productDataTable.ajax.reload();
+            if (filterElements.sort) {
+                filterElements.sort.value = resolveSortValue(url.searchParams.get('sort'));
             }
+            applySort();
         });
     }
 

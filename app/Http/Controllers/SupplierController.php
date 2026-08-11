@@ -14,6 +14,20 @@ class SupplierController extends Controller
 {
     use PaginatesLegacySqlServer;
 
+    /** @var list<string> */
+    private const ALLOWED_SORTS = [
+        'name_asc',
+        'name_desc',
+        'code_asc',
+        'code_desc',
+        'po_count_asc',
+        'po_count_desc',
+        'total_amount_asc',
+        'total_amount_desc',
+        'last_po_date_asc',
+        'last_po_date_desc',
+    ];
+
     /**
      * Display a listing of the resource.
      */
@@ -26,11 +40,14 @@ class SupplierController extends Controller
             $editingSupplier = Supplier::query()->find($editingSupplierId);
         }
 
+        $sort = mb_strtolower(trim((string) request('sort', 'name_asc')));
+
         return view('pages.supplier', [
             'editingSupplier' => $editingSupplier,
             'filters' => [
                 'keyword' => request('keyword', ''),
                 'has_po' => request('has_po', ''),
+                'sort' => in_array($sort, self::ALLOWED_SORTS, true) ? $sort : 'name_asc',
             ],
             'canManageSuppliers' => auth()->user()?->hasAnyRole([
                 'administrator',

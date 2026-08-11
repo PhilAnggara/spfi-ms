@@ -29,7 +29,7 @@
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
                 <div class="row g-3 align-items-end po-filter-grid" id="product-filter-form">
-                    <div class="col-12 col-md-6 col-xl-4">
+                    <div class="col-12 col-md-6 col-xl-3">
                         <label for="filter-product-keyword" class="form-label mb-1">Search Product</label>
                         <input type="text" id="filter-product-keyword" class="form-control" value="{{ $filters['keyword'] }}" placeholder="Product code / name">
                     </div>
@@ -44,7 +44,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-3 col-xl-2">
+                    <div class="col-6 col-md-3 col-xl-1">
                         <label for="filter-product-unit" class="form-label mb-1">Unit</label>
                         <select id="filter-product-unit" class="form-select">
                             <option value="">All Units</option>
@@ -55,7 +55,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-3 col-xl-2">
+                    <div class="col-6 col-md-3 col-xl-1">
                         <label for="filter-product-type" class="form-label mb-1">Type</label>
                         <select id="filter-product-type" class="form-select">
                             <option value="">All Types</option>
@@ -64,7 +64,20 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-3 col-xl-2">
+                    <div class="col-8 col-md-6 col-xl-3">
+                        <label for="filter-product-sort" class="form-label mb-1">Sort By</label>
+                        <select id="filter-product-sort" class="form-select">
+                            <option value="name_asc" @selected($filters['sort'] === 'name_asc')>Name A–Z</option>
+                            <option value="name_desc" @selected($filters['sort'] === 'name_desc')>Name Z–A</option>
+                            <option value="code_asc" @selected($filters['sort'] === 'code_asc')>Product Code A–Z</option>
+                            <option value="code_desc" @selected($filters['sort'] === 'code_desc')>Product Code Z–A</option>
+                            <option value="category_asc" @selected($filters['sort'] === 'category_asc')>Category A–Z</option>
+                            <option value="category_desc" @selected($filters['sort'] === 'category_desc')>Category Z–A</option>
+                            <option value="avg_unit_price_asc" @selected($filters['sort'] === 'avg_unit_price_asc')>Avg Unit Price: Low → High</option>
+                            <option value="avg_unit_price_desc" @selected($filters['sort'] === 'avg_unit_price_desc')>Avg Unit Price: High → Low</option>
+                        </select>
+                    </div>
+                    <div class="col-4 col-md-3 col-xl-2">
                         <button type="button" id="reset-product-filter" class="btn btn-light-secondary w-100">
                             <i class="fa-regular fa-rotate-left me-1"></i>
                             Reset

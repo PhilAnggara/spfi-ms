@@ -23,7 +23,34 @@ document.addEventListener('DOMContentLoaded', function () {
     const filterElements = {
         keyword: document.getElementById('filter-supplier-keyword'),
         hasPo: document.getElementById('filter-supplier-has-po'),
+        sort: document.getElementById('filter-supplier-sort'),
         reset: document.getElementById('reset-supplier-filter'),
+    };
+
+    const DEFAULT_SORT = 'name_asc';
+    const SORT_OPTIONS = {
+        name_asc: { column: 2, dir: 'asc' },
+        name_desc: { column: 2, dir: 'desc' },
+        code_asc: { column: 1, dir: 'asc' },
+        code_desc: { column: 1, dir: 'desc' },
+        po_count_asc: { column: 4, dir: 'asc' },
+        po_count_desc: { column: 4, dir: 'desc' },
+        total_amount_asc: { column: 5, dir: 'asc' },
+        total_amount_desc: { column: 5, dir: 'desc' },
+        last_po_date_asc: { column: 6, dir: 'asc' },
+        last_po_date_desc: { column: 6, dir: 'desc' },
+    };
+    const COLUMN_TO_SORT = {
+        '2:asc': 'name_asc',
+        '2:desc': 'name_desc',
+        '1:asc': 'code_asc',
+        '1:desc': 'code_desc',
+        '4:asc': 'po_count_asc',
+        '4:desc': 'po_count_desc',
+        '5:asc': 'total_amount_asc',
+        '5:desc': 'total_amount_desc',
+        '6:asc': 'last_po_date_asc',
+        '6:desc': 'last_po_date_desc',
     };
 
     const editModalElement = document.getElementById('edit-modal');
@@ -132,6 +159,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const url = new URL(window.location.href);
         setQueryParam(url.searchParams, 'keyword', filterElements.keyword?.value);
         setQueryParam(url.searchParams, 'has_po', filterElements.hasPo?.value);
+        setQueryParam(url.searchParams, 'sort', resolveSortValue(filterElements.sort?.value));
 
         if (pushState) {
             window.history.pushState({}, '', url.toString());
@@ -139,6 +167,13 @@ document.addEventListener('DOMContentLoaded', function () {
             window.history.replaceState({}, '', url.toString());
         }
     };
+
+    const resolveSortValue = (value) => {
+        const normalized = String(value || '').trim();
+        return Object.prototype.hasOwnProperty.call(SORT_OPTIONS, normalized) ? normalized : DEFAULT_SORT;
+    };
+
+    const resolveSortOrder = (value) => SORT_OPTIONS[resolveSortValue(value)];
 
     const getFilterPayload = () => ({
         keyword: filterElements.keyword?.value?.trim() || '',
@@ -160,6 +195,39 @@ document.addEventListener('DOMContentLoaded', function () {
 
         clearTimeout(filterDebounceTimer);
         filterDebounceTimer = setTimeout(reload, 350);
+    };
+
+    const applySort = () => {
+        const sortOrder = resolveSortOrder(filterElements.sort?.value);
+        if (filterElements.sort) {
+            filterElements.sort.value = resolveSortValue(filterElements.sort.value);
+        }
+        syncFilterUrl(true);
+        if (supplierDataTable) {
+            supplierDataTable.order([[sortOrder.column, sortOrder.dir]]).draw();
+        }
+    };
+
+    const syncSortDropdownFromTable = () => {
+        if (!supplierDataTable || !filterElements.sort) {
+            return;
+        }
+
+        const order = supplierDataTable.order();
+        if (!Array.isArray(order) || !order.length) {
+            return;
+        }
+
+        const [column, dir] = order[0];
+        const sortValue = COLUMN_TO_SORT[`${column}:${dir}`];
+        if (!sortValue) {
+            return;
+        }
+
+        if (filterElements.sort.value !== sortValue) {
+            filterElements.sort.value = sortValue;
+            syncFilterUrl(true);
+        }
     };
 
     const resetHistoryTable = () => {
@@ -358,6 +426,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
+    const initialSortOrder = resolveSortOrder(filterElements.sort?.value);
+
     supplierDataTable = table.DataTable({
         processing: true,
         serverSide: true,
@@ -384,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 setLoading(false);
             },
         },
-        order: [[0, 'desc']],
+        order: [[initialSortOrder.column, initialSortOrder.dir]],
         columns: [
             {
                 data: 'id',
@@ -527,11 +597,20 @@ document.addEventListener('DOMContentLoaded', function () {
             filterElements.hasPo.addEventListener('change', () => applyFilters(false));
         }
 
+        if (filterElements.sort) {
+            filterElements.sort.addEventListener('change', () => applySort());
+        }
+
+        table.on('order.dt', function () {
+            syncSortDropdownFromTable();
+        });
+
         if (filterElements.reset) {
             filterElements.reset.addEventListener('click', function () {
                 if (filterElements.keyword) filterElements.keyword.value = '';
                 if (filterElements.hasPo) filterElements.hasPo.value = '';
-                applyFilters(false);
+                if (filterElements.sort) filterElements.sort.value = DEFAULT_SORT;
+                applySort();
             });
         }
 
@@ -539,9 +618,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const url = new URL(window.location.href);
             if (filterElements.keyword) filterElements.keyword.value = url.searchParams.get('keyword') || '';
             if (filterElements.hasPo) filterElements.hasPo.value = url.searchParams.get('has_po') || '';
-            if (supplierDataTable) {
-                supplierDataTable.ajax.reload();
+            if (filterElements.sort) {
+                filterElements.sort.value = resolveSortValue(url.searchParams.get('sort'));
             }
+            applySort();
         });
     }
 

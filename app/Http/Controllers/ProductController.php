@@ -33,6 +33,18 @@ class ProductController extends Controller
         'im-supervisor',
     ];
 
+    /** @var list<string> */
+    private const ALLOWED_SORTS = [
+        'name_asc',
+        'name_desc',
+        'code_asc',
+        'code_desc',
+        'category_asc',
+        'category_desc',
+        'avg_unit_price_asc',
+        'avg_unit_price_desc',
+    ];
+
     /**
      * Display a listing of the resource.
      */
@@ -49,6 +61,8 @@ class ProductController extends Controller
             $editingItem = Item::query()->find($editingProductId);
         }
 
+        $sort = mb_strtolower(trim((string) request('sort', 'name_asc')));
+
         return view('pages.product', [
             'itemCategories' => $itemCategories,
             'itemUnits' => $itemUnits,
@@ -59,6 +73,7 @@ class ProductController extends Controller
                 'category_id' => request('category_id', ''),
                 'unit_id' => request('unit_id', ''),
                 'type' => request('type', ''),
+                'sort' => in_array($sort, self::ALLOWED_SORTS, true) ? $sort : 'name_asc',
             ],
             'canCreateProducts' => $this->userCanCreateProducts($user),
             'canManageProducts' => $this->userCanManageProducts($user),
