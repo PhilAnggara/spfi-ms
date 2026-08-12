@@ -83,7 +83,13 @@
                                 $isLocked = (bool) $prsItem->purchase_order_id;
                                 $hasSelectedSupplier = (bool) $prsItem->selected_canvassing_item_id;
                             @endphp
-                            <div class="card shadow-sm border-0 sc-comparison-card" id="supplier-comparison-item-{{ $prsItem->id }}" data-prs-item-id="{{ $prsItem->id }}">
+                            <div class="card shadow-sm border-0 sc-comparison-card position-relative" id="supplier-comparison-item-{{ $prsItem->id }}" data-prs-item-id="{{ $prsItem->id }}">
+                                <div class="sc-card-loading d-none" data-card-loading aria-hidden="true">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                                        <div class="mt-2 text-muted">Saving selection...</div>
+                                    </div>
+                                </div>
                                 <div class="card-body">
                                     <div class="sc-card-header">
                                         <div class="sc-item-heading">
@@ -113,11 +119,11 @@
                                         </div>
                                         <div class="sc-info-item sc-info-selected">
                                             <span class="sc-info-label">Selected Supplier</span>
-                                            <span class="sc-info-value {{ $selectedSupplier ? 'text-primary' : 'text-muted' }}">{{ $selectedSupplier ?? 'Not selected' }}</span>
+                                            <span class="sc-info-value {{ $selectedSupplier ? 'text-primary' : 'text-muted' }}" data-selected-supplier-name>{{ $selectedSupplier ?? 'Not selected' }}</span>
                                         </div>
                                     </div>
 
-                                    <form method="post" action="{{ route('procurement.supplier-comparison.select', $prsItem) }}" id="form-{{ $prsItem->id }}" class="sc-selection-form {{ $isLocked ? 'opacity-75' : '' }}" data-selection-form>
+                                    <form method="post" action="{{ route('procurement.supplier-comparison.select', $prsItem) }}" id="form-{{ $prsItem->id }}" class="sc-selection-form {{ $isLocked ? 'opacity-75' : '' }}" data-selection-form data-select-url="{{ route('procurement.supplier-comparison.select', $prsItem) }}">
                                         @csrf
                                         <input type="hidden" name="selection_reason" id="reason-{{ $prsItem->id }}">
                                         <div class="table-responsive sc-table-responsive">
@@ -168,15 +174,13 @@
                                             </table>
                                         </div>
 
-                                        <div class="sc-card-actions">
-                                            @if ($prsItem->selected_canvassing_item_id)
-                                                <a href="{{ route('procurement.supplier-comparison.report', $prsItem->id) }}" target="_blank" rel="noopener" class="btn btn-outline-danger icon icon-left sc-action-btn">
-                                                    <i class="fa-duotone fa-solid fa-file-pdf"></i>
-                                                    Export PDF
-                                                </a>
-                                            @endif
+                                        <div class="sc-card-actions" data-card-actions>
+                                            <a href="{{ route('procurement.supplier-comparison.report', $prsItem->id) }}" target="_blank" rel="noopener" class="btn btn-outline-danger icon icon-left sc-action-btn {{ $prsItem->selected_canvassing_item_id ? '' : 'd-none' }}" data-export-pdf-link>
+                                                <i class="fa-duotone fa-solid fa-file-pdf"></i>
+                                                Export PDF
+                                            </a>
                                             @role('administrator|purchasing-manager')
-                                                <button type="button" class="btn btn-outline-warning icon icon-left sc-action-btn" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $prsItem->id }}" @disabled($isLocked)>
+                                                <button type="button" class="btn btn-outline-warning icon icon-left sc-action-btn" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $prsItem->id }}" data-reject-button @disabled($isLocked)>
                                                     <i class="fa-duotone fa-solid fa-rotate-left"></i>
                                                     Reject Canvassing
                                                 </button>
@@ -202,8 +206,8 @@
                                             <textarea class="form-control" id="reasonText-{{ $prsItem->id }}" rows="4" placeholder="Enter reason for selecting this supplier (optional)">{{ $prsItem->selection_reason }}</textarea>
                                         </div>
                                         <div class="modal-footer">
-                                            <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
-                                            <button type="button" class="btn btn-primary icon icon-left" onclick="submitWithReason({{ $prsItem->id }})">
+                                            <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal" data-reason-cancel>Cancel</button>
+                                            <button type="button" class="btn btn-primary icon icon-left" data-reason-submit onclick="submitWithReason({{ $prsItem->id }})">
                                                 <i class="fa-duotone fa-solid fa-floppy-disk"></i>
                                                 Save Selection
                                             </button>

@@ -334,14 +334,130 @@
         replacePageContent(window.location.href, false);
     });
 
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.content || '';
+    }
+
+    function showAlert(icon, title) {
+        if (typeof window.Swal === 'undefined') {
+            window.alert(title);
+            return;
+        }
+
+        window.Swal.fire({
+            icon,
+            title,
+            timer: 5000,
+            showConfirmButton: icon !== 'success',
+        });
+    }
+
+    function setCardSaving(card, active) {
+        if (!card) {
+            return;
+        }
+
+        const loadingEl = card.querySelector('[data-card-loading]');
+        card.classList.toggle('is-saving', active);
+
+        if (loadingEl) {
+            loadingEl.classList.toggle('d-none', !active);
+            loadingEl.setAttribute('aria-hidden', active ? 'false' : 'true');
+        }
+
+        card.querySelectorAll('[data-save-selection-button], [data-reject-button]').forEach((button) => {
+            if (active) {
+                button.dataset.wasDisabled = button.disabled ? '1' : '0';
+                button.disabled = true;
+                return;
+            }
+
+            if (button.dataset.wasDisabled === '1') {
+                button.disabled = true;
+            } else if (button.hasAttribute('data-save-selection-button')) {
+                const form = card.querySelector('[data-selection-form]');
+                if (form) {
+                    updateSelectionState(form);
+                }
+            } else {
+                button.disabled = false;
+            }
+
+            delete button.dataset.wasDisabled;
+        });
+    }
+
+    function closeReasonModal(prsItemId) {
+        const modalEl = document.getElementById('reasonModal-' + prsItemId);
+        if (!modalEl || !window.bootstrap?.Modal) {
+            return;
+        }
+
+        window.bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+
+    function applySelectionSuccess(card, form, payload) {
+        const supplierName = payload.selected_supplier_name || 'Not selected';
+        const supplierNameEl = card.querySelector('[data-selected-supplier-name]');
+        if (supplierNameEl) {
+            supplierNameEl.textContent = supplierName;
+            supplierNameEl.classList.toggle('text-primary', Boolean(payload.selected_supplier_name));
+            supplierNameEl.classList.toggle('text-muted', !payload.selected_supplier_name);
+        }
+
+        const exportLink = card.querySelector('[data-export-pdf-link]');
+        if (exportLink) {
+            if (payload.report_url) {
+                exportLink.setAttribute('href', payload.report_url);
+            }
+            exportLink.classList.remove('d-none');
+        }
+
+        const reasonText = document.getElementById('reasonText-' + (payload.prs_item_id || card.dataset.prsItemId));
+        if (reasonText && Object.prototype.hasOwnProperty.call(payload, 'selection_reason')) {
+            reasonText.value = payload.selection_reason || '';
+        }
+
+        updateSelectionState(form);
+    }
+
+    function firstValidationMessage(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return null;
+        }
+
+        if (typeof payload.message === 'string' && payload.message !== '') {
+            return payload.message;
+        }
+
+        const errors = payload.errors;
+        if (!errors || typeof errors !== 'object') {
+            return null;
+        }
+
+        for (const key of Object.keys(errors)) {
+            const value = errors[key];
+            if (Array.isArray(value) && value[0]) {
+                return String(value[0]);
+            }
+            if (typeof value === 'string' && value !== '') {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
     window.supplierComparisonReplacePageContent = replacePageContent;
 
-    window.submitWithReason = function (prsItemId) {
+    window.submitWithReason = async function (prsItemId) {
         const form = document.getElementById('form-' + prsItemId);
         const reasonInput = document.getElementById('reason-' + prsItemId);
         const reasonText = document.getElementById('reasonText-' + prsItemId);
+        const card = document.getElementById('supplier-comparison-item-' + prsItemId);
+        const modalSubmit = document.querySelector('#reasonModal-' + prsItemId + ' [data-reason-submit]');
 
-        if (!form || !reasonInput || !reasonText) {
+        if (!form || !reasonInput || !reasonText || !card) {
             return;
         }
 
@@ -352,6 +468,55 @@
         }
 
         reasonInput.value = reasonText.value;
-        form.submit();
+
+        const selectUrl = form.getAttribute('data-select-url') || form.getAttribute('action');
+        if (!selectUrl) {
+            form.submit();
+            return;
+        }
+
+        const body = new FormData(form);
+        body.set('canvassing_item_id', checkedRadio.value);
+        body.set('selection_reason', reasonText.value);
+
+        setCardSaving(card, true);
+        if (modalSubmit) {
+            modalSubmit.disabled = true;
+        }
+
+        try {
+            const response = await fetch(selectUrl, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                },
+                body,
+            });
+
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch (_) {
+                payload = null;
+            }
+
+            if (!response.ok) {
+                showAlert('error', firstValidationMessage(payload) || 'Failed to save supplier selection.');
+                return;
+            }
+
+            applySelectionSuccess(card, form, payload || {});
+            closeReasonModal(prsItemId);
+            showAlert('success', payload?.message || 'Supplier selected for this item.');
+        } catch (_) {
+            showAlert('error', 'Failed to save supplier selection.');
+        } finally {
+            setCardSaving(card, false);
+            if (modalSubmit) {
+                modalSubmit.disabled = false;
+            }
+        }
     };
 })();

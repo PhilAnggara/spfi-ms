@@ -70,7 +70,12 @@ class SupplierComparisonController extends Controller
     public function select(Request $request, PrsItem $prsItem)
     {
         if ($prsItem->purchase_order_id) {
-            return redirect()->back()->withErrors(['canvassing_item_id' => 'Supplier selection is locked because a PO has been created.']);
+            return $this->selectResponse(
+                $request,
+                'Supplier selection is locked because a PO has been created.',
+                ['canvassing_item_id' => 'Supplier selection is locked because a PO has been created.'],
+                422
+            );
         }
 
         $validated = $request->validate([
@@ -80,7 +85,12 @@ class SupplierComparisonController extends Controller
 
         $canvassing = $prsItem->canvassingItems()->whereKey($validated['canvassing_item_id'])->first();
         if (! $canvassing) {
-            return redirect()->back()->withErrors(['canvassing_item_id' => 'Invalid supplier for this item.']);
+            return $this->selectResponse(
+                $request,
+                'Invalid supplier for this item.',
+                ['canvassing_item_id' => 'Invalid supplier for this item.'],
+                422
+            );
         }
 
         $prsItem->update([
@@ -101,9 +111,10 @@ class SupplierComparisonController extends Controller
 
         $prsItem->load(['prs', 'item', 'canvasser', 'selectedCanvassingItem.supplier']);
 
+        $supplierName = $prsItem->selectedCanvassingItem?->supplier?->name ?? '-';
+
         if ($prsItem->canvasser) {
             $prsNumber = (string) ($prsItem->prs?->prs_number ?? $prsItem->prs_id);
-            $supplierName = $prsItem->selectedCanvassingItem?->supplier?->name ?? '-';
 
             app(NotificationRecipientService::class)->notify(
                 collect([$prsItem->canvasser]),
@@ -130,7 +141,42 @@ class SupplierComparisonController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Supplier selected for this item.');
+        $message = 'Supplier selected for this item.';
+
+        if ($this->wantsAjaxSelectResponse($request)) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'prs_item_id' => $prsItem->id,
+                'canvassing_item_id' => $canvassing->id,
+                'selected_supplier_name' => $supplierName,
+                'selection_reason' => $prsItem->selection_reason,
+                'report_url' => route('procurement.supplier-comparison.report', $prsItem),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /**
+     * @param  array<string, string>  $errors
+     */
+    private function selectResponse(Request $request, string $message, array $errors, int $status)
+    {
+        if ($this->wantsAjaxSelectResponse($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+                'errors' => $errors,
+            ], $status);
+        }
+
+        return redirect()->back()->withErrors($errors);
+    }
+
+    private function wantsAjaxSelectResponse(Request $request): bool
+    {
+        return $request->expectsJson() || $request->ajax();
     }
 
     /**
