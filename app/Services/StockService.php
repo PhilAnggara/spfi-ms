@@ -50,6 +50,7 @@ class StockService
             : (string) $receivingReport->received_date;
 
         $poItemIds = array_unique(array_merge(array_keys($currentLines), array_keys($previousLines)));
+        $rechainTargets = [];
 
         foreach ($poItemIds as $purchaseOrderItemId) {
             $current = $currentLines[$purchaseOrderItemId] ?? null;
@@ -68,10 +69,12 @@ class StockService
                 continue;
             }
 
+            $whCode = (string) ($line['wh_code'] ?? self::DEFAULT_WH_CODE);
+
             $this->applyInventoryMovement(
                 itemId: (int) $line['item_id'],
                 productCode: (string) $line['product_code'],
-                whCode: (string) ($line['wh_code'] ?? self::DEFAULT_WH_CODE),
+                whCode: $whCode,
                 deltaQty: $deltaQty,
                 movementPrice: (float) ($line['unit_price'] ?? 0),
                 movementDate: $movementDate,
@@ -82,7 +85,15 @@ class StockService
                 outBucket: self::OUT_BUCKET_TS,
                 allowNegativeBalance: $allowNegativeBalance,
             );
+
+            $rechainTargets[] = [
+                'item_id' => (int) $line['item_id'],
+                'wh_code' => $whCode,
+                'from_date' => $movementDate,
+            ];
         }
+
+        $this->rechainLedgerTargets($rechainTargets);
     }
 
     /**
@@ -182,6 +193,8 @@ class StockService
         bool $allowNegativeBalance = false,
         string $referenceType = self::REF_STOCK_ADJUSTMENT
     ): void {
+        $rechainTargets = [];
+
         foreach ($lines as $line) {
             $itemId = (int) ($line['item_id'] ?? 0);
             $productCode = (string) ($line['product_code'] ?? '');
@@ -205,7 +218,15 @@ class StockService
                 userId: $userId,
                 allowNegativeBalance: $allowNegativeBalance,
             );
+
+            $rechainTargets[] = [
+                'item_id' => $itemId,
+                'wh_code' => $whCode,
+                'from_date' => $movementDate,
+            ];
         }
+
+        $this->rechainLedgerTargets($rechainTargets);
     }
 
     /**
@@ -354,6 +375,26 @@ class StockService
     }
 
     /**
+     * @param  list<array{item_id: int, wh_code: string, from_date: string}>  $targets
+     */
+    private function rechainLedgerTargets(array $targets): void
+    {
+        $seen = [];
+
+        foreach ($targets as $target) {
+            $key = $target['item_id'].'|'.$target['wh_code'].'|'.$target['from_date'];
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+
+            $this->rechainItemLedger($target['item_id'], $target['wh_code'], $target['from_date']);
+        }
+    }
+
+    /**
      * Recast begin/end on remaining ledger rows from a date forward.
      * Does not change qty buckets or inventory on-hand.
      */
@@ -492,11 +533,14 @@ class StockService
         bool $allowNegativeBalance,
         bool $reverse
     ): void {
+        $rechainTargets = [];
+
         foreach ($lines as $line) {
             $itemId = (int) ($line['item_id'] ?? 0);
             $productCode = (string) ($line['product_code'] ?? '');
             $referenceLineId = (int) ($line['reference_line_id'] ?? 0);
             $quantity = round((float) ($line['quantity'] ?? 0), 5);
+            $whCode = (string) ($line['wh_code'] ?? self::DEFAULT_WH_CODE);
 
             if ($itemId <= 0 || $productCode === '' || $referenceLineId <= 0 || abs($quantity) < 0.00001) {
                 continue;
@@ -521,7 +565,7 @@ class StockService
             $this->applyIssueMovement(
                 itemId: $itemId,
                 productCode: $productCode,
-                whCode: (string) ($line['wh_code'] ?? self::DEFAULT_WH_CODE),
+                whCode: $whCode,
                 issueQty: $issueQty,
                 movementDate: $movementDate,
                 referenceType: $referenceType,
@@ -531,7 +575,15 @@ class StockService
                 outBucket: $outBucket,
                 allowNegativeBalance: $allowNegativeBalance,
             );
+
+            $rechainTargets[] = [
+                'item_id' => $itemId,
+                'wh_code' => $whCode,
+                'from_date' => $movementDate,
+            ];
         }
+
+        $this->rechainLedgerTargets($rechainTargets);
     }
 
     private function netIssuedQuantity(
