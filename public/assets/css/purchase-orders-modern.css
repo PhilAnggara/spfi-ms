@@ -1087,3 +1087,46 @@
         grid-column: auto;
     }
 }
+
+/* Product modals: keep Choices.js dropdowns above the footer instead of clipping */
+.modal-dialog-scrollable .modal-content.product-form-modal {
+    overflow: visible;
+    max-height: none;
+}
+
+.product-form-modal .master-form-modal-header {
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+}
+
+.product-form-modal .master-form-modal-footer {
+    position: relative;
+    z-index: 1;
+    border-bottom-left-radius: 1rem;
+    border-bottom-right-radius: 1rem;
+}
+
+.modal-dialog-scrollable .modal-content.product-form-modal .modal-body {
+    overflow: visible;
+}
+
+.product-form-modal .modal-body {
+    position: relative;
+    z-index: 2;
+}
+
+.product-form-modal .master-form-modal-section,
+.product-form-modal .master-form-modal-grid,
+.product-form-modal .master-form-modal-field,
+.product-form-modal .choices {
+    overflow: visible;
+}
+
+.product-form-modal .choices.is-open {
+    z-index: 20;
+}
+
+.product-form-modal .choices__list--dropdown,
+.product-form-modal .choices__list[aria-expanded] {
+    z-index: 30;
+}

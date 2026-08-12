@@ -9,7 +9,9 @@ for (let i = 0; i < choices.length; i++) {
       removeItemButton: true,
     })
   } else {
-    initChoice = new Choices(choices[i])
+    initChoice = new Choices(choices[i], {
+      position: choices[i].closest('.product-form-modal') ? 'auto' : 'bottom',
+    })
   }
   // Simpan instance agar bisa diakses saat set value dari modal edit
   choices[i].choicesInstance = initChoice

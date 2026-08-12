@@ -1,7 +1,7 @@
 <!-- Create Product Modal -->
 <div class="modal fade text-left modal-borderless" id="create-modal" tabindex="-1" role="dialog" aria-labelledby="createProductLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
-        <div class="modal-content master-form-modal po-detail-modal">
+        <div class="modal-content master-form-modal po-detail-modal product-form-modal">
             <form action="{{ route('product.store') }}" method="POST">
                 @csrf
                 <div class="modal-header master-form-modal-header po-detail-modal-header">
@@ -119,8 +119,8 @@
 @if ($canManageProducts ?? false)
 <!-- Edit Product Modal -->
 <div class="modal fade text-left modal-borderless" id="edit-modal" tabindex="-1" role="dialog" aria-labelledby="editProductLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable" role="document">
-        <div class="modal-content master-form-modal po-detail-modal">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+        <div class="modal-content master-form-modal po-detail-modal product-form-modal">
             <form action="{{ $editingItem ? route('product.update', $editingItem->id) : '#' }}" method="POST" id="edit-form">
                 @csrf
                 @method('PUT')
