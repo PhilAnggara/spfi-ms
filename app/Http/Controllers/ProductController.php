@@ -6,7 +6,6 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\PurchaseOrderItem;
 use App\Models\UnitOfMeasure;
-use App\Models\User;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,23 +15,6 @@ use Illuminate\Validation\Rule;
 class ProductController extends Controller
 {
     use PaginatesLegacySqlServer;
-
-    /** @var list<string> */
-    private const ROLES_CREATE_PRODUCTS = [
-        'administrator',
-        'it-staff',
-        'engineering-manager',
-        'im-manager',
-        'im-supervisor',
-    ];
-
-    /** @var list<string> */
-    private const ROLES_MANAGE_PRODUCTS = [
-        'administrator',
-        'it-staff',
-        'im-manager',
-        'im-supervisor',
-    ];
 
     /** @var list<string> */
     private const ALLOWED_SORTS = [
@@ -76,14 +58,9 @@ class ProductController extends Controller
                 'type' => request('type', ''),
                 'sort' => in_array($sort, self::ALLOWED_SORTS, true) ? $sort : 'name_asc',
             ],
-            'canCreateProducts' => $this->userCanCreateProducts($user),
-            'canManageProducts' => $this->userCanManageProducts($user),
-            'canViewPurchaseOrders' => $user?->hasAnyRole([
-                'administrator',
-                'purchasing-staff',
-                'purchasing-manager',
-                'general-manager',
-            ]) ?? false,
+            'canCreateProducts' => $user?->can('create-products') ?? false,
+            'canManageProducts' => ($user?->can('update-products') || $user?->can('delete-products')) ?? false,
+            'canViewPurchaseOrders' => $user?->can('view-po') ?? false,
         ]);
     }
 
@@ -336,7 +313,7 @@ class ProductController extends Controller
      */
     public function checkCode(Request $request): JsonResponse
     {
-        abort_unless($this->userCanCreateProducts($request->user()), 403);
+        abort_unless($request->user()?->can('create-products'), 403);
 
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:8', 'alpha_num'],
@@ -369,7 +346,7 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        abort_unless($this->userCanCreateProducts($request->user()), 403);
+        abort_unless($request->user()?->can('create-products'), 403);
 
         $allowedTypes = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
 
@@ -413,7 +390,7 @@ class ProductController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        abort_unless($this->userCanManageProducts($request->user()), 403);
+        abort_unless($request->user()?->can('update-products'), 403);
 
         $item = Item::findOrFail($id);
 
@@ -446,22 +423,12 @@ class ProductController extends Controller
      */
     public function destroy(Request $request, string $id)
     {
-        abort_unless($this->userCanManageProducts($request->user()), 403);
+        abort_unless($request->user()?->can('delete-products'), 403);
 
         $item = Item::findOrFail($id);
         $itemName = $item->name;
         $item->delete();
 
         return redirect()->back()->with('success', 'Product '.$itemName.' has been deleted successfully.');
-    }
-
-    private function userCanCreateProducts(?User $user): bool
-    {
-        return $user?->hasAnyRole(self::ROLES_CREATE_PRODUCTS) ?? false;
-    }
-
-    private function userCanManageProducts(?User $user): bool
-    {
-        return $user?->hasAnyRole(self::ROLES_MANAGE_PRODUCTS) ?? false;
     }
 }

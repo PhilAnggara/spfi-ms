@@ -28,12 +28,7 @@ class StoreWithdrawalController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $canViewAll = $user && $user->hasAnyRole([
-            'administrator',
-            'im-manager',
-            'im-supervisor',
-            'im-staff',
-        ]);
+        $canViewAll = $user && $user->can('view-all-stores-withdrawal');
 
         $filters = [
             'keyword' => trim((string) $request->query('keyword', '')),
@@ -1604,12 +1599,7 @@ class StoreWithdrawalController extends Controller
         }
 
         $user = $request->user();
-        $canViewAll = $user?->hasAnyRole([
-            'administrator',
-            'im-manager',
-            'im-supervisor',
-            'im-staff',
-        ]);
+        $canViewAll = $user?->can('view-all-stores-withdrawal');
 
         if (! $canViewAll && (int) $sws->created_by !== (int) $user?->id) {
             abort(403);

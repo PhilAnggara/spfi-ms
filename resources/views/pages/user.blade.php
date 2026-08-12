@@ -131,6 +131,18 @@
 
                             {{-- Role badge --}}
                             <span class="uc-badge {{ $roleStyle['badgeCls'] }} mt-2">{{ $user->role }}</span>
+                            <div class="uc-access-roles mt-2">
+                                @if ($user->roles->isEmpty())
+                                    <span class="uc-access-chip uc-access-chip-empty">No access role</span>
+                                @else
+                                    @foreach ($user->roles as $accessRole)
+                                        <span class="uc-access-chip"
+                                              data-bstooltip-toggle="tooltip"
+                                              data-bs-placement="top"
+                                              title="Access role">{{ $accessRole->name }}</span>
+                                    @endforeach
+                                @endif
+                            </div>
 
                             {{-- Info --}}
                             <div class="uc-info mt-3">
@@ -145,11 +157,17 @@
                                 </div>
                             </div>
 
-                            <div class="mt-3">
+                            <div class="mt-3 d-grid gap-2">
                                 <button class="btn btn-sm uc-edit-btn w-100" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ $user->id }}">
                                     <i class="fa-solid fa-user-pen me-2"></i>
                                     Edit {{ $isMe ? 'Profile' : 'User' }}
                                 </button>
+                                @can('manage-user-access')
+                                    <a href="{{ route('users.access.edit', $user) }}" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="fa-solid fa-key me-2"></i>
+                                        Manage Access
+                                    </a>
+                                @endcan
                             </div>
                         </div>
 

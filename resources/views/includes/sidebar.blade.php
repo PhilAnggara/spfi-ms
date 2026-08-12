@@ -58,7 +58,7 @@
                             </a>
                         </li>
 
-                        @role('administrator|it-staff')
+                        @canany(['view-users', 'manage-active-sessions', 'view-employees', 'manage-roles', 'manage-permissions', 'view-products', 'view-suppliers', 'view-product-categories', 'view-uom', 'view-buyers', 'view-currencies', 'view-batches', 'view-fish-suppliers', 'view-vessels', 'view-fish', 'view-accounting-master'])
                             <li class="sidebar-item {{ is_active_menu(['master/*']) }} has-sub">
                                 <a href="#" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-user-tie {{ Request::is('master/*') ? 'fa-fade' : '' }}"></i>
@@ -66,63 +66,106 @@
                                 </a>
                                 <ul class="submenu ">
 
-                                    <li class="submenu-item {{ is_active_menu(['master/user', 'master/active-sessions', 'master/employees*']) }} has-sub">
+                                    @canany(['view-users', 'manage-active-sessions', 'view-employees', 'manage-roles', 'manage-permissions'])
+                                    <li class="submenu-item {{ is_active_menu(['master/user', 'master/active-sessions', 'master/employees*', 'master/roles*', 'master/permissions*']) }} has-sub">
                                         <a href="#" class="submenu-link">Management</a>
                                         <ul class="submenu submenu-level-2 ">
+                                            @can('view-users')
                                             <li class="submenu-item {{ Request::is('master/user') ? 'active' : '' }}">
                                                 <a href="{{ route('user.index') }}" class="submenu-link">User</a>
                                             </li>
+                                            @endcan
+                                            @can('manage-roles')
+                                            <li class="submenu-item {{ Request::is('master/roles*') ? 'active' : '' }}">
+                                                <a href="{{ route('roles.index') }}" class="submenu-link">Roles</a>
+                                            </li>
+                                            @endcan
+                                            @can('manage-permissions')
+                                            <li class="submenu-item {{ Request::is('master/permissions*') ? 'active' : '' }}">
+                                                <a href="{{ route('permissions.index') }}" class="submenu-link">Permissions</a>
+                                            </li>
+                                            @endcan
+                                            @can('manage-active-sessions')
                                             <li class="submenu-item {{ Request::is('master/active-sessions') ? 'active' : '' }}">
                                                 <a href="{{ route('active-sessions.index') }}" class="submenu-link">Active Sessions</a>
                                             </li>
+                                            @endcan
+                                            @can('view-employees')
                                             <li class="submenu-item {{ Request::is('master/employees*') ? 'active' : '' }}">
                                                 <a href="{{ route('employees.index') }}" class="submenu-link">Employee</a>
                                             </li>
+                                            @endcan
                                         </ul>
                                     </li>
+                                    @endcanany
 
+                                    @canany(['view-products', 'view-product-categories', 'view-uom', 'view-suppliers', 'view-buyers', 'view-currencies'])
                                     <li class="submenu-item {{ is_active_menu(['master/product', 'master/product-category', 'master/unit-of-measurement', 'master/supplier', 'master/buyer', 'master/currency']) }} has-sub">
                                         <a href="#" class="submenu-link">Inventory</a>
                                         <ul class="submenu submenu-level-2 ">
+                                            @can('view-products')
                                             <li class="submenu-item {{ Request::is('master/product') ? 'active' : '' }}">
                                                 <a href="{{ route('product.index') }}" class="submenu-link">Product</a>
                                             </li>
+                                            @endcan
+                                            @can('view-product-categories')
                                             <li class="submenu-item {{ Request::is('master/product-category') ? 'active' : '' }}">
                                                 <a href="{{ route('product-category.index') }}" class="submenu-link">Product Category</a>
                                             </li>
+                                            @endcan
+                                            @can('view-uom')
                                             <li class="submenu-item {{ Request::is('master/unit-of-measurement') ? 'active' : '' }}">
                                                 <a href="{{ route('unit-of-measurement.index') }}" class="submenu-link">UoM</a>
                                             </li>
+                                            @endcan
+                                            @can('view-suppliers')
                                             <li class="submenu-item {{ Request::is('master/supplier') ? 'active' : '' }}">
                                                 <a href="{{ route('supplier.index') }}" class="submenu-link">Supplier</a>
                                             </li>
+                                            @endcan
+                                            @can('view-buyers')
                                             <li class="submenu-item {{ Request::is('master/buyer') ? 'active' : '' }}">
                                                 <a href="{{ route('buyer.index') }}" class="submenu-link">Buyer</a>
                                             </li>
+                                            @endcan
+                                            @can('view-currencies')
                                             <li class="submenu-item {{ Request::is('master/currency') ? 'active' : '' }}">
                                                 <a href="{{ route('currency.index') }}" class="submenu-link">Currency</a>
                                             </li>
+                                            @endcan
                                         </ul>
                                     </li>
+                                    @endcanany
 
-                                    <li class="submenu-item {{ is_active_menu(['master/product', 'master/product-category', 'master/unit-of-measurement', 'master/supplier', 'master/buyer', 'master/currency', 'master/fish-supplier', 'master/vessel', 'master/batch', 'master/fish']) }} has-sub">
+                                    @canany(['view-batches', 'view-fish-suppliers', 'view-vessels', 'view-fish'])
+                                    <li class="submenu-item {{ is_active_menu(['master/fish-supplier', 'master/vessel', 'master/batch', 'master/fish']) }} has-sub">
                                         <a href="#" class="submenu-link">Production</a>
                                         <ul class="submenu submenu-level-2 ">
+                                            @can('view-batches')
                                             <li class="submenu-item {{ Request::is('master/batch') ? 'active' : '' }}">
                                                 <a href="{{ route('batch.index') }}" class="submenu-link">Batch Number</a>
                                             </li>
+                                            @endcan
+                                            @can('view-fish-suppliers')
                                             <li class="submenu-item {{ Request::is('master/fish-supplier') ? 'active' : '' }}">
                                                 <a href="{{ route('fish-supplier.index') }}" class="submenu-link">Fish Supplier</a>
                                             </li>
+                                            @endcan
+                                            @can('view-vessels')
                                             <li class="submenu-item {{ Request::is('master/vessel') ? 'active' : '' }}">
                                                 <a href="{{ route('vessel.index') }}" class="submenu-link">Vessel</a>
                                             </li>
+                                            @endcan
+                                            @can('view-fish')
                                             <li class="submenu-item {{ Request::is('master/fish') ? 'active' : '' }}">
                                                 <a href="{{ route('fish.index') }}" class="submenu-link">Fish</a>
                                             </li>
+                                            @endcan
                                         </ul>
                                     </li>
+                                    @endcanany
 
+                                    @can('view-accounting-master')
                                     <li class="submenu-item {{ is_active_menu(['master/accounting/*']) }} has-sub">
                                         <a href="#" class="submenu-link">Accounting</a>
                                         <ul class="submenu submenu-level-2 ">
@@ -140,201 +183,74 @@
                                             </li>
                                         </ul>
                                     </li>
+                                    @endcan
 
                                 </ul>
                             </li>
-                        @endrole
+                        @endcanany
 
-                        @role('hrd-manager|hrd-supervisor|hrd-staff')
-                            <li class="sidebar-item {{ Request::is('master/employees*') ? 'active' : '' }}">
-                                <a href="{{ route('employees.index') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-id-card {{ Request::is('master/employees*') ? 'fa-fade' : '' }}"></i>
-                                    <span>Employee</span>
-                                </a>
-                            </li>
-                        @endrole
-
-                        @role('administrator')
-                            <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-users {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
-                                    <span>HR</span>
-                                </a>
-                            </li>
-
-                            <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-money-check-dollar-pen {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
-                                    <span>Purchasing</span>
-                                </a>
-                            </li>
-
-                            <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-warehouse-full {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
-                                    <span>Warehouse</span>
-                                </a>
-                            </li>
-
-                            <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-file-export {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
-                                    <span>Export Document</span>
-                                </a>
-                            </li>
-
-                            <li class="sidebar-item {{ Request::is('production/prs') ? 'active' : '' }} has-sub">
-                                <a href="#" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-conveyor-belt-arm {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
-                                    <span>Production</span>
-                                </a>
-                                <ul class="submenu {{ Request::is('production/prs') ? 'active' : '' }}">
-                                    <li class="submenu-item {{ Request::is('production/prs') ? 'active' : '' }}">
-                                        <a href="{{ route('dashboard') }}" class="submenu-link">PRS</a>
-                                    </li>
-                                    <li class="submenu-item  ">
-                                        <a href="{{ route('dashboard') }}" class="submenu-link">RR</a>
-                                    </li>
-                                    <li class="submenu-item  ">
-                                        <a href="{{ route('dashboard') }}" class="submenu-link">TS</a>
-                                    </li>
-                                </ul>
-                            </li>
-
-                            <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-calculator {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
-                                    <span>Accounting</span>
-                                </a>
-                            </li>
-
-                            <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-fish {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
-                                    <span>Tunaviand</span>
-                                </a>
-                            </li>
-
-                            <li class="sidebar-item {{ Request::is('asdfadfsfsadfasfdfdddffsa') ? 'active' : '' }}">
-                                <a href="{{ route('dashboard') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-user-police {{ Request::is('asdfasfasfsafasf') ? 'fa-fade' : '' }}"></i>
-                                    <span>Customs</span>
-                                </a>
-                            </li>
-
-                            <li class="sidebar-item {{ Request::is('im/*') ? 'active' : '' }} has-sub">
-                                <a href="#" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-list-check {{ Request::is('im/*') ? 'fa-fade' : '' }}"></i>
-                                    <span>IM</span>
-                                </a>
-                                <ul class="submenu {{ Request::is('im/prs') ? 'active' : '' }}">
-                                    {{-- <li class="submenu-item {{ Request::is('im/prs') ? 'active' : '' }}">
-                                        <a href="{{ route('prs.index') }}" class="submenu-link">PRS</a>
-                                    </li> --}}
-                                    <li class="submenu-item {{ Request::is('im/rr') ? 'active' : '' }}">
-                                        <a href="{{ route('dashboard') }}" class="submenu-link">RR</a>
-                                    </li>
-                                    <li class="submenu-item {{ Request::is('im/ts') ? 'active' : '' }}">
-                                        <a href="{{ route('dashboard') }}" class="submenu-link">TS</a>
-                                    </li>
-                                </ul>
-                            </li>
-                        @endrole
-
-                        @role('administrator|purchasing-manager|general-manager')
+                        @can('assign-canvasser')
                             <li class="sidebar-item {{ Request::is('procurement/approval') ? 'active' : '' }}">
                                 <a href="{{ route('prs.approval.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-cart-circle-check {{ Request::is('procurement/approval') ? 'fa-fade' : '' }}"></i>
                                     <span>Canvasser Assignment</span>
                                 </a>
                             </li>
-                            @role('administrator|purchasing-manager')
-                                <li class="sidebar-item {{ Request::is('procurement/supplier-comparison') ? 'active' : '' }}">
-                                    <a href="{{ route('procurement.supplier-comparison.index') }}" class='sidebar-link'>
-                                        <i class="fa-duotone fa-solid fa-scale-balanced {{ Request::is('procurement/supplier-comparison') ? 'fa-fade' : '' }}"></i>
-                                        <span>Supplier Comparison</span>
-                                    </a>
-                                </li>
-                            @endrole
-                        @endrole
+                        @endcan
 
-                        @role('purchasing-staff|purchasing-manager')
-                            <li class="sidebar-item {{ Request::is('master/product') ? 'active' : '' }}">
-                                <a href="{{ route('product.index') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-boxes-stacked {{ Request::is('master/product') ? 'fa-fade' : '' }}"></i>
-                                    <span>Product Lookup</span>
+                        @can('view-supplier-comparison')
+                            <li class="sidebar-item {{ Request::is('procurement/supplier-comparison') ? 'active' : '' }}">
+                                <a href="{{ route('procurement.supplier-comparison.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-scale-balanced {{ Request::is('procurement/supplier-comparison') ? 'fa-fade' : '' }}"></i>
+                                    <span>Supplier Comparison</span>
                                 </a>
                             </li>
-                            <li class="sidebar-item {{ Request::is('master/supplier') ? 'active' : '' }}">
-                                <a href="{{ route('supplier.index') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-truck-field {{ Request::is('master/supplier') ? 'fa-fade' : '' }}"></i>
-                                    <span>Supplier Lookup</span>
-                                </a>
-                            </li>
-                        @endrole
+                        @endcan
 
-                        {{-- @role('engineering-manager')
-                            <li class="sidebar-item {{ Request::is('master/product') ? 'active' : '' }}">
-                                <a href="{{ route('product.index') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-boxes-stacked {{ Request::is('master/product') ? 'fa-fade' : '' }}"></i>
-                                    <span>Item Master</span>
-                                </a>
-                            </li>
-                        @endrole --}}
-
-                        @role('im-manager|im-supervisor')
-                            <li class="sidebar-item {{ Request::is('master/product') ? 'active' : '' }}">
-                                <a href="{{ route('product.index') }}" class='sidebar-link'>
-                                    <i class="fa-duotone fa-solid fa-boxes-stacked {{ Request::is('master/product') ? 'fa-fade' : '' }}"></i>
-                                    <span>Product</span>
-                                </a>
-                            </li>
-                        @endrole
-
-                        @role('administrator|purchasing-manager|purchasing-staff')
+                        @can('view-procurement-reports')
                             <li class="sidebar-item {{ Request::is('procurement/reports') ? 'active' : '' }}">
                                 <a href="{{ route('procurement.reports.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-file-chart-column {{ Request::is('procurement/reports') ? 'fa-fade' : '' }}"></i>
                                     <span>Purchasing Reports</span>
                                 </a>
                             </li>
-                        @endrole
+                        @endcan
 
-                        @role('administrator|im-manager|im-supervisor|im-staff')
+                        @can('view-im-reports')
                             <li class="sidebar-item {{ Request::is('im/reports') ? 'active' : '' }}">
                                 <a href="{{ route('im.reports.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-file-chart-column {{ Request::is('im/reports') ? 'fa-fade' : '' }}"></i>
                                     <span>IM Reports</span>
                                 </a>
                             </li>
-                        @endrole
+                        @endcan
 
-                        @role('administrator|finance-manager|finance-supervisor|finance-staff|accounting-manager|accounting-supervisor|accounting-staff')
+                        @can('view-accounting-reports')
                             <li class="sidebar-item {{ Request::is('accounting/reports') ? 'active' : '' }}">
                                 <a href="{{ route('accounting.reports.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-file-invoice-dollar {{ Request::is('accounting/reports') ? 'fa-fade' : '' }}"></i>
                                     <span>Accounting Reports</span>
                                 </a>
                             </li>
-                        @endrole
+                        @endcan
 
-                        @role('administrator|finance-manager|finance-supervisor|finance-staff|accounting-manager|accounting-supervisor|accounting-staff')
+                        @can('view-doc-entries')
                             <li class="sidebar-item {{ Request::is('accounting/doc-entries*') ? 'active' : '' }}">
                                 <a href="{{ route('accounting.doc-entries.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-file-pen {{ Request::is('accounting/doc-entries*') ? 'fa-fade' : '' }}"></i>
                                     <span>Doc Entry</span>
                                 </a>
                             </li>
-                        @endrole
+                        @endcan
 
-                        @role('administrator|finance-manager|finance-supervisor|finance-staff|accounting-manager|accounting-supervisor|accounting-staff')
+                        @can('view-exchange-rates')
                             <li class="sidebar-item {{ Request::is('accounting/exchange-rates*') ? 'active' : '' }}">
                                 <a href="{{ route('accounting.exchange-rates.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-money-bill-transfer {{ Request::is('accounting/exchange-rates*') ? 'fa-fade' : '' }}"></i>
                                     <span>Exchange Rates</span>
                                 </a>
                             </li>
-                        @endrole
+                        @endcan
 
                         <li class="sidebar-item {{ Request::is('prs*') ? 'active' : '' }}">
                             <a href="{{ route('prs.index') }}" class='sidebar-link'>
@@ -343,46 +259,41 @@
                             </a>
                         </li>
 
-                        @role('administrator|purchasing-staff')
+                        @can('view-canvassing')
                             <li class="sidebar-item {{ Request::is('canvassing*') ? 'active' : '' }}">
                                 <a href="{{ route('canvassing.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-diagram-lean-canvas {{ Request::is('canvassing') ? 'fa-fade' : '' }}"></i>
                                     <span>Canvassing</span>
                                 </a>
                             </li>
+                        @endcan
 
-                            @unlessrole('administrator')
-                                <li class="sidebar-item {{ Request::is('purchase-orders') ? 'active' : '' }}">
-                                    <a href="{{ route('purchase-orders.index') }}" class='sidebar-link'>
-                                        <i class="fa-duotone fa-solid fa-clipboard-list-check {{ Request::is('purchase-orders') ? 'fa-fade' : '' }}"></i>
-                                        <span>PO List</span>
-                                    </a>
-                                </li>
-                            @endunlessrole
-
+                        @can('create-po')
                             <li class="sidebar-item {{ Request::is('purchase-orders/draft') ? 'active' : '' }}">
                                 <a href="{{ route('purchase-orders.draft') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-bag-shopping-plus {{ Request::is('purchase-orders/draft') ? 'fa-fade' : '' }}"></i>
                                     <span>Draft PO</span>
                                 </a>
                             </li>
-                        @endrole
+                        @endcan
 
-                        @role('administrator|purchasing-manager|general-manager')
+                        @can('approve-po')
                             <li class="sidebar-item {{ Request::is('purchase-orders/approval') ? 'active' : '' }}">
                                 <a href="{{ route('purchase-orders.approval') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-bag-shopping-plus {{ Request::is('purchase-orders/approval') ? 'fa-fade' : '' }}"></i>
                                     <span>PO Approval</span>
                                 </a>
                             </li>
+                        @endcan
 
-                            <li class="sidebar-item {{ Request::is('purchase-orders') ? 'active' : '' }}">
+                        @can('view-po')
+                            <li class="sidebar-item {{ Request::is('purchase-orders') && ! Request::is('purchase-orders/draft') && ! Request::is('purchase-orders/approval') ? 'active' : '' }}">
                                 <a href="{{ route('purchase-orders.index') }}" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-clipboard-list-check {{ Request::is('purchase-orders') ? 'fa-fade' : '' }}"></i>
                                     <span>PO List</span>
                                 </a>
                             </li>
-                        @endrole
+                        @endcan
 
                         @can('view-rr')
                             <li class="sidebar-item {{ Request::is('receiving-reports*') ? 'active' : '' }}">

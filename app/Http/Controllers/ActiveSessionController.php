@@ -106,7 +106,7 @@ class ActiveSessionController extends Controller
 
     public function resetActivityLogs(Request $request): RedirectResponse
     {
-        abort_unless($request->user()?->hasRole('administrator'), 403);
+        abort_unless($request->user()?->can('reset-activity-logs'), 403);
 
         $request->validate([
             'reset_password' => ['required', 'string'],

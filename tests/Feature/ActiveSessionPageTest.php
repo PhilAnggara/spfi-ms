@@ -668,7 +668,7 @@ it('forbids it-staff from resetting activity logs', function () {
     expect(UserActivityLog::query()->count())->toBeGreaterThanOrEqual(0);
 });
 
-it('shows the reset activity logs control only to administrators', function () {
+it('shows the reset activity logs control only with reset-activity-logs permission', function () {
     $this->actingAs($this->admin)
         ->get(route('active-sessions.index'))
         ->assertSuccessful()

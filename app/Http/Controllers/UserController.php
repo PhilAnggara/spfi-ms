@@ -11,58 +11,12 @@ use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
-    private const ROLE_MAP = [
-        'Manager' => [
-            'Management' => 'general-manager',
-            'Purchasing' => 'purchasing-manager',
-            'Finance' => 'finance-manager',
-            'Information Technology' => 'it-manager',
-            'Inventory Management' => 'im-manager',
-            'Accounting' => 'accounting-manager',
-            'Marketing / Export' => 'production-manager',
-            'Fixed Labeling' => 'production-manager',
-            'Quality Assurance' => 'production-manager',
-            'Engineering' => 'engineering-manager',
-            'Human Resources Development' => 'hrd-manager',
-        ],
-        'Supervisor' => [
-            'Purchasing' => 'purchasing-staff',
-            'Finance' => 'finance-supervisor',
-            'Information Technology' => 'it-staff',
-            'Inventory Management' => 'im-supervisor',
-            'Accounting' => 'accounting-supervisor',
-            'Marketing / Export' => 'production-manager',
-            'Fixed Labeling' => 'production-manager',
-            'Quality Assurance' => 'production-manager',
-            'Engineering' => 'production-manager',
-            'Human Resources Development' => 'hrd-supervisor',
-        ],
-        'Staff' => [
-            'Purchasing' => 'purchasing-staff',
-            'Finance' => 'finance-staff',
-            'Information Technology' => 'it-staff',
-            'Inventory Management' => 'im-staff',
-            'Accounting' => 'accounting-staff',
-            'Marketing / Export' => 'production-manager',
-            'Fixed Labeling' => 'production-manager',
-            'Quality Assurance' => 'production-manager',
-            'Engineering' => 'production-manager',
-            'Human Resources Development' => 'hrd-staff',
-        ],
-    ];
-
-    private function resolveSpatieRole(?string $departmentName, ?string $role): ?string
-    {
-        return self::ROLE_MAP[$role][$departmentName] ?? null;
-    }
-
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        // $users = User::where('id', '!=', Auth::id())->get();
-        $users = User::all();
+        $users = User::with(['roles', 'permissions', 'department'])->get();
         $departments = Department::all();
 
         return view('pages.user', [
@@ -102,13 +56,12 @@ class UserController extends Controller
             'role' => $request->role,
         ]);
 
-        $departmentName = Department::find($request->department_id)?->name;
-        $spatieRole = $this->resolveSpatieRole($departmentName, $request->role);
-        if ($spatieRole) {
-            $user->syncRoles([$spatieRole]);
+        $message = 'New user has been created successfully.';
+        if ($request->user()?->can('manage-user-access')) {
+            $message .= ' Assign Spatie roles and permissions via Manage Access.';
         }
 
-        return redirect()->back()->with('success', 'New user has been created successfully.');
+        return redirect()->back()->with('success', $message);
     }
 
     /**
@@ -130,11 +83,11 @@ class UserController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $user)
     {
-        $user = User::findOrFail($id);
+        $id = $user;
+        $userModel = User::findOrFail($id);
 
-        // Store editing user id in session BEFORE validation for error handling
         $request->session()->flash('editing_user_id', $id);
 
         $rules = [
@@ -145,40 +98,28 @@ class UserController extends Controller
             'role' => ['nullable', 'in:Manager,Supervisor,Staff'],
         ];
 
-        // Add password validation only if password field is filled
         if ($request->filled('password')) {
             $rules['password'] = ['required', 'confirmed', Password::defaults()];
         }
 
         $request->validate($rules);
 
-        // Update user data
-        $user->name = Str::title($request->name);
-        $user->username = $request->username;
-        $user->email = $request->email;
-        $user->department_id = $request->department_id;
-        // $user->role = $request->role;
+        $userModel->name = Str::title($request->name);
+        $userModel->username = $request->username;
+        $userModel->email = $request->email;
+        $userModel->department_id = $request->department_id;
 
-        // Update password only if provided
         if ($request->filled('password')) {
-            $user->password = Hash::make($request->password);
+            $userModel->password = Hash::make($request->password);
         }
 
         if ($request->filled('role')) {
-            $user->role = $request->role;
+            $userModel->role = $request->role;
         }
 
-        $user->save();
+        $userModel->save();
 
-        if ($request->filled('role') || $request->filled('department_id')) {
-            $departmentName = Department::find($request->department_id)?->name;
-            $spatieRole = $this->resolveSpatieRole($departmentName, $request->input('role', $user->role));
-            if ($spatieRole) {
-                $user->syncRoles([$spatieRole]);
-            }
-        }
-
-        return redirect()->back()->with('success', "User {$user->name} has been updated successfully.");
+        return redirect()->back()->with('success', "User {$userModel->name} has been updated successfully.");
     }
 
     /**
@@ -186,7 +127,6 @@ class UserController extends Controller
      */
     public function changePassword(Request $request)
     {
-        // Flag so the correct modal opens and errors stay scoped
         $request->session()->flash('change_password', true);
 
         $request->validate([
@@ -204,11 +144,11 @@ class UserController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(string $user)
     {
-        $user = User::findOrFail($id);
-        $name = $user->name;
-        $user->delete();
+        $userModel = User::findOrFail($user);
+        $name = $userModel->name;
+        $userModel->delete();
 
         return redirect()->back()->with('success', "User $name has been deleted successfully.");
     }

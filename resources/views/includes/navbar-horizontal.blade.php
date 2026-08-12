@@ -69,7 +69,7 @@
                     </a>
                 </li>
 
-                @role('administrator|it-staff')
+                @canany(['view-users', 'manage-active-sessions', 'manage-roles', 'manage-permissions', 'view-products', 'view-product-categories', 'view-uom'])
                     <li class="menu-item  has-sub">
                         <a href="#" class='menu-link'>
                             <span>
@@ -82,39 +82,63 @@
                             <div class="submenu-group-wrapper">
                                 <ul class="submenu-group">
 
+                                    @canany(['view-users', 'manage-active-sessions', 'manage-roles', 'manage-permissions'])
                                     <li class="submenu-item {{ Request::is('master/*') ? 'active' : '' }} has-sub">
                                         <a href="#" class='submenu-link'>Management</a>
                                         <ul class="subsubmenu">
+                                            @can('view-users')
                                             <li class="subsubmenu-item ">
                                                 <a href="{{ route('user.index') }}" class="subsubmenu-link">User</a>
                                             </li>
+                                            @endcan
+                                            @can('manage-roles')
+                                            <li class="subsubmenu-item ">
+                                                <a href="{{ route('roles.index') }}" class="subsubmenu-link">Roles</a>
+                                            </li>
+                                            @endcan
+                                            @can('manage-permissions')
+                                            <li class="subsubmenu-item ">
+                                                <a href="{{ route('permissions.index') }}" class="subsubmenu-link">Permissions</a>
+                                            </li>
+                                            @endcan
+                                            @can('manage-active-sessions')
                                             <li class="subsubmenu-item ">
                                                 <a href="{{ route('active-sessions.index') }}" class="subsubmenu-link">Active Sessions</a>
                                             </li>
+                                            @endcan
                                         </ul>
                                     </li>
+                                    @endcanany
 
+                                    @canany(['view-products', 'view-product-categories', 'view-uom'])
                                     <li class="submenu-item  has-sub">
                                         <a href="#" class='submenu-link'>Inventory</a>
                                         <!-- 3 Level Submenu -->
                                         <ul class="subsubmenu">
+                                            @can('view-products')
                                             <li class="subsubmenu-item ">
                                                 <a href="{{ route('product.index') }}" class="subsubmenu-link">Product</a>
                                             </li>
+                                            @endcan
+                                            @can('view-product-categories')
                                             <li class="subsubmenu-item ">
                                                 <a href="{{ route('product-category.index') }}" class="subsubmenu-link">Product Category</a>
                                             </li>
+                                            @endcan
+                                            @can('view-uom')
                                             <li class="subsubmenu-item ">
                                                 <a href="{{ route('unit-of-measurement.index') }}" class="subsubmenu-link">Unit of Measurement</a>
                                             </li>
+                                            @endcan
                                         </ul>
                                     </li>
+                                    @endcanany
 
                                 </ul>
                             </div>
                         </div>
                     </li>
-                @endrole
+                @endcanany
 
 
             </ul>

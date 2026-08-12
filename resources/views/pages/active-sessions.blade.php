@@ -11,7 +11,7 @@
                 <small class="text-muted">Monitor presence, devices, and recent activity across all accounts</small>
             </div>
             <div class="col-auto d-flex flex-wrap gap-2">
-                @if (auth()->user()?->hasRole('administrator'))
+                @can('reset-activity-logs')
                     <button type="button" id="as-reset-logs" class="btn btn-outline-danger icon icon-left">
                         <i class="fa-duotone fa-solid fa-trash-can"></i>
                         Reset activity logs
@@ -21,7 +21,7 @@
                         @method('DELETE')
                         <input type="hidden" name="reset_password" id="as-reset-password-input" value="">
                     </form>
-                @endif
+                @endcan
                 <button type="button" id="as-refresh" class="btn btn-outline-primary icon icon-left">
                     <i class="fa-duotone fa-solid fa-arrows-rotate" id="as-refresh-icon"></i>
                     Refresh

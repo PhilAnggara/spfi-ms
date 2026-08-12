@@ -22,6 +22,7 @@ use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\MainController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OpeningBalanceCorrectionController;
+use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
@@ -30,19 +31,17 @@ use App\Http\Controllers\PurchaseOrderApprovalController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchasingReportController;
 use App\Http\Controllers\ReceivingReportController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StoreWithdrawalController;
 use App\Http\Controllers\SupplierComparisonController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TransferSlipController;
 use App\Http\Controllers\UnitOfMeasureController;
+use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VesselController;
 use Illuminate\Support\Facades\Route;
-
-// Route::get('/', function () {
-//     return view('welcome');
-// });
 
 Route::middleware('guest')->group(function () {
     Route::get('/', fn () => redirect()->route('login'));
@@ -54,75 +53,256 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/charts/open-prs-heatmap', [MainController::class, 'openPrsHeatmap'])
         ->name('dashboard.charts.open-prs-heatmap');
 
-    Route::middleware('role:administrator|it-staff|purchasing-staff|purchasing-manager|engineering-manager|im-manager|im-supervisor')->prefix('master')->group(function () {
+    Route::middleware('permission:view-products')->prefix('master')->group(function () {
         Route::get('product', [ProductController::class, 'index'])->name('product.index');
         Route::get('product/datatables', [ProductController::class, 'datatable'])->name('product.datatables');
         Route::get('product/{item}/purchase-history', [ProductController::class, 'purchaseHistory'])->name('product.purchase-history');
     });
 
-    Route::middleware('role:administrator|it-staff|engineering-manager|im-manager|im-supervisor')->prefix('master')->group(function () {
+    Route::middleware('permission:create-products')->prefix('master')->group(function () {
         Route::get('product/check-code', [ProductController::class, 'checkCode'])->name('product.check-code');
         Route::post('product', [ProductController::class, 'store'])->name('product.store');
     });
 
-    Route::middleware('role:administrator|it-staff|im-manager|im-supervisor')->prefix('master')->group(function () {
+    Route::middleware('permission:update-products')->prefix('master')->group(function () {
         Route::put('product/{product}', [ProductController::class, 'update'])->name('product.update');
+    });
+
+    Route::middleware('permission:delete-products')->prefix('master')->group(function () {
         Route::delete('product/{product}', [ProductController::class, 'destroy'])->name('product.destroy');
     });
 
-    Route::middleware('role:administrator|it-staff|purchasing-staff|purchasing-manager')->prefix('master')->group(function () {
+    Route::middleware('permission:view-suppliers')->prefix('master')->group(function () {
         Route::get('supplier', [SupplierController::class, 'index'])->name('supplier.index');
         Route::get('supplier/datatables', [SupplierController::class, 'datatable'])->name('supplier.datatables');
-        Route::get('supplier/check-code', [SupplierController::class, 'checkCode'])->name('supplier.check-code');
         Route::get('supplier/{supplier}/purchase-history', [SupplierController::class, 'purchaseHistory'])->name('supplier.purchase-history');
+    });
+
+    Route::middleware('permission:create-suppliers')->prefix('master')->group(function () {
+        Route::get('supplier/check-code', [SupplierController::class, 'checkCode'])->name('supplier.check-code');
         Route::post('supplier', [SupplierController::class, 'store'])->name('supplier.store');
+    });
+
+    Route::middleware('permission:update-suppliers')->prefix('master')->group(function () {
         Route::put('supplier/{supplier}', [SupplierController::class, 'update'])->name('supplier.update');
     });
 
-    Route::middleware('role:administrator|it-staff')->prefix('master')->group(function () {
-        Route::resource('user', UserController::class);
+    Route::middleware('permission:delete-suppliers')->prefix('master')->group(function () {
+        Route::delete('supplier/{supplier}', [SupplierController::class, 'destroy'])->name('supplier.destroy');
+    });
+
+    Route::middleware('permission:view-users')->prefix('master')->group(function () {
+        Route::get('user', [UserController::class, 'index'])->name('user.index');
+        Route::get('user/create', [UserController::class, 'create'])->name('user.create');
+        Route::get('user/{user}', [UserController::class, 'show'])->name('user.show');
+        Route::get('user/{user}/edit', [UserController::class, 'edit'])->name('user.edit');
+    });
+
+    Route::middleware('permission:create-users')->prefix('master')->group(function () {
+        Route::post('user', [UserController::class, 'store'])->name('user.store');
+    });
+
+    Route::middleware('permission:edit-users')->prefix('master')->group(function () {
+        Route::put('user/{user}', [UserController::class, 'update'])->name('user.update');
+        Route::patch('user/{user}', [UserController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-users')->prefix('master')->group(function () {
+        Route::delete('user/{user}', [UserController::class, 'destroy'])->name('user.destroy');
+    });
+
+    Route::middleware('permission:manage-active-sessions')->prefix('master')->group(function () {
         Route::get('active-sessions', [ActiveSessionController::class, 'index'])->name('active-sessions.index');
-        Route::delete('active-sessions/activity-logs', [ActiveSessionController::class, 'resetActivityLogs'])->name('active-sessions.reset-activity-logs');
         Route::get('active-sessions/{user}', [ActiveSessionController::class, 'show'])->name('active-sessions.show');
         Route::delete('active-sessions/{user}/sessions', [ActiveSessionController::class, 'destroySessions'])->name('active-sessions.destroy-sessions');
-        Route::delete('supplier/{supplier}', [SupplierController::class, 'destroy'])->name('supplier.destroy');
-        Route::resource('product-category', ItemCategoryController::class);
-        Route::resource('unit-of-measurement', UnitOfMeasureController::class);
-        Route::resource('buyer', BuyerController::class);
-        Route::resource('currency', CurrencyController::class);
-        Route::resource('batch', BatchController::class);
-        Route::resource('fish-supplier', FishSupplierController::class);
-        Route::resource('vessel', VesselController::class);
-        Route::resource('fish', FishController::class);
+    });
+
+    Route::middleware('permission:reset-activity-logs')->prefix('master')->group(function () {
+        Route::delete('active-sessions/activity-logs', [ActiveSessionController::class, 'resetActivityLogs'])->name('active-sessions.reset-activity-logs');
+    });
+
+    Route::middleware('permission:view-product-categories')->prefix('master')->group(function () {
+        Route::get('product-category', [ItemCategoryController::class, 'index'])->name('product-category.index');
+        Route::get('product-category/create', [ItemCategoryController::class, 'create'])->name('product-category.create');
+        Route::get('product-category/{product_category}', [ItemCategoryController::class, 'show'])->name('product-category.show');
+        Route::get('product-category/{product_category}/edit', [ItemCategoryController::class, 'edit'])->name('product-category.edit');
+    });
+
+    Route::middleware('permission:manage-product-categories')->prefix('master')->group(function () {
+        Route::post('product-category', [ItemCategoryController::class, 'store'])->name('product-category.store');
+        Route::put('product-category/{product_category}', [ItemCategoryController::class, 'update'])->name('product-category.update');
+        Route::patch('product-category/{product_category}', [ItemCategoryController::class, 'update']);
+        Route::delete('product-category/{product_category}', [ItemCategoryController::class, 'destroy'])->name('product-category.destroy');
+    });
+
+    Route::middleware('permission:view-uom')->prefix('master')->group(function () {
+        Route::get('unit-of-measurement', [UnitOfMeasureController::class, 'index'])->name('unit-of-measurement.index');
+        Route::get('unit-of-measurement/create', [UnitOfMeasureController::class, 'create'])->name('unit-of-measurement.create');
+        Route::get('unit-of-measurement/{unit_of_measurement}', [UnitOfMeasureController::class, 'show'])->name('unit-of-measurement.show');
+        Route::get('unit-of-measurement/{unit_of_measurement}/edit', [UnitOfMeasureController::class, 'edit'])->name('unit-of-measurement.edit');
+    });
+
+    Route::middleware('permission:manage-uom')->prefix('master')->group(function () {
+        Route::post('unit-of-measurement', [UnitOfMeasureController::class, 'store'])->name('unit-of-measurement.store');
+        Route::put('unit-of-measurement/{unit_of_measurement}', [UnitOfMeasureController::class, 'update'])->name('unit-of-measurement.update');
+        Route::patch('unit-of-measurement/{unit_of_measurement}', [UnitOfMeasureController::class, 'update']);
+        Route::delete('unit-of-measurement/{unit_of_measurement}', [UnitOfMeasureController::class, 'destroy'])->name('unit-of-measurement.destroy');
+    });
+
+    Route::middleware('permission:view-buyers')->prefix('master')->group(function () {
+        Route::get('buyer', [BuyerController::class, 'index'])->name('buyer.index');
+        Route::get('buyer/create', [BuyerController::class, 'create'])->name('buyer.create');
+        Route::get('buyer/{buyer}', [BuyerController::class, 'show'])->name('buyer.show');
+        Route::get('buyer/{buyer}/edit', [BuyerController::class, 'edit'])->name('buyer.edit');
+    });
+
+    Route::middleware('permission:manage-buyers')->prefix('master')->group(function () {
+        Route::post('buyer', [BuyerController::class, 'store'])->name('buyer.store');
+        Route::put('buyer/{buyer}', [BuyerController::class, 'update'])->name('buyer.update');
+        Route::patch('buyer/{buyer}', [BuyerController::class, 'update']);
+        Route::delete('buyer/{buyer}', [BuyerController::class, 'destroy'])->name('buyer.destroy');
+    });
+
+    Route::middleware('permission:view-currencies')->prefix('master')->group(function () {
+        Route::get('currency', [CurrencyController::class, 'index'])->name('currency.index');
+        Route::get('currency/create', [CurrencyController::class, 'create'])->name('currency.create');
+        Route::get('currency/{currency}', [CurrencyController::class, 'show'])->name('currency.show');
+        Route::get('currency/{currency}/edit', [CurrencyController::class, 'edit'])->name('currency.edit');
+    });
+
+    Route::middleware('permission:manage-currencies')->prefix('master')->group(function () {
+        Route::post('currency', [CurrencyController::class, 'store'])->name('currency.store');
+        Route::put('currency/{currency}', [CurrencyController::class, 'update'])->name('currency.update');
+        Route::patch('currency/{currency}', [CurrencyController::class, 'update']);
+        Route::delete('currency/{currency}', [CurrencyController::class, 'destroy'])->name('currency.destroy');
+    });
+
+    Route::middleware('permission:view-batches')->prefix('master')->group(function () {
+        Route::get('batch', [BatchController::class, 'index'])->name('batch.index');
+        Route::get('batch/create', [BatchController::class, 'create'])->name('batch.create');
+        Route::get('batch/{batch}', [BatchController::class, 'show'])->name('batch.show');
+        Route::get('batch/{batch}/edit', [BatchController::class, 'edit'])->name('batch.edit');
+    });
+
+    Route::middleware('permission:manage-batches')->prefix('master')->group(function () {
+        Route::post('batch', [BatchController::class, 'store'])->name('batch.store');
+        Route::put('batch/{batch}', [BatchController::class, 'update'])->name('batch.update');
+        Route::patch('batch/{batch}', [BatchController::class, 'update']);
+        Route::delete('batch/{batch}', [BatchController::class, 'destroy'])->name('batch.destroy');
+    });
+
+    Route::middleware('permission:view-fish-suppliers')->prefix('master')->group(function () {
+        Route::get('fish-supplier', [FishSupplierController::class, 'index'])->name('fish-supplier.index');
+        Route::get('fish-supplier/create', [FishSupplierController::class, 'create'])->name('fish-supplier.create');
+        Route::get('fish-supplier/{fish_supplier}', [FishSupplierController::class, 'show'])->name('fish-supplier.show');
+        Route::get('fish-supplier/{fish_supplier}/edit', [FishSupplierController::class, 'edit'])->name('fish-supplier.edit');
+    });
+
+    Route::middleware('permission:manage-fish-suppliers')->prefix('master')->group(function () {
+        Route::post('fish-supplier', [FishSupplierController::class, 'store'])->name('fish-supplier.store');
+        Route::put('fish-supplier/{fish_supplier}', [FishSupplierController::class, 'update'])->name('fish-supplier.update');
+        Route::patch('fish-supplier/{fish_supplier}', [FishSupplierController::class, 'update']);
+        Route::delete('fish-supplier/{fish_supplier}', [FishSupplierController::class, 'destroy'])->name('fish-supplier.destroy');
+    });
+
+    Route::middleware('permission:view-vessels')->prefix('master')->group(function () {
+        Route::get('vessel', [VesselController::class, 'index'])->name('vessel.index');
+        Route::get('vessel/create', [VesselController::class, 'create'])->name('vessel.create');
+        Route::get('vessel/{vessel}', [VesselController::class, 'show'])->name('vessel.show');
+        Route::get('vessel/{vessel}/edit', [VesselController::class, 'edit'])->name('vessel.edit');
+    });
+
+    Route::middleware('permission:manage-vessels')->prefix('master')->group(function () {
+        Route::post('vessel', [VesselController::class, 'store'])->name('vessel.store');
+        Route::put('vessel/{vessel}', [VesselController::class, 'update'])->name('vessel.update');
+        Route::patch('vessel/{vessel}', [VesselController::class, 'update']);
+        Route::delete('vessel/{vessel}', [VesselController::class, 'destroy'])->name('vessel.destroy');
+    });
+
+    Route::middleware('permission:view-fish')->prefix('master')->group(function () {
+        Route::get('fish', [FishController::class, 'index'])->name('fish.index');
+        Route::get('fish/create', [FishController::class, 'create'])->name('fish.create');
+        Route::get('fish/{fish}', [FishController::class, 'show'])->name('fish.show');
+        Route::get('fish/{fish}/edit', [FishController::class, 'edit'])->name('fish.edit');
+    });
+
+    Route::middleware('permission:manage-fish')->prefix('master')->group(function () {
+        Route::post('fish', [FishController::class, 'store'])->name('fish.store');
+        Route::put('fish/{fish}', [FishController::class, 'update'])->name('fish.update');
+        Route::patch('fish/{fish}', [FishController::class, 'update']);
+        Route::delete('fish/{fish}', [FishController::class, 'destroy'])->name('fish.destroy');
         Route::post('fish-size', [FishSizeController::class, 'store'])->name('fish-size.store');
         Route::delete('fish-size/{fishSize}', [FishSizeController::class, 'destroy'])->name('fish-size.destroy');
-
-        Route::prefix('accounting')->name('accounting.')->group(function () {
-            Route::resource('groupings', GroupingController::class)->except(['create', 'show', 'edit']);
-            Route::resource('group-codes', AccountingGroupCodeController::class)->except(['create', 'show', 'edit']);
-            Route::resource('codes', AccountingCodeController::class)->except(['create', 'show', 'edit']);
-            Route::get('balance-sheet/datatables', [BsGroupingController::class, 'datatable'])->name('balance-sheet.datatables');
-            Route::resource('balance-sheet', BsGroupingController::class)->except(['create', 'show', 'edit']);
-        });
     });
 
-    Route::middleware('role:administrator|it-staff|hrd-manager|hrd-supervisor|hrd-staff')->prefix('master')->group(function () {
+    Route::middleware('permission:view-accounting-master')->prefix('master')->name('accounting.')->group(function () {
+        Route::get('accounting/groupings', [GroupingController::class, 'index'])->name('groupings.index');
+        Route::get('accounting/group-codes', [AccountingGroupCodeController::class, 'index'])->name('group-codes.index');
+        Route::get('accounting/codes', [AccountingCodeController::class, 'index'])->name('codes.index');
+        Route::get('accounting/balance-sheet', [BsGroupingController::class, 'index'])->name('balance-sheet.index');
+        Route::get('accounting/balance-sheet/datatables', [BsGroupingController::class, 'datatable'])->name('balance-sheet.datatables');
+    });
+
+    Route::middleware('permission:manage-accounting-master')->prefix('master')->name('accounting.')->group(function () {
+        Route::post('accounting/groupings', [GroupingController::class, 'store'])->name('groupings.store');
+        Route::put('accounting/groupings/{grouping}', [GroupingController::class, 'update'])->name('groupings.update');
+        Route::delete('accounting/groupings/{grouping}', [GroupingController::class, 'destroy'])->name('groupings.destroy');
+        Route::post('accounting/group-codes', [AccountingGroupCodeController::class, 'store'])->name('group-codes.store');
+        Route::put('accounting/group-codes/{groupCode}', [AccountingGroupCodeController::class, 'update'])->name('group-codes.update');
+        Route::delete('accounting/group-codes/{groupCode}', [AccountingGroupCodeController::class, 'destroy'])->name('group-codes.destroy');
+        Route::post('accounting/codes', [AccountingCodeController::class, 'store'])->name('codes.store');
+        Route::put('accounting/codes/{code}', [AccountingCodeController::class, 'update'])->name('codes.update');
+        Route::delete('accounting/codes/{code}', [AccountingCodeController::class, 'destroy'])->name('codes.destroy');
+        Route::post('accounting/balance-sheet', [BsGroupingController::class, 'store'])->name('balance-sheet.store');
+        Route::put('accounting/balance-sheet/{balanceSheet}', [BsGroupingController::class, 'update'])->name('balance-sheet.update');
+        Route::delete('accounting/balance-sheet/{balanceSheet}', [BsGroupingController::class, 'destroy'])->name('balance-sheet.destroy');
+    });
+
+    Route::middleware('permission:view-employees')->prefix('master')->group(function () {
+        Route::get('employees', [EmployeeController::class, 'index'])->name('employees.index');
         Route::get('employees/id-cards/print', [EmployeeController::class, 'printIdCards'])->name('employees.id-cards.print');
-        Route::resource('employees', EmployeeController::class)->except(['create', 'show', 'edit']);
     });
-    Route::middleware('role:administrator|purchasing-manager|purchasing-staff')->prefix('procurement')->group(function () {
+
+    Route::middleware('permission:manage-employees')->prefix('master')->group(function () {
+        Route::post('employees', [EmployeeController::class, 'store'])->name('employees.store');
+        Route::put('employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+        Route::patch('employees/{employee}', [EmployeeController::class, 'update']);
+        Route::delete('employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
+    });
+
+    Route::middleware('permission:manage-roles')->prefix('master')->group(function () {
+        Route::resource('roles', RoleController::class);
+    });
+
+    Route::middleware('permission:manage-permissions')->prefix('master')->group(function () {
+        Route::resource('permissions', PermissionController::class)->except(['show']);
+    });
+
+    Route::middleware('permission:manage-user-access')->prefix('master')->group(function () {
+        Route::get('users/{user}/access', [UserAccessController::class, 'edit'])->name('users.access.edit');
+        Route::put('users/{user}/access', [UserAccessController::class, 'update'])->name('users.access.update');
+    });
+
+    Route::middleware('permission:assign-canvasser|approve-prs')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');
         Route::get('/approval/{prs}', [PrsApprovalController::class, 'show'])->name('prs.approval.show');
         Route::post('/approval/{prs}/approve', [PrsApprovalController::class, 'approve'])->name('prs.approve');
         Route::post('/approval/{prs}/reassign', [PrsApprovalController::class, 'reassign'])->name('prs.reassign');
         Route::post('/approval/{prs}/hold', [PrsApprovalController::class, 'hold'])->name('prs.hold');
         Route::post('/approval/{prs}/reject', [PrsApprovalController::class, 'reject'])->name('prs.reject');
+    });
 
+    Route::middleware('permission:view-supplier-comparison')->prefix('procurement')->group(function () {
         Route::get('/supplier-comparison', [SupplierComparisonController::class, 'index'])->name('procurement.supplier-comparison.index');
+        Route::get('/supplier-comparison/{prsItem}/report', [SupplierComparisonController::class, 'report'])->name('procurement.supplier-comparison.report');
+    });
+
+    Route::middleware('permission:manage-supplier-comparison')->prefix('procurement')->group(function () {
         Route::post('/supplier-comparison/{prsItem}', [SupplierComparisonController::class, 'select'])->name('procurement.supplier-comparison.select');
         Route::post('/supplier-comparison/{prsItem}/reject', [SupplierComparisonController::class, 'reject'])->name('procurement.supplier-comparison.reject');
-        Route::get('/supplier-comparison/{prsItem}/report', [SupplierComparisonController::class, 'report'])->name('procurement.supplier-comparison.report');
+    });
 
+    Route::middleware('permission:view-procurement-reports')->prefix('procurement')->group(function () {
         Route::get('/reports', [PurchasingReportController::class, 'index'])->name('procurement.reports.index');
         Route::post('/reports/prs-not-yet-po', [PurchasingReportController::class, 'prsNotYetPo'])->name('procurement.reports.prs-not-yet-po');
         Route::post('/reports/po-not-yet-delivered', [PurchasingReportController::class, 'poNotYetDelivered'])->name('procurement.reports.po-not-yet-delivered');
@@ -133,7 +313,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/purchasing-lead-time', [PurchasingReportController::class, 'purchasingLeadTime'])->name('procurement.reports.purchasing-lead-time');
     });
 
-    Route::middleware('role:administrator|finance-manager|finance-supervisor|finance-staff|accounting-manager|accounting-supervisor|accounting-staff')->prefix('accounting')->group(function () {
+    Route::middleware('permission:view-accounting-reports')->prefix('accounting')->group(function () {
         Route::get('/reports', [AccountingReportController::class, 'index'])->name('accounting.reports.index');
         Route::post('/reports/stock-card', [AccountingReportController::class, 'stockCard'])->name('accounting.reports.stock-card');
         Route::post('/reports/transaction', [AccountingReportController::class, 'transaction'])->name('accounting.reports.transaction');
@@ -143,7 +323,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/purchase', [AccountingReportController::class, 'purchase'])->name('accounting.reports.purchase');
     });
 
-    Route::middleware('role:administrator|im-manager|im-supervisor|im-staff')->prefix('im')->group(function () {
+    Route::middleware('permission:view-im-reports')->prefix('im')->group(function () {
         Route::get('/reports', [ImReportController::class, 'index'])->name('im.reports.index');
         Route::post('/reports/stock-inventory', [ImReportController::class, 'stockInventory'])->name('im.reports.stock-inventory');
         Route::post('/reports/transaction', [ImReportController::class, 'transaction'])->name('im.reports.transaction');
@@ -153,11 +333,24 @@ Route::middleware('auth')->group(function () {
         Route::post('/reports/delivery-register', [ImReportController::class, 'deliveryRegister'])->name('im.reports.delivery-register');
     });
 
-    Route::middleware('role:administrator|finance-manager|finance-supervisor|finance-staff|accounting-manager|accounting-supervisor|accounting-staff')
+    Route::middleware('permission:view-exchange-rates')
         ->prefix('accounting')
         ->name('accounting.')
         ->group(function () {
             Route::get('exchange-rates', [CurrencyExchangeRateController::class, 'index'])->name('exchange-rates.index');
+        });
+
+    Route::middleware('permission:create-exchange-rates')
+        ->prefix('accounting')
+        ->name('accounting.')
+        ->group(function () {
+            Route::post('exchange-rates', [CurrencyExchangeRateController::class, 'store'])->name('exchange-rates.store');
+        });
+
+    Route::middleware('permission:view-doc-entries')
+        ->prefix('accounting')
+        ->name('accounting.')
+        ->group(function () {
             Route::get('doc-entries', [AccountingDocEntryController::class, 'index'])->name('doc-entries.index');
             Route::get('doc-entries/account-lookup', [AccountingDocEntryController::class, 'lookupAccount'])->name('doc-entries.account-lookup');
             Route::get('doc-entries/transaction/{transaction}', [AccountingDocEntryController::class, 'showTransaction'])
@@ -165,61 +358,62 @@ Route::middleware('auth')->group(function () {
             Route::get('doc-entries/{docType}/{id}', [AccountingDocEntryController::class, 'show'])
                 ->where(['docType' => 'rr|dr', 'id' => '[0-9]+'])
                 ->name('doc-entries.show');
-            Route::put('doc-entries/{transaction}', [AccountingDocEntryController::class, 'update'])->name('doc-entries.update');
         });
 
-    Route::middleware('role:administrator|finance-manager|finance-supervisor|accounting-manager|accounting-supervisor')
+    Route::middleware('permission:update-doc-entries')
         ->prefix('accounting')
         ->name('accounting.')
         ->group(function () {
-            Route::post('exchange-rates', [CurrencyExchangeRateController::class, 'store'])->name('exchange-rates.store');
+            Route::put('doc-entries/{transaction}', [AccountingDocEntryController::class, 'update'])->name('doc-entries.update');
         });
 
-    Route::middleware('role:administrator|purchasing-staff')->group(function () {
+    Route::middleware('permission:view-canvassing')->group(function () {
         Route::get('/canvassing', [CanvassingController::class, 'index'])->name('canvassing.index');
         Route::get('/canvassing/reports/print', [CanvassingController::class, 'printReports'])->name('canvassing.reports.print');
         Route::get('/canvassing/{prsItem}', [CanvassingController::class, 'show'])->name('canvassing.show');
         Route::get('/canvassing/{prsItem}/report', [CanvassingController::class, 'report'])->name('canvassing.report');
+    });
+
+    Route::middleware('permission:update-canvassing')->group(function () {
         Route::post('/canvassing/{prsItem}', [CanvassingController::class, 'store'])->name('canvassing.store');
         Route::post('/canvassing/{prsItem}/toggle-direct-purchase', [CanvassingController::class, 'toggleDirectPurchase'])->name('canvassing.toggle-direct-purchase');
         Route::post('/canvassing/{prsItem}/hold', [CanvassingController::class, 'hold'])->name('canvassing.hold');
-
-        Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
-            Route::get('/draft', [PurchaseOrderController::class, 'draft'])->name('draft');
-            Route::post('/preview', [PurchaseOrderController::class, 'preview'])->name('preview');
-            Route::post('/', [PurchaseOrderController::class, 'store'])->name('store');
-            Route::put('/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('update');
-            Route::post('/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit'])->name('submit');
-            Route::post('/{purchaseOrder}/withdraw', [PurchaseOrderController::class, 'withdraw'])->name('withdraw');
-            Route::delete('/{purchaseOrder}/items/{purchaseOrderItem}', [PurchaseOrderController::class, 'destroyItem'])
-                ->name('items.destroy');
-        });
     });
 
-    Route::middleware('role:administrator|purchasing-manager')->group(function () {
-        Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
-            Route::get('/approval', [PurchaseOrderApprovalController::class, 'index'])->name('approval');
-            Route::post('/{purchaseOrder}/approve', [PurchaseOrderApprovalController::class, 'approve'])->name('approve');
-            Route::post('/{purchaseOrder}/request-changes', [PurchaseOrderApprovalController::class, 'requestChanges'])->name('request-changes');
-        });
+    Route::middleware('permission:create-po')->prefix('purchase-orders')->name('purchase-orders.')->group(function () {
+        Route::get('/draft', [PurchaseOrderController::class, 'draft'])->name('draft');
+        Route::post('/preview', [PurchaseOrderController::class, 'preview'])->name('preview');
+        Route::post('/', [PurchaseOrderController::class, 'store'])->name('store');
+        Route::put('/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('update');
+        Route::post('/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit'])->name('submit');
+        Route::post('/{purchaseOrder}/withdraw', [PurchaseOrderController::class, 'withdraw'])->name('withdraw');
+        Route::delete('/{purchaseOrder}/items/{purchaseOrderItem}', [PurchaseOrderController::class, 'destroyItem'])
+            ->name('items.destroy');
     });
 
-    Route::middleware('role:administrator|purchasing-staff|purchasing-manager|general-manager')->group(function () {
-        Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
-            Route::get('/', [PurchaseOrderController::class, 'index'])->name('index');
-            Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
-                ->whereNumber('purchaseOrder')
-                ->name('show');
-            Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])
-                ->whereNumber('purchaseOrder')
-                ->name('cancel');
-            Route::post('/{purchaseOrder}/number', [PurchaseOrderController::class, 'updateNumber'])
-                ->whereNumber('purchaseOrder')
-                ->name('number');
-            Route::match(['get', 'post'], '/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])
-                ->whereNumber('purchaseOrder')
-                ->name('print');
-        });
+    Route::middleware('permission:approve-po')->prefix('purchase-orders')->name('purchase-orders.')->group(function () {
+        Route::get('/approval', [PurchaseOrderApprovalController::class, 'index'])->name('approval');
+        Route::post('/{purchaseOrder}/approve', [PurchaseOrderApprovalController::class, 'approve'])->name('approve');
+        Route::post('/{purchaseOrder}/request-changes', [PurchaseOrderApprovalController::class, 'requestChanges'])->name('request-changes');
+    });
+
+    Route::middleware('permission:view-po')->prefix('purchase-orders')->name('purchase-orders.')->group(function () {
+        Route::get('/', [PurchaseOrderController::class, 'index'])->name('index');
+        Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
+            ->whereNumber('purchaseOrder')
+            ->name('show');
+        Route::match(['get', 'post'], '/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])
+            ->whereNumber('purchaseOrder')
+            ->name('print');
+        Route::post('/{purchaseOrder}/number', [PurchaseOrderController::class, 'updateNumber'])
+            ->whereNumber('purchaseOrder')
+            ->name('number');
+    });
+
+    Route::middleware('permission:cancel-po')->prefix('purchase-orders')->name('purchase-orders.')->group(function () {
+        Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])
+            ->whereNumber('purchaseOrder')
+            ->name('cancel');
     });
 
     Route::middleware('permission:view-rr')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
@@ -227,9 +421,12 @@ Route::middleware('auth')->group(function () {
         Route::match(['get', 'post'], '/{receivingReport}/print', [ReceivingReportController::class, 'print'])->name('print');
     });
 
-    Route::middleware('role:administrator|im-manager|im-supervisor|im-staff')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
+    Route::middleware('permission:create-rr')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
         Route::get('/po-by-number', [ReceivingReportController::class, 'poByNumber'])->name('po-by-number');
         Route::post('/', [ReceivingReportController::class, 'store'])->name('store');
+    });
+
+    Route::middleware('permission:update-rr')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
         Route::put('/{receivingReport}', [ReceivingReportController::class, 'update'])->name('update');
         Route::delete('/{receivingReport}', [ReceivingReportController::class, 'destroy'])->name('destroy');
     });
@@ -315,7 +512,6 @@ Route::middleware('auth')->group(function () {
     Route::post('prs/export-by-department', [PrsController::class, 'exportByDepartment'])->name('prs.export-by-department');
     Route::get('prs/{prs}/print', [PrsController::class, 'print'])->name('prs.print');
 
-    // ===== Notification Routes =====
     Route::prefix('notifications')->group(function () {
         Route::get('/', [NotificationController::class, 'index'])->name('notifications.index');
         Route::get('/recent', [NotificationController::class, 'getRecent'])->name('notifications.recent');

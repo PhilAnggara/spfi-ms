@@ -36,12 +36,7 @@ class PrsController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $canViewAll = $user && $user->hasAnyRole([
-            'administrator',
-            'general-manager',
-            'purchasing-manager',
-            'purchasing-staff',
-        ]);
+        $canViewAll = $user && $user->can('view-all-prs');
 
         $filters = [
             'keyword' => trim((string) $request->query('keyword', '')),
@@ -894,12 +889,7 @@ class PrsController extends Controller
             abort(403);
         }
 
-        if ($user->hasAnyRole([
-            'administrator',
-            'general-manager',
-            'purchasing-manager',
-            'purchasing-staff',
-        ])) {
+        if ($user->can('view-all-prs')) {
             return;
         }
 

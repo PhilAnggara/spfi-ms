@@ -50,22 +50,9 @@ class SupplierController extends Controller
                 'has_po' => request('has_po', ''),
                 'sort' => in_array($sort, self::ALLOWED_SORTS, true) ? $sort : 'name_asc',
             ],
-            'canManageSuppliers' => auth()->user()?->hasAnyRole([
-                'administrator',
-                'it-staff',
-                'purchasing-staff',
-                'purchasing-manager',
-            ]) ?? false,
-            'canDeleteSuppliers' => auth()->user()?->hasAnyRole([
-                'administrator',
-                'it-staff',
-            ]) ?? false,
-            'canViewPurchaseOrders' => auth()->user()?->hasAnyRole([
-                'administrator',
-                'purchasing-staff',
-                'purchasing-manager',
-                'general-manager',
-            ]) ?? false,
+            'canManageSuppliers' => auth()->user()?->can('update-suppliers') ?? false,
+            'canDeleteSuppliers' => auth()->user()?->can('delete-suppliers') ?? false,
+            'canViewPurchaseOrders' => auth()->user()?->can('view-po') ?? false,
         ]);
     }
 
