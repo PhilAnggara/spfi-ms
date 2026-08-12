@@ -174,7 +174,6 @@
                 window.history.pushState({}, '', normalizedUrl);
             }
 
-            updateKeywordFromUrl(normalizedUrl);
             syncHighlightFromUrl(normalizedUrl);
             initSelectionForms(newResults);
             highlightRequestedPrsItem();
@@ -331,6 +330,7 @@
 
     window.addEventListener('popstate', function () {
         clearFilterDebounce();
+        updateKeywordFromUrl(window.location.href);
         replacePageContent(window.location.href, false);
     });
 
