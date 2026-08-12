@@ -50,9 +50,9 @@
                 </div>
 
                 <!-- Burger button responsive -->
-                <a href="#" class="burger-btn d-block d-xl-none">
+                <button type="button" class="burger-btn d-block d-xl-none" aria-label="Toggle sidebar">
                     <i class="bi bi-justify fs-3"></i>
-                </a>
+                </button>
             </div>
         </div>
     </div>

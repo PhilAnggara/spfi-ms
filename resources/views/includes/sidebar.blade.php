@@ -36,7 +36,7 @@
                             </svg>
                         </div>
                         <div class="sidebar-toggler  x">
-                            <a href="#" class="sidebar-hide d-xl-none d-block"><i class="bi bi-x bi-middle"></i></a>
+                            <button type="button" class="sidebar-hide d-xl-none d-block" aria-label="Close sidebar"><i class="bi bi-x bi-middle"></i></button>
                         </div>
                     </div>
                 </div>

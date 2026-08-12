@@ -81,7 +81,9 @@ class EmployeeModuleTest extends TestCase
             ->get(route('employees.index', ['keyword' => 'alice']))
             ->assertOk()
             ->assertSee('Employee Master List')
-            ->assertSee('Alice Example');
+            ->assertSee('Alice Example')
+            ->assertSee('d-none d-md-table-cell', false)
+            ->assertSee('d-none d-lg-table-cell', false);
     }
 
     public function test_employee_index_filters_by_photo_presence(): void
@@ -176,7 +178,7 @@ class EmployeeModuleTest extends TestCase
         $this->actingAs($this->admin)
             ->put(route('employees.update', $employee), [
                 'employee_department_id' => $department->id,
-            'employee_id' => 'TEST-EMP-002',
+                'employee_id' => 'TEST-EMP-002',
                 'code_employee' => 'C-002-REV',
                 'id_biometrik' => 'BIO-002',
                 'employee_name' => 'Budi Example Updated',

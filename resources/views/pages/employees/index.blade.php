@@ -139,9 +139,9 @@
                                         <th>Employee ID</th>
                                         <th>Name</th>
                                         <th>Department</th>
-                                        <th>Gender</th>
-                                        <th>Date of Birth</th>
-                                        <th>Hired Date</th>
+                                        <th class="d-none d-lg-table-cell">Gender</th>
+                                        <th class="d-none d-md-table-cell">Date of Birth</th>
+                                        <th class="d-none d-md-table-cell">Hired Date</th>
                                         <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
@@ -179,7 +179,7 @@
                                                     {{ $department?->code ?? ($employee->legacy_department_code ?? '-') }}
                                                 </span>
                                             </td>
-                                            <td>
+                                            <td class="d-none d-lg-table-cell">
                                                 @if ($employee->gender === 'M')
                                                     <span class="badge employee-gender-badge bg-light-primary text-primary" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Male">
                                                         <i class="fa-solid fa-mars" aria-hidden="true"></i>
@@ -194,8 +194,8 @@
                                                     <span class="text-muted">-</span>
                                                 @endif
                                             </td>
-                                            <td>{{ optional($employee->date_of_birth)->format('d M Y') ?? '-' }}</td>
-                                            <td>{{ optional($employee->date_hired)->format('d M Y') ?? '-' }}</td>
+                                            <td class="d-none d-md-table-cell">{{ optional($employee->date_of_birth)->format('d M Y') ?? '-' }}</td>
+                                            <td class="d-none d-md-table-cell">{{ optional($employee->date_hired)->format('d M Y') ?? '-' }}</td>
                                             <td>
                                                 <span class="badge {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
                                             </td>

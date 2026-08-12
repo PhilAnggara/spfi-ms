@@ -152,6 +152,27 @@ const SIDEBAR_BREAKPOINT = '(min-width: 1200px)';
 const SIDEBAR_WIDTH = 'var(--spfi-sidebar-width)';
 const SIDEBAR_OFFSCREEN = 'var(--spfi-sidebar-offscreen)';
 
+const clearMobileBodyScrollLock = () => {
+  document.documentElement.style.overflow = '';
+  document.documentElement.style.overscrollBehavior = '';
+  document.body.style.overflow = '';
+  document.body.style.overflowY = '';
+  document.body.style.overscrollBehavior = '';
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+};
+
+const lockMobileBodyScroll = () => {
+  // Overflow-only lock keeps the native scroll offset (no position:fixed jump
+  // when the drawer closes).
+  document.documentElement.style.overflow = 'hidden';
+  document.documentElement.style.overscrollBehavior = 'none';
+  document.body.style.overflow = 'hidden';
+  document.body.style.overflowY = 'hidden';
+  document.body.style.overscrollBehavior = 'none';
+};
+
 // Apply stored sidebar state early - with inline style to force correct layout
 const applySidebarStateEarly = () => {
   if (!window.matchMedia(SIDEBAR_BREAKPOINT).matches) {
@@ -189,6 +210,61 @@ applySidebarStateEarly();
 
 // Full initialization with event handlers - runs after DOM is ready
 (() => {
+  /**
+   * Mobile browser chrome show/hide fires resize with unchanged width.
+   * Mazer's Sidebar.onResize closes the drawer on every resize — block those.
+   */
+  let lastViewportWidth = window.innerWidth;
+  window.addEventListener('resize', (event) => {
+    const width = window.innerWidth;
+    if (width === lastViewportWidth) {
+      event.stopImmediatePropagation();
+      return;
+    }
+    lastViewportWidth = width;
+  }, true);
+
+  const initMobileSidebarBehavior = () => {
+    const instance = window.sidebar;
+    if (!instance || typeof instance.show !== 'function') {
+      return;
+    }
+
+    const originalShow = instance.show.bind(instance);
+    const originalHide = instance.hide.bind(instance);
+
+    instance.show = function () {
+      originalShow();
+
+      if (!window.matchMedia(SIDEBAR_BREAKPOINT).matches) {
+        lockMobileBodyScroll();
+      }
+    };
+
+    instance.hide = function () {
+      originalHide();
+      clearMobileBodyScrollLock();
+    };
+
+    instance.forceElementVisibility = function (el) {
+      if (!el) {
+        return;
+      }
+
+      const container = document.querySelector('.sidebar-wrapper');
+      if (!container) {
+        return;
+      }
+
+      const elRect = el.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      if (elRect.top < containerRect.top || elRect.bottom > containerRect.bottom) {
+        container.scrollTop += elRect.top - containerRect.top - 16;
+      }
+    };
+  };
+
   const initSidebarToggle = () => {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) {
@@ -215,6 +291,7 @@ applySidebarStateEarly();
       }
 
       document.querySelector('.sidebar-backdrop')?.remove();
+      clearMobileBodyScrollLock();
       document.body.style.overflowY = 'auto';
       localStorage.setItem(SIDEBAR_STORAGE_KEY, isVisible ? 'shown' : 'hidden');
     };
@@ -230,11 +307,12 @@ applySidebarStateEarly();
 
     document.querySelectorAll('.burger-btn, .sidebar-hide').forEach((trigger) => {
       trigger.addEventListener('click', (event) => {
+        event.preventDefault();
+
         if (!isDesktop()) {
           return;
         }
 
-        event.preventDefault();
         event.stopImmediatePropagation();
 
         const isVisible = !sidebar.classList.contains('inactive');
@@ -282,6 +360,7 @@ applySidebarStateEarly();
   };
 
   const initSidebarEnhancements = () => {
+    initMobileSidebarBehavior();
     initSidebarToggle();
     initSidebarSubmenuGuards();
   };

@@ -37,6 +37,7 @@ class Sidebar {
   constructor(el, options = {}) {
     this.sidebarEL = el instanceof HTMLElement ? el : document.querySelector(el)
     this.options = options
+    this.lastWidth = window.innerWidth
     this.init()
   }
 
@@ -47,10 +48,16 @@ class Sidebar {
     // add event listener to sidebar
     document
       .querySelectorAll(".burger-btn")
-      .forEach((el) => el.addEventListener("click", this.toggle.bind(this)))
+      .forEach((el) => el.addEventListener("click", (e) => {
+        e.preventDefault()
+        this.toggle()
+      }))
     document
       .querySelectorAll(".sidebar-hide")
-      .forEach((el) => el.addEventListener("click", this.toggle.bind(this)))
+      .forEach((el) => el.addEventListener("click", (e) => {
+        e.preventDefault()
+        this.toggle()
+      }))
     window.addEventListener("resize", this.onResize.bind(this))
 
     
@@ -114,9 +121,16 @@ class Sidebar {
   
 
   /**
-   * On Sidebar Rezise Event
+   * On Sidebar Resize Event
+   * Ignore height-only resizes (mobile URL bar) so the drawer stays open.
    */
   onResize() {
+    const width = window.innerWidth
+    if (width === this.lastWidth) {
+      return
+    }
+    this.lastWidth = width
+
     if (isDesktop(window)) {
       this.sidebarEL.classList.add("active")
       this.sidebarEL.classList.remove("inactive")
@@ -126,6 +140,7 @@ class Sidebar {
 
     // reset
     this.deleteBackdrop()
+    this.clearBodyScrollLock()
     this.toggleOverflowBody(true)
   }
 
@@ -148,6 +163,7 @@ class Sidebar {
     this.sidebarEL.classList.add("active")
     this.sidebarEL.classList.remove("inactive")
     this.createBackdrop()
+    this.lockBodyScroll()
     this.toggleOverflowBody()
   }
 
@@ -158,6 +174,7 @@ class Sidebar {
     this.sidebarEL.classList.remove("active")
     this.deleteBackdrop()
     this.toggleOverflowBody()
+    this.unlockBodyScroll()
   }
 
   /**
@@ -196,21 +213,56 @@ class Sidebar {
     }
   }
 
+  lockBodyScroll() {
+    if (isDesktop(window)) return
+    // Overflow-only lock preserves native scroll offset (avoids jump-from-top on close).
+    document.documentElement.style.overflow = "hidden"
+    document.documentElement.style.overscrollBehavior = "none"
+    document.body.style.overflow = "hidden"
+    document.body.style.overflowY = "hidden"
+    document.body.style.overscrollBehavior = "none"
+  }
+
+  unlockBodyScroll() {
+    if (isDesktop(window)) return
+    this.clearBodyScrollLock()
+  }
+
+  clearBodyScrollLock() {
+    document.documentElement.style.overflow = ""
+    document.documentElement.style.overscrollBehavior = ""
+    document.body.style.overflow = ""
+    document.body.style.overflowY = ""
+    document.body.style.overscrollBehavior = ""
+    document.body.style.position = ""
+    document.body.style.top = ""
+    document.body.style.width = ""
+  }
+
   isElementInViewport(el) {
-    var rect = el.getBoundingClientRect()
+    if (!el) return true
+    const container = document.querySelector(".sidebar-wrapper")
+    if (!container) return true
+
+    const rect = el.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
 
     return (
-      rect.top >= 0 &&
-      rect.left >= 0 &&
-      rect.bottom <=
-        (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+      rect.top >= containerRect.top &&
+      rect.bottom <= containerRect.bottom
     )
   }
 
   forceElementVisibility(el) {
+    if (!el) return
+
+    const container = document.querySelector(".sidebar-wrapper")
+    if (!container) return
+
     if (!this.isElementInViewport(el)) {
-      el.scrollIntoView(false)
+      const elRect = el.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      container.scrollTop += elRect.top - containerRect.top - 16
     }
   }
 }

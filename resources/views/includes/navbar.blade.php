@@ -1,9 +1,9 @@
 <header>
     <nav class="navbar navbar-expand navbar-light navbar-top">
         <div class="container-fluid">
-            <a href="#" class="burger-btn d-block">
+            <button type="button" class="burger-btn d-block" aria-label="Toggle sidebar">
                 <i class="bi bi-justify fs-3"></i>
-            </a>
+            </button>
 
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                 data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
@@ -15,7 +15,7 @@
                     <li class="nav-item dropdown me-3">
                         <a class="nav-link active dropdown-toggle text-gray-600" href="#" id="notificationBell"
                             data-auth-user-id="{{ auth()->id() }}"
-                            data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                             <i class="fa-light fa-bell fa-shake fa-xl"></i>
 
                             <span

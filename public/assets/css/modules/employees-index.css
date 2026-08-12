@@ -14,6 +14,19 @@
     align-items: center;
     gap: 0.75rem;
     min-width: 220px;
+    max-width: 100%;
+}
+
+.employee-list-person > div {
+    min-width: 0;
+}
+
+.employee-list-person .fw-semibold,
+.employee-list-person small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .employee-list-person-button {
@@ -408,6 +421,15 @@
 }
 
 @media (max-width: 767.98px) {
+    #employees-page-container {
+        max-width: 100%;
+        overflow-x: clip;
+    }
+
+    .employee-list-person {
+        min-width: 0;
+    }
+
     .employee-photo-upload-card {
         grid-template-columns: 1fr;
     }
@@ -435,6 +457,11 @@
 
     .employee-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none {
         justify-content: flex-start !important;
+    }
+
+    .employee-pagination-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 }
 
