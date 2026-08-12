@@ -16,7 +16,6 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -440,10 +439,14 @@ class ReceivingReportController extends Controller
             'items.purchaseOrderItem.prsItem.prs',
         ]);
 
-        $previousStockLines = $this->buildStockLinesFromReceivingReportItems($receivingReport->items);
         $releasedNumber = $receivingReport->rr_number;
 
-        DB::transaction(function () use ($receivingReport, $previousStockLines) {
+        DB::transaction(function () use ($receivingReport) {
+            app(StockService::class)->purgeDocumentMovementsAndRechain(
+                StockService::REF_RECEIVING_REPORT,
+                (int) $receivingReport->id,
+            );
+
             $receivingReport->items()->delete();
 
             $receivingReport->update([
@@ -451,13 +454,6 @@ class ReceivingReportController extends Controller
             ]);
 
             $receivingReport->delete();
-
-            app(StockService::class)->applyReceivingReportAdjustment(
-                receivingReport: $receivingReport,
-                currentLines: [],
-                previousLines: $previousStockLines,
-                userId: Auth::id(),
-            );
 
             $this->checkPrsDeliveryStatus($receivingReport->purchase_order_id);
         });

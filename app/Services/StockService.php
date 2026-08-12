@@ -306,6 +306,96 @@ class StockService
     }
 
     /**
+     * Remove a document's ledger rows, undo inventory, then recast begin/end
+     * on remaining rows from the document date forward so IM reports stay consistent.
+     */
+    public function purgeDocumentMovementsAndRechain(string $referenceType, int $referenceId): int
+    {
+        $rows = StockBalance::query()
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $referenceId)
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return 0;
+        }
+
+        $targets = $rows
+            ->groupBy(fn (StockBalance $row): string => $row->item_id.'|'.$row->wh_code)
+            ->map(function (Collection $group): array {
+                /** @var Collection<int, StockBalance> $group */
+                $first = $group->first();
+                $fromDate = $group
+                    ->map(fn (StockBalance $row): string => $row->date instanceof CarbonInterface
+                        ? $row->date->toDateString()
+                        : (string) $row->date)
+                    ->min();
+
+                return [
+                    'item_id' => (int) $first->item_id,
+                    'wh_code' => (string) $first->wh_code,
+                    'from_date' => (string) $fromDate,
+                ];
+            });
+
+        $purged = $this->purgeDocumentMovements($referenceType, $referenceId);
+
+        $targets->each(function (array $target): void {
+            $this->rechainItemLedger(
+                itemId: $target['item_id'],
+                whCode: $target['wh_code'],
+                fromDate: $target['from_date'],
+            );
+        });
+
+        return $purged;
+    }
+
+    /**
+     * Recast begin/end on remaining ledger rows from a date forward.
+     * Does not change qty buckets or inventory on-hand.
+     */
+    public function rechainItemLedger(int $itemId, string $whCode, string $fromDate): int
+    {
+        $priorEnd = StockBalance::query()
+            ->where('item_id', $itemId)
+            ->where('wh_code', $whCode)
+            ->whereDate('date', '<', $fromDate)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->value('end');
+
+        $running = round((float) ($priorEnd ?? 0), 5);
+
+        $rows = StockBalance::query()
+            ->where('item_id', $itemId)
+            ->where('wh_code', $whCode)
+            ->whereDate('date', '>=', $fromDate)
+            ->orderBy('date')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($rows as $row) {
+            $netIn = (float) $row->qty_in1 + (float) $row->qty_in2 + (float) $row->qty_in3;
+            $netOut = (float) $row->qty_out1 + (float) $row->qty_out2 + (float) $row->qty_out3;
+            $begin = $running;
+            $end = round($begin + $netIn - $netOut, 5);
+
+            $row->begin = $begin;
+            $row->end = $end;
+            $row->acc_qty_total = $end;
+            $row->save();
+
+            $running = $end;
+        }
+
+        return $rows->count();
+    }
+
+    /**
      * Purge all ledger rows for an item/warehouse from a given date (inclusive),
      * undoing their net effect on inventory. Used by opening-balance rebuild.
      */

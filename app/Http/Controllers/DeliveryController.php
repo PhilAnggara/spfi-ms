@@ -317,23 +317,9 @@ class DeliveryController extends Controller
                 return 0;
             }
 
-            $stockLines = DB::table('delivery_items')
-                ->where('delivery_id', $deliveryId)
-                ->whereNull('deleted_at')
-                ->get(['id', 'item_id', 'product_code', 'quantity'])
-                ->map(fn ($row): array => [
-                    'item_id' => (int) $row->item_id,
-                    'product_code' => (string) $row->product_code,
-                    'quantity' => (float) $row->quantity,
-                    'reference_line_id' => (int) $row->id,
-                ])
-                ->all();
-
-            app(StockService::class)->reverseDeliveryIssue(
-                deliveryId: $deliveryId,
-                movementDate: (string) $delivery->dr_date,
-                lines: $stockLines,
-                userId: $authUserId,
+            app(StockService::class)->purgeDocumentMovementsAndRechain(
+                StockService::REF_DELIVERY,
+                $deliveryId,
             );
 
             DB::table('delivery_items')

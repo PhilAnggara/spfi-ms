@@ -814,23 +814,9 @@ class TransferSlipController extends Controller
                 return 0;
             }
 
-            $stockLines = DB::table('transfer_slip_items')
-                ->where('transfer_slip_id', $transferSlipId)
-                ->whereNull('deleted_at')
-                ->get(['id', 'item_id', 'product_code', 'quantity'])
-                ->map(fn ($row): array => [
-                    'item_id' => (int) $row->item_id,
-                    'product_code' => (string) $row->product_code,
-                    'quantity' => (float) $row->quantity,
-                    'reference_line_id' => (int) $row->id,
-                ])
-                ->all();
-
-            app(StockService::class)->reverseTransferSlipIssue(
-                transferSlipId: $transferSlipId,
-                movementDate: (string) $transferSlip->ts_date,
-                lines: $stockLines,
-                userId: $authUserId,
+            app(StockService::class)->purgeDocumentMovementsAndRechain(
+                StockService::REF_TRANSFER_SLIP,
+                $transferSlipId,
             );
 
             DB::table('transfer_slip_items')
