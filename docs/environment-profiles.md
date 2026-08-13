@@ -9,16 +9,42 @@ Referensi cepat untuk menyesuaikan `.env` saat pindah device atau lokasi.
 
 ## Ringkasan 3 Skenario
 
-| Skenario | Device | Lokasi | `DB_PROFILE` | `SEED_SOURCE` | Database dev | Snapshot |
-|----------|--------|--------|--------------|---------------|--------------|----------|
-| **Rumah** | Laptop | Offline / tidak ada jaringan kantor | `1` | `local` | MySQL `spfi_ms` | `storage/app/db-snapshots/*.sql` |
-| **Kantor** | Laptop | Terhubung jaringan kantor | `1` | `legacy` | MySQL `spfi_ms` | `storage/app/db-snapshots/*.sql` |
-| **Kantor** | PC | Terhubung jaringan kantor | `2` | `legacy` | SQL Server `spfi_ms` | `\\192.168.11.250\database\spfi_ms\*.bak` |
+| Skenario | Device | Lokasi | `DB_PROFILE` | Database dev | Sumber data |
+|----------|--------|--------|--------------|--------------|-------------|
+| **Rumah** | Laptop | Offline / tidak ada jaringan kantor | `1` | MySQL `spfi_ms` | Snapshot / data yang di-pull di kantor |
+| **Kantor** | Laptop | Terhubung jaringan kantor | `1` | MySQL `spfi_ms` | `db:pull-production` dari SQL Server `spfi_ms` |
+| **Kantor** | PC | Terhubung jaringan kantor | `2` | SQL Server `spfi_ms_dev` | `db:pull-production` dari SQL Server `spfi_ms` |
 
 **Catatan snapshot:**
 - Snapshot **tidak bisa ditukar** antar driver (`.sql` MySQL ≠ `.bak` SQL Server).
-- Snapshot **tidak bisa ditukar** antar skenario data berbeda (CSV vs legacy) — buat snapshot baru setelah seed.
-- Database **legacy kantor** (`b12d4a36`, dll.) **tidak** di-backup — hanya database dev `spfi_ms`.
+- Database **production** (`spfi_ms` di SQL Server) **tidak** di-backup oleh `db:snapshot` — hanya database development.
+- Database **legacy kantor** (`b12d4a36`, dll.) **tidak** di-backup.
+
+---
+
+## Pull production → development
+
+Jalankan **hanya di kantor** (production SQL Server harus reachable). Schema target harus sudah up-to-date (`php artisan migrate`) sebelum pull — command ini mengganti **data**, bukan membuat ulang schema.
+
+```bash
+php artisan migrate
+php artisan db:pull-production
+```
+
+- `DB_PROFILE=2` (PC kantor): production `spfi_ms` → SQL Server `spfi_ms_dev`
+- `DB_PROFILE=1` (laptop di kantor): production `spfi_ms` → MySQL lokal `spfi_ms`, lalu dibawa pulang
+
+Opsi:
+
+```bash
+php artisan db:pull-production --dry-run
+php artisan db:pull-production --force
+php artisan db:pull-production --chunk=500
+```
+
+`--force` melewati konfirmasi. `--dry-run` hanya menampilkan daftar tabel dan jumlah baris.
+
+Setelah pull, opsional: `php artisan db:snapshot` agar development bisa di-restore tanpa pull ulang.
 
 ---
 
@@ -62,9 +88,9 @@ php artisan db:snapshot
 
 ---
 
-## Skenario 2 — Laptop Kantor (MySQL + Legacy)
+## Skenario 2 — Laptop Kantor (MySQL + Production)
 
-Gunakan saat laptop di kantor, terhubung jaringan, seed langsung dari sistem lama.
+Gunakan saat laptop di kantor, terhubung jaringan, untuk menyalin data production ke MySQL lokal sebelum pulang.
 
 ```env
 DB_PROFILE=1
@@ -82,19 +108,16 @@ DB_DATABASE=spfi_ms
 DB_USERNAME=root
 DB_PASSWORD=
 
-SEED_SOURCE=legacy
+SEED_SOURCE=local
 SEED_SOURCE_FALLBACK_TO_LOCAL=true
-LEGACY_DB_DEFAULT_CONNECTION=legacy_sqlsrv_1
 
-LEGACY_DB1_HOST=192.168.11.250
-LEGACY_DB1_PORT=1433
-LEGACY_DB1_DATABASE=b12d4a36
-LEGACY_DB1_USERNAME=sa
-LEGACY_DB1_PASSWORD=YourPasswordHere
-LEGACY_DB1_ENCRYPT=no
-LEGACY_DB1_TRUST_SERVER_CERTIFICATE=true
-
-# ... isi LEGACY_DB2, LEGACY_DB3, LEGACY_DB4 sesuai .env kantor Anda
+PROD_DB_HOST=192.168.11.250
+PROD_DB_PORT=1433
+PROD_DB_DATABASE=spfi_ms
+PROD_DB_USERNAME=sa
+PROD_DB_PASSWORD=YourPasswordHere
+PROD_DB_ENCRYPT=no
+PROD_DB_TRUST_SERVER_CERTIFICATE=true
 ```
 
 **Snapshot — tidak perlu `SQLSERVER_SNAPSHOT_PATH`** (MySQL lokal di laptop).
@@ -103,22 +126,23 @@ LEGACY_DB1_TRUST_SERVER_CERTIFICATE=true
 ```bash
 php artisan config:clear
 php artisan test --filter=DatabaseIsolationTest
-php artisan migrate:fresh --seed
+php artisan migrate
+php artisan db:pull-production
 php artisan db:snapshot
 ```
 
 ---
 
-## Skenario 3 — PC Kantor (SQL Server + Legacy)
+## Skenario 3 — PC Kantor (SQL Server + Production)
 
-Gunakan di PC kantor dengan database dev SQL Server.
+Gunakan di PC kantor dengan database development SQL Server `spfi_ms_dev` (bukan production `spfi_ms`).
 
 ```env
 DB_PROFILE=2
 
 DB_SQLSRV_HOST=192.168.11.250
 DB_SQLSRV_PORT=1433
-DB_SQLSRV_DATABASE=spfi_ms
+DB_SQLSRV_DATABASE=spfi_ms_dev
 DB_SQLSRV_USERNAME=sa
 DB_SQLSRV_PASSWORD=YourPasswordHere
 DB_SQLSRV_ENCRYPT=no
@@ -127,33 +151,28 @@ DB_SQLSRV_TRUST_SERVER_CERTIFICATE=true
 DB_CONNECTION=sqlsrv
 DB_HOST=192.168.11.250
 DB_PORT=1433
-DB_DATABASE=spfi_ms
+DB_DATABASE=spfi_ms_dev
 DB_USERNAME=sa
 DB_PASSWORD=YourPasswordHere
 
-SEED_SOURCE=legacy
-SEED_SOURCE_FALLBACK_TO_LOCAL=true
-LEGACY_DB_DEFAULT_CONNECTION=legacy_sqlsrv_1
-
-LEGACY_DB1_HOST=192.168.11.250
-LEGACY_DB1_PORT=1433
-LEGACY_DB1_DATABASE=b12d4a36
-LEGACY_DB1_USERNAME=sa
-LEGACY_DB1_PASSWORD=YourPasswordHere
-LEGACY_DB1_ENCRYPT=no
-LEGACY_DB1_TRUST_SERVER_CERTIFICATE=true
-
-# ... isi LEGACY_DB2, LEGACY_DB3, LEGACY_DB4 sesuai kebutuhan
+PROD_DB_HOST=192.168.11.250
+PROD_DB_PORT=1433
+PROD_DB_DATABASE=spfi_ms
+PROD_DB_USERNAME=sa
+PROD_DB_PASSWORD=YourPasswordHere
+PROD_DB_ENCRYPT=no
+PROD_DB_TRUST_SERVER_CERTIFICATE=true
 
 # Wajib untuk SQL Server remote — path di server, bukan di PC Anda
-SQLSERVER_SNAPSHOT_PATH=\\192.168.11.250\database\spfi_ms
+SQLSERVER_SNAPSHOT_PATH=\\192.168.11.250\database\spfi_ms_dev
 ```
 
 **Setup pertama:**
 ```bash
 php artisan config:clear
 php artisan test --filter=DatabaseIsolationTest
-php artisan migrate:fresh --seed
+php artisan migrate
+php artisan db:pull-production
 php artisan db:snapshot
 php artisan db:snapshots
 ```
@@ -163,10 +182,14 @@ php artisan db:snapshots
 ## Workflow Sehari-hari (Semua Skenario)
 
 ```bash
-# Setelah migrate:fresh --seed (hanya jika ada perubahan struktur tabel)
+# Di kantor: samakan data development dengan production
+php artisan migrate
+php artisan db:pull-production
+
+# Opsional: simpan salinan development
 php artisan db:snapshot
 
-# Saat database dev kosong
+# Saat database dev kosong (rumah / PC)
 php artisan db:restore
 
 # Lihat daftar snapshot
@@ -179,11 +202,10 @@ php artisan db:snapshots
 
 ### PC → Laptop (pulang ke rumah)
 
-1. `git push` dari PC (jika ada perubahan kode)
-2. Di laptop: `git pull`
-3. Ubah `.env` ke **Skenario 1** (Rumah)
-4. `php artisan config:clear`
-5. `php artisan db:restore` (jika sudah pernah snapshot di laptop) **atau** `migrate:fresh --seed` (jika belum ada snapshot)
+1. Di laptop **sebelum pulang** (masih di jaringan kantor): `.env` Skenario 2, lalu `php artisan migrate` → `php artisan db:pull-production` → `php artisan db:snapshot`
+2. `git push` dari PC (jika ada perubahan kode)
+3. Di rumah: `git pull`, `.env` Skenario 1, `php artisan config:clear`
+4. `php artisan db:restore` jika snapshot laptop sudah ada
 
 ### Laptop → PC (masuk kantor)
 
@@ -191,52 +213,26 @@ php artisan db:snapshots
 2. Di PC: `git pull`
 3. Ubah `.env` ke **Skenario 3** (PC Kantor)
 4. `php artisan config:clear`
-5. `php artisan db:restore` (jika sudah pernah snapshot di PC) **atau** `migrate:fresh --seed`
+5. `php artisan migrate` → `php artisan db:pull-production`
 
-### Laptop di kantor (pakai legacy, bukan CSV)
+### Laptop di kantor (refresh MySQL dari production)
 
 1. Ubah `.env` ke **Skenario 2** (Laptop Kantor)
 2. `php artisan config:clear`
-3. `migrate:fresh --seed` → `db:snapshot`
-
-### Refresh CSV fallback (kantor, sebelum pulang ke rumah)
-
-Gunakan saat ingin memperbarui file CSV offline di `public/csv/` agar `SEED_SOURCE=local` di rumah memakai data terbaru.
-
-```bash
-# Pastikan legacy SQL Server reachable (Skenario 2 atau 3)
-php artisan config:clear
-php artisan legacy:export-csv
-
-# Verifikasi CSV masih valid untuk seeding
-php artisan migrate:fresh --seed
-
-# Opsional: snapshot dev DB (lebih praktis untuk restore di rumah)
-php artisan db:snapshot
-```
-
-Export dataset tertentu saja:
-
-```bash
-php artisan legacy:export-csv --only=supplier,po,po_detail,rr,rr_detail
-php artisan legacy:export-csv --list
-php artisan legacy:export-csv --dry-run
-```
-
-Menambah tabel legacy baru: tambah entry di `config/legacy_import.php` → buat seeder → `legacy:export-csv --only=nama_dataset`.
-
-**Git:** file GL (`tbl_DocTran*.csv`) sangat besar — hindari commit ke repository.
+3. `php artisan migrate` → `php artisan db:pull-production` → `php artisan db:snapshot`
 
 ---
 
 ## Verifikasi Keamanan
 
-Pastikan database dev dan legacy **berbeda nama**:
+Production dan development SQL Server **harus berbeda nama**:
 
 ```env
-DB_SQLSRV_DATABASE=spfi_ms          # database dev app
-LEGACY_DB1_DATABASE=b12d4a36       # sistem lama — BUKAN spfi_ms
+PROD_DB_DATABASE=spfi_ms           # production — sumber pull, jangan dijadikan target
+DB_SQLSRV_DATABASE=spfi_ms_dev     # database development di kantor
 ```
+
+`db:pull-production` menolak menulis ke production, ke koneksi `legacy_*`, dan ke `APP_ENV=production`.
 
 Test isolasi (wajib pass setelah setup):
 
@@ -256,4 +252,7 @@ Harus **PASS** — artinya `php artisan test` tidak akan mengosongkan database d
 | `SQLSERVER_SNAPSHOT_PATH` required | Wajib di PC kantor (Skenario 3) |
 | `filesize(): stat failed` | Pastikan `SQLSERVER_SNAPSHOT_PATH` mengarah ke share server, bukan folder lokal PC |
 | Test menghapus database dev | Jalankan `php artisan config:clear`, pastikan `DatabaseIsolationTest` pass |
-| Snapshot lama gagal restore | Ada migration baru — jalankan `migrate:fresh --seed` lalu `db:snapshot` lagi |
+| Snapshot lama gagal restore | Ada migration baru — jalankan `migrate` lalu `db:pull-production` lalu `db:snapshot` lagi |
+| `db:pull-production` menolak target | Pastikan `DB_SQLSRV_DATABASE` bukan `spfi_ms` (harus `spfi_ms_dev`) dan `PROD_DB_*` terisi |
+| Schema mismatch saat pull | Jalankan `php artisan migrate` di target sebelum `db:pull-production` |
+

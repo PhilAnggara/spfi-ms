@@ -123,6 +123,21 @@ return [
             'trust_server_certificate' => env('DB_SQLSRV_TRUST_SERVER_CERTIFICATE', env('DB_TRUST_SERVER_CERTIFICATE', 'false')),
         ],
 
+        // Production SQL Server (read-only source for db:pull-production).
+        'production_sqlsrv' => [
+            'driver' => 'sqlsrv',
+            'host' => env('PROD_DB_HOST', env('DB_SQLSRV_HOST', env('DB_HOST', 'localhost'))),
+            'port' => env('PROD_DB_PORT', env('DB_SQLSRV_PORT', env('DB_PORT', '1433'))),
+            'database' => env('PROD_DB_DATABASE', 'spfi_ms'),
+            'username' => env('PROD_DB_USERNAME', env('DB_SQLSRV_USERNAME', env('DB_USERNAME', 'sa'))),
+            'password' => env('PROD_DB_PASSWORD', env('DB_SQLSRV_PASSWORD', env('DB_PASSWORD', ''))),
+            'charset' => env('PROD_DB_CHARSET', env('DB_CHARSET', 'utf8')),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('PROD_DB_ENCRYPT', env('DB_SQLSRV_ENCRYPT', env('DB_ENCRYPT', 'yes'))),
+            'trust_server_certificate' => env('PROD_DB_TRUST_SERVER_CERTIFICATE', env('DB_SQLSRV_TRUST_SERVER_CERTIFICATE', env('DB_TRUST_SERVER_CERTIFICATE', 'false'))),
+        ],
+
         // Legacy DB koneksi 1 (mis. sistem lama utama).
         'legacy_sqlsrv_1' => [
             'driver' => 'sqlsrv',
