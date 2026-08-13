@@ -59,6 +59,7 @@ class PermissionModuleGroups
         'po-progress' => 'po',
         'canvasser' => 'canvassing',
         'canvassing' => 'canvassing',
+        'purchase-history' => 'po',
         'products' => 'products',
         'suppliers' => 'suppliers',
         'employees' => 'employees',

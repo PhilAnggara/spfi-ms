@@ -73,8 +73,10 @@
                             <option value="code_desc" @selected($filters['sort'] === 'code_desc')>Product Code Z–A</option>
                             <option value="category_asc" @selected($filters['sort'] === 'category_asc')>Category A–Z</option>
                             <option value="category_desc" @selected($filters['sort'] === 'category_desc')>Category Z–A</option>
-                            <option value="avg_unit_price_asc" @selected($filters['sort'] === 'avg_unit_price_asc')>Avg Unit Price: Low → High</option>
-                            <option value="avg_unit_price_desc" @selected($filters['sort'] === 'avg_unit_price_desc')>Avg Unit Price: High → Low</option>
+                            @if ($canViewPurchaseHistory)
+                                <option value="avg_unit_price_asc" @selected($filters['sort'] === 'avg_unit_price_asc')>Avg Unit Price: Low → High</option>
+                                <option value="avg_unit_price_desc" @selected($filters['sort'] === 'avg_unit_price_desc')>Avg Unit Price: High → Low</option>
+                            @endif
                         </select>
                     </div>
                     <div class="col-4 col-md-3 col-xl-2">
@@ -110,11 +112,12 @@
                             data-csrf-token="{{ csrf_token() }}"
                             data-update-route-template="{{ route('product.update', '__ID__') }}"
                             data-destroy-route-template="{{ route('product.destroy', '__ID__') }}"
-                            data-history-route-template="{{ route('product.purchase-history', '__ID__') }}"
+                            data-history-route-template="{{ $canViewPurchaseHistory ? route('product.purchase-history', '__ID__') : '' }}"
                             data-po-show-route-template="{{ route('purchase-orders.show', '__ID__') }}"
                             data-can-manage="{{ $canManageProducts ? '1' : '0' }}"
                             data-can-create="{{ $canCreateProducts ? '1' : '0' }}"
                             data-can-view-po="{{ $canViewPurchaseOrders ? '1' : '0' }}"
+                            data-can-view-purchase-history="{{ $canViewPurchaseHistory ? '1' : '0' }}"
                             data-open-create-modal="{{ $errors->any() ? '1' : '0' }}"
                             data-editing-product-id="{{ (string) session('editing_product_id', '') }}">
                             <thead>
@@ -125,7 +128,9 @@
                                     <th>Unit</th>
                                     <th>Category</th>
                                     <th>Type</th>
-                                    <th class="text-end">Avg Unit Price</th>
+                                    @if ($canViewPurchaseHistory)
+                                        <th class="text-end">Avg Unit Price</th>
+                                    @endif
                                     <th class="text-center">Action</th>
                                 </tr>
                             </thead>
@@ -142,7 +147,9 @@
 @if ($canCreateProducts || $canManageProducts)
     @include('includes.modals.product-modal')
 @endif
-@include('includes.modals.product-purchase-history-modal')
+@if ($canViewPurchaseHistory)
+    @include('includes.modals.product-purchase-history-modal')
+@endif
 @endsection
 
 @push('prepend-style')

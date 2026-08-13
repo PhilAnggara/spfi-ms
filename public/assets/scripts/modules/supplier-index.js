@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const canManage = table.data('canManage') === 1 || table.data('canManage') === '1';
     const canDelete = table.data('canDelete') === 1 || table.data('canDelete') === '1';
     const canViewPo = table.data('canViewPo') === 1 || table.data('canViewPo') === '1';
+    const canViewPurchaseHistory = table.data('canViewPurchaseHistory') === 1 || table.data('canViewPurchaseHistory') === '1';
     const openCreateModal = table.data('openCreateModal') === 1 || table.data('openCreateModal') === '1';
     const editingSupplierId = String(table.data('editingSupplierId') || '');
 
@@ -33,25 +34,28 @@ document.addEventListener('DOMContentLoaded', function () {
         name_desc: { column: 2, dir: 'desc' },
         code_asc: { column: 1, dir: 'asc' },
         code_desc: { column: 1, dir: 'desc' },
-        po_count_asc: { column: 4, dir: 'asc' },
-        po_count_desc: { column: 4, dir: 'desc' },
-        total_amount_asc: { column: 5, dir: 'asc' },
-        total_amount_desc: { column: 5, dir: 'desc' },
-        last_po_date_asc: { column: 6, dir: 'asc' },
-        last_po_date_desc: { column: 6, dir: 'desc' },
     };
     const COLUMN_TO_SORT = {
         '2:asc': 'name_asc',
         '2:desc': 'name_desc',
         '1:asc': 'code_asc',
         '1:desc': 'code_desc',
-        '4:asc': 'po_count_asc',
-        '4:desc': 'po_count_desc',
-        '5:asc': 'total_amount_asc',
-        '5:desc': 'total_amount_desc',
-        '6:asc': 'last_po_date_asc',
-        '6:desc': 'last_po_date_desc',
     };
+
+    if (canViewPurchaseHistory) {
+        SORT_OPTIONS.po_count_asc = { column: 4, dir: 'asc' };
+        SORT_OPTIONS.po_count_desc = { column: 4, dir: 'desc' };
+        SORT_OPTIONS.total_amount_asc = { column: 5, dir: 'asc' };
+        SORT_OPTIONS.total_amount_desc = { column: 5, dir: 'desc' };
+        SORT_OPTIONS.last_po_date_asc = { column: 6, dir: 'asc' };
+        SORT_OPTIONS.last_po_date_desc = { column: 6, dir: 'desc' };
+        COLUMN_TO_SORT['4:asc'] = 'po_count_asc';
+        COLUMN_TO_SORT['4:desc'] = 'po_count_desc';
+        COLUMN_TO_SORT['5:asc'] = 'total_amount_asc';
+        COLUMN_TO_SORT['5:desc'] = 'total_amount_desc';
+        COLUMN_TO_SORT['6:asc'] = 'last_po_date_asc';
+        COLUMN_TO_SORT['6:desc'] = 'last_po_date_desc';
+    }
 
     const editModalElement = document.getElementById('edit-modal');
     const editModal = editModalElement && window.bootstrap && window.bootstrap.Modal
@@ -342,6 +346,10 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     const initHistoryTable = (supplierId) => {
+        if (!canViewPurchaseHistory || !historyRouteTemplate) {
+            return;
+        }
+
         resetHistoryTable();
 
         const historyUrl = String(historyRouteTemplate || '').replace('__ID__', supplierId);
@@ -428,65 +436,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const initialSortOrder = resolveSortOrder(filterElements.sort?.value);
 
-    supplierDataTable = table.DataTable({
-        processing: true,
-        serverSide: true,
-        searching: false,
-        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
-        pageLength: 10,
-        dom: "<'row mb-2'<'col-sm-6'l><'col-sm-6 text-end'>>rtip",
-        language: {
-            emptyTable: 'No suppliers found.',
-            zeroRecords: 'No suppliers found. Try changing your keyword or filters.',
+    const tableColumns = [
+        {
+            data: 'id',
+            visible: false,
+            searchable: false,
         },
-        ajax: {
-            url: tableUrl,
-            type: 'GET',
-            data: function (data) {
-                const filters = getFilterPayload();
-                data.keyword = filters.keyword;
-                data.has_po = filters.has_po;
-            },
-            beforeSend: function () {
-                setLoading(true);
-            },
-            complete: function () {
-                setLoading(false);
+        {
+            data: 'code',
+            render: function (data) {
+                const safeCode = escapeHtml(data ?? '-');
+                return `
+                    <button type="button" class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill copy-code" data-code="${safeCode}">
+                        <i class="fa-solid fa-regular fa-clipboard"></i>
+                        ${safeCode}
+                    </button>
+                `;
             },
         },
-        order: [[initialSortOrder.column, initialSortOrder.dir]],
-        columns: [
-            {
-                data: 'id',
-                visible: false,
-                searchable: false,
+        {
+            data: 'name',
+            render: function (data) {
+                const truncated = truncateText(data);
+                return `<span class="copy-name" data-name="${truncated.full}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="${truncated.full}" style="cursor: pointer">${truncated.display}</span>`;
             },
-            {
-                data: 'code',
-                render: function (data) {
-                    const safeCode = escapeHtml(data ?? '-');
-                    return `
-                        <button type="button" class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill copy-code" data-code="${safeCode}">
-                            <i class="fa-solid fa-regular fa-clipboard"></i>
-                            ${safeCode}
-                        </button>
-                    `;
-                },
+        },
+        {
+            data: 'address',
+            render: function (data) {
+                const truncated = truncateText(data, 40);
+                return `<span data-bstooltip-toggle="tooltip" data-bs-placement="top" title="${truncated.full}">${truncated.display}</span>`;
             },
-            {
-                data: 'name',
-                render: function (data) {
-                    const truncated = truncateText(data);
-                    return `<span class="copy-name" data-name="${truncated.full}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="${truncated.full}" style="cursor: pointer">${truncated.display}</span>`;
-                },
-            },
-            {
-                data: 'address',
-                render: function (data) {
-                    const truncated = truncateText(data, 40);
-                    return `<span data-bstooltip-toggle="tooltip" data-bs-placement="top" title="${truncated.full}">${truncated.display}</span>`;
-                },
-            },
+        },
+    ];
+
+    if (canViewPurchaseHistory) {
+        tableColumns.push(
             {
                 data: 'po_count',
                 className: 'text-end',
@@ -519,56 +504,115 @@ document.addEventListener('DOMContentLoaded', function () {
                 render: function (data) {
                     return formatDate(data);
                 },
-            },
+            }
+        );
+    } else {
+        tableColumns.push(
             {
-                data: null,
-                orderable: false,
-                searchable: false,
-                className: 'text-center',
-                render: function (row) {
-                    let manageButtons = '';
-                    if (canManage) {
-                        const editAttrs = `
-                            data-id="${row.id}"
-                            data-code="${escapeAttr(row.code)}"
-                            data-name="${escapeAttr(row.name)}"
-                            data-address="${escapeAttr(row.address)}"
-                            data-phone="${escapeAttr(row.phone)}"
-                            data-fax="${escapeAttr(row.fax)}"
-                            data-email="${escapeAttr(row.email)}"
-                            data-contact-person="${escapeAttr(row.contact_person)}"
-                            data-remarks="${escapeAttr(row.remarks)}"
-                        `;
-                        manageButtons += `
-                            <button type="button" class="btn icon edit-supplier" ${editAttrs} data-bs-toggle="modal" data-bs-target="#edit-modal" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
-                                <i class="fa-light fa-edit text-primary"></i>
-                            </button>
-                        `;
-                    }
-
-                    if (canDelete) {
-                        manageButtons += `
-                            <button type="button" class="btn icon delete-supplier" data-id="${row.id}" data-name="${escapeAttr(row.name)}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
-                                <i class="fa-light fa-trash text-secondary"></i>
-                            </button>
-                            <form action="${String(destroyRouteTemplate || '').replace('__ID__', row.id)}" id="hapus-${row.id}" method="POST">
-                                <input type="hidden" name="_token" value="${csrfToken}">
-                                <input type="hidden" name="_method" value="delete">
-                            </form>
-                        `;
-                    }
-
-                    return `
-                        <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn icon view-supplier-detail" data-id="${row.id}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Detail & Purchase History">
-                                <i class="fa-light fa-circle-info text-info"></i>
-                            </button>
-                            ${manageButtons}
-                        </div>
-                    `;
+                data: 'phone',
+                render: function (data) {
+                    return data ? escapeHtml(data) : '<span class="text-muted">-</span>';
                 },
             },
-        ],
+            {
+                data: 'contact_person',
+                render: function (data) {
+                    return data ? escapeHtml(data) : '<span class="text-muted">-</span>';
+                },
+            },
+            {
+                data: 'email',
+                render: function (data) {
+                    if (!data) {
+                        return '<span class="text-muted">-</span>';
+                    }
+                    return `<a href="mailto:${escapeAttr(data)}">${escapeHtml(data)}</a>`;
+                },
+            }
+        );
+    }
+
+    tableColumns.push({
+        data: null,
+        orderable: false,
+        searchable: false,
+        className: 'text-center',
+        render: function (row) {
+            let manageButtons = '';
+            if (canManage) {
+                const editAttrs = `
+                    data-id="${row.id}"
+                    data-code="${escapeAttr(row.code)}"
+                    data-name="${escapeAttr(row.name)}"
+                    data-address="${escapeAttr(row.address)}"
+                    data-phone="${escapeAttr(row.phone)}"
+                    data-fax="${escapeAttr(row.fax)}"
+                    data-email="${escapeAttr(row.email)}"
+                    data-contact-person="${escapeAttr(row.contact_person)}"
+                    data-remarks="${escapeAttr(row.remarks)}"
+                `;
+                manageButtons += `
+                    <button type="button" class="btn icon edit-supplier" ${editAttrs} data-bs-toggle="modal" data-bs-target="#edit-modal" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                        <i class="fa-light fa-edit text-primary"></i>
+                    </button>
+                `;
+            }
+
+            if (canDelete) {
+                manageButtons += `
+                    <button type="button" class="btn icon delete-supplier" data-id="${row.id}" data-name="${escapeAttr(row.name)}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
+                        <i class="fa-light fa-trash text-secondary"></i>
+                    </button>
+                    <form action="${String(destroyRouteTemplate || '').replace('__ID__', row.id)}" id="hapus-${row.id}" method="POST">
+                        <input type="hidden" name="_token" value="${csrfToken}">
+                        <input type="hidden" name="_method" value="delete">
+                    </form>
+                `;
+            }
+
+            const detailTitle = canViewPurchaseHistory ? 'Detail & Purchase History' : 'Detail';
+
+            return `
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn icon view-supplier-detail" data-id="${row.id}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="${detailTitle}">
+                        <i class="fa-light fa-circle-info text-info"></i>
+                    </button>
+                    ${manageButtons}
+                </div>
+            `;
+        },
+    });
+
+    supplierDataTable = table.DataTable({
+        processing: true,
+        serverSide: true,
+        searching: false,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        pageLength: 10,
+        dom: "<'row mb-2'<'col-sm-6'l><'col-sm-6 text-end'>>rtip",
+        language: {
+            emptyTable: 'No suppliers found.',
+            zeroRecords: 'No suppliers found. Try changing your keyword or filters.',
+        },
+        ajax: {
+            url: tableUrl,
+            type: 'GET',
+            data: function (data) {
+                const filters = getFilterPayload();
+                data.keyword = filters.keyword;
+                if (canViewPurchaseHistory) {
+                    data.has_po = filters.has_po;
+                }
+            },
+            beforeSend: function () {
+                setLoading(true);
+            },
+            complete: function () {
+                setLoading(false);
+            },
+        },
+        order: [[initialSortOrder.column, initialSortOrder.dir]],
+        columns: tableColumns,
         drawCallback: function () {
             const info = supplierDataTable.page.info();
             if (resultBadge) {
@@ -641,10 +685,14 @@ document.addEventListener('DOMContentLoaded', function () {
             title.textContent = `${code} — ${name}`;
         }
         if (meta) {
-            meta.textContent = 'Supplier information and purchase history';
+            meta.textContent = canViewPurchaseHistory
+                ? 'Supplier information and purchase history'
+                : 'Supplier information';
         }
 
-        initHistoryTable(row.id);
+        if (canViewPurchaseHistory) {
+            initHistoryTable(row.id);
+        }
 
         updateSupplierDetail({
             address: row.address,
@@ -660,7 +708,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    if (historyModalElement) {
+    if (historyModalElement && canViewPurchaseHistory) {
         historyModalElement.addEventListener('hidden.bs.modal', destroyHistoryTable);
     }
 

@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const canManage = table.data('canManage') === 1 || table.data('canManage') === '1';
     const canCreate = table.data('canCreate') === 1 || table.data('canCreate') === '1';
     const canViewPo = table.data('canViewPo') === 1 || table.data('canViewPo') === '1';
+    const canViewPurchaseHistory = table.data('canViewPurchaseHistory') === 1 || table.data('canViewPurchaseHistory') === '1';
     const openCreateModal = table.data('openCreateModal') === 1 || table.data('openCreateModal') === '1';
     const editingProductId = String(table.data('editingProductId') || '');
 
@@ -37,8 +38,6 @@ document.addEventListener('DOMContentLoaded', function () {
         code_desc: { column: 1, dir: 'desc' },
         category_asc: { column: 4, dir: 'asc' },
         category_desc: { column: 4, dir: 'desc' },
-        avg_unit_price_asc: { column: 6, dir: 'asc' },
-        avg_unit_price_desc: { column: 6, dir: 'desc' },
     };
     const COLUMN_TO_SORT = {
         '2:asc': 'name_asc',
@@ -47,9 +46,14 @@ document.addEventListener('DOMContentLoaded', function () {
         '1:desc': 'code_desc',
         '4:asc': 'category_asc',
         '4:desc': 'category_desc',
-        '6:asc': 'avg_unit_price_asc',
-        '6:desc': 'avg_unit_price_desc',
     };
+
+    if (canViewPurchaseHistory) {
+        SORT_OPTIONS.avg_unit_price_asc = { column: 6, dir: 'asc' };
+        SORT_OPTIONS.avg_unit_price_desc = { column: 6, dir: 'desc' };
+        COLUMN_TO_SORT['6:asc'] = 'avg_unit_price_asc';
+        COLUMN_TO_SORT['6:desc'] = 'avg_unit_price_desc';
+    }
 
     const editModalElement = document.getElementById('edit-modal');
     const editModal = editModalElement && window.bootstrap && window.bootstrap.Modal
@@ -318,6 +322,126 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const initialSortOrder = resolveSortOrder(filterElements.sort?.value);
 
+    const tableColumns = [
+        {
+            data: 'id',
+            visible: false,
+            searchable: false,
+        },
+        {
+            data: 'code',
+            render: function (data) {
+                const safeCode = escapeHtml(data ?? '-');
+                return `
+                    <button type="button" class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill copy-code" data-code="${safeCode}">
+                        <i class="fa-solid fa-regular fa-clipboard"></i>
+                        ${safeCode}
+                    </button>
+                `;
+            },
+        },
+        {
+            data: 'name',
+            render: function (data) {
+                const rawName = data ?? '-';
+                const safeName = escapeHtml(rawName);
+                const displayName = rawName.length > 80 ? `${escapeHtml(rawName.slice(0, 80))}...` : safeName;
+                return `<span class="copy-name" data-name="${safeName}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="${safeName}" style="cursor: pointer">${displayName}</span>`;
+            },
+        },
+        {
+            data: 'unit_name',
+            render: function (data) {
+                return `<span class="badge bg-light-secondary">${escapeHtml(data ?? '-')}</span>`;
+            },
+        },
+        {
+            data: 'category_name',
+            render: function (data) {
+                return escapeHtml(data ?? '-');
+            },
+        },
+        {
+            data: 'type',
+            render: function (data) {
+                return escapeHtml(data ?? '-');
+            },
+        },
+    ];
+
+    if (canViewPurchaseHistory) {
+        tableColumns.push({
+            data: 'avg_unit_price',
+            className: 'text-end',
+            render: function (data, type, row) {
+                if (data === null || data === undefined || data === '') {
+                    return '<span class="text-muted">-</span>';
+                }
+                const currency = escapeHtml(row.avg_price_currency ?? '');
+                return `<span class="fw-semibold">${currency} ${formatNumber(data)}</span>`;
+            },
+        });
+    }
+
+    tableColumns.push({
+        data: null,
+        orderable: false,
+        searchable: false,
+        className: 'text-center',
+        render: function (row) {
+            const safeName = escapeHtml(row.name ?? '-');
+            const safeCode = escapeHtml(row.code ?? '-');
+            const safeUnit = escapeHtml(row.unit_name ?? '-');
+            const safeCategory = escapeHtml(row.category_name ?? '-');
+            const historyAttrs = `
+                data-id="${row.id}"
+                data-code="${safeCode}"
+                data-name="${safeName}"
+                data-unit="${safeUnit}"
+                data-category="${safeCategory}"
+            `;
+
+            let manageButtons = '';
+            if (canManage) {
+                const editAttrs = `
+                    data-id="${row.id}"
+                    data-code="${safeCode}"
+                    data-name="${safeName}"
+                    data-unit-id="${row.unit_of_measure_id ?? ''}"
+                    data-category-id="${row.category_id ?? ''}"
+                    data-type="${escapeHtml(row.type ?? '')}"
+                `;
+                manageButtons = `
+                    <button type="button" class="btn icon edit-product" ${editAttrs} data-bs-toggle="modal" data-bs-target="#edit-modal" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
+                        <i class="fa-light fa-edit text-primary"></i>
+                    </button>
+                    <button type="button" class="btn icon delete-product" data-id="${row.id}" data-name="${safeName}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
+                        <i class="fa-light fa-trash text-secondary"></i>
+                    </button>
+                    <form action="${String(destroyRouteTemplate || '').replace('__ID__', row.id)}" id="hapus-${row.id}" method="POST">
+                        <input type="hidden" name="_token" value="${csrfToken}">
+                        <input type="hidden" name="_method" value="delete">
+                    </form>
+                `;
+            }
+
+            const historyButton = canViewPurchaseHistory
+                ? `
+                    <button type="button" class="btn icon view-purchase-history" ${historyAttrs} data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Purchase History">
+                        <i class="fa-light fa-clock-rotate-left text-info"></i>
+                    </button>
+                `
+                : '';
+
+            return `
+                <div class="btn-group btn-group-sm">
+                    ${historyButton}
+                    ${manageButtons}
+                </div>
+            `;
+        },
+    });
+
     productDataTable = table.DataTable({
         processing: true,
         serverSide: true,
@@ -347,115 +471,7 @@ document.addEventListener('DOMContentLoaded', function () {
             },
         },
         order: [[initialSortOrder.column, initialSortOrder.dir]],
-        columns: [
-            {
-                data: 'id',
-                visible: false,
-                searchable: false,
-            },
-            {
-                data: 'code',
-                render: function (data) {
-                    const safeCode = escapeHtml(data ?? '-');
-                    return `
-                        <button type="button" class="btn btn-sm icon icon-left btn-outline-secondary rounded-pill copy-code" data-code="${safeCode}">
-                            <i class="fa-solid fa-regular fa-clipboard"></i>
-                            ${safeCode}
-                        </button>
-                    `;
-                },
-            },
-            {
-                data: 'name',
-                render: function (data) {
-                    const rawName = data ?? '-';
-                    const safeName = escapeHtml(rawName);
-                    const displayName = rawName.length > 80 ? `${escapeHtml(rawName.slice(0, 80))}...` : safeName;
-                    return `<span class="copy-name" data-name="${safeName}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="${safeName}" style="cursor: pointer">${displayName}</span>`;
-                },
-            },
-            {
-                data: 'unit_name',
-                render: function (data) {
-                    return `<span class="badge bg-light-secondary">${escapeHtml(data ?? '-')}</span>`;
-                },
-            },
-            {
-                data: 'category_name',
-                render: function (data) {
-                    return escapeHtml(data ?? '-');
-                },
-            },
-            {
-                data: 'type',
-                render: function (data) {
-                    return escapeHtml(data ?? '-');
-                },
-            },
-            {
-                data: 'avg_unit_price',
-                className: 'text-end',
-                render: function (data, type, row) {
-                    if (data === null || data === undefined || data === '') {
-                        return '<span class="text-muted">-</span>';
-                    }
-                    const currency = escapeHtml(row.avg_price_currency ?? '');
-                    return `<span class="fw-semibold">${currency} ${formatNumber(data)}</span>`;
-                },
-            },
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                className: 'text-center',
-                render: function (row) {
-                    const safeName = escapeHtml(row.name ?? '-');
-                    const safeCode = escapeHtml(row.code ?? '-');
-                    const safeUnit = escapeHtml(row.unit_name ?? '-');
-                    const safeCategory = escapeHtml(row.category_name ?? '-');
-                    const historyAttrs = `
-                        data-id="${row.id}"
-                        data-code="${safeCode}"
-                        data-name="${safeName}"
-                        data-unit="${safeUnit}"
-                        data-category="${safeCategory}"
-                    `;
-
-                    let manageButtons = '';
-                    if (canManage) {
-                        const editAttrs = `
-                            data-id="${row.id}"
-                            data-code="${safeCode}"
-                            data-name="${safeName}"
-                            data-unit-id="${row.unit_of_measure_id ?? ''}"
-                            data-category-id="${row.category_id ?? ''}"
-                            data-type="${escapeHtml(row.type ?? '')}"
-                        `;
-                        manageButtons = `
-                            <button type="button" class="btn icon edit-product" ${editAttrs} data-bs-toggle="modal" data-bs-target="#edit-modal" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
-                                <i class="fa-light fa-edit text-primary"></i>
-                            </button>
-                            <button type="button" class="btn icon delete-product" data-id="${row.id}" data-name="${safeName}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
-                                <i class="fa-light fa-trash text-secondary"></i>
-                            </button>
-                            <form action="${String(destroyRouteTemplate || '').replace('__ID__', row.id)}" id="hapus-${row.id}" method="POST">
-                                <input type="hidden" name="_token" value="${csrfToken}">
-                                <input type="hidden" name="_method" value="delete">
-                            </form>
-                        `;
-                    }
-
-                    return `
-                        <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn icon view-purchase-history" ${historyAttrs} data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Purchase History">
-                                <i class="fa-light fa-clock-rotate-left text-info"></i>
-                            </button>
-                            ${manageButtons}
-                        </div>
-                    `;
-                },
-            },
-        ],
+        columns: tableColumns,
         drawCallback: function () {
             const info = productDataTable.page.info();
             if (resultBadge) {

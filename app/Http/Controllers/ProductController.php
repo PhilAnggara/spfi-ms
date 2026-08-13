@@ -34,6 +34,7 @@ class ProductController extends Controller
     public function index()
     {
         $user = auth()->user();
+        $canViewPurchaseHistory = $user?->can('view-purchase-history') ?? false;
         $itemCategories = ItemCategory::query()->orderBy('name')->get();
         $itemUnits = UnitOfMeasure::query()->orderBy('name')->get();
         $types = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
@@ -43,6 +44,13 @@ class ProductController extends Controller
         if ($editingProductId) {
             $editingItem = Item::query()->find($editingProductId);
         }
+
+        $allowedSorts = $canViewPurchaseHistory
+            ? self::ALLOWED_SORTS
+            : array_values(array_filter(
+                self::ALLOWED_SORTS,
+                fn (string $sort): bool => ! str_starts_with($sort, 'avg_unit_price_')
+            ));
 
         $sort = mb_strtolower(trim((string) request('sort', 'name_asc')));
 
@@ -56,11 +64,12 @@ class ProductController extends Controller
                 'category_id' => request('category_id', ''),
                 'unit_id' => request('unit_id', ''),
                 'type' => request('type', ''),
-                'sort' => in_array($sort, self::ALLOWED_SORTS, true) ? $sort : 'name_asc',
+                'sort' => in_array($sort, $allowedSorts, true) ? $sort : 'name_asc',
             ],
             'canCreateProducts' => $user?->can('create-products') ?? false,
             'canManageProducts' => ($user?->can('update-products') || $user?->can('delete-products')) ?? false,
             'canViewPurchaseOrders' => $user?->can('view-po') ?? false,
+            'canViewPurchaseHistory' => $canViewPurchaseHistory,
         ]);
     }
 
@@ -69,7 +78,8 @@ class ProductController extends Controller
      */
     public function datatable(Request $request)
     {
-        // Mapping kolom agar sorting sesuai urutan kolom di DataTables
+        $canViewPurchaseHistory = $request->user()?->can('view-purchase-history') ?? false;
+
         $columns = [
             'items.id',
             'items.code',
@@ -77,30 +87,15 @@ class ProductController extends Controller
             'unit_of_measures.name',
             'item_categories.name',
             'items.type',
-            'item_avg_price.avg_unit_price',
         ];
 
-        $rankedAvgSql = '
-            SELECT poi.item_id,
-                   c.code AS currency_code,
-                   SUM(poi.quantity * poi.unit_price) / NULLIF(SUM(poi.quantity), 0) AS avg_unit_price,
-                   SUM(poi.quantity) AS total_qty,
-                   ROW_NUMBER() OVER (PARTITION BY poi.item_id ORDER BY SUM(poi.quantity) DESC) AS rn
-            FROM purchase_order_items poi
-            INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id AND po.deleted_at IS NULL
-            INNER JOIN currencies c ON c.id = po.currency_id
-            GROUP BY poi.item_id, c.code
-        ';
+        if ($canViewPurchaseHistory) {
+            $columns[] = 'item_avg_price.avg_unit_price';
+        }
 
-        $avgPriceSubquery = DB::table(DB::raw("({$rankedAvgSql}) as ranked_avg"))
-            ->where('rn', 1)
-            ->select('item_id', 'currency_code', 'avg_unit_price');
-
-        // Base query untuk kebutuhan paging + join relasi
         $baseQuery = Item::query()
             ->leftJoin('unit_of_measures', 'items.unit_of_measure_id', '=', 'unit_of_measures.id')
             ->leftJoin('item_categories', 'items.category_id', '=', 'item_categories.id')
-            ->leftJoinSub($avgPriceSubquery, 'item_avg_price', 'item_avg_price.item_id', '=', 'items.id')
             ->select([
                 'items.id',
                 'items.code',
@@ -110,9 +105,32 @@ class ProductController extends Controller
                 'items.category_id',
                 'unit_of_measures.name as unit_name',
                 'item_categories.name as category_name',
-                'item_avg_price.avg_unit_price',
-                'item_avg_price.currency_code as avg_price_currency',
             ]);
+
+        if ($canViewPurchaseHistory) {
+            $rankedAvgSql = '
+                SELECT poi.item_id,
+                       c.code AS currency_code,
+                       SUM(poi.quantity * poi.unit_price) / NULLIF(SUM(poi.quantity), 0) AS avg_unit_price,
+                       SUM(poi.quantity) AS total_qty,
+                       ROW_NUMBER() OVER (PARTITION BY poi.item_id ORDER BY SUM(poi.quantity) DESC) AS rn
+                FROM purchase_order_items poi
+                INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id AND po.deleted_at IS NULL
+                INNER JOIN currencies c ON c.id = po.currency_id
+                GROUP BY poi.item_id, c.code
+            ';
+
+            $avgPriceSubquery = DB::table(DB::raw("({$rankedAvgSql}) as ranked_avg"))
+                ->where('rn', 1)
+                ->select('item_id', 'currency_code', 'avg_unit_price');
+
+            $baseQuery
+                ->leftJoinSub($avgPriceSubquery, 'item_avg_price', 'item_avg_price.item_id', '=', 'items.id')
+                ->addSelect([
+                    'item_avg_price.avg_unit_price',
+                    'item_avg_price.currency_code as avg_price_currency',
+                ]);
+        }
 
         // Total data tanpa filter
         $recordsTotal = Item::query()->count();
@@ -149,6 +167,10 @@ class ProductController extends Controller
         $orderDirection = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
         $orderColumn = $columns[$orderColumnIndex] ?? 'items.id';
 
+        if (! $canViewPurchaseHistory && str_contains((string) $orderColumn, 'avg_unit_price')) {
+            $orderColumn = 'items.id';
+        }
+
         // Paging
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -167,18 +189,25 @@ class ProductController extends Controller
             $start,
             $length
         )
-            ->map(fn ($row) => [
-                'id' => $row->id,
-                'code' => $row->code,
-                'name' => $row->name,
-                'type' => $row->type,
-                'unit_of_measure_id' => $row->unit_of_measure_id,
-                'category_id' => $row->category_id,
-                'unit_name' => $row->unit_name,
-                'category_name' => $row->category_name,
-                'avg_unit_price' => $row->avg_unit_price !== null ? round((float) $row->avg_unit_price, 2) : null,
-                'avg_price_currency' => $row->avg_price_currency,
-            ]);
+            ->map(function ($row) use ($canViewPurchaseHistory) {
+                $payload = [
+                    'id' => $row->id,
+                    'code' => $row->code,
+                    'name' => $row->name,
+                    'type' => $row->type,
+                    'unit_of_measure_id' => $row->unit_of_measure_id,
+                    'category_id' => $row->category_id,
+                    'unit_name' => $row->unit_name,
+                    'category_name' => $row->category_name,
+                ];
+
+                if ($canViewPurchaseHistory) {
+                    $payload['avg_unit_price'] = $row->avg_unit_price !== null ? round((float) $row->avg_unit_price, 2) : null;
+                    $payload['avg_price_currency'] = $row->avg_price_currency;
+                }
+
+                return $payload;
+            });
 
         // Format JSON sesuai kebutuhan DataTables
         return response()->json([

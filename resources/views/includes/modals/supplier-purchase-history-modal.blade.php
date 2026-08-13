@@ -1,3 +1,6 @@
+@php
+    $canViewPurchaseHistory = $canViewPurchaseHistory ?? false;
+@endphp
 <div class="modal fade text-left modal-borderless" id="supplier-purchase-history-modal" tabindex="-1" role="dialog" aria-labelledby="supplierPurchaseHistoryLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
         <div class="modal-content">
@@ -12,7 +15,7 @@
             </div>
             <div class="modal-body">
                 <div class="row g-3 mb-3 align-items-stretch">
-                    <div class="col-12 col-xl-6">
+                    <div class="{{ $canViewPurchaseHistory ? 'col-12 col-xl-6' : 'col-12' }}">
                         <div id="supplier-detail-panel" class="supplier-detail-panel h-100">
                             <h6 class="supplier-detail-heading">Supplier Information</h6>
                             <div class="supplier-info-grid">
@@ -62,31 +65,37 @@
                         </div>
                     </div>
 
-                    <div class="col-12 col-xl-6">
-                        <div id="supplier-purchase-history-summary" class="supplier-summary-panel h-100">
-                            <h6 class="supplier-detail-heading">Purchase Summary</h6>
-                            <div id="supplier-purchase-history-summary-body" class="supplier-summary-body"></div>
-                            <div class="text-muted small mt-2 mb-0">Grouped by currency. Average is weighted by quantity.</div>
+                    @if ($canViewPurchaseHistory)
+                        <div class="col-12 col-xl-6">
+                            <div id="supplier-purchase-history-summary" class="supplier-summary-panel h-100">
+                                <h6 class="supplier-detail-heading">Purchase Summary</h6>
+                                <div id="supplier-purchase-history-summary-body" class="supplier-summary-body"></div>
+                                <div class="text-muted small mt-2 mb-0">Grouped by currency. Average is weighted by quantity.</div>
+                            </div>
                         </div>
-                    </div>
+                    @endif
                 </div>
 
-                <h6 class="mb-2">Purchase History</h6>
-                <table class="table table-striped text-center text-nowrap w-100" id="supplier-purchase-history-table">
-                    <thead>
-                        <tr>
-                            <th>PO Number</th>
-                            <th>PO Date</th>
-                            <th>Currency</th>
-                            <th>Product Code</th>
-                            <th>Product Name</th>
-                            <th class="text-end">Qty</th>
-                            <th class="text-end">Unit Price</th>
-                            <th>Canvasser</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+                @if ($canViewPurchaseHistory)
+                    <div id="supplier-purchase-history-section">
+                        <h6 class="mb-2">Purchase History</h6>
+                        <table class="table table-striped text-center text-nowrap w-100" id="supplier-purchase-history-table">
+                            <thead>
+                                <tr>
+                                    <th>PO Number</th>
+                                    <th>PO Date</th>
+                                    <th>Currency</th>
+                                    <th>Product Code</th>
+                                    <th>Product Name</th>
+                                    <th class="text-end">Qty</th>
+                                    <th class="text-end">Unit Price</th>
+                                    <th>Canvasser</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                @endif
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Close</button>

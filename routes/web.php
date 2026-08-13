@@ -56,7 +56,11 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:view-products')->prefix('master')->group(function () {
         Route::get('product', [ProductController::class, 'index'])->name('product.index');
         Route::get('product/datatables', [ProductController::class, 'datatable'])->name('product.datatables');
+    });
+
+    Route::middleware('permission:view-purchase-history')->prefix('master')->group(function () {
         Route::get('product/{item}/purchase-history', [ProductController::class, 'purchaseHistory'])->name('product.purchase-history');
+        Route::get('supplier/{supplier}/purchase-history', [SupplierController::class, 'purchaseHistory'])->name('supplier.purchase-history');
     });
 
     Route::middleware('permission:create-products')->prefix('master')->group(function () {
@@ -75,7 +79,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:view-suppliers')->prefix('master')->group(function () {
         Route::get('supplier', [SupplierController::class, 'index'])->name('supplier.index');
         Route::get('supplier/datatables', [SupplierController::class, 'datatable'])->name('supplier.datatables');
-        Route::get('supplier/{supplier}/purchase-history', [SupplierController::class, 'purchaseHistory'])->name('supplier.purchase-history');
     });
 
     Route::middleware('permission:create-suppliers')->prefix('master')->group(function () {

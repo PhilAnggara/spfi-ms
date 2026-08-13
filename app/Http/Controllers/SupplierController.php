@@ -34,6 +34,8 @@ class SupplierController extends Controller
      */
     public function index()
     {
+        $user = auth()->user();
+        $canViewPurchaseHistory = $user?->can('view-purchase-history') ?? false;
         $editingSupplier = null;
         $editingSupplierId = session('editing_supplier_id');
 
@@ -41,18 +43,27 @@ class SupplierController extends Controller
             $editingSupplier = Supplier::query()->find($editingSupplierId);
         }
 
+        $allowedSorts = $canViewPurchaseHistory
+            ? self::ALLOWED_SORTS
+            : array_values(array_filter(
+                self::ALLOWED_SORTS,
+                fn (string $sort): bool => ! preg_match('/^(po_count|total_amount|last_po_date)_/', $sort)
+            ));
+
         $sort = mb_strtolower(trim((string) request('sort', 'name_asc')));
+        $hasPo = $canViewPurchaseHistory ? request('has_po', '') : '';
 
         return view('pages.supplier', [
             'editingSupplier' => $editingSupplier,
             'filters' => [
                 'keyword' => request('keyword', ''),
-                'has_po' => request('has_po', ''),
-                'sort' => in_array($sort, self::ALLOWED_SORTS, true) ? $sort : 'name_asc',
+                'has_po' => $hasPo,
+                'sort' => in_array($sort, $allowedSorts, true) ? $sort : 'name_asc',
             ],
-            'canManageSuppliers' => auth()->user()?->can('update-suppliers') ?? false,
-            'canDeleteSuppliers' => auth()->user()?->can('delete-suppliers') ?? false,
-            'canViewPurchaseOrders' => auth()->user()?->can('view-po') ?? false,
+            'canManageSuppliers' => $user?->can('update-suppliers') ?? false,
+            'canDeleteSuppliers' => $user?->can('delete-suppliers') ?? false,
+            'canViewPurchaseOrders' => $user?->can('view-po') ?? false,
+            'canViewPurchaseHistory' => $canViewPurchaseHistory,
         ]);
     }
 
@@ -61,43 +72,30 @@ class SupplierController extends Controller
      */
     public function datatable(Request $request)
     {
+        $canViewPurchaseHistory = $request->user()?->can('view-purchase-history') ?? false;
+
         $columns = [
             'suppliers.id',
             'suppliers.code',
             'suppliers.name',
             'suppliers.address',
-            'po_stats.po_count',
-            'amount_stats.total_amount',
-            'po_stats.last_po_date',
         ];
 
-        $poStatsSubquery = DB::table('purchase_orders as po')
-            ->whereNull('po.deleted_at')
-            ->select([
-                'po.supplier_id',
-                DB::raw('COUNT(DISTINCT po.id) as po_count'),
-                DB::raw('MAX(po.created_at) as last_po_date'),
-            ])
-            ->groupBy('po.supplier_id');
-
-        $rankedAmountSql = '
-            SELECT po.supplier_id,
-                   c.code AS currency_code,
-                   SUM(poi.quantity * poi.unit_price) AS total_amount,
-                   ROW_NUMBER() OVER (PARTITION BY po.supplier_id ORDER BY SUM(poi.quantity * poi.unit_price) DESC) AS rn
-            FROM purchase_order_items poi
-            INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id AND po.deleted_at IS NULL
-            INNER JOIN currencies c ON c.id = po.currency_id
-            GROUP BY po.supplier_id, c.code
-        ';
-
-        $amountStatsSubquery = DB::table(DB::raw("({$rankedAmountSql}) as ranked_amounts"))
-            ->where('rn', 1)
-            ->select('supplier_id', 'currency_code', 'total_amount');
+        if ($canViewPurchaseHistory) {
+            $columns = array_merge($columns, [
+                'po_stats.po_count',
+                'amount_stats.total_amount',
+                'po_stats.last_po_date',
+            ]);
+        } else {
+            $columns = array_merge($columns, [
+                'suppliers.phone',
+                'suppliers.contact_person',
+                'suppliers.email',
+            ]);
+        }
 
         $baseQuery = Supplier::query()
-            ->leftJoinSub($poStatsSubquery, 'po_stats', 'po_stats.supplier_id', '=', 'suppliers.id')
-            ->leftJoinSub($amountStatsSubquery, 'amount_stats', 'amount_stats.supplier_id', '=', 'suppliers.id')
             ->select([
                 'suppliers.id',
                 'suppliers.code',
@@ -108,11 +106,43 @@ class SupplierController extends Controller
                 'suppliers.email',
                 'suppliers.contact_person',
                 'suppliers.remarks',
-                'po_stats.po_count',
-                'po_stats.last_po_date',
-                'amount_stats.total_amount as primary_total_amount',
-                'amount_stats.currency_code as primary_total_currency',
             ]);
+
+        if ($canViewPurchaseHistory) {
+            $poStatsSubquery = DB::table('purchase_orders as po')
+                ->whereNull('po.deleted_at')
+                ->select([
+                    'po.supplier_id',
+                    DB::raw('COUNT(DISTINCT po.id) as po_count'),
+                    DB::raw('MAX(po.created_at) as last_po_date'),
+                ])
+                ->groupBy('po.supplier_id');
+
+            $rankedAmountSql = '
+                SELECT po.supplier_id,
+                       c.code AS currency_code,
+                       SUM(poi.quantity * poi.unit_price) AS total_amount,
+                       ROW_NUMBER() OVER (PARTITION BY po.supplier_id ORDER BY SUM(poi.quantity * poi.unit_price) DESC) AS rn
+                FROM purchase_order_items poi
+                INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id AND po.deleted_at IS NULL
+                INNER JOIN currencies c ON c.id = po.currency_id
+                GROUP BY po.supplier_id, c.code
+            ';
+
+            $amountStatsSubquery = DB::table(DB::raw("({$rankedAmountSql}) as ranked_amounts"))
+                ->where('rn', 1)
+                ->select('supplier_id', 'currency_code', 'total_amount');
+
+            $baseQuery
+                ->leftJoinSub($poStatsSubquery, 'po_stats', 'po_stats.supplier_id', '=', 'suppliers.id')
+                ->leftJoinSub($amountStatsSubquery, 'amount_stats', 'amount_stats.supplier_id', '=', 'suppliers.id')
+                ->addSelect([
+                    'po_stats.po_count',
+                    'po_stats.last_po_date',
+                    'amount_stats.total_amount as primary_total_amount',
+                    'amount_stats.currency_code as primary_total_currency',
+                ]);
+        }
 
         $recordsTotal = Supplier::query()->count();
 
@@ -129,13 +159,15 @@ class SupplierController extends Controller
             });
         }
 
-        if ($request->input('has_po') === '1') {
-            $baseQuery->where('po_stats.po_count', '>', 0);
-        } elseif ($request->input('has_po') === '0') {
-            $baseQuery->where(function ($query) {
-                $query->whereNull('po_stats.po_count')
-                    ->orWhere('po_stats.po_count', '=', 0);
-            });
+        if ($canViewPurchaseHistory) {
+            if ($request->input('has_po') === '1') {
+                $baseQuery->where('po_stats.po_count', '>', 0);
+            } elseif ($request->input('has_po') === '0') {
+                $baseQuery->where(function ($query) {
+                    $query->whereNull('po_stats.po_count')
+                        ->orWhere('po_stats.po_count', '=', 0);
+                });
+            }
         }
 
         $recordsFiltered = (clone $baseQuery)->reorder()->count();
@@ -143,6 +175,13 @@ class SupplierController extends Controller
         $orderColumnIndex = (int) $request->input('order.0.column', 0);
         $orderDirection = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
         $orderColumn = $columns[$orderColumnIndex] ?? 'suppliers.id';
+
+        if (
+            ! $canViewPurchaseHistory
+            && preg_match('/(po_count|total_amount|last_po_date)/', (string) $orderColumn)
+        ) {
+            $orderColumn = 'suppliers.id';
+        }
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -162,34 +201,30 @@ class SupplierController extends Controller
             $length
         );
 
-        $supplierIds = $rows->pluck('id');
+        $purchaseTotalsBySupplier = collect();
+        if ($canViewPurchaseHistory) {
+            $supplierIds = $rows->pluck('id');
 
-        $purchaseTotalsBySupplier = $supplierIds->isEmpty()
-            ? collect()
-            : DB::table('purchase_order_items as poi')
-                ->join('purchase_orders as po', 'po.id', '=', 'poi.purchase_order_id')
-                ->join('currencies as c', 'c.id', '=', 'po.currency_id')
-                ->whereNull('po.deleted_at')
-                ->whereIn('po.supplier_id', $supplierIds)
-                ->groupBy('po.supplier_id', 'c.code')
-                ->orderBy('c.code')
-                ->select([
-                    'po.supplier_id',
-                    'c.code as currency',
-                    DB::raw('ROUND(SUM(poi.quantity * poi.unit_price), 2) as total_amount'),
-                ])
-                ->get()
-                ->groupBy('supplier_id');
+            $purchaseTotalsBySupplier = $supplierIds->isEmpty()
+                ? collect()
+                : DB::table('purchase_order_items as poi')
+                    ->join('purchase_orders as po', 'po.id', '=', 'poi.purchase_order_id')
+                    ->join('currencies as c', 'c.id', '=', 'po.currency_id')
+                    ->whereNull('po.deleted_at')
+                    ->whereIn('po.supplier_id', $supplierIds)
+                    ->groupBy('po.supplier_id', 'c.code')
+                    ->orderBy('c.code')
+                    ->select([
+                        'po.supplier_id',
+                        'c.code as currency',
+                        DB::raw('ROUND(SUM(poi.quantity * poi.unit_price), 2) as total_amount'),
+                    ])
+                    ->get()
+                    ->groupBy('supplier_id');
+        }
 
-        $data = $rows->map(function ($row) use ($purchaseTotalsBySupplier) {
-            $purchaseTotals = ($purchaseTotalsBySupplier[$row->id] ?? collect())
-                ->map(fn ($totalRow) => [
-                    'currency' => $totalRow->currency,
-                    'total_amount' => $totalRow->total_amount !== null ? (float) $totalRow->total_amount : null,
-                ])
-                ->values();
-
-            return [
+        $data = $rows->map(function ($row) use ($canViewPurchaseHistory, $purchaseTotalsBySupplier) {
+            $payload = [
                 'id' => $row->id,
                 'code' => $row->code,
                 'name' => $row->name,
@@ -199,12 +234,24 @@ class SupplierController extends Controller
                 'email' => $row->email,
                 'contact_person' => $row->contact_person,
                 'remarks' => $row->remarks,
-                'po_count' => (int) ($row->po_count ?? 0),
-                'last_po_date' => $row->last_po_date,
-                'primary_total_amount' => $row->primary_total_amount !== null ? round((float) $row->primary_total_amount, 2) : null,
-                'primary_total_currency' => $row->primary_total_currency,
-                'purchase_totals' => $purchaseTotals,
             ];
+
+            if ($canViewPurchaseHistory) {
+                $purchaseTotals = ($purchaseTotalsBySupplier[$row->id] ?? collect())
+                    ->map(fn ($totalRow) => [
+                        'currency' => $totalRow->currency,
+                        'total_amount' => $totalRow->total_amount !== null ? (float) $totalRow->total_amount : null,
+                    ])
+                    ->values();
+
+                $payload['po_count'] = (int) ($row->po_count ?? 0);
+                $payload['last_po_date'] = $row->last_po_date;
+                $payload['primary_total_amount'] = $row->primary_total_amount !== null ? round((float) $row->primary_total_amount, 2) : null;
+                $payload['primary_total_currency'] = $row->primary_total_currency;
+                $payload['purchase_totals'] = $purchaseTotals;
+            }
+
+            return $payload;
         });
 
         return response()->json([
