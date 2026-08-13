@@ -21,31 +21,6 @@
     font-size: var(--spfi-input-font-size);
 }
 
-/*
- * iOS Safari zooms focused inputs when computed font-size is under 16px.
- * Root scale (75%/80% on <=1600px) would shrink rem-based controls below that.
- * Floor form controls to absolute 16px while keeping the rest of the UI dense.
- */
-@media (max-width: 1600px) {
-    :root {
-        --spfi-input-font-size: 16px;
-    }
-
-    .form-control-sm,
-    .form-select-sm,
-    .input-group-sm > .form-control,
-    .input-group-sm > .form-select,
-    .form-control.form-control-lg,
-    .form-control.form-control-xl,
-    .form-select.form-select-lg {
-        font-size: 16px;
-    }
-
-    .choices__input {
-        font-size: 16px;
-    }
-}
-
 /* Tables */
 .table {
     font-size: var(--spfi-table-font-size);

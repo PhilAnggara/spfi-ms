@@ -40,18 +40,49 @@ it('loads spfi scaling stylesheets on the dashboard', function () {
         ->assertSee('<button type="button" class="burger-btn', false)
         ->assertDontSee('<a href="#" class="burger-btn', false)
         ->assertDontSee('data-bs-display="static"', false)
+        ->assertSee('maximum-scale=1', false)
         ->assertDontSee('set-font-size.js', false);
 });
 
-it('floors form control font size to avoid mobile input zoom', function () {
+it('keeps form controls on rem scale instead of absolute 16px floor', function () {
     $componentsCss = file_get_contents(public_path('assets/styles/spfi-components.css'));
+    $tokensCss = file_get_contents(public_path('assets/styles/spfi-tokens.css'));
 
     expect($componentsCss)
-        ->toContain('--spfi-input-font-size: 16px')
-        ->toContain('@media (max-width: 1600px)')
-        ->toContain('.form-control-sm')
-        ->toContain('.form-control.form-control-xl')
-        ->toContain('.choices__input');
+        ->toContain('font-size: var(--spfi-input-font-size)')
+        ->not->toContain('--spfi-input-font-size: 16px')
+        ->not->toContain('@media (max-width: 1600px)');
+
+    expect($tokensCss)
+        ->toContain('--spfi-input-font-size: 1rem');
+});
+
+it('prevents mobile input zoom via viewport maximum-scale', function () {
+    $this->get(route('login'))
+        ->assertSuccessful()
+        ->assertSee('maximum-scale=1', false);
+
+    $department = Department::query()->create([
+        'name' => 'Viewport Test Department',
+        'code' => '7057',
+        'alias' => 'VP',
+    ]);
+
+    $user = User::query()->create([
+        'name' => 'Viewport Test User',
+        'username' => 'viewport-test-'.uniqid(),
+        'email' => 'viewport-test-'.uniqid().'@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $department->id,
+        'role' => 'Staff',
+    ]);
+
+    $user->assignRole('administrator');
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertSee('maximum-scale=1', false);
 });
 
 it('keeps notification dropdown inside the mobile viewport', function () {
@@ -89,6 +120,7 @@ it('loads spfi scaling stylesheets on the login page', function () {
         ->assertSuccessful()
         ->assertSee('spfi-tokens.css', false)
         ->assertSee('spfi-scale.css', false)
+        ->assertSee('maximum-scale=1', false)
         ->assertDontSee('set-font-size.js', false);
 });
 
