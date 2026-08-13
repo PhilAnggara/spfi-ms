@@ -99,6 +99,7 @@ it('forbids im manager from product purchase history but allows product list wit
         ->get(route('product.index'))
         ->assertSuccessful()
         ->assertSee('data-can-view-purchase-history="0"', false)
+        ->assertSee('Stock')
         ->assertDontSee('Avg Unit Price')
         ->assertDontSee('product-purchase-history-modal', false);
 
@@ -112,6 +113,8 @@ it('forbids im manager from product purchase history but allows product list wit
 
     $row = collect($response->json('data'))->firstWhere('id', $this->item->id);
     expect($row)->not->toBeNull()
+        ->and($row)->toHaveKey('stock_on_hand')
+        ->and($row['stock_on_hand'])->toEqual(1)
         ->and($row)->not->toHaveKey('avg_unit_price')
         ->and($row)->not->toHaveKey('avg_price_currency');
 });
@@ -123,6 +126,7 @@ it('allows purchasing staff to open product purchase history and see avg price i
         ->get(route('product.index'))
         ->assertSuccessful()
         ->assertSee('data-can-view-purchase-history="1"', false)
+        ->assertSee('Stock')
         ->assertSee('Avg Unit Price')
         ->assertSee('product-purchase-history-modal', false);
 

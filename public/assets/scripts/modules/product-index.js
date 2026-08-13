@@ -36,23 +36,27 @@ document.addEventListener('DOMContentLoaded', function () {
         name_desc: { column: 2, dir: 'desc' },
         code_asc: { column: 1, dir: 'asc' },
         code_desc: { column: 1, dir: 'desc' },
-        category_asc: { column: 4, dir: 'asc' },
-        category_desc: { column: 4, dir: 'desc' },
+        stock_asc: { column: 3, dir: 'asc' },
+        stock_desc: { column: 3, dir: 'desc' },
+        category_asc: { column: 5, dir: 'asc' },
+        category_desc: { column: 5, dir: 'desc' },
     };
     const COLUMN_TO_SORT = {
         '2:asc': 'name_asc',
         '2:desc': 'name_desc',
         '1:asc': 'code_asc',
         '1:desc': 'code_desc',
-        '4:asc': 'category_asc',
-        '4:desc': 'category_desc',
+        '3:asc': 'stock_asc',
+        '3:desc': 'stock_desc',
+        '5:asc': 'category_asc',
+        '5:desc': 'category_desc',
     };
 
     if (canViewPurchaseHistory) {
-        SORT_OPTIONS.avg_unit_price_asc = { column: 6, dir: 'asc' };
-        SORT_OPTIONS.avg_unit_price_desc = { column: 6, dir: 'desc' };
-        COLUMN_TO_SORT['6:asc'] = 'avg_unit_price_asc';
-        COLUMN_TO_SORT['6:desc'] = 'avg_unit_price_desc';
+        SORT_OPTIONS.avg_unit_price_asc = { column: 7, dir: 'asc' };
+        SORT_OPTIONS.avg_unit_price_desc = { column: 7, dir: 'desc' };
+        COLUMN_TO_SORT['7:asc'] = 'avg_unit_price_asc';
+        COLUMN_TO_SORT['7:desc'] = 'avg_unit_price_desc';
     }
 
     const editModalElement = document.getElementById('edit-modal');
@@ -104,6 +108,17 @@ document.addEventListener('DOMContentLoaded', function () {
         return number.toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
+        });
+    };
+
+    const formatStock = (value) => {
+        const number = Number(value);
+        if (Number.isNaN(number)) {
+            return '-';
+        }
+        return number.toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 5,
         });
     };
 
@@ -347,6 +362,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 const safeName = escapeHtml(rawName);
                 const displayName = rawName.length > 80 ? `${escapeHtml(rawName.slice(0, 80))}...` : safeName;
                 return `<span class="copy-name" data-name="${safeName}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="${safeName}" style="cursor: pointer">${displayName}</span>`;
+            },
+        },
+        {
+            data: 'stock_on_hand',
+            className: 'text-end',
+            render: function (data) {
+                if (data === null || data === undefined || data === '') {
+                    return '<span class="text-muted">0</span>';
+                }
+                return `<span class="fw-semibold">${formatStock(data)}</span>`;
             },
         },
         {

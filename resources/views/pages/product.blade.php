@@ -73,6 +73,8 @@
                             <option value="code_desc" @selected($filters['sort'] === 'code_desc')>Product Code Z–A</option>
                             <option value="category_asc" @selected($filters['sort'] === 'category_asc')>Category A–Z</option>
                             <option value="category_desc" @selected($filters['sort'] === 'category_desc')>Category Z–A</option>
+                            <option value="stock_asc" @selected($filters['sort'] === 'stock_asc')>Stock: Low → High</option>
+                            <option value="stock_desc" @selected($filters['sort'] === 'stock_desc')>Stock: High → Low</option>
                             @if ($canViewPurchaseHistory)
                                 <option value="avg_unit_price_asc" @selected($filters['sort'] === 'avg_unit_price_asc')>Avg Unit Price: Low → High</option>
                                 <option value="avg_unit_price_desc" @selected($filters['sort'] === 'avg_unit_price_desc')>Avg Unit Price: High → Low</option>
@@ -125,6 +127,7 @@
                                     <th class="d-none">ID</th>
                                     <th>Product Code</th>
                                     <th>Name</th>
+                                    <th class="text-end">Stock</th>
                                     <th>Unit</th>
                                     <th>Category</th>
                                     <th>Type</th>
