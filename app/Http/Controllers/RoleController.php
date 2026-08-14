@@ -46,9 +46,9 @@ class RoleController extends Controller
     {
         $role->load(['permissions', 'users.department']);
         $permissions = Permission::query()->orderBy('name')->get();
-        $permissionGroups = PermissionModuleGroups::group($permissions);
+        $permissionMatrix = PermissionModuleGroups::matrix($permissions);
 
-        return view('pages.roles.show', compact('role', 'permissionGroups'));
+        return view('pages.roles.show', compact('role', 'permissionMatrix'));
     }
 
     public function update(UpdateRoleRequest $request, Role $role): RedirectResponse

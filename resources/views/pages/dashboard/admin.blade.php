@@ -135,7 +135,7 @@
             'items' => $dashboard['lists']['active_users'] ?? collect(),
             'onlineCount' => $metrics['users_online'] ?? 0,
             'sessionCount' => $metrics['active_sessions'] ?? 0,
-            'canManage' => auth()->user()?->hasAnyRole(['administrator', 'it-staff']) ?? false,
+            'canManage' => auth()->user()?->can('view-active-sessions') ?? false,
         ])
     </div>
 

@@ -83,6 +83,59 @@ class PermissionModuleGroups
     ];
 
     /**
+     * Permissions that are not CRUD view/create/update/delete of their suffix.
+     *
+     * @var array<string, string>
+     */
+    private const OTHER_RESOURCES = [
+        'view-all-prs' => 'prs',
+        'update-department-prs' => 'prs',
+        'update-all-prs' => 'prs',
+        'delete-department-prs' => 'prs',
+        'delete-all-prs' => 'prs',
+        'view-all-stores-withdrawal' => 'stores-withdrawal',
+        'update-department-stores-withdrawal' => 'stores-withdrawal',
+        'update-all-stores-withdrawal' => 'stores-withdrawal',
+        'delete-department-stores-withdrawal' => 'stores-withdrawal',
+        'delete-all-stores-withdrawal' => 'stores-withdrawal',
+        'view-po-progress' => 'po',
+        'view-purchase-history' => 'po',
+        'update-all-po' => 'po',
+        'assign-canvasser' => 'canvasser',
+        'assign-user-access' => 'users',
+        'force-logout-users' => 'active-sessions',
+        'reset-activity-logs' => 'activity-logs',
+        'select-supplier-comparison' => 'supplier-comparison',
+        'approve-po' => 'po',
+        'submit-po' => 'po',
+        'cancel-po' => 'po',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    private const RESOURCE_LABELS = [
+        'uom' => 'UOM',
+        'prs' => 'PRS',
+        'po' => 'PO',
+        'rr' => 'RR',
+        'accounting-master' => 'Accounting master',
+        'active-sessions' => 'Active sessions',
+        'activity-logs' => 'Activity logs',
+        'product-categories' => 'Product categories',
+        'fish-suppliers' => 'Fish suppliers',
+        'stores-withdrawal' => 'Stores withdrawal',
+        'stock-adjustment' => 'Stock adjustments',
+        'opening-balance-correction' => 'Opening balance',
+        'supplier-comparison' => 'Supplier comparison',
+        'doc-entries' => 'Document entries',
+        'exchange-rates' => 'Exchange rates',
+        'procurement-reports' => 'Procurement reports',
+        'accounting-reports' => 'Accounting reports',
+        'im-reports' => 'IM reports',
+    ];
+
+    /**
      * Group permissions by module. Returns ordered list of groups.
      *
      * @param  Collection<int, object>  $permissions
@@ -135,5 +188,108 @@ class PermissionModuleGroups
         }
 
         return $bestMatch ?? 'other';
+    }
+
+    /**
+     * Group permissions into module tables with CRUD columns plus Other.
+     *
+     * @param  Collection<int, object>  $permissions
+     * @return list<array{key: string, label: string, rows: list<array{resource: string, label: string, view: ?object, create: ?object, update: ?object, delete: ?object, other: list<object>}>}>
+     */
+    public static function matrix(Collection $permissions): array
+    {
+        $grouped = self::group($permissions);
+        $matrix = [];
+
+        foreach ($grouped as $group) {
+            /** @var array<string, array{resource: string, label: string, view: ?object, create: ?object, update: ?object, delete: ?object, other: list<object>}> $rows */
+            $rows = [];
+
+            foreach ($group['permissions'] as $permission) {
+                $parsed = self::parse((string) $permission->name);
+                $resource = $parsed['resource'];
+
+                if (! isset($rows[$resource])) {
+                    $rows[$resource] = [
+                        'resource' => $resource,
+                        'label' => self::resourceLabel($resource),
+                        'view' => null,
+                        'create' => null,
+                        'update' => null,
+                        'delete' => null,
+                        'other' => [],
+                    ];
+                }
+
+                if (in_array($parsed['column'], ['view', 'create', 'update', 'delete'], true)) {
+                    $rows[$resource][$parsed['column']] = $permission;
+                } else {
+                    $rows[$resource]['other'][] = $permission;
+                }
+            }
+
+            $matrix[] = [
+                'key' => $group['key'],
+                'label' => $group['label'],
+                'rows' => array_values($rows),
+            ];
+        }
+
+        return $matrix;
+    }
+
+    /**
+     * @return array{column: string, resource: string, verb: string}
+     */
+    public static function parse(string $permissionName): array
+    {
+        $name = strtolower(trim($permissionName));
+
+        if (isset(self::OTHER_RESOURCES[$name])) {
+            $resource = self::OTHER_RESOURCES[$name];
+
+            return [
+                'column' => 'other',
+                'resource' => $resource,
+                'verb' => self::actionLabel($name, $resource),
+            ];
+        }
+
+        if (preg_match('/^(view|create|update|delete)-(.+)$/', $name, $matches) === 1) {
+            return [
+                'column' => $matches[1],
+                'resource' => $matches[2],
+                'verb' => $matches[1],
+            ];
+        }
+
+        $parts = explode('-', $name, 2);
+
+        return [
+            'column' => 'other',
+            'resource' => $parts[1] ?? $name,
+            'verb' => str_replace('-', ' ', $parts[0]),
+        ];
+    }
+
+    public static function resourceLabel(string $resource): string
+    {
+        if (isset(self::RESOURCE_LABELS[$resource])) {
+            return self::RESOURCE_LABELS[$resource];
+        }
+
+        return ucwords(str_replace('-', ' ', $resource));
+    }
+
+    public static function actionLabel(string $permissionName, string $resource): string
+    {
+        $name = strtolower(trim($permissionName));
+        $suffix = '-'.$resource;
+
+        if (str_ends_with($name, $suffix)) {
+            return str_replace('-', ' ', substr($name, 0, -strlen($suffix)));
+        }
+
+        return str_replace('-', ' ', $name);
     }
 }

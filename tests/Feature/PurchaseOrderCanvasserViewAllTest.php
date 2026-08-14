@@ -95,6 +95,25 @@ it('forbids purchasing staff from cancelling another staff purchase order', func
     expect($this->otherPo->fresh()->status)->toBe('APPROVED');
 });
 
+it('allows im-staff with view-po to see purchase orders created by other users', function () {
+    $imStaff = User::query()->create([
+        'name' => 'IM Staff Viewer',
+        'username' => 'po-view-im-staff',
+        'email' => 'po-view-im-staff@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $this->canvasser->department_id,
+        'role' => 'Staff',
+    ]);
+    $imStaff->assignRole('im-staff');
+
+    $this->actingAs($imStaff)
+        ->get(route('purchase-orders.index'))
+        ->assertSuccessful()
+        ->assertSee('PO-VIEW-OWN-001')
+        ->assertSee('PO-VIEW-OTHER-001')
+        ->assertSee('PO-VIEW-OTHER-PENDING');
+});
+
 it('forbids purchasing staff from withdrawing another staff purchase order', function () {
     $this->actingAs($this->canvasser)
         ->post(route('purchase-orders.withdraw', $this->otherPendingPo))

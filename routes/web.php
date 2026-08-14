@@ -105,7 +105,7 @@ Route::middleware('auth')->group(function () {
         Route::post('user', [UserController::class, 'store'])->name('user.store');
     });
 
-    Route::middleware('permission:edit-users')->prefix('master')->group(function () {
+    Route::middleware('permission:update-users')->prefix('master')->group(function () {
         Route::put('user/{user}', [UserController::class, 'update'])->name('user.update');
         Route::patch('user/{user}', [UserController::class, 'update']);
     });
@@ -114,9 +114,12 @@ Route::middleware('auth')->group(function () {
         Route::delete('user/{user}', [UserController::class, 'destroy'])->name('user.destroy');
     });
 
-    Route::middleware('permission:manage-active-sessions')->prefix('master')->group(function () {
+    Route::middleware('permission:view-active-sessions')->prefix('master')->group(function () {
         Route::get('active-sessions', [ActiveSessionController::class, 'index'])->name('active-sessions.index');
         Route::get('active-sessions/{user}', [ActiveSessionController::class, 'show'])->name('active-sessions.show');
+    });
+
+    Route::middleware('permission:force-logout-users')->prefix('master')->group(function () {
         Route::delete('active-sessions/{user}/sessions', [ActiveSessionController::class, 'destroySessions'])->name('active-sessions.destroy-sessions');
     });
 
@@ -131,10 +134,16 @@ Route::middleware('auth')->group(function () {
         Route::get('product-category/{product_category}/edit', [ItemCategoryController::class, 'edit'])->name('product-category.edit');
     });
 
-    Route::middleware('permission:manage-product-categories')->prefix('master')->group(function () {
+    Route::middleware('permission:create-product-categories')->prefix('master')->group(function () {
         Route::post('product-category', [ItemCategoryController::class, 'store'])->name('product-category.store');
+    });
+
+    Route::middleware('permission:update-product-categories')->prefix('master')->group(function () {
         Route::put('product-category/{product_category}', [ItemCategoryController::class, 'update'])->name('product-category.update');
         Route::patch('product-category/{product_category}', [ItemCategoryController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-product-categories')->prefix('master')->group(function () {
         Route::delete('product-category/{product_category}', [ItemCategoryController::class, 'destroy'])->name('product-category.destroy');
     });
 
@@ -145,10 +154,16 @@ Route::middleware('auth')->group(function () {
         Route::get('unit-of-measurement/{unit_of_measurement}/edit', [UnitOfMeasureController::class, 'edit'])->name('unit-of-measurement.edit');
     });
 
-    Route::middleware('permission:manage-uom')->prefix('master')->group(function () {
+    Route::middleware('permission:create-uom')->prefix('master')->group(function () {
         Route::post('unit-of-measurement', [UnitOfMeasureController::class, 'store'])->name('unit-of-measurement.store');
+    });
+
+    Route::middleware('permission:update-uom')->prefix('master')->group(function () {
         Route::put('unit-of-measurement/{unit_of_measurement}', [UnitOfMeasureController::class, 'update'])->name('unit-of-measurement.update');
         Route::patch('unit-of-measurement/{unit_of_measurement}', [UnitOfMeasureController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-uom')->prefix('master')->group(function () {
         Route::delete('unit-of-measurement/{unit_of_measurement}', [UnitOfMeasureController::class, 'destroy'])->name('unit-of-measurement.destroy');
     });
 
@@ -159,10 +174,16 @@ Route::middleware('auth')->group(function () {
         Route::get('buyer/{buyer}/edit', [BuyerController::class, 'edit'])->name('buyer.edit');
     });
 
-    Route::middleware('permission:manage-buyers')->prefix('master')->group(function () {
+    Route::middleware('permission:create-buyers')->prefix('master')->group(function () {
         Route::post('buyer', [BuyerController::class, 'store'])->name('buyer.store');
+    });
+
+    Route::middleware('permission:update-buyers')->prefix('master')->group(function () {
         Route::put('buyer/{buyer}', [BuyerController::class, 'update'])->name('buyer.update');
         Route::patch('buyer/{buyer}', [BuyerController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-buyers')->prefix('master')->group(function () {
         Route::delete('buyer/{buyer}', [BuyerController::class, 'destroy'])->name('buyer.destroy');
     });
 
@@ -173,10 +194,16 @@ Route::middleware('auth')->group(function () {
         Route::get('currency/{currency}/edit', [CurrencyController::class, 'edit'])->name('currency.edit');
     });
 
-    Route::middleware('permission:manage-currencies')->prefix('master')->group(function () {
+    Route::middleware('permission:create-currencies')->prefix('master')->group(function () {
         Route::post('currency', [CurrencyController::class, 'store'])->name('currency.store');
+    });
+
+    Route::middleware('permission:update-currencies')->prefix('master')->group(function () {
         Route::put('currency/{currency}', [CurrencyController::class, 'update'])->name('currency.update');
         Route::patch('currency/{currency}', [CurrencyController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-currencies')->prefix('master')->group(function () {
         Route::delete('currency/{currency}', [CurrencyController::class, 'destroy'])->name('currency.destroy');
     });
 
@@ -187,10 +214,16 @@ Route::middleware('auth')->group(function () {
         Route::get('batch/{batch}/edit', [BatchController::class, 'edit'])->name('batch.edit');
     });
 
-    Route::middleware('permission:manage-batches')->prefix('master')->group(function () {
+    Route::middleware('permission:create-batches')->prefix('master')->group(function () {
         Route::post('batch', [BatchController::class, 'store'])->name('batch.store');
+    });
+
+    Route::middleware('permission:update-batches')->prefix('master')->group(function () {
         Route::put('batch/{batch}', [BatchController::class, 'update'])->name('batch.update');
         Route::patch('batch/{batch}', [BatchController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-batches')->prefix('master')->group(function () {
         Route::delete('batch/{batch}', [BatchController::class, 'destroy'])->name('batch.destroy');
     });
 
@@ -201,10 +234,16 @@ Route::middleware('auth')->group(function () {
         Route::get('fish-supplier/{fish_supplier}/edit', [FishSupplierController::class, 'edit'])->name('fish-supplier.edit');
     });
 
-    Route::middleware('permission:manage-fish-suppliers')->prefix('master')->group(function () {
+    Route::middleware('permission:create-fish-suppliers')->prefix('master')->group(function () {
         Route::post('fish-supplier', [FishSupplierController::class, 'store'])->name('fish-supplier.store');
+    });
+
+    Route::middleware('permission:update-fish-suppliers')->prefix('master')->group(function () {
         Route::put('fish-supplier/{fish_supplier}', [FishSupplierController::class, 'update'])->name('fish-supplier.update');
         Route::patch('fish-supplier/{fish_supplier}', [FishSupplierController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-fish-suppliers')->prefix('master')->group(function () {
         Route::delete('fish-supplier/{fish_supplier}', [FishSupplierController::class, 'destroy'])->name('fish-supplier.destroy');
     });
 
@@ -215,10 +254,16 @@ Route::middleware('auth')->group(function () {
         Route::get('vessel/{vessel}/edit', [VesselController::class, 'edit'])->name('vessel.edit');
     });
 
-    Route::middleware('permission:manage-vessels')->prefix('master')->group(function () {
+    Route::middleware('permission:create-vessels')->prefix('master')->group(function () {
         Route::post('vessel', [VesselController::class, 'store'])->name('vessel.store');
+    });
+
+    Route::middleware('permission:update-vessels')->prefix('master')->group(function () {
         Route::put('vessel/{vessel}', [VesselController::class, 'update'])->name('vessel.update');
         Route::patch('vessel/{vessel}', [VesselController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-vessels')->prefix('master')->group(function () {
         Route::delete('vessel/{vessel}', [VesselController::class, 'destroy'])->name('vessel.destroy');
     });
 
@@ -229,12 +274,18 @@ Route::middleware('auth')->group(function () {
         Route::get('fish/{fish}/edit', [FishController::class, 'edit'])->name('fish.edit');
     });
 
-    Route::middleware('permission:manage-fish')->prefix('master')->group(function () {
+    Route::middleware('permission:create-fish')->prefix('master')->group(function () {
         Route::post('fish', [FishController::class, 'store'])->name('fish.store');
+        Route::post('fish-size', [FishSizeController::class, 'store'])->name('fish-size.store');
+    });
+
+    Route::middleware('permission:update-fish')->prefix('master')->group(function () {
         Route::put('fish/{fish}', [FishController::class, 'update'])->name('fish.update');
         Route::patch('fish/{fish}', [FishController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-fish')->prefix('master')->group(function () {
         Route::delete('fish/{fish}', [FishController::class, 'destroy'])->name('fish.destroy');
-        Route::post('fish-size', [FishSizeController::class, 'store'])->name('fish-size.store');
         Route::delete('fish-size/{fishSize}', [FishSizeController::class, 'destroy'])->name('fish-size.destroy');
     });
 
@@ -246,18 +297,24 @@ Route::middleware('auth')->group(function () {
         Route::get('accounting/balance-sheet/datatables', [BsGroupingController::class, 'datatable'])->name('balance-sheet.datatables');
     });
 
-    Route::middleware('permission:manage-accounting-master')->prefix('master')->name('accounting.')->group(function () {
+    Route::middleware('permission:create-accounting-master')->prefix('master')->name('accounting.')->group(function () {
         Route::post('accounting/groupings', [GroupingController::class, 'store'])->name('groupings.store');
-        Route::put('accounting/groupings/{grouping}', [GroupingController::class, 'update'])->name('groupings.update');
-        Route::delete('accounting/groupings/{grouping}', [GroupingController::class, 'destroy'])->name('groupings.destroy');
         Route::post('accounting/group-codes', [AccountingGroupCodeController::class, 'store'])->name('group-codes.store');
-        Route::put('accounting/group-codes/{groupCode}', [AccountingGroupCodeController::class, 'update'])->name('group-codes.update');
-        Route::delete('accounting/group-codes/{groupCode}', [AccountingGroupCodeController::class, 'destroy'])->name('group-codes.destroy');
         Route::post('accounting/codes', [AccountingCodeController::class, 'store'])->name('codes.store');
-        Route::put('accounting/codes/{code}', [AccountingCodeController::class, 'update'])->name('codes.update');
-        Route::delete('accounting/codes/{code}', [AccountingCodeController::class, 'destroy'])->name('codes.destroy');
         Route::post('accounting/balance-sheet', [BsGroupingController::class, 'store'])->name('balance-sheet.store');
+    });
+
+    Route::middleware('permission:update-accounting-master')->prefix('master')->name('accounting.')->group(function () {
+        Route::put('accounting/groupings/{grouping}', [GroupingController::class, 'update'])->name('groupings.update');
+        Route::put('accounting/group-codes/{groupCode}', [AccountingGroupCodeController::class, 'update'])->name('group-codes.update');
+        Route::put('accounting/codes/{code}', [AccountingCodeController::class, 'update'])->name('codes.update');
         Route::put('accounting/balance-sheet/{balanceSheet}', [BsGroupingController::class, 'update'])->name('balance-sheet.update');
+    });
+
+    Route::middleware('permission:delete-accounting-master')->prefix('master')->name('accounting.')->group(function () {
+        Route::delete('accounting/groupings/{grouping}', [GroupingController::class, 'destroy'])->name('groupings.destroy');
+        Route::delete('accounting/group-codes/{groupCode}', [AccountingGroupCodeController::class, 'destroy'])->name('group-codes.destroy');
+        Route::delete('accounting/codes/{code}', [AccountingCodeController::class, 'destroy'])->name('codes.destroy');
         Route::delete('accounting/balance-sheet/{balanceSheet}', [BsGroupingController::class, 'destroy'])->name('balance-sheet.destroy');
     });
 
@@ -266,27 +323,49 @@ Route::middleware('auth')->group(function () {
         Route::get('employees/id-cards/print', [EmployeeController::class, 'printIdCards'])->name('employees.id-cards.print');
     });
 
-    Route::middleware('permission:manage-employees')->prefix('master')->group(function () {
+    Route::middleware('permission:create-employees')->prefix('master')->group(function () {
         Route::post('employees', [EmployeeController::class, 'store'])->name('employees.store');
+    });
+
+    Route::middleware('permission:update-employees')->prefix('master')->group(function () {
         Route::put('employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
         Route::patch('employees/{employee}', [EmployeeController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-employees')->prefix('master')->group(function () {
         Route::delete('employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
     });
 
-    Route::middleware('permission:manage-roles')->prefix('master')->group(function () {
-        Route::resource('roles', RoleController::class);
+    Route::middleware('permission:view-roles')->prefix('master')->group(function () {
+        Route::get('roles', [RoleController::class, 'index'])->name('roles.index');
+        Route::get('roles/create', [RoleController::class, 'create'])->name('roles.create');
+        Route::get('roles/{role}', [RoleController::class, 'show'])->name('roles.show');
+        Route::get('roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
     });
 
-    Route::middleware('permission:manage-permissions')->prefix('master')->group(function () {
+    Route::middleware('permission:create-roles')->prefix('master')->group(function () {
+        Route::post('roles', [RoleController::class, 'store'])->name('roles.store');
+    });
+
+    Route::middleware('permission:update-roles')->prefix('master')->group(function () {
+        Route::put('roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+        Route::patch('roles/{role}', [RoleController::class, 'update']);
+    });
+
+    Route::middleware('permission:delete-roles')->prefix('master')->group(function () {
+        Route::delete('roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+    });
+
+    Route::middleware('permission:view-permissions')->prefix('master')->group(function () {
         Route::resource('permissions', PermissionController::class)->except(['show']);
     });
 
-    Route::middleware('permission:manage-user-access')->prefix('master')->group(function () {
+    Route::middleware('permission:assign-user-access')->prefix('master')->group(function () {
         Route::get('users/{user}/access', [UserAccessController::class, 'edit'])->name('users.access.edit');
         Route::put('users/{user}/access', [UserAccessController::class, 'update'])->name('users.access.update');
     });
 
-    Route::middleware('permission:assign-canvasser|approve-prs')->prefix('procurement')->group(function () {
+    Route::middleware('permission:assign-canvasser')->prefix('procurement')->group(function () {
         Route::get('/approval', [PrsApprovalController::class, 'index'])->name('prs.approval.index');
         Route::get('/approval/{prs}', [PrsApprovalController::class, 'show'])->name('prs.approval.show');
         Route::post('/approval/{prs}/approve', [PrsApprovalController::class, 'approve'])->name('prs.approve');
@@ -300,7 +379,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/supplier-comparison/{prsItem}/report', [SupplierComparisonController::class, 'report'])->name('procurement.supplier-comparison.report');
     });
 
-    Route::middleware('permission:manage-supplier-comparison')->prefix('procurement')->group(function () {
+    Route::middleware('permission:select-supplier-comparison')->prefix('procurement')->group(function () {
         Route::post('/supplier-comparison/{prsItem}', [SupplierComparisonController::class, 'select'])->name('procurement.supplier-comparison.select');
         Route::post('/supplier-comparison/{prsItem}/reject', [SupplierComparisonController::class, 'reject'])->name('procurement.supplier-comparison.reject');
     });
@@ -431,6 +510,9 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:update-rr')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
         Route::put('/{receivingReport}', [ReceivingReportController::class, 'update'])->name('update');
+    });
+
+    Route::middleware('permission:delete-rr')->prefix('receiving-reports')->name('receiving-reports.')->group(function () {
         Route::delete('/{receivingReport}', [ReceivingReportController::class, 'destroy'])->name('destroy');
     });
 

@@ -341,7 +341,7 @@
 
             </div>
             @php
-                $canManagePrs = auth()->id() === $item->user_id || auth()->user()->hasRole('administrator');
+                $canManagePrs = \App\Support\DocumentAccess::canUpdatePrs(auth()->user(), $item);
             @endphp
             @if ($canManagePrs)
                 <div class="modal-footer d-flex justify-content-center">
@@ -357,7 +357,7 @@
 
 
 @php
-    $canManagePrs = auth()->id() === $item->user_id || auth()->user()->hasRole('administrator');
+    $canManagePrs = \App\Support\DocumentAccess::canUpdatePrs(auth()->user(), $item);
     $canShowQuantityEditModal = $canManagePrs && $item->status === 'CANVASSER_HOLD';
     $canvasserHoldLog = $item->latestCanvasserHoldLog();
 @endphp

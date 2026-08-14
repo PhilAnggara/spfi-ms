@@ -38,7 +38,7 @@
                         @endif
                     </div>
                 </div>
-                @can('manage-user-access')
+                @can('assign-user-access')
                     <a href="{{ route('users.access.edit', $user) }}"
                        class="btn btn-sm btn-outline-primary flex-shrink-0"
                        data-bstooltip-toggle="tooltip"

@@ -10,6 +10,7 @@ use App\Services\CapexWithdrawalAvailabilityService;
 use App\Services\NotificationRecipientService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\UsesSmartCatalogSearch;
+use App\Support\DocumentAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -41,6 +42,7 @@ class StoreWithdrawalController extends Controller
         $storeWithdrawals = $this->paginateStoreWithdrawals(
             canViewAll: $canViewAll,
             userId: $user?->id,
+            departmentId: $user?->department_id ? (int) $user->department_id : null,
             filters: $filters,
             perPage: 10,
         );
@@ -532,7 +534,7 @@ class StoreWithdrawalController extends Controller
     {
         $storeWithdrawalId = (int) $storeWithdrawal;
 
-        $this->ensureUserCanManageStoreWithdrawal($request, $storeWithdrawalId);
+        $this->ensureUserCanViewStoreWithdrawal($request, $storeWithdrawalId);
 
         $sws = DB::table('store_withdrawals as sw')
             ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
@@ -614,7 +616,7 @@ class StoreWithdrawalController extends Controller
     {
         $storeWithdrawalId = (int) $storeWithdrawal;
 
-        $this->ensureUserCanManageStoreWithdrawal($request, $storeWithdrawalId);
+        $this->ensureUserCanUpdateStoreWithdrawal($request, $storeWithdrawalId);
 
         $sws = DB::table('store_withdrawals')
             ->where('id', $storeWithdrawalId)
@@ -704,7 +706,7 @@ class StoreWithdrawalController extends Controller
     {
         $storeWithdrawalId = (int) $storeWithdrawal;
 
-        $this->ensureUserCanManageStoreWithdrawal($request, $storeWithdrawalId);
+        $this->ensureUserCanUpdateStoreWithdrawal($request, $storeWithdrawalId);
 
         $existing = DB::table('store_withdrawals')
             ->where('id', $storeWithdrawalId)
@@ -1306,7 +1308,7 @@ class StoreWithdrawalController extends Controller
     {
         $storeWithdrawalId = (int) $storeWithdrawal;
 
-        $this->ensureUserCanManageStoreWithdrawal($request, $storeWithdrawalId);
+        $this->ensureUserCanDeleteStoreWithdrawal($request, $storeWithdrawalId);
 
         if ($this->hasActiveTransferSlip($storeWithdrawalId)) {
             return redirect()->back()->with('error', 'Stores withdrawal cannot be deleted because a transfer slip has already been created.');
@@ -1369,7 +1371,7 @@ class StoreWithdrawalController extends Controller
     /**
      * SQL Server-compatible pagination for stores withdrawals.
      */
-    private function paginateStoreWithdrawals(bool $canViewAll, ?int $userId, array $filters = [], int $perPage = 10): LengthAwarePaginator
+    private function paginateStoreWithdrawals(bool $canViewAll, ?int $userId, ?int $departmentId = null, array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
         $currentPage = max(1, (int) $currentPage);
@@ -1387,8 +1389,13 @@ class StoreWithdrawalController extends Controller
             ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
             ->leftJoin('users as u', 'u.id', '=', 'sw.created_by')
             ->whereNull('sw.deleted_at')
-            ->when(! $canViewAll, function ($subQuery) use ($userId) {
-                $subQuery->where('sw.created_by', $userId);
+            ->when(! $canViewAll, function ($subQuery) use ($userId, $departmentId) {
+                if ($departmentId) {
+                    // Visibility follows the creator's department.
+                    $subQuery->where('u.department_id', $departmentId);
+                } else {
+                    $subQuery->where('sw.created_by', $userId);
+                }
             })
             ->select([
                 'sw.id',
@@ -1400,6 +1407,7 @@ class StoreWithdrawalController extends Controller
                 'd.name as department_name',
                 'sw.info',
                 'u.name as created_by_name',
+                'u.department_id as created_by_department_id',
             ])
             ->when($keyword !== '', function ($subQuery) use ($keywordLike) {
                 $subQuery->where(function ($whereQuery) use ($keywordLike) {
@@ -1466,6 +1474,7 @@ class StoreWithdrawalController extends Controller
                     'd.name as department_name',
                     'sw.info',
                     'u.name as created_by_name',
+                    'u.department_id as created_by_department_id',
                 ])
                 ->get()
                 ->keyBy('id');
@@ -1587,7 +1596,22 @@ class StoreWithdrawalController extends Controller
             ->exists();
     }
 
-    private function ensureUserCanManageStoreWithdrawal(Request $request, int $storeWithdrawalId): void
+    private function ensureUserCanViewStoreWithdrawal(Request $request, int $storeWithdrawalId): void
+    {
+        $this->authorizeStoreWithdrawal($request, $storeWithdrawalId, 'view');
+    }
+
+    private function ensureUserCanUpdateStoreWithdrawal(Request $request, int $storeWithdrawalId): void
+    {
+        $this->authorizeStoreWithdrawal($request, $storeWithdrawalId, 'update');
+    }
+
+    private function ensureUserCanDeleteStoreWithdrawal(Request $request, int $storeWithdrawalId): void
+    {
+        $this->authorizeStoreWithdrawal($request, $storeWithdrawalId, 'delete');
+    }
+
+    private function authorizeStoreWithdrawal(Request $request, int $storeWithdrawalId, string $action): void
     {
         $sws = DB::table('store_withdrawals')
             ->where('id', $storeWithdrawalId)
@@ -1599,9 +1623,29 @@ class StoreWithdrawalController extends Controller
         }
 
         $user = $request->user();
-        $canViewAll = $user?->can('view-all-stores-withdrawal');
+        $ownerId = (int) ($sws->created_by ?? 0);
+        $creator = $ownerId > 0 ? User::query()->find($ownerId) : null;
 
-        if (! $canViewAll && (int) $sws->created_by !== (int) $user?->id) {
+        $allowed = match ($action) {
+            'view' => DocumentAccess::canView($user, $ownerId, $creator, 'view-all-stores-withdrawal'),
+            'update' => DocumentAccess::canMutate(
+                $user,
+                $ownerId,
+                $creator,
+                'update-department-stores-withdrawal',
+                'update-all-stores-withdrawal',
+            ),
+            'delete' => DocumentAccess::canMutate(
+                $user,
+                $ownerId,
+                $creator,
+                'delete-department-stores-withdrawal',
+                'delete-all-stores-withdrawal',
+            ),
+            default => false,
+        };
+
+        if (! $allowed) {
             abort(403);
         }
     }

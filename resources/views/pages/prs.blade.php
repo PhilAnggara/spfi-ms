@@ -14,16 +14,16 @@
             </div>
             <div class="col-12 col-lg-5">
                 <div class="prs-top-actions">
-                    @role('administrator|it-manager|it-staff|purchasing-manager|purchasing-staff|finance-manager|finance-supervisor|finance-staff')
                     <button type="button" class="btn btn-outline-primary icon icon-left" data-bs-toggle="modal" data-bs-target="#export-modal">
                         <i class="fa-duotone fa-solid fa-file-pdf"></i>
                         Export PDF
                     </button>
-                    @endrole
+                    @can('view-all-prs')
                     <button type="button" class="btn btn-outline-secondary icon icon-left" data-bs-toggle="modal" data-bs-target="#export-by-department-modal">
                         <i class="fa-duotone fa-solid fa-building"></i>
                         PRS per Department
                     </button>
+                    @endcan
                     <a href="{{ route('prs.create') }}" class="btn btn-success icon icon-left">
                         <i class="fa-duotone fa-solid fa-plus"></i>
                         Create PRS
@@ -190,10 +190,11 @@
                                                 <i class="fa-light fa-eye text-primary"></i>
                                             </button>
                                             @php
-                                                $canManagePrs = auth()->id() === $item->user_id || auth()->user()->hasRole('administrator');
-                                                $canFullEdit = $canManagePrs && in_array($item->status, ['REQUESTED', 'ON_HOLD', 'REVISED'], true);
-                                                $canQuantityEdit = $canManagePrs && $item->status === 'CANVASSER_HOLD';
-                                                $canDelete = $canFullEdit;
+                                                $canUpdatePrs = \App\Support\DocumentAccess::canUpdatePrs(auth()->user(), $item);
+                                                $canDeletePrs = \App\Support\DocumentAccess::canDeletePrs(auth()->user(), $item);
+                                                $canFullEdit = $canUpdatePrs && in_array($item->status, ['REQUESTED', 'ON_HOLD', 'REVISED'], true);
+                                                $canQuantityEdit = $canUpdatePrs && $item->status === 'CANVASSER_HOLD';
+                                                $canDelete = $canDeletePrs && in_array($item->status, ['REQUESTED', 'ON_HOLD', 'REVISED'], true);
                                             @endphp
                                             @if ($canFullEdit)
                                                 <a href="{{ route('prs.edit', $item) }}" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
@@ -231,10 +232,10 @@
 </div>
 <div id="prs-page-modals">
     @include('includes.modals.prs-modal')
-    @role('administrator|it-manager|it-staff|purchasing-manager|purchasing-staff|finance-manager|finance-supervisor|finance-staff')
     @include('includes.modals.prs-export')
-    @endrole
+    @can('view-all-prs')
     @include('includes.modals.prs-export-by-department')
+    @endcan
 </div>
 </div>
 @endsection

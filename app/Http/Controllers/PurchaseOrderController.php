@@ -57,14 +57,6 @@ class PurchaseOrderController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        $canViewAll = $user->hasAnyRole([
-            'administrator',
-            'purchasing-manager',
-            'purchasing-staff',
-            'general-manager',
-        ]);
-
         $filters = [
             'keyword' => trim((string) $request->query('keyword', '')),
             'status' => trim((string) $request->query('status', '')),
@@ -73,8 +65,6 @@ class PurchaseOrderController extends Controller
         ];
 
         $purchaseOrders = $this->paginatePurchaseOrdersForSqlServer(
-            canViewAll: $canViewAll,
-            userId: $user->id,
             filters: $filters,
             perPage: 10,
         );
@@ -90,16 +80,12 @@ class PurchaseOrderController extends Controller
     /**
      * SQL Server-compatible pagination without OFFSET/FETCH for PO list.
      */
-    private function paginatePurchaseOrdersForSqlServer(bool $canViewAll, int $userId, array $filters = [], int $perPage = 10): LengthAwarePaginator
+    private function paginatePurchaseOrdersForSqlServer(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
         $currentPage = max(1, (int) $currentPage);
 
         $baseQuery = PurchaseOrder::query();
-
-        if (! $canViewAll) {
-            $baseQuery->where('created_by', $userId);
-        }
 
         $keyword = trim((string) ($filters['keyword'] ?? ''));
         $status = strtoupper(trim((string) ($filters['status'] ?? '')));
@@ -556,7 +542,7 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['message' => 'Only draft PO can be submitted.']);
         }
 
-        if ($purchaseOrder->created_by !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
+        if ((int) $purchaseOrder->created_by !== (int) $request->user()->id && ! $request->user()->can('update-all-po')) {
             abort(403);
         }
 
@@ -591,7 +577,7 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['message' => 'Only pending approval PO can be withdrawn.']);
         }
 
-        if ($purchaseOrder->created_by !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
+        if ((int) $purchaseOrder->created_by !== (int) $request->user()->id && ! $request->user()->can('update-all-po')) {
             abort(403);
         }
 
@@ -610,10 +596,7 @@ class PurchaseOrderController extends Controller
     public function cancel(Request $request, PurchaseOrder $purchaseOrder)
     {
         $user = $request->user();
-        $canCancel = $user->hasAnyRole(['administrator', 'purchasing-manager'])
-            || (int) $purchaseOrder->created_by === (int) $user->id;
-
-        if (! $canCancel) {
+        if (! $user?->can('cancel-po')) {
             abort(403);
         }
 
@@ -675,7 +658,7 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['message' => 'Items can only be removed from a draft PO.']);
         }
 
-        if ($purchaseOrder->created_by !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
+        if ((int) $purchaseOrder->created_by !== (int) $request->user()->id && ! $request->user()->can('update-all-po')) {
             abort(403);
         }
 
@@ -759,7 +742,7 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['message' => 'Only draft PO can be updated.']);
         }
 
-        if ($purchaseOrder->created_by !== $request->user()->id && ! $request->user()->hasRole('administrator')) {
+        if ((int) $purchaseOrder->created_by !== (int) $request->user()->id && ! $request->user()->can('update-all-po')) {
             abort(403);
         }
 

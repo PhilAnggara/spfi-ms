@@ -69,7 +69,7 @@
                     </a>
                 </li>
 
-                @canany(['view-users', 'manage-active-sessions', 'manage-roles', 'manage-permissions', 'view-products', 'view-product-categories', 'view-uom'])
+                @canany(['view-users', 'view-active-sessions', 'view-roles', 'view-permissions', 'view-products', 'view-product-categories', 'view-uom'])
                     <li class="menu-item  has-sub">
                         <a href="#" class='menu-link'>
                             <span>
@@ -82,7 +82,7 @@
                             <div class="submenu-group-wrapper">
                                 <ul class="submenu-group">
 
-                                    @canany(['view-users', 'manage-active-sessions', 'manage-roles', 'manage-permissions'])
+                                    @canany(['view-users', 'view-active-sessions', 'view-roles', 'view-permissions'])
                                     <li class="submenu-item {{ Request::is('master/*') ? 'active' : '' }} has-sub">
                                         <a href="#" class='submenu-link'>Management</a>
                                         <ul class="subsubmenu">
@@ -91,17 +91,17 @@
                                                 <a href="{{ route('user.index') }}" class="subsubmenu-link">User</a>
                                             </li>
                                             @endcan
-                                            @can('manage-roles')
+                                            @can('view-roles')
                                             <li class="subsubmenu-item ">
                                                 <a href="{{ route('roles.index') }}" class="subsubmenu-link">Roles</a>
                                             </li>
                                             @endcan
-                                            @can('manage-permissions')
+                                            @can('view-permissions')
                                             <li class="subsubmenu-item ">
                                                 <a href="{{ route('permissions.index') }}" class="subsubmenu-link">Permissions</a>
                                             </li>
                                             @endcan
-                                            @can('manage-active-sessions')
+                                            @can('view-active-sessions')
                                             <li class="subsubmenu-item ">
                                                 <a href="{{ route('active-sessions.index') }}" class="subsubmenu-link">Active Sessions</a>
                                             </li>

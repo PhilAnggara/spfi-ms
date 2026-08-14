@@ -53,40 +53,19 @@
                     @php
                         $selected = old('permissions', $role->permissions->pluck('name')->all());
                         $actorIsAdmin = auth()->user()?->hasRole('administrator');
-                        $permissionsLocked = $role->name === 'administrator' && ! $actorIsAdmin;
+                        $canUpdateRole = auth()->user()?->can('update-roles') ?? false;
+                        $permissionsLocked = ($role->name === 'administrator' && ! $actorIsAdmin) || ! $canUpdateRole;
                     @endphp
-                    @if ($permissionsLocked)
+                    @if ($role->name === 'administrator' && ! $actorIsAdmin)
                         <div class="alert alert-warning">Only administrators can change the administrator role permissions.</div>
                     @endif
-                    @forelse ($permissionGroups as $group)
-                        <div class="mb-4">
-                            <h6 class="text-uppercase text-muted small fw-bold mb-2 border-bottom pb-1">{{ $group['label'] }}</h6>
-                            <div class="row">
-                                @foreach ($group['permissions'] as $permission)
-                                    @php
-                                        $isProtectedPerm = $permission->name === 'reset-activity-logs';
-                                        $permDisabled = $permissionsLocked || ($isProtectedPerm && ! $actorIsAdmin);
-                                    @endphp
-                                    <div class="col-md-6 col-lg-4 mb-2">
-                                        <div class="form-check">
-                                            @if ($permDisabled && in_array($permission->name, $selected, true))
-                                                <input type="hidden" name="permissions[]" value="{{ $permission->name }}">
-                                            @endif
-                                            <input class="form-check-input" type="checkbox" name="permissions[]"
-                                                   value="{{ $permission->name }}" id="perm-{{ $permission->id }}"
-                                                   @checked(in_array($permission->name, $selected, true))
-                                                   @disabled($permDisabled)>
-                                            <label class="form-check-label" for="perm-{{ $permission->id }}">
-                                                <code class="small">{{ $permission->name }}</code>
-                                            </label>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @empty
-                        <p class="text-muted mb-0">No permissions available.</p>
-                    @endforelse
+                    @include('includes.partials.rbac-permission-matrix', [
+                        'permissionMatrix' => $permissionMatrix,
+                        'selected' => $selected,
+                        'idPrefix' => 'perm',
+                        'permissionsLocked' => $permissionsLocked,
+                        'actorIsAdmin' => $actorIsAdmin,
+                    ])
                 </div>
                 <div class="card-footer text-end">
                     <button type="submit" class="btn btn-primary" @disabled($permissionsLocked)>Save Role</button>

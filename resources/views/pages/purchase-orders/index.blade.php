@@ -207,10 +207,7 @@
                             $canCancel = $authUser
                                 && $po->status === 'APPROVED'
                                 && (int) ($po->receiving_reports_count ?? 0) === 0
-                                && (
-                                    $authUser->hasAnyRole(['administrator', 'purchasing-manager'])
-                                    || (int) $po->created_by === (int) $authUser->id
-                                );
+                                && $authUser->can('cancel-po');
                         @endphp
                         <div class="modal fade" id="poDetail-{{ $po->id }}" tabindex="-1" aria-labelledby="poDetailLabel-{{ $po->id }}" aria-hidden="true">
                             <div class="modal-dialog modal-xl modal-dialog-scrollable">

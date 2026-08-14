@@ -9,12 +9,6 @@
                 <h3 class="mb-0">Permissions</h3>
                 <small class="text-muted">{{ $permissions->count() }} permission{{ $permissions->count() !== 1 ? 's' : '' }}</small>
             </div>
-            <div class="col-auto">
-                <button type="button" class="btn btn-primary icon icon-left" data-bs-toggle="modal" data-bs-target="#create-permission-modal">
-                    <i class="fa-duotone fa-solid fa-plus"></i>
-                    Add Permission
-                </button>
-            </div>
         </div>
     </div>
 
@@ -24,10 +18,6 @@
     @if (session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
-
-    <div class="alert alert-warning">
-        Renaming a permission does not update hard-coded middleware, <code>@@can</code>, or controller checks. Prefer creating a new permission when unsure.
-    </div>
 
     <section class="section">
         <div class="card shadow-sm border-0">
@@ -55,24 +45,14 @@
                                         <td class="text-center">{{ $permission->roles_count }}</td>
                                         <td class="text-center">{{ $userCount }}</td>
                                         <td class="text-center">
-                                            <div class="btn-group btn-group-sm">
-                                                <button type="button" class="btn icon"
-                                                        data-bstooltip-toggle="tooltip"
-                                                        data-bs-placement="top"
-                                                        title="Detail"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#permission-detail-{{ $permission->id }}">
-                                                    <i class="fa-light fa-eye text-info"></i>
-                                                </button>
-                                                <button type="button" class="btn icon"
-                                                        data-bstooltip-toggle="tooltip"
-                                                        data-bs-placement="top"
-                                                        title="Rename"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#edit-permission-{{ $permission->id }}">
-                                                    <i class="fa-light fa-edit text-primary"></i>
-                                                </button>
-                                            </div>
+                                            <button type="button" class="btn icon btn-sm"
+                                                    data-bstooltip-toggle="tooltip"
+                                                    data-bs-placement="top"
+                                                    title="Detail"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#permission-detail-{{ $permission->id }}">
+                                                <i class="fa-light fa-eye text-info"></i>
+                                            </button>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -115,80 +95,11 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal"
-                            data-bs-toggle="modal" data-bs-target="#edit-permission-{{ $permission->id }}">
-                        Rename
-                    </button>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="edit-permission-{{ $permission->id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <form action="{{ route('permissions.update', $permission) }}" method="POST" class="modal-content">
-                @csrf
-                @method('PUT')
-                <div class="modal-header">
-                    <h5 class="modal-title">Rename Permission</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <label class="form-label">Name (kebab-case)</label>
-                    <input type="text" name="name" class="form-control" value="{{ $permission->name }}" required>
-                    <div class="alert alert-light border mt-3 mb-0">
-                        <div class="fw-semibold mb-1">Developer checklist</div>
-                        <ul class="mb-0 ps-3 small">
-                            <li>Update every hard-coded reference: route <code>permission:...</code>, <code>@@can</code>, Form Requests, and controllers.</li>
-                            <li>Clear permission cache after deploy if names changed in production.</li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>
-            </form>
         </div>
     </div>
 @endforeach
-
-<div class="modal fade" id="create-permission-modal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <form action="{{ route('permissions.store') }}" method="POST" class="modal-content">
-            @csrf
-            <div class="modal-header">
-                <div>
-                    <h5 class="modal-title">Create Permission</h5>
-                    <small class="text-muted">Use kebab-case (e.g. view-products)</small>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <label class="form-label">Name</label>
-                <input type="text" name="name" class="form-control @error('name') is-invalid @enderror" value="{{ old('name') }}" placeholder="e.g. view-products" required>
-                @error('name')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-
-                <div class="alert alert-light border mt-3 mb-0">
-                    <div class="fw-semibold mb-1">Developer checklist</div>
-                    <ul class="mb-0 ps-3 small">
-                        <li>Wire the new name into routes: <code>middleware('permission:your-name')</code>.</li>
-                        <li>Gate menus with <code>@@can('your-name')</code> / <code>@@canany([...])</code> in the sidebar.</li>
-                        <li>Use <code>$user->can('your-name')</code> in controllers or Form Requests when needed.</li>
-                        <li>Assign the permission to roles (or as a direct user permission) before testing access.</li>
-                        <li>Add it to <code>RolePermissionSeeder</code> so other environments stay in sync.</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary">Create</button>
-            </div>
-        </form>
-    </div>
-</div>
 @endsection
 
 @push('addon-style')

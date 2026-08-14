@@ -10,6 +10,16 @@ use Spatie\Permission\PermissionRegistrar;
 class RolePermissionSeeder extends Seeder
 {
     /**
+     * Roles that received leftover approve-prs but should not assign canvassers.
+     *
+     * @var list<string>
+     */
+    private const APPROVE_PRS_EXCLUDE_ROLES = [
+        'production-manager',
+        'engineering-manager',
+    ];
+
+    /**
      * Run the database seeds.
      *
      * Assignments are additive (givePermissionTo) so re-seeding does not revoke
@@ -19,23 +29,25 @@ class RolePermissionSeeder extends Seeder
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
+        $this->migrateLegacyPermissionNames();
+
         $permissionsUsers = [
             'create-users',
             'view-users',
-            'edit-users',
+            'update-users',
             'delete-users',
-            'manage-active-sessions',
+            'view-active-sessions',
+            'force-logout-users',
             'reset-activity-logs',
-            'manage-user-access',
+            'assign-user-access',
         ];
 
         $permissionsPrs = [
-            'create-prs',
-            'view-prs',
-            'edit-prs',
-            'delete-prs',
-            'approve-prs',
             'view-all-prs',
+            'update-department-prs',
+            'update-all-prs',
+            'delete-department-prs',
+            'delete-all-prs',
         ];
 
         $permissionsCanvassing = [
@@ -51,12 +63,14 @@ class RolePermissionSeeder extends Seeder
             'approve-po',
             'cancel-po',
             'view-po-progress',
+            'update-all-po',
         ];
 
         $permissionsRr = [
             'create-rr',
             'view-rr',
             'update-rr',
+            'delete-rr',
         ];
 
         $permissionsTransfer = [
@@ -86,44 +100,36 @@ class RolePermissionSeeder extends Seeder
         ];
 
         $permissionsStoresWithdrawal = [
-            'view-stores-withdrawal',
-            'create-stores-withdrawal',
-            'update-stores-withdrawal',
-            'delete-stores-withdrawal',
             'view-all-stores-withdrawal',
+            'update-department-stores-withdrawal',
+            'update-all-stores-withdrawal',
+            'delete-department-stores-withdrawal',
+            'delete-all-stores-withdrawal',
         ];
 
-        $permissionsMaster = [
-            'view-products',
-            'create-products',
-            'update-products',
-            'delete-products',
-            'view-suppliers',
-            'create-suppliers',
-            'update-suppliers',
-            'delete-suppliers',
-            'view-purchase-history',
-            'view-product-categories',
-            'manage-product-categories',
-            'view-uom',
-            'manage-uom',
-            'view-buyers',
-            'manage-buyers',
-            'view-currencies',
-            'manage-currencies',
-            'view-batches',
-            'manage-batches',
-            'view-fish-suppliers',
-            'manage-fish-suppliers',
-            'view-vessels',
-            'manage-vessels',
-            'view-fish',
-            'manage-fish',
-            'view-employees',
-            'manage-employees',
-            'view-accounting-master',
-            'manage-accounting-master',
-        ];
+        $permissionsMaster = array_merge(
+            [
+                'view-products',
+                'create-products',
+                'update-products',
+                'delete-products',
+                'view-suppliers',
+                'create-suppliers',
+                'update-suppliers',
+                'delete-suppliers',
+                'view-purchase-history',
+            ],
+            $this->crud('product-categories'),
+            $this->crud('uom'),
+            $this->crud('buyers'),
+            $this->crud('currencies'),
+            $this->crud('batches'),
+            $this->crud('fish-suppliers'),
+            $this->crud('vessels'),
+            $this->crud('fish'),
+            $this->crud('employees'),
+            $this->crud('accounting-master'),
+        );
 
         $permissionsReportsOps = [
             'view-procurement-reports',
@@ -134,18 +140,15 @@ class RolePermissionSeeder extends Seeder
             'view-exchange-rates',
             'create-exchange-rates',
             'view-supplier-comparison',
-            'manage-supplier-comparison',
+            'select-supplier-comparison',
         ];
 
         $permissionsRbac = [
-            'manage-roles',
-            'manage-permissions',
-        ];
-
-        $permissionsGeneral = [
-            'view-dashboard',
-            'export-report',
-            'print-document',
+            'view-roles',
+            'create-roles',
+            'update-roles',
+            'delete-roles',
+            'view-permissions',
         ];
 
         $allPermissions = array_values(array_unique(array_merge(
@@ -162,12 +165,26 @@ class RolePermissionSeeder extends Seeder
             $permissionsMaster,
             $permissionsReportsOps,
             $permissionsRbac,
-            $permissionsGeneral,
         )));
 
         foreach ($allPermissions as $permission) {
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
+
+        $this->deleteObsoletePermissions([
+            'create-prs',
+            'view-prs',
+            'edit-prs',
+            'update-prs',
+            'delete-prs',
+            'view-stores-withdrawal',
+            'create-stores-withdrawal',
+            'update-stores-withdrawal',
+            'delete-stores-withdrawal',
+            'view-dashboard',
+            'export-report',
+            'print-document',
+        ]);
 
         $roles = [
             'administrator',
@@ -198,42 +215,35 @@ class RolePermissionSeeder extends Seeder
             Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
         }
 
-        $itMasterReadWrite = [
-            'view-products',
-            'create-products',
-            'update-products',
-            'delete-products',
-            'view-suppliers',
-            'create-suppliers',
-            'update-suppliers',
-            'delete-suppliers',
-            'view-purchase-history',
-            'view-product-categories',
-            'manage-product-categories',
-            'view-uom',
-            'manage-uom',
-            'view-buyers',
-            'manage-buyers',
-            'view-currencies',
-            'manage-currencies',
-            'view-batches',
-            'manage-batches',
-            'view-fish-suppliers',
-            'manage-fish-suppliers',
-            'view-vessels',
-            'manage-vessels',
-            'view-fish',
-            'manage-fish',
-            'view-accounting-master',
-            'manage-accounting-master',
-            'view-users',
-            'create-users',
-            'edit-users',
-            'delete-users',
-            'manage-active-sessions',
-            'view-employees',
-            'manage-employees',
-        ];
+        $itMasterReadWrite = array_merge(
+            [
+                'view-products',
+                'create-products',
+                'update-products',
+                'delete-products',
+                'view-suppliers',
+                'create-suppliers',
+                'update-suppliers',
+                'delete-suppliers',
+                'view-purchase-history',
+                'view-users',
+                'create-users',
+                'update-users',
+                'delete-users',
+                'view-active-sessions',
+                'force-logout-users',
+            ],
+            $this->crud('product-categories'),
+            $this->crud('uom'),
+            $this->crud('buyers'),
+            $this->crud('currencies'),
+            $this->crud('batches'),
+            $this->crud('fish-suppliers'),
+            $this->crud('vessels'),
+            $this->crud('fish'),
+            $this->crud('accounting-master'),
+            $this->crud('employees'),
+        );
 
         $imProductCreate = ['view-products', 'create-products'];
         $imProductManage = ['view-products', 'create-products', 'update-products', 'delete-products'];
@@ -245,26 +255,43 @@ class RolePermissionSeeder extends Seeder
             'view-exchange-rates',
         ];
 
+        $imWarehouseOps = [
+            'create-rr',
+            'view-rr',
+            'update-rr',
+            'delete-rr',
+            'create-transfer',
+            'view-transfer',
+            'update-transfer',
+            'delete-transfer',
+            'create-delivery',
+            'view-delivery',
+            'update-delivery',
+            'delete-delivery',
+            'create-stock-adjustment',
+            'view-stock-adjustment',
+            'delete-stock-adjustment',
+            'create-opening-balance-correction',
+            'view-opening-balance-correction',
+            'delete-opening-balance-correction',
+            'view-all-stores-withdrawal',
+            'update-all-stores-withdrawal',
+            'delete-all-stores-withdrawal',
+            'view-im-reports',
+            'view-po',
+        ];
+
         $rolePermissions = [
             'administrator' => $allPermissions,
             'general-manager' => [
-                'view-prs',
                 'view-all-prs',
                 'view-po',
                 'view-po-progress',
                 'cancel-po',
-                'view-dashboard',
-                'export-report',
-                'print-document',
             ],
             'it-manager' => array_values(array_diff($allPermissions, ['reset-activity-logs'])),
-            'it-staff' => array_merge($itMasterReadWrite, [
-                'view-dashboard',
-                'print-document',
-            ]),
+            'it-staff' => $itMasterReadWrite,
             'purchasing-manager' => [
-                'approve-prs',
-                'view-prs',
                 'view-all-prs',
                 'assign-canvasser',
                 'view-canvassing',
@@ -279,10 +306,7 @@ class RolePermissionSeeder extends Seeder
                 'update-suppliers',
                 'view-procurement-reports',
                 'view-supplier-comparison',
-                'manage-supplier-comparison',
-                'view-dashboard',
-                'export-report',
-                'print-document',
+                'select-supplier-comparison',
             ],
             'purchasing-staff' => [
                 'view-canvassing',
@@ -292,13 +316,8 @@ class RolePermissionSeeder extends Seeder
                 'submit-po',
                 'cancel-po',
                 'view-po-progress',
-                'create-prs',
-                'view-prs',
                 'view-all-prs',
-                'edit-prs',
-                'delete-prs',
                 'assign-canvasser',
-                'approve-prs',
                 'view-products',
                 'view-suppliers',
                 'view-purchase-history',
@@ -306,187 +325,48 @@ class RolePermissionSeeder extends Seeder
                 'update-suppliers',
                 'view-procurement-reports',
                 'view-supplier-comparison',
-                'manage-supplier-comparison',
-                'view-dashboard',
-                'print-document',
+                'select-supplier-comparison',
             ],
-            'im-manager' => array_merge($imProductManage, [
-                'create-rr',
-                'view-rr',
-                'update-rr',
-                'create-transfer',
-                'view-transfer',
-                'update-transfer',
-                'delete-transfer',
-                'create-delivery',
-                'view-delivery',
-                'update-delivery',
-                'delete-delivery',
-                'create-stock-adjustment',
-                'view-stock-adjustment',
-                'delete-stock-adjustment',
-                'create-opening-balance-correction',
-                'view-opening-balance-correction',
-                'delete-opening-balance-correction',
-                'view-stores-withdrawal',
-                'create-stores-withdrawal',
-                'update-stores-withdrawal',
-                'delete-stores-withdrawal',
-                'view-all-stores-withdrawal',
-                'view-im-reports',
-                'view-po',
-                'view-dashboard',
-                'print-document',
-            ]),
-            'im-supervisor' => array_merge($imProductManage, [
-                'create-rr',
-                'view-rr',
-                'update-rr',
-                'create-transfer',
-                'view-transfer',
-                'update-transfer',
-                'delete-transfer',
-                'create-delivery',
-                'view-delivery',
-                'update-delivery',
-                'delete-delivery',
-                'create-stock-adjustment',
-                'view-stock-adjustment',
-                'delete-stock-adjustment',
-                'create-opening-balance-correction',
-                'view-opening-balance-correction',
-                'delete-opening-balance-correction',
-                'view-stores-withdrawal',
-                'create-stores-withdrawal',
-                'update-stores-withdrawal',
-                'delete-stores-withdrawal',
-                'view-all-stores-withdrawal',
-                'view-im-reports',
-                'view-po',
-                'view-dashboard',
-                'print-document',
-            ]),
-            'im-staff' => [
-                'create-rr',
-                'view-rr',
-                'update-rr',
-                'create-transfer',
-                'view-transfer',
-                'update-transfer',
-                'delete-transfer',
-                'create-delivery',
-                'view-delivery',
-                'update-delivery',
-                'delete-delivery',
-                'create-stock-adjustment',
-                'view-stock-adjustment',
-                'delete-stock-adjustment',
-                'create-opening-balance-correction',
-                'view-opening-balance-correction',
-                'delete-opening-balance-correction',
-                'view-stores-withdrawal',
-                'create-stores-withdrawal',
-                'update-stores-withdrawal',
-                'delete-stores-withdrawal',
-                'view-all-stores-withdrawal',
-                'view-im-reports',
-                'view-po',
-                'view-dashboard',
-                'print-document',
-            ],
+            'im-manager' => array_merge($imProductManage, $imWarehouseOps),
+            'im-supervisor' => array_merge($imProductManage, $imWarehouseOps),
+            'im-staff' => $imWarehouseOps,
             'finance-manager' => array_merge($financeAccountingOps, [
                 'create-exchange-rates',
-                'view-prs',
                 'view-po',
-                'view-dashboard',
-                'export-report',
-                'print-document',
             ]),
             'finance-supervisor' => array_merge($financeAccountingOps, [
                 'create-exchange-rates',
-                'view-prs',
                 'view-po',
-                'view-dashboard',
-                'export-report',
-                'print-document',
             ]),
             'finance-staff' => array_merge($financeAccountingOps, [
-                'view-prs',
                 'view-po',
-                'view-dashboard',
-                'print-document',
             ]),
             'accounting-manager' => array_merge($financeAccountingOps, [
                 'create-exchange-rates',
-                'view-prs',
                 'view-po',
-                'view-dashboard',
-                'export-report',
-                'print-document',
             ]),
             'accounting-supervisor' => array_merge($financeAccountingOps, [
                 'create-exchange-rates',
-                'view-prs',
                 'view-po',
-                'view-dashboard',
-                'export-report',
-                'print-document',
             ]),
             'accounting-staff' => array_merge($financeAccountingOps, [
-                'view-prs',
                 'view-po',
-                'view-dashboard',
-                'print-document',
             ]),
             'production-manager' => [
-                'create-prs',
-                'view-prs',
-                'edit-prs',
-                'approve-prs',
                 'view-po-progress',
-                'view-dashboard',
-                'print-document',
             ],
             'engineering-manager' => array_merge($imProductCreate, [
-                'create-prs',
-                'view-prs',
-                'edit-prs',
-                'approve-prs',
                 'view-po-progress',
-                'view-dashboard',
-                'print-document',
             ]),
             'engineering-supervisor' => [
-                'view-prs',
                 'view-po',
-                'view-dashboard',
-                'export-report',
-                'print-document',
             ],
             'engineering-staff' => [
-                'view-prs',
                 'view-po',
-                'view-dashboard',
-                'print-document',
             ],
-            'hrd-manager' => [
-                'view-employees',
-                'manage-employees',
-                'view-dashboard',
-                'print-document',
-            ],
-            'hrd-supervisor' => [
-                'view-employees',
-                'manage-employees',
-                'view-dashboard',
-                'print-document',
-            ],
-            'hrd-staff' => [
-                'view-employees',
-                'manage-employees',
-                'view-dashboard',
-                'print-document',
-            ],
+            'hrd-manager' => $this->crud('employees'),
+            'hrd-supervisor' => $this->crud('employees'),
+            'hrd-staff' => $this->crud('employees'),
         ];
 
         foreach ($rolePermissions as $roleName => $permissions) {
@@ -495,5 +375,153 @@ class RolePermissionSeeder extends Seeder
         }
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function crud(string $resource): array
+    {
+        return [
+            "view-{$resource}",
+            "create-{$resource}",
+            "update-{$resource}",
+            "delete-{$resource}",
+        ];
+    }
+
+    private function migrateLegacyPermissionNames(): void
+    {
+        $this->renamePermission('edit-users', 'update-users');
+        $this->renamePermission('manage-user-access', 'assign-user-access');
+        $this->renamePermission('manage-supplier-comparison', 'select-supplier-comparison');
+
+        $this->mergePermission('approve-prs', 'assign-canvasser', self::APPROVE_PRS_EXCLUDE_ROLES);
+
+        $this->splitPermission('manage-active-sessions', ['view-active-sessions', 'force-logout-users']);
+        $this->splitPermission('manage-roles', ['view-roles', 'create-roles', 'update-roles', 'delete-roles']);
+        $this->splitPermission('manage-permissions', ['view-permissions']);
+
+        foreach ([
+            'product-categories',
+            'uom',
+            'buyers',
+            'currencies',
+            'batches',
+            'fish-suppliers',
+            'vessels',
+            'fish',
+            'employees',
+            'accounting-master',
+        ] as $resource) {
+            $this->splitPermission("manage-{$resource}", [
+                "create-{$resource}",
+                "update-{$resource}",
+                "delete-{$resource}",
+            ]);
+        }
+    }
+
+    /**
+     * @param  list<string>  $names
+     */
+    private function deleteObsoletePermissions(array $names): void
+    {
+        foreach ($names as $name) {
+            $permission = $this->findPermission($name);
+            if ($permission !== null) {
+                $this->deletePermission($permission);
+            }
+        }
+    }
+
+    private function renamePermission(string $from, string $to): void
+    {
+        $fromPermission = $this->findPermission($from);
+        $toPermission = $this->findPermission($to);
+
+        if ($fromPermission === null) {
+            return;
+        }
+
+        if ($toPermission === null) {
+            $fromPermission->name = $to;
+            $fromPermission->save();
+
+            return;
+        }
+
+        $this->copyAssignments($fromPermission, $toPermission);
+        $this->deletePermission($fromPermission);
+    }
+
+    /**
+     * @param  list<string>  $excludeRoleNames
+     */
+    private function mergePermission(string $from, string $to, array $excludeRoleNames = []): void
+    {
+        $fromPermission = $this->findPermission($from);
+
+        if ($fromPermission === null) {
+            return;
+        }
+
+        $toPermission = Permission::firstOrCreate(['name' => $to, 'guard_name' => 'web']);
+        $this->copyAssignments($fromPermission, $toPermission, $excludeRoleNames);
+        $this->deletePermission($fromPermission);
+    }
+
+    /**
+     * @param  list<string>  $targets
+     */
+    private function splitPermission(string $from, array $targets): void
+    {
+        $fromPermission = $this->findPermission($from);
+
+        if ($fromPermission === null) {
+            return;
+        }
+
+        foreach ($targets as $target) {
+            $targetPermission = Permission::firstOrCreate(['name' => $target, 'guard_name' => 'web']);
+            $this->copyAssignments($fromPermission, $targetPermission);
+        }
+
+        $this->deletePermission($fromPermission);
+    }
+
+    /**
+     * @param  list<string>  $excludeRoleNames
+     */
+    private function copyAssignments(Permission $from, Permission $to, array $excludeRoleNames = []): void
+    {
+        $from->load(['roles', 'users']);
+
+        foreach ($from->roles as $role) {
+            if (in_array($role->name, $excludeRoleNames, true)) {
+                continue;
+            }
+
+            $role->givePermissionTo($to);
+        }
+
+        foreach ($from->users as $user) {
+            $user->givePermissionTo($to);
+        }
+    }
+
+    private function deletePermission(Permission $permission): void
+    {
+        $permission->roles()->detach();
+        $permission->users()->detach();
+        $permission->delete();
+    }
+
+    private function findPermission(string $name): ?Permission
+    {
+        return Permission::query()
+            ->where('name', $name)
+            ->where('guard_name', 'web')
+            ->first();
     }
 }

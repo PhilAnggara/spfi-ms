@@ -125,7 +125,7 @@ it('allows regular staff to create a normal stores withdrawal', function () {
     expect(DB::table('store_withdrawals')->where('created_by', $this->regularUser->id)->count())->toBe(1);
 });
 
-it('shows only own stores withdrawals for regular staff', function () {
+it('shows department peer stores withdrawals for regular staff', function () {
     createStoreWithdrawalForUser($this->regularUser, $this->department, $this->item, 'OWN-001');
     createStoreWithdrawalForUser($this->otherUser, $this->department, $this->item, 'OTH-001');
 
@@ -134,10 +134,67 @@ it('shows only own stores withdrawals for regular staff', function () {
 
     $response->assertSuccessful();
     $response->assertSee('SWS-OWN-001');
-    $response->assertDontSee('SWS-OTH-001');
+    $response->assertSee('SWS-OTH-001');
 });
 
-it('forbids regular staff from updating another users stores withdrawal', function () {
+it('hides stores withdrawals created outside the viewer department', function () {
+    $otherDepartment = Department::query()->create([
+        'name' => 'Engineering',
+        'code' => '7038',
+        'alias' => 'ENG',
+    ]);
+
+    $outsider = User::query()->create([
+        'name' => 'Outside Staff',
+        'username' => 'outside.staff',
+        'email' => 'outside.staff@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $otherDepartment->id,
+        'role' => 'Staff',
+    ]);
+
+    createStoreWithdrawalForUser($this->regularUser, $this->department, $this->item, 'OWN-DEPT');
+    createStoreWithdrawalForUser($outsider, $otherDepartment, $this->item, 'OUT-DEPT');
+
+    $response = $this->actingAs($this->regularUser)
+        ->get(route('stores-withdrawals.index'));
+
+    $response->assertSuccessful();
+    $response->assertSee('SWS-OWN-DEPT');
+    $response->assertDontSee('SWS-OUT-DEPT');
+});
+
+it('allows department managers with update-department-stores-withdrawal to edit peer documents', function () {
+    $manager = User::query()->create([
+        'name' => 'Dept Manager',
+        'username' => 'dept.manager',
+        'email' => 'dept.manager@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $this->department->id,
+        'role' => 'Manager',
+    ]);
+    $manager->givePermissionTo('update-department-stores-withdrawal');
+
+    $peerWithdrawalId = createStoreWithdrawalForUser($this->otherUser, $this->department, $this->item, 'PEER-UPD');
+
+    $response = $this->actingAs($manager)->put(route('stores-withdrawals.update', $peerWithdrawalId), [
+        'department_id' => $this->department->id,
+        'sws_date' => now()->toDateString(),
+        'type' => 'NORMAL',
+        'info' => 'Updated by dept manager',
+        'items' => [
+            [
+                'item_id' => $this->item->id,
+                'quantity' => 3,
+            ],
+        ],
+    ]);
+
+    $response->assertRedirect(route('stores-withdrawals.index'));
+    $response->assertSessionHasNoErrors();
+});
+
+it('forbids department peers without elevated permissions from updating another users stores withdrawal', function () {
     $otherWithdrawalId = createStoreWithdrawalForUser($this->otherUser, $this->department, $this->item, 'OTH-002');
 
     $response = $this->actingAs($this->regularUser)->put(route('stores-withdrawals.update', $otherWithdrawalId), [

@@ -167,9 +167,21 @@ it('exports prs list as openxml xlsx with item lines and blank continuation', fu
     expect((string) $sheet->getCell('F9')->getValue())->toBe('PRS-EXP-002');
 });
 
-it('forbids prs list export for roles outside the allow list', function () {
+it('allows any authenticated user to export the prs list', function () {
+    $response = app(PrsController::class)->export(prsExportRequest(route('prs.export'), [
+        'start_month' => $this->month,
+        'end_month' => $this->month,
+        'format' => 'pdf',
+    ], $this->imStaff));
+
+    expect($response->getStatusCode())->toBeGreaterThanOrEqual(200);
+    expect($response->getStatusCode())->toBeLessThan(300);
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+});
+
+it('forbids prs export by department without view-all-prs', function () {
     try {
-        app(PrsController::class)->export(prsExportRequest(route('prs.export'), [
+        app(PrsController::class)->exportByDepartment(prsExportRequest(route('prs.export-by-department'), [
             'start_month' => $this->month,
             'end_month' => $this->month,
             'format' => 'pdf',
@@ -181,14 +193,15 @@ it('forbids prs list export for roles outside the allow list', function () {
     }
 });
 
-it('allows im-staff to export prs by department', function () {
+it('allows users with view-all-prs to export prs by department', function () {
+    $this->imStaff->givePermissionTo('view-all-prs');
     $this->actingAs($this->imStaff);
 
     $response = app(PrsController::class)->exportByDepartment(prsExportRequest(route('prs.export-by-department'), [
         'start_month' => $this->month,
         'end_month' => $this->month,
         'format' => 'pdf',
-    ], $this->imStaff));
+    ], $this->imStaff->fresh()));
 
     expect($response->getStatusCode())->toBeGreaterThanOrEqual(200);
     expect($response->getStatusCode())->toBeLessThan(300);

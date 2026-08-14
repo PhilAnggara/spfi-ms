@@ -15,10 +15,10 @@ class NotificationRecipientService
         $users = User::role('purchasing-manager')->get();
 
         if ($users->isEmpty()) {
-            $approvePrs = User::permission('approve-prs')->get();
+            $assignCanvasser = User::permission('assign-canvasser')->get();
             $approvePo = User::permission('approve-po')->get();
 
-            $users = $this->uniqueUsers($approvePrs, $approvePo);
+            $users = $this->uniqueUsers($assignCanvasser, $approvePo);
         }
 
         return $users;

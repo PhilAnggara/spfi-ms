@@ -57,7 +57,7 @@ class UserController extends Controller
         ]);
 
         $message = 'New user has been created successfully.';
-        if ($request->user()?->can('manage-user-access')) {
+        if ($request->user()?->can('assign-user-access')) {
             $message .= ' Assign Spatie roles and permissions via Manage Access.';
         }
 

@@ -19,7 +19,7 @@ class UserAccessController extends Controller
         $user->load(['roles.permissions', 'permissions']);
         $roles = Role::query()->orderBy('name')->get();
         $permissions = Permission::query()->orderBy('name')->get();
-        $permissionGroups = PermissionModuleGroups::group($permissions);
+        $permissionMatrix = PermissionModuleGroups::matrix($permissions);
 
         $viaRolePermissionNames = $user->getPermissionsViaRoles()->pluck('name')->all();
 
@@ -33,7 +33,7 @@ class UserAccessController extends Controller
         return view('pages.users.access', compact(
             'user',
             'roles',
-            'permissionGroups',
+            'permissionMatrix',
             'viaRolePermissionNames',
             'viaRoleSources',
         ));

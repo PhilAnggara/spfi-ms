@@ -10,18 +10,17 @@
                 <p class="text-muted mb-0">Status: {{ $purchaseOrder->status }}</p>
             </div>
             <div class="col-12 col-md-6 order-md-2 text-md-end">
-                @role('administrator|purchasing-manager|general-manager')
+                @can('approve-po')
                     <a href="{{ route('purchase-orders.approval') }}" class="btn btn-sm btn-outline-secondary">
                         <i class="fa-duotone fa-solid fa-arrow-left"></i>
                         Back to PO Approval
                     </a>
-                @endrole
-                @role('purchasing-staff')
+                @elsecan('view-po')
                     <a href="{{ route('purchase-orders.index') }}" class="btn btn-sm btn-outline-secondary">
                         <i class="fa-duotone fa-solid fa-arrow-left"></i>
                         Back to PO List
                     </a>
-                @endrole
+                @endcan
             </div>
         </div>
     </div>
@@ -32,19 +31,19 @@
                 @php
                     $currencyCode = $purchaseOrder->currency?->code ?? 'IDR';
                     $user = auth()->user();
-                    $canEdit = $user
-                        && in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED'], true)
-                        && ($user->hasRole('administrator') || $purchaseOrder->created_by === $user->id);
-                    $canWithdraw = $user
-                        && $purchaseOrder->status === 'PENDING_APPROVAL'
-                        && ($user->hasRole('administrator') || $purchaseOrder->created_by === $user->id);
+                    $canMutatePo = $user
+                        && (
+                            (int) $purchaseOrder->created_by === (int) $user->id
+                            || $user->can('update-all-po')
+                        );
+                    $canEdit = $canMutatePo
+                        && in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED'], true);
+                    $canWithdraw = $canMutatePo
+                        && $purchaseOrder->status === 'PENDING_APPROVAL';
                     $canCancel = $user
                         && $purchaseOrder->status === 'APPROVED'
                         && $purchaseOrder->receivingReports->isEmpty()
-                        && (
-                            $user->hasAnyRole(['administrator', 'purchasing-manager'])
-                            || $purchaseOrder->created_by === $user->id
-                        );
+                        && $user->can('cancel-po');
                     $canRemoveItems = $canEdit && $purchaseOrder->items->count() > 1;
                     $feeItemsForForm = old('fee_items', $purchaseOrder->fees_breakdown ?? []);
 
@@ -351,7 +350,6 @@
                         </form>
                     </div>
                     <div class="col-12 col-md-6 text-md-end">
-                        @role('administrator|purchasing-staff|purchasing-manager')
                             @if ($canWithdraw)
                                 <form id="withdraw-po-{{ $purchaseOrder->id }}" method="post" action="{{ route('purchase-orders.withdraw', $purchaseOrder) }}" class="d-inline">
                                     @csrf
@@ -370,7 +368,7 @@
                                     Cancel PO
                                 </button>
                             @endif
-                            @if (in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED']))
+                            @if ($canEdit)
                                 <form method="post" action="{{ route('purchase-orders.submit', $purchaseOrder) }}" class="d-inline">
                                     @csrf
                                     <button type="submit" class="btn btn-success">
@@ -379,7 +377,6 @@
                                     </button>
                                 </form>
                             @endif
-                        @endrole
                         @if ($purchaseOrder->status !== 'CANCELLED')
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#poPrintConfirm-{{ $purchaseOrder->id }}">
                                 <i class="fa-duotone fa-solid fa-print"></i>

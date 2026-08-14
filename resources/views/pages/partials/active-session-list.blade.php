@@ -118,6 +118,7 @@
                             <i class="fa-light fa-eye text-primary"></i>
                         </button>
                         @if (! $isMe && $hasSession)
+                            @can('force-logout-users')
                             <button type="button"
                                     class="btn icon"
                                     onclick="hapusData({{ $user->id }}, 'Force Logout', 'End all active sessions for {{ addslashes($user->name) }}?')"
@@ -130,6 +131,7 @@
                                 @csrf
                                 @method('DELETE')
                             </form>
+                            @endcan
                         @endif
                     </div>
                 </div>

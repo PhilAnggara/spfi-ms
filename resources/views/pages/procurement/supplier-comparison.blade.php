@@ -179,12 +179,12 @@
                                                 <i class="fa-duotone fa-solid fa-file-pdf"></i>
                                                 Export PDF
                                             </a>
-                                            @role('administrator|purchasing-manager')
+                                            @can('select-supplier-comparison')
                                                 <button type="button" class="btn btn-outline-warning icon icon-left sc-action-btn" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $prsItem->id }}" data-reject-button @disabled($isLocked)>
                                                     <i class="fa-duotone fa-solid fa-rotate-left"></i>
                                                     Reject Canvassing
                                                 </button>
-                                            @endrole
+                                            @endcan
                                             <button type="button" class="btn btn-primary icon icon-left sc-action-btn" data-bs-toggle="modal" data-bs-target="#reasonModal-{{ $prsItem->id }}" data-save-selection-button @disabled($isLocked || ! $hasSelectedSupplier)>
                                                 <i class="fa-duotone fa-solid fa-floppy-disk"></i>
                                                 Save Selection
@@ -216,7 +216,7 @@
                                 </div>
                             </div>
 
-                            @role('administrator|purchasing-manager')
+                            @can('select-supplier-comparison')
                                 <div class="modal fade sc-modal" id="rejectModal-{{ $prsItem->id }}" tabindex="-1" aria-labelledby="rejectModalLabel-{{ $prsItem->id }}" aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered">
                                         <form method="post" action="{{ route('procurement.supplier-comparison.reject', $prsItem) }}" class="modal-content" id="reject-form-{{ $prsItem->id }}">
@@ -242,7 +242,7 @@
                                         </form>
                                     </div>
                                 </div>
-                            @endrole
+                            @endcan
                         @endforeach
                     </div>
 

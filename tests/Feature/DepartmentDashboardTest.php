@@ -93,7 +93,7 @@ it('shows active users widget data for online sessions on admin dashboard', func
         ->assertSee('1 online');
 });
 
-it('shows the full administrator dashboard for general-manager', function () {
+it('shows the executive dashboard for general-manager in the MD department', function () {
     $user = makeDashboardUser('general-manager', [
         'name' => 'Office Of The Managing Director',
         'code' => '7054',
@@ -103,12 +103,11 @@ it('shows the full administrator dashboard for general-manager', function () {
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertSuccessful()
-        ->assertSee('data-dashboard-key="admin"', false)
-        ->assertSee('Administrator Dashboard')
-        ->assertSee('User Accounts')
+        ->assertSee('data-dashboard-key="md"', false)
+        ->assertSee('Executive Dashboard')
+        ->assertSee('Approved PO Value')
         ->assertSee('Canvass Open')
-        ->assertSee('SWS Open')
-        ->assertDontSee('Executive Dashboard');
+        ->assertDontSee('Administrator Dashboard');
 });
 
 it('shows the purchasing dashboard for PUR department users', function () {
@@ -270,7 +269,7 @@ it('shows the administrator dashboard for it-manager', function () {
         ->assertSee('Administrator Dashboard');
 });
 
-it('shows the executive dashboard for MD department users without general-manager role', function () {
+it('shows the executive dashboard for MD department users', function () {
     $department = Department::query()->create([
         'name' => 'Office Of The Managing Director',
         'code' => '7054',

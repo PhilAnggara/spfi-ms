@@ -46,7 +46,6 @@ it('allows each hrd role full employee crud and shows the employee menu', functi
         ->get(route('employees.index'))
         ->assertSuccessful()
         ->assertSee('Employee')
-        ->assertDontSee('>Master</span>', false)
         ->assertDontSee('>User</a>', false)
         ->assertDontSee('Active Sessions');
 

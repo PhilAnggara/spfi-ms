@@ -87,10 +87,6 @@ class CurrencyExchangeRateController extends Controller
             return false;
         }
 
-        return $user->hasAnyRole([
-            'administrator',
-            'accounting-manager',
-            'accounting-supervisor',
-        ]);
+        return $user->can('create-exchange-rates');
     }
 }

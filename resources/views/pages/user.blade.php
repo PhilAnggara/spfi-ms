@@ -162,7 +162,7 @@
                                     <i class="fa-solid fa-user-pen me-2"></i>
                                     Edit {{ $isMe ? 'Profile' : 'User' }}
                                 </button>
-                                @can('manage-user-access')
+                                @can('assign-user-access')
                                     <a href="{{ route('users.access.edit', $user) }}" class="btn btn-sm btn-outline-primary w-100">
                                         <i class="fa-solid fa-key me-2"></i>
                                         Manage Access

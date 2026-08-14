@@ -136,6 +136,26 @@ it('allows an administrator to update a prs they did not create', function () {
     $response->assertSessionHas('success');
 });
 
+it('allows update-department-prs for same-department peers', function () {
+    $this->otherUser->givePermissionTo('update-department-prs');
+
+    $response = $this->actingAs($this->otherUser)
+        ->put(route('prs.update', $this->prs), validPrsUpdatePayload($this->department, $this->item));
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success');
+});
+
+it('allows update-all-prs across departments', function () {
+    $this->chargedDepartmentUser->givePermissionTo('update-all-prs');
+
+    $response = $this->actingAs($this->chargedDepartmentUser)
+        ->put(route('prs.update', $this->prs), validPrsUpdatePayload($this->department, $this->item));
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success');
+});
+
 it('forbids other users from updating a prs', function () {
     $response = $this->actingAs($this->otherUser)
         ->put(route('prs.update', $this->prs), validPrsUpdatePayload($this->department, $this->item));
@@ -154,6 +174,17 @@ it('allows the creator to delete a prs', function () {
 
 it('allows an administrator to delete a prs they did not create', function () {
     $response = $this->actingAs($this->admin)
+        ->delete(route('prs.destroy', $this->prs));
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success');
+    expect(Prs::query()->find($this->prs->id))->toBeNull();
+});
+
+it('allows delete-department-prs for same-department peers', function () {
+    $this->otherUser->givePermissionTo('delete-department-prs');
+
+    $response = $this->actingAs($this->otherUser)
         ->delete(route('prs.destroy', $this->prs));
 
     $response->assertRedirect();

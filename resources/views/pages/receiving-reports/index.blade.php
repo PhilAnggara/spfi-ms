@@ -12,7 +12,7 @@
                     <p class="text-muted mb-0">Track incoming goods with instant search, live date filters, and dynamic pagination.</p>
                 </div>
             </div>
-            @role('administrator|im-manager|im-supervisor|im-staff')
+            @can('create-rr')
                 <div class="col-12 col-lg-5">
                     <div class="po-top-actions text-lg-end">
                         <button type="button" class="btn btn-success icon icon-left" data-bs-toggle="modal" data-bs-target="#create-rr-modal">
@@ -21,7 +21,7 @@
                         </button>
                     </div>
                 </div>
-            @endrole
+            @endcan
         </div>
     </div>
 
@@ -181,10 +181,12 @@
                                                 <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rrPrintConfirm-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Print">
                                                     <i class="fa-light fa-print text-primary"></i>
                                                 </button>
-                                                @role('administrator|im-manager|im-supervisor|im-staff')
+                                                @can('update-rr')
                                                     <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#rr-edit-modal-{{ $rr->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                         <i class="fa-light fa-edit text-primary"></i>
                                                     </button>
+                                                @endcan
+                                                @can('delete-rr')
                                                     <button type="button" class="btn icon" onclick="confirmDeleteRr({{ $rr->id }}, '{{ $rrNumber !== '' ? $rrNumber : '-' }}')" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete">
                                                         <i class="fa-light fa-trash text-secondary"></i>
                                                     </button>
@@ -192,7 +194,7 @@
                                                         @csrf
                                                         @method('DELETE')
                                                     </form>
-                                                @endrole
+                                                @endcan
                                             </div>
                                         </td>
                                     </tr>
@@ -210,7 +212,7 @@
         </div>
     </section>
 
-    @role('administrator|im-manager|im-supervisor|im-staff')
+    @can('create-rr')
         <div class="modal fade" id="create-rr-modal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <div class="modal-content">
@@ -347,7 +349,7 @@
                 </div>
             </div>
         </div>
-    @endrole
+    @endcan
 
     <div id="rr-page-modals">
         @php $renderedPoModal = []; @endphp
@@ -436,7 +438,7 @@
                 'nextRrNumber' => $nextRrNumber ?? '',
             ])
 
-            @role('administrator|im-manager|im-supervisor|im-staff')
+            @can('update-rr')
                 <div class="modal fade" id="rr-edit-modal-{{ $rr->id }}" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-xl modal-dialog-scrollable">
                         <div class="modal-content">
@@ -545,7 +547,7 @@
                     </div>
                 </div>
             </div>
-        @endrole
+        @endcan
 
         @if ($po && ! in_array($po->id, $renderedPoModal, true))
             @php $renderedPoModal[] = $po->id; @endphp

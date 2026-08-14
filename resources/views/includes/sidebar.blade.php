@@ -58,7 +58,7 @@
                             </a>
                         </li>
 
-                        @canany(['view-users', 'manage-active-sessions', 'view-employees', 'manage-roles', 'manage-permissions', 'view-products', 'view-suppliers', 'view-product-categories', 'view-uom', 'view-buyers', 'view-currencies', 'view-batches', 'view-fish-suppliers', 'view-vessels', 'view-fish', 'view-accounting-master'])
+                        @canany(['view-users', 'view-active-sessions', 'view-employees', 'view-roles', 'view-permissions', 'view-products', 'view-suppliers', 'view-product-categories', 'view-uom', 'view-buyers', 'view-currencies', 'view-batches', 'view-fish-suppliers', 'view-vessels', 'view-fish', 'view-accounting-master'])
                             <li class="sidebar-item {{ is_active_menu(['master/*']) }} has-sub">
                                 <a href="#" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-user-tie {{ Request::is('master/*') ? 'fa-fade' : '' }}"></i>
@@ -66,7 +66,7 @@
                                 </a>
                                 <ul class="submenu ">
 
-                                    @canany(['view-users', 'manage-active-sessions', 'view-employees', 'manage-roles', 'manage-permissions'])
+                                    @canany(['view-users', 'view-active-sessions', 'view-employees', 'view-roles', 'view-permissions'])
                                     <li class="submenu-item {{ is_active_menu(['master/user', 'master/active-sessions', 'master/employees*', 'master/roles*', 'master/permissions*']) }} has-sub">
                                         <a href="#" class="submenu-link">Management</a>
                                         <ul class="submenu submenu-level-2 ">
@@ -75,17 +75,17 @@
                                                 <a href="{{ route('user.index') }}" class="submenu-link">User</a>
                                             </li>
                                             @endcan
-                                            @can('manage-roles')
+                                            @can('view-roles')
                                             <li class="submenu-item {{ Request::is('master/roles*') ? 'active' : '' }}">
                                                 <a href="{{ route('roles.index') }}" class="submenu-link">Roles</a>
                                             </li>
                                             @endcan
-                                            @can('manage-permissions')
+                                            @can('view-permissions')
                                             <li class="submenu-item {{ Request::is('master/permissions*') ? 'active' : '' }}">
                                                 <a href="{{ route('permissions.index') }}" class="submenu-link">Permissions</a>
                                             </li>
                                             @endcan
-                                            @can('manage-active-sessions')
+                                            @can('view-active-sessions')
                                             <li class="submenu-item {{ Request::is('master/active-sessions') ? 'active' : '' }}">
                                                 <a href="{{ route('active-sessions.index') }}" class="submenu-link">Active Sessions</a>
                                             </li>

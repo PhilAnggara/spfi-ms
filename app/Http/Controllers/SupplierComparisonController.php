@@ -184,7 +184,7 @@ class SupplierComparisonController extends Controller
      */
     public function reject(Request $request, PrsItem $prsItem)
     {
-        if (! $request->user()?->hasAnyRole(['administrator', 'purchasing-manager'])) {
+        if (! $request->user()?->can('select-supplier-comparison')) {
             abort(403);
         }
 

@@ -10,10 +10,12 @@
                 <small class="text-muted">{{ $roles->count() }} access role{{ $roles->count() !== 1 ? 's' : '' }}</small>
             </div>
             <div class="col-auto">
-                <button type="button" class="btn btn-primary icon icon-left" data-bs-toggle="modal" data-bs-target="#create-role-modal">
-                    <i class="fa-duotone fa-solid fa-plus"></i>
-                    Add Role
-                </button>
+                @can('create-roles')
+                    <button type="button" class="btn btn-primary icon icon-left" data-bs-toggle="modal" data-bs-target="#create-role-modal">
+                        <i class="fa-duotone fa-solid fa-plus"></i>
+                        Add Role
+                    </button>
+                @endcan
             </div>
         </div>
     </div>
@@ -73,6 +75,7 @@
                                                 <i class="fa-light fa-edit text-primary"></i>
                                             </a>
                                             @if ($role->name !== 'administrator')
+                                                @can('delete-roles')
                                                 <button type="button" class="btn icon"
                                                         data-bstooltip-toggle="tooltip"
                                                         data-bs-placement="top"
@@ -84,6 +87,7 @@
                                                     @csrf
                                                     @method('delete')
                                                 </form>
+                                                @endcan
                                             @endif
                                         </div>
                                     </td>
@@ -139,6 +143,7 @@
     </div>
 @endforeach
 
+@can('create-roles')
 <div class="modal fade" id="create-role-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <form action="{{ route('roles.store') }}" method="POST" class="modal-content">
@@ -174,6 +179,7 @@
         </form>
     </div>
 </div>
+@endcan
 @endsection
 
 @push('addon-style')

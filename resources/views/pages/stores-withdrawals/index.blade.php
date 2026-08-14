@@ -112,8 +112,17 @@
                                             $canRemoveItem = $detailItems->count() > 1;
                                             $isLocked = (bool) ($lockedStoreWithdrawalLookup[$sws->id] ?? false);
                                             $isDeleteLocked = (bool) ($deleteLockedStoreWithdrawalLookup[$sws->id] ?? false);
-                                            $canManageSws = auth()->user()->hasAnyRole(['administrator', 'im-manager', 'im-supervisor', 'im-staff'])
-                                                || auth()->id() === (int) ($sws->created_by ?? 0);
+                                            $actor = auth()->user();
+                                            $isOwner = (int) $actor?->id === (int) ($sws->created_by ?? 0);
+                                            $sameDept = $actor?->department_id
+                                                && ! empty($sws->created_by_department_id)
+                                                && (int) $actor->department_id === (int) $sws->created_by_department_id;
+                                            $canUpdateSws = $isOwner
+                                                || $actor?->can('update-all-stores-withdrawal')
+                                                || ($sameDept && $actor?->can('update-department-stores-withdrawal'));
+                                            $canDeleteSws = $isOwner
+                                                || $actor?->can('delete-all-stores-withdrawal')
+                                                || ($sameDept && $actor?->can('delete-department-stores-withdrawal'));
                                         @endphp
                                         <tr>
                                             <td>
@@ -150,12 +159,12 @@
                                                         <button type="button" class="btn icon" disabled data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Locked: all items fully transferred">
                                                             <i class="fa-light fa-lock text-secondary"></i>
                                                         </button>
-                                                    @elseif ($canManageSws)
+                                                    @elseif ($canUpdateSws)
                                                         <a href="{{ route('stores-withdrawals.edit', $sws->id) }}" class="btn icon" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit">
                                                             <i class="fa-light fa-edit text-primary"></i>
                                                         </a>
                                                     @endif
-                                                    @if ($canManageSws && ! $isDeleteLocked)
+                                                    @if ($canDeleteSws && ! $isDeleteLocked)
                                                         <button
                                                             type="button"
                                                             class="btn icon"
@@ -165,12 +174,12 @@
                                                             onclick="hapusData({{ $sws->id }}, 'Delete Stores Withdrawal', 'Are you sure want to delete Stores Withdrawal {{ $sws->sws_number }}?')">
                                                             <i class="fa-light fa-trash text-secondary"></i>
                                                         </button>
-                                                    @elseif ($canManageSws && $isDeleteLocked && ! $isLocked)
+                                                    @elseif ($canDeleteSws && $isDeleteLocked && ! $isLocked)
                                                         <button type="button" class="btn icon" disabled data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Delete locked: transfer slip already created">
                                                             <i class="fa-light fa-trash text-secondary"></i>
                                                         </button>
                                                     @endif
-                                                    @if ($canManageSws)
+                                                    @if ($canDeleteSws)
                                                     <form action="{{ route('stores-withdrawals.destroy', $sws->id) }}" id="hapus-{{ $sws->id }}" method="POST">
                                                         @csrf
                                                         @method('DELETE')
@@ -191,8 +200,14 @@
                             @foreach ($storeWithdrawals as $sws)
                             @php
                                 $detailItems = collect($storeWithdrawalItems[$sws->id] ?? []);
-                                $canManageSws = auth()->user()->hasAnyRole(['administrator', 'im-manager', 'im-supervisor', 'im-staff'])
-                                    || auth()->id() === (int) ($sws->created_by ?? 0);
+                                $actor = auth()->user();
+                                $isOwner = (int) $actor?->id === (int) ($sws->created_by ?? 0);
+                                $sameDept = $actor?->department_id
+                                    && ! empty($sws->created_by_department_id)
+                                    && (int) $actor->department_id === (int) $sws->created_by_department_id;
+                                $canManageSws = $isOwner
+                                    || $actor?->can('update-all-stores-withdrawal')
+                                    || ($sameDept && $actor?->can('update-department-stores-withdrawal'));
                             @endphp
 
                             <div class="modal fade" id="detail-modal-{{ $sws->id }}" tabindex="-1" aria-hidden="true">

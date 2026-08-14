@@ -15,6 +15,7 @@ use App\Services\DocumentNumberService;
 use App\Services\NotificationRecipientService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\UsesSmartCatalogSearch;
+use App\Support\DocumentAccess;
 use App\Support\PdfReport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -147,12 +148,12 @@ class PrsController extends Controller
         }
 
         // ===== KIRIM NOTIFIKASI =====
-        // Ambil user yang memiliki role 'Purchasing Manager' atau permission 'approve prs'
+        // Ambil user yang memiliki role 'Purchasing Manager' atau permission assign-canvasser
         $purchasingManagers = User::role('purchasing-manager')->get();
 
         // Jika tidak ada role, coba cari berdasarkan permission
         if ($purchasingManagers->isEmpty()) {
-            $purchasingManagers = User::permission('approve-prs')->get();
+            $purchasingManagers = User::permission('assign-canvasser')->get();
         }
 
         // Kirim notifikasi ke setiap Purchasing Manager
@@ -363,7 +364,7 @@ class PrsController extends Controller
     public function destroy(Request $request, string $id)
     {
         $item = Prs::findOrFail($id);
-        $this->ensureUserCanManagePrs($request, $item);
+        $this->ensureUserCanDeletePrs($request, $item);
         $tile = $item->prs_no;
         $item->delete();
 
@@ -423,31 +424,11 @@ class PrsController extends Controller
     }
 
     /**
-     * Roles allowed to run the full PRS list export (PDF/Excel).
-     *
-     * @var list<string>
-     */
-    private const PRS_LIST_EXPORT_ROLES = [
-        'administrator',
-        'it-manager',
-        'it-staff',
-        'purchasing-manager',
-        'purchasing-staff',
-        'finance-manager',
-        'finance-supervisor',
-        'finance-staff',
-    ];
-
-    /**
      * Export PRS list by month range (PDF or Excel).
      */
     public function export(Request $request)
     {
-        $user = $request->user() ?? Auth::user();
-        abort_unless(
-            $user && $user->hasAnyRole(self::PRS_LIST_EXPORT_ROLES),
-            403
-        );
+        abort_unless($request->user() !== null, 403);
 
         $validated = $request->validate([
             'start_month' => ['required', 'date_format:Y-m'],
@@ -544,20 +525,11 @@ class PrsController extends Controller
         ]);
 
         $user = Auth::user();
-        $isAdministrator = $user && $user->hasRole('administrator');
+        abort_unless($user?->can('view-all-prs'), 403);
 
         $departmentId = null;
-        if ($isAdministrator) {
-            if (! empty($validated['department_id'])) {
-                $departmentId = (int) $validated['department_id'];
-            }
-        } else {
-            $departmentId = $user?->department_id;
-            if (! $departmentId) {
-                return redirect()
-                    ->back()
-                    ->withErrors(['department_id' => 'Your account is not linked to a department.']);
-            }
+        if (! empty($validated['department_id'])) {
+            $departmentId = (int) $validated['department_id'];
         }
 
         $start = Carbon::createFromFormat('Y-m', $validated['start_month'])->startOfMonth();
@@ -868,46 +840,28 @@ class PrsController extends Controller
 
     private function ensureUserCanManagePrs(Request $request, Prs $prs): void
     {
-        if (! $this->userCanManagePrs($request, $prs)) {
+        if (! DocumentAccess::canUpdatePrs($request->user(), $prs)) {
+            abort(403);
+        }
+    }
+
+    private function ensureUserCanDeletePrs(Request $request, Prs $prs): void
+    {
+        if (! DocumentAccess::canDeletePrs($request->user(), $prs)) {
             abort(403);
         }
     }
 
     private function userCanManagePrs(Request $request, Prs $prs): bool
     {
-        $user = $request->user();
-
-        return $user
-            && ($prs->user_id === $user->id || $user->hasRole('administrator'));
+        return DocumentAccess::canUpdatePrs($request->user(), $prs);
     }
 
     private function ensureUserCanViewPrs(Request $request, Prs $prs): void
     {
-        $user = $request->user();
-
-        if (! $user) {
+        if (! DocumentAccess::canViewPrs($request->user(), $prs)) {
             abort(403);
         }
-
-        if ($user->can('view-all-prs')) {
-            return;
-        }
-
-        if ($prs->user_id === $user->id) {
-            return;
-        }
-
-        $prs->loadMissing('user');
-
-        if (
-            $user->department_id
-            && $prs->user?->department_id
-            && (int) $user->department_id === (int) $prs->user->department_id
-        ) {
-            return;
-        }
-
-        abort(403);
     }
 
     /**

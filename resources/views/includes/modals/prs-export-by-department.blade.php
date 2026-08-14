@@ -22,7 +22,7 @@
                             <label class="form-label" for="dept-end-month">End Month</label>
                             <input type="month" class="form-control" id="dept-end-month" name="end_month" value="{{ now()->format('Y-m') }}" required>
                         </div>
-                        @role('administrator')
+                        @can('view-all-prs')
                             <div class="col-12">
                                 <label class="form-label" for="dept-export-department">Department</label>
                                 <select class="form-select" id="dept-export-department" name="department_id">
@@ -32,7 +32,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                        @endrole
+                        @endcan
                         <div class="col-12">
                             <label class="form-label d-block mb-2">Export Format</label>
                             <div class="d-flex flex-wrap gap-3">
