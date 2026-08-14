@@ -44,7 +44,8 @@ class ReceivingReport extends Model
 
     public function items()
     {
-        return $this->hasMany(ReceivingReportItem::class, 'receiving_report_id');
+        return $this->hasMany(ReceivingReportItem::class, 'receiving_report_id')
+            ->orderBy('purchase_order_item_id');
     }
 
     protected static function booted()

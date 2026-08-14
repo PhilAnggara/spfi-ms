@@ -276,9 +276,14 @@ it('uses flexible item row heights so a long name pushes the next row down', fun
         ->toContain('font-weight: normal')
         ->toContain('line-height: 1.12')
         ->toContain($shortName)
+        ->toContain('po-number-bold')
+        ->toContain('font-weight: bold')
         ->not->toContain('max-height:')
-        ->not->toContain('…')
-        ->not->toContain('font-weight: bold');
+        ->not->toContain('…');
+
+    expect($html)->toMatch('/\.item-cell\s*\{[^}]*font-weight:\s*normal/s');
+    expect($html)->toMatch('/\.po-number-bold\s*\{[^}]*font-weight:\s*bold/s');
+    expect($html)->toContain('PO-TEST-001');
 
     preg_match_all('/class="cell item-cell"[^>]*>(.*?)<\/div>/s', $html, $matches);
     $itemCells = $matches[1] ?? [];
@@ -542,4 +547,104 @@ it('renders full accounting entry debit and credit amounts without clipping larg
 
     expect($amounts)->toContain('21,360,000.00');
     expect(collect($amounts)->filter(fn (string $amount) => $amount === '1,360,000.00'))->toBeEmpty();
+});
+
+it('prints rr items in purchase order item order even when rr rows were inserted reversed', function () {
+    $unit = UnitOfMeasure::query()->create(['name' => 'Pieces', 'code' => 'PCS']);
+    $category = ItemCategory::query()->create(['name' => 'Spare Parts', 'code' => 'SPR']);
+
+    $firstItem = Item::query()->create([
+        'name' => 'ALPHA LINE',
+        'code' => 'PO-LINE-1',
+        'unit_of_measure_id' => $unit->id,
+        'category_id' => $category->id,
+        'type' => 'Raw Material',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+    $secondItem = Item::query()->create([
+        'name' => 'BRAVO LINE',
+        'code' => 'PO-LINE-2',
+        'unit_of_measure_id' => $unit->id,
+        'category_id' => $category->id,
+        'type' => 'Raw Material',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    $purchaseOrder = $this->receivingReport->purchaseOrder;
+
+    $firstPoItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $firstItem->id,
+        'quantity' => 1,
+        'unit_price' => 10,
+        'total' => 10,
+        'line_subtotal' => 10,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+    ]);
+    $secondPoItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $secondItem->id,
+        'quantity' => 1,
+        'unit_price' => 5,
+        'total' => 5,
+        'line_subtotal' => 5,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+    ]);
+
+    // Insert RR rows in reverse of PO line order.
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $this->receivingReport->id,
+        'purchase_order_item_id' => $secondPoItem->id,
+        'qty_good' => 1,
+        'qty_bad' => 0,
+    ]);
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $this->receivingReport->id,
+        'purchase_order_item_id' => $firstPoItem->id,
+        'qty_good' => 1,
+        'qty_bad' => 0,
+    ]);
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $this->receivingReport->fresh()->load([
+            'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
+            'createdBy',
+        ]),
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    preg_match_all('/class="cell item-cell"[^>]*>(.*?)<\/div>/s', $html, $matches);
+    $itemCells = array_map(
+        fn (string $cell) => trim(html_entity_decode($cell)),
+        $matches[1] ?? []
+    );
+
+    expect($itemCells)->toHaveCount(2);
+    expect($itemCells[0])->toBe('ALPHA LINE');
+    expect($itemCells[1])->toBe('BRAVO LINE');
+
+    expect($html)
+        ->toContain('po-number-bold')
+        ->toContain('PO-TEST-001')
+        ->toMatch('/\.po-number-bold\s*\{[^}]*font-weight:\s*bold/s')
+        ->toMatch('/class="field po-number"[^>]*>RR-TEST-001/');
 });

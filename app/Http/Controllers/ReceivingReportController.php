@@ -159,6 +159,7 @@ class ReceivingReportController extends Controller
             ->filter(function ($row) {
                 return ($row['selected'] ?? '0') === '1';
             })
+            ->sortBy(fn ($row) => (int) ($row['purchase_order_item_id'] ?? 0))
             ->values();
 
         if ($selectedRows->isEmpty()) {
@@ -322,6 +323,7 @@ class ReceivingReportController extends Controller
             ->filter(function ($row) {
                 return ($row['selected'] ?? '0') === '1';
             })
+            ->sortBy(fn ($row) => (int) ($row['purchase_order_item_id'] ?? 0))
             ->values();
 
         if ($selectedRows->isEmpty()) {

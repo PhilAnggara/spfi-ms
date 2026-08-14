@@ -168,6 +168,12 @@
             letter-spacing: 0.2px;
         }
 
+        .po-number-bold {
+            font-size: {{ $poNumberFontSize }}px;
+            font-weight: bold;
+            letter-spacing: 0.2px;
+        }
+
         .capex-label {
             font-size: {{ $capexFontSize }}px;
             font-weight: normal;
@@ -233,7 +239,9 @@
         $rowStartTopMm = $sy(73);
         // Leave space before the accounting block (starts around base-y 166).
         $itemsBottomLimitMm = $sy(152);
-        $allItems = $receivingReport->items;
+        $allItems = $receivingReport->items
+            ->sortBy(fn ($rrItem) => $rrItem->purchase_order_item_id)
+            ->values();
         $supplierName = trim((string) ($po?->supplier?->name ?? ''));
         $supplierCode = trim((string) ($po?->supplier?->code ?? ''));
         $supplierDisplay = $supplierName !== '' ? $supplierName : '-';
@@ -355,7 +363,7 @@
         @endif
 
         <div class="field" style="left: {{ $mmX(37) }}; top: {{ $mmY(41) }}; width: {{ $mmW(100) }};">{{ $supplierDisplay }}</div>
-        <div class="field po-number" style="left: {{ $mmX(161) }}; top: {{ $mmY(38) }}; width: {{ $mmW(48) }};">{{ $po?->po_number ?? '-' }}</div>
+        <div class="field po-number-bold" style="left: {{ $mmX(161) }}; top: {{ $mmY(38) }}; width: {{ $mmW(48) }};">{{ $po?->po_number ?? '-' }}</div>
         <div class="field" style="left: {{ $mmX(160) }}; top: {{ $mmY(49) }}; width: {{ $mmW(48) }};">{{ $poDateText }}</div>
 
         @foreach($layoutRows as $row)
