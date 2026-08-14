@@ -1088,41 +1088,51 @@
     }
 }
 
-/* Product modals: keep Choices.js dropdowns above the footer instead of clipping */
-.modal-dialog-scrollable .modal-content.product-form-modal {
-    overflow: visible;
-    max-height: none;
+/*
+ * Fix Save/Cancel footer sinking on smaller monitors.
+ * Form wraps header+body+footer inside modal-dialog-scrollable; Bootstrap flex only
+ * targets direct children of .modal-content, so make the form a flex column that
+ * fills available height and lets .modal-body scroll while footer stays sticky.
+ */
+.modal-dialog-scrollable .modal-content.master-form-modal {
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    overflow: hidden;
 }
 
-.product-form-modal .master-form-modal-header {
+.modal-dialog-scrollable .modal-content.master-form-modal > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.modal-dialog-scrollable .modal-content.master-form-modal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.modal-dialog-scrollable .modal-content.master-form-modal .modal-header,
+.modal-dialog-scrollable .modal-content.master-form-modal .modal-footer {
+    flex-shrink: 0;
+}
+
+.master-form-modal .master-form-modal-header {
     border-top-left-radius: 1rem;
     border-top-right-radius: 1rem;
 }
 
-.product-form-modal .master-form-modal-footer {
-    position: relative;
-    z-index: 1;
+.master-form-modal .master-form-modal-footer {
     border-bottom-left-radius: 1rem;
     border-bottom-right-radius: 1rem;
 }
 
-.modal-dialog-scrollable .modal-content.product-form-modal .modal-body {
-    overflow: visible;
-}
-
-.product-form-modal .modal-body {
-    position: relative;
-    z-index: 2;
-}
-
-.product-form-modal .master-form-modal-section,
-.product-form-modal .master-form-modal-grid,
-.product-form-modal .master-form-modal-field,
-.product-form-modal .choices {
-    overflow: visible;
-}
-
+/* Choices.js: keep dropdown above sibling fields while body scrolls */
 .product-form-modal .choices.is-open {
+    position: relative;
     z-index: 20;
 }
 

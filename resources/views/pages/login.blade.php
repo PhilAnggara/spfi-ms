@@ -65,7 +65,7 @@
                            target="_blank"
                            rel="noopener noreferrer">
                             <i class="bi bi-box-arrow-up-right"></i>
-                            Fish Module
+                            Production Module
                         </a>
                     </div>
                 </div>

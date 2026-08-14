@@ -54,7 +54,7 @@
                         <li class="sidebar-item">
                             <a href="{{ config('services.fish_system.url') }}" class="sidebar-link" target="_blank" rel="noopener noreferrer">
                                 <i class="fa-duotone fa-solid fa-fish"></i>
-                                <span>Fish</span>
+                                <span>Production</span>
                             </a>
                         </li>
 
