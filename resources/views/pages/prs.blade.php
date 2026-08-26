@@ -14,10 +14,10 @@
             </div>
             <div class="col-12 col-lg-5">
                 <div class="prs-top-actions">
-                    <button type="button" class="btn btn-outline-primary icon icon-left" data-bs-toggle="modal" data-bs-target="#export-modal">
+                    {{-- <button type="button" class="btn btn-outline-primary icon icon-left" data-bs-toggle="modal" data-bs-target="#export-modal">
                         <i class="fa-duotone fa-solid fa-file-pdf"></i>
                         Export PDF
-                    </button>
+                    </button> --}}
                     @can('view-all-prs')
                     <button type="button" class="btn btn-outline-secondary icon icon-left" data-bs-toggle="modal" data-bs-target="#export-by-department-modal">
                         <i class="fa-duotone fa-solid fa-building"></i>

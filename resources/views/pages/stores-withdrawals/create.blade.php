@@ -203,7 +203,7 @@
                                     <label for="sws-type" class="form-label">Type</label>
                                     <select class="form-select" id="sws-type" name="type" required>
                                         <option value="NORMAL" @selected($initialMode !== 'capex')>Normal</option>
-                                        <option value="CONFIRMATORY">Confirmatory</option>
+                                        {{-- <option value="CONFIRMATORY">Confirmatory</option> --}}
                                         <option value="CAPEX" @selected($initialMode === 'capex')>CAPEX</option>
                                     </select>
                                 </div>

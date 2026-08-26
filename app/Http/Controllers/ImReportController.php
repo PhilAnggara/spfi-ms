@@ -31,7 +31,7 @@ class ImReportController extends Controller
         'LABEL',
         'CARTON',
         'CAN',
-        'RAW MATERIALS',
+        'PLASTIC BAG FPL',
         'SPICES AND INGREDIENTS',
         'COAL',
         'SLUDGE OIL',
