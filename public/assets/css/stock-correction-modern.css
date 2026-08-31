@@ -108,6 +108,18 @@
     font-variant-numeric: tabular-nums;
 }
 
+.sc-summary-card .subvalue {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: 0.25rem;
+    line-height: 1.35;
+}
+
+.sc-summary-card .subvalue-sep {
+    margin: 0 0.2rem;
+}
+
 .sc-reason-panel {
     border-radius: 1rem;
 }

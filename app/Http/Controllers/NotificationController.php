@@ -2,21 +2,39 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Support\Concerns\PaginatesLegacySqlServer;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class NotificationController extends Controller
 {
+    use PaginatesLegacySqlServer;
+
     /**
      * Display all notifications untuk user yang sedang login
      */
-    public function index()
+    public function index(): View
     {
-        $notifications = Auth::user()
-            ->notifications()
-            ->paginate(20);
+        $user = Auth::user();
 
-        return view('pages.notifications.index', compact('notifications'));
+        $notificationsQuery = DatabaseNotification::query()
+            ->where('notifiable_id', $user->getKey())
+            ->where('notifiable_type', $user->getMorphClass());
+
+        $orderClause = 'notifications.created_at DESC, notifications.id DESC';
+        $notificationsQuery->orderByDesc('created_at')->orderByDesc('id');
+
+        $notifications = $this->paginateEloquentForCurrentConnection($notificationsQuery, $orderClause, 20);
+
+        $unreadCount = (clone $notificationsQuery)->unread()->count();
+        $readCount = (clone $notificationsQuery)->read()->count();
+
+        return view('pages.notifications.index', [
+            'notifications' => $notifications,
+            'unreadCount' => $unreadCount,
+            'readCount' => $readCount,
+        ]);
     }
 
     /**

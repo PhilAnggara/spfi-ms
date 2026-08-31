@@ -556,6 +556,39 @@ it('rejects a second reverse on the same correction', function () {
         ->assertSessionHasErrors('correction');
 });
 
+it('paginates opening balance corrections index and keeps ajax results wrapper', function () {
+    for ($i = 1; $i <= 31; $i++) {
+        OpeningBalanceCorrection::factory()->create([
+            'obc_number' => 'OBC-PAGE-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+            'created_by' => $this->user->id,
+            'updated_by' => $this->user->id,
+        ]);
+    }
+
+    $firstPage = $this->actingAs($this->user)
+        ->get(route('opening-balance-corrections.index'))
+        ->assertOk();
+
+    $html = $firstPage->getContent();
+    $containerPos = strpos($html, 'id="obc-page-container"');
+    $resultsPos = strpos($html, 'id="obc-page-results"');
+
+    expect($containerPos)->not->toBeFalse()
+        ->and($resultsPos)->not->toBeFalse()
+        ->and($containerPos)->toBeLessThan($resultsPos);
+
+    $firstPage
+        ->assertSee('OBC-PAGE-031')
+        ->assertSee('OBC-PAGE-002')
+        ->assertDontSee('OBC-PAGE-001');
+
+    $this->actingAs($this->user)
+        ->get(route('opening-balance-corrections.index', ['page' => 2]))
+        ->assertOk()
+        ->assertSee('OBC-PAGE-001')
+        ->assertDontSee('OBC-PAGE-031');
+});
+
 function createMinimalSws(int $departmentId, int $userId): int
 {
     $now = now();

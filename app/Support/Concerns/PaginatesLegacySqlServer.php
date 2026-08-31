@@ -3,6 +3,7 @@
 namespace App\Support\Concerns;
 
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 trait PaginatesLegacySqlServer
 {
     protected function paginateEloquentForCurrentConnection(
-        EloquentBuilder $query,
+        EloquentBuilder|Relation $query,
         string $rowNumberOrderBySql,
         int $perPage = 15
     ): LengthAwarePaginator {
@@ -46,7 +47,7 @@ trait PaginatesLegacySqlServer
 
         if (! empty($ids)) {
             $itemsById = (clone $query)
-                ->whereKey($ids)
+                ->whereIn($qualifiedKeyName, $ids)
                 ->get()
                 ->keyBy($keyName);
 

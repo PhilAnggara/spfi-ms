@@ -6,6 +6,7 @@ use App\Http\Requests\StoreOpeningBalanceCorrectionRequest;
 use App\Models\OpeningBalanceCorrection;
 use App\Services\DocumentNumberService;
 use App\Services\OpeningBalanceCorrectionService;
+use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\SearchesStockCorrectionItems;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -18,24 +19,26 @@ use Illuminate\View\View;
 
 class OpeningBalanceCorrectionController extends Controller
 {
+    use PaginatesLegacySqlServer;
     use SearchesStockCorrectionItems;
 
     public function index(Request $request): View
     {
         $keyword = trim((string) $request->query('keyword'));
 
-        $corrections = OpeningBalanceCorrection::query()
+        $correctionsQuery = OpeningBalanceCorrection::query()
             ->with(['createdBy:id,name', 'items'])
             ->when($keyword !== '', function ($query) use ($keyword) {
                 $query->where(function ($inner) use ($keyword) {
                     $inner->where('obc_number', 'like', "%{$keyword}%")
                         ->orWhere('reason', 'like', "%{$keyword}%");
                 });
-            })
-            ->latest('period_month')
-            ->latest('id')
-            ->paginate(30)
-            ->withQueryString();
+            });
+
+        $orderClause = 'opening_balance_corrections.period_month DESC, opening_balance_corrections.id DESC';
+        $correctionsQuery->orderByDesc('period_month')->orderByDesc('id');
+
+        $corrections = $this->paginateEloquentForCurrentConnection($correctionsQuery, $orderClause, 30);
 
         return view('pages.opening-balance-corrections.index', [
             'corrections' => $corrections,

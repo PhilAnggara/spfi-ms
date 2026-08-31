@@ -25,8 +25,8 @@
                     <h3 class="mb-1">Opening Balance {{ $correction->obc_number }}</h3>
                     <div class="sc-meta-chips mt-2">
                         <span class="sc-meta-chip"><i class="fa-regular fa-calendar"></i> Period {{ $correction->period_month?->format('Y-m') }}</span>
-                        <span class="sc-meta-chip"><i class="fa-regular fa-user"></i> {{ $correction->createdBy?->name ?? '-' }}</span>
                         <span class="sc-meta-chip"><i class="fa-regular fa-list"></i> {{ $correction->items->count() }} lines</span>
+                        <span class="sc-meta-chip"><i class="fa-regular fa-arrows-rotate"></i> {{ $replayTotal }} replayed</span>
                         @if ($correction->isReversed())
                             <span class="sc-status-badge is-reversed">Reversed</span>
                         @else
@@ -96,8 +96,18 @@
             </div>
         </div>
         <div class="sc-summary-card">
-            <div class="label">Replayed</div>
-            <div class="value">{{ $replayTotal }}</div>
+            <div class="label">Created</div>
+            <div class="value">{{ $correction->created_at?->format('Y-m-d') ?? '-' }}</div>
+            @if ($correction->created_at)
+                <div class="subvalue">
+                    {{ $correction->created_at->format('H:i') }}
+                    @if ($correction->createdBy)
+                        <span class="subvalue-sep">·</span>{{ $correction->createdBy->name }}
+                    @endif
+                </div>
+            @elseif ($correction->createdBy)
+                <div class="subvalue">{{ $correction->createdBy->name }}</div>
+            @endif
         </div>
     </div>
 
