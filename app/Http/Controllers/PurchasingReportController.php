@@ -22,6 +22,8 @@ class PurchasingReportController extends Controller
 {
     private const LEAD_TIME_PDF_MAX_ROWS = 800;
 
+    private const PO_NOT_DELIVERED_PDF_MAX_ROWS = 800;
+
     private const LEAD_TIME_QUERY_CHUNK_SIZE = 500;
 
     public function index()
@@ -109,6 +111,8 @@ class PurchasingReportController extends Controller
 
     public function poNotYetDelivered(Request $request)
     {
+        set_time_limit(300);
+
         $validated = $request->validate([
             'date_to' => ['required', 'date'],
             'canvasser_id' => ['nullable', 'exists:users,id'],
@@ -118,51 +122,28 @@ class PurchasingReportController extends Controller
 
         $dateFrom = Carbon::parse($validated['date_to'])->subYear()->toDateString();
 
-        $itemsQuery = PurchaseOrderItem::with([
-            'purchaseOrder.supplier',
-            'purchaseOrder.currency',
-            'purchaseOrder.createdBy',
-            'item.unit',
-        ])
-            ->whereHas('purchaseOrder', function ($query) use ($validated, $dateFrom) {
-                $query->whereDate('created_at', '>=', $dateFrom)
-                    ->whereDate('created_at', '<=', $validated['date_to'])
-                    ->where('term_of_payment_type', $validated['po_type']);
-            });
+        $itemsQuery = $this->poNotYetDeliveredItemsQuery($validated, $dateFrom);
 
-        if (! empty($validated['canvasser_id'])) {
-            $itemsQuery->whereHas('purchaseOrder', function ($query) use ($validated) {
-                $query->where('created_by', $validated['canvasser_id']);
-            });
+        if ($validated['format'] === 'pdf') {
+            $rowCount = (clone $itemsQuery)->count();
+
+            if ($rowCount > self::PO_NOT_DELIVERED_PDF_MAX_ROWS) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'format' => sprintf(
+                            'PDF tidak dapat dihasilkan karena data terlalu banyak (%s baris). Maksimal %s baris untuk PDF. Gunakan Export Excel atau persempit rentang tanggal.',
+                            number_format($rowCount),
+                            number_format(self::PO_NOT_DELIVERED_PDF_MAX_ROWS)
+                        ),
+                    ]);
+            }
         }
 
-        $rows = $itemsQuery->orderByDesc('id')->get()->map(function ($item) {
-            $po = $item->purchaseOrder;
-            $currencyCode = $po?->currency?->code ?? 'IDR';
-            $amount = $this->calculateLineAmount($item, $po);
-            $currencyBuckets = $this->currencyBuckets($currencyCode, $amount);
-
-            return [
-                'po_number' => $po?->po_number ?? ('#'.$po?->id),
-                'po_date' => $po?->created_at?->toDateString(),
-                'po_type' => $po?->term_of_payment_type ?? ($item->meta['term_of_payment_type'] ?? null),
-                'currency' => $currencyCode,
-                'supplier_code' => $po?->supplier?->code,
-                'supplier_name' => $po?->supplier?->name,
-                'item_code' => $item->item?->code,
-                'item_name' => $item->item?->name,
-                'quantity' => $item->quantity,
-                'unit' => $item->item?->unit?->name ?? '',
-                'unit_price' => $item->unit_price,
-                'discount' => $this->calculateLineDiscount($item, $po),
-                'pph' => $this->calculateLinePph($item, $po),
-                'ppn' => $this->calculateLinePpn($item, $po),
-                'amount' => $amount,
-                'currency_buckets' => $currencyBuckets,
-                'canvasser' => $po?->createdBy?->name,
-                'remarks' => $item->notes ?? $po?->remark_text,
-            ];
-        });
+        $rows = $itemsQuery
+            ->orderByDesc('purchase_order_items.id')
+            ->get()
+            ->map(fn (PurchaseOrderItem $item) => $this->mapPoNotYetDeliveredRow($item));
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
@@ -688,6 +669,89 @@ class PurchasingReportController extends Controller
         }
 
         return User::query()->find($canvasserId)?->name ?? 'All';
+    }
+
+    private function poItemReceivedQuantitySubquerySql(): string
+    {
+        return '(SELECT COALESCE(SUM(rri.qty_good + rri.qty_bad), 0)
+            FROM receiving_report_items AS rri
+            INNER JOIN receiving_reports AS rr ON rr.id = rri.receiving_report_id
+            WHERE rri.purchase_order_item_id = purchase_order_items.id
+              AND rr.deleted_at IS NULL
+              AND rri.deleted_at IS NULL)';
+    }
+
+    /**
+     * @param  array{date_to: string, po_type: string, canvasser_id?: int|null}  $validated
+     */
+    private function poNotYetDeliveredItemsQuery(array $validated, string $dateFrom)
+    {
+        $receivedSubquery = $this->poItemReceivedQuantitySubquerySql();
+
+        $itemsQuery = PurchaseOrderItem::query()
+            ->with([
+                'purchaseOrder.supplier',
+                'purchaseOrder.currency',
+                'purchaseOrder.createdBy',
+                'item.unit',
+            ])
+            ->select('purchase_order_items.*')
+            ->selectRaw("{$receivedSubquery} as qty_received")
+            ->whereRaw("purchase_order_items.quantity > {$receivedSubquery}")
+            ->whereHas('purchaseOrder', function ($query) use ($validated, $dateFrom) {
+                $query->whereDate('created_at', '>=', $dateFrom)
+                    ->whereDate('created_at', '<=', $validated['date_to'])
+                    ->where('term_of_payment_type', $validated['po_type'])
+                    ->where('status', 'APPROVED');
+            });
+
+        if (! empty($validated['canvasser_id'])) {
+            $itemsQuery->whereHas('purchaseOrder', function ($query) use ($validated) {
+                $query->where('created_by', $validated['canvasser_id']);
+            });
+        }
+
+        return $itemsQuery;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapPoNotYetDeliveredRow(PurchaseOrderItem $item): array
+    {
+        $po = $item->purchaseOrder;
+        $currencyCode = $po?->currency?->code ?? 'IDR';
+        $qtyOrdered = (float) $item->quantity;
+        $qtyReceived = (float) ($item->qty_received ?? 0);
+        $qtyRemaining = max(0, $qtyOrdered - $qtyReceived);
+        $ratio = $qtyOrdered > 0 ? ($qtyRemaining / $qtyOrdered) : 0.0;
+
+        $discount = $this->calculateLineDiscount($item, $po) * $ratio;
+        $pph = $this->calculateLinePph($item, $po) * $ratio;
+        $ppn = $this->calculateLinePpn($item, $po) * $ratio;
+        $amount = $this->calculateLineAmount($item, $po) * $ratio;
+        $currencyBuckets = $this->currencyBuckets($currencyCode, $amount);
+
+        return [
+            'po_number' => $po?->po_number ?? ('#'.$po?->id),
+            'po_date' => $po?->created_at?->toDateString(),
+            'po_type' => $po?->term_of_payment_type ?? ($item->meta['term_of_payment_type'] ?? null),
+            'currency' => $currencyCode,
+            'supplier_code' => $po?->supplier?->code,
+            'supplier_name' => $po?->supplier?->name,
+            'item_code' => $item->item?->code,
+            'item_name' => $item->item?->name,
+            'quantity' => $qtyRemaining,
+            'unit' => $item->item?->unit?->name ?? '',
+            'unit_price' => $item->unit_price,
+            'discount' => $discount,
+            'pph' => $pph,
+            'ppn' => $ppn,
+            'amount' => $amount,
+            'currency_buckets' => $currencyBuckets,
+            'canvasser' => $po?->createdBy?->name,
+            'remarks' => $item->notes ?? $po?->remark_text,
+        ];
     }
 
     private function calculateLineDiscount(PurchaseOrderItem $item, ?PurchaseOrder $po): float

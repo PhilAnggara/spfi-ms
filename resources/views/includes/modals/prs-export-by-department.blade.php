@@ -32,6 +32,14 @@
                                     @endforeach
                                 </select>
                             </div>
+                        @else
+                            <div class="col-12">
+                                <label class="form-label" for="dept-export-department">Department</label>
+                                <select class="form-select" id="dept-export-department" name="department_id" disabled>
+                                    <option value="{{ auth()->user()->department_id }}">{{ auth()->user()->department->code }} - {{ auth()->user()->department->name }}</option>
+                                </select>
+                                <input type="hidden" name="department_id" value="{{ auth()->user()->department_id }}">
+                            </div>
                         @endcan
                         <div class="col-12">
                             <label class="form-label d-block mb-2">Export Format</label>

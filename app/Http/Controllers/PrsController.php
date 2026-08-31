@@ -525,7 +525,7 @@ class PrsController extends Controller
         ]);
 
         $user = Auth::user();
-        abort_unless($user?->can('view-all-prs'), 403);
+        // abort_unless($user?->can('view-all-prs'), 403);
 
         $departmentId = null;
         if (! empty($validated['department_id'])) {

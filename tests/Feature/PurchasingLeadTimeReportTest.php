@@ -365,6 +365,174 @@ it('filters the po not yet delivered report by purchase order payment type witho
     expect($poNumbers)->not->toContain('PO-CREDIT-001');
 });
 
+it('excludes fully received purchase orders from the po not yet delivered report', function () {
+    $supplier = Supplier::query()->create([
+        'code' => 'SUP-PO-NYD-001',
+        'name' => 'PO NYD Supplier',
+        'created_by' => $this->manager->id,
+    ]);
+
+    $receivedOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'created_by' => $this->manager->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-RECEIVED-001',
+        'term_of_payment_type' => 'cash',
+        'created_at' => now()->subDays(2),
+    ]);
+
+    $pendingOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'created_by' => $this->manager->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-PENDING-001',
+        'term_of_payment_type' => 'cash',
+        'created_at' => now()->subDay(),
+    ]);
+
+    $receivedItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $receivedOrder->id,
+        'item_id' => $this->item->id,
+        'quantity' => 4,
+        'unit_price' => 100,
+        'total' => 400,
+    ]);
+
+    PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $pendingOrder->id,
+        'item_id' => $this->item->id,
+        'quantity' => 3,
+        'unit_price' => 100,
+        'total' => 300,
+    ]);
+
+    $receivingReport = ReceivingReport::query()->create([
+        'rr_number' => 'RR-NYD-001',
+        'purchase_order_id' => $receivedOrder->id,
+        'received_date' => now()->subDay()->toDateString(),
+        'created_by' => $this->manager->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $receivingReport->id,
+        'purchase_order_item_id' => $receivedItem->id,
+        'qty_good' => 4,
+        'qty_bad' => 0,
+    ]);
+
+    $request = Request::create(
+        route('procurement.reports.po-not-yet-delivered'),
+        'POST',
+        [
+            'date_to' => now()->toDateString(),
+            'po_type' => 'cash',
+            'format' => 'excel',
+        ],
+    );
+    $request->setUserResolver(fn () => $this->manager);
+
+    $response = app(PurchasingReportController::class)->poNotYetDelivered($request);
+
+    ob_start();
+    $response->sendContent();
+    $content = ob_get_clean();
+
+    $tmp = tempnam(sys_get_temp_dir(), 'po-nyd-xlsx');
+    file_put_contents($tmp, $content);
+
+    try {
+        $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp)->getActiveSheet();
+    } finally {
+        @unlink($tmp);
+    }
+
+    $highestRow = $sheet->getHighestDataRow();
+    $poNumbers = [];
+    for ($row = 8; $row <= $highestRow; $row++) {
+        $poNumbers[] = (string) $sheet->getCell('A'.$row)->getValue();
+    }
+
+    expect($poNumbers)->toContain('PO-PENDING-001');
+    expect($poNumbers)->not->toContain('PO-RECEIVED-001');
+});
+
+it('shows remaining quantity for partially received purchase orders in the po not yet delivered report', function () {
+    $supplier = Supplier::query()->create([
+        'code' => 'SUP-PO-NYD-002',
+        'name' => 'PO NYD Partial Supplier',
+        'created_by' => $this->manager->id,
+    ]);
+
+    $partialOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $supplier->id,
+        'created_by' => $this->manager->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-PARTIAL-001',
+        'term_of_payment_type' => 'cash',
+        'created_at' => now()->subDay(),
+    ]);
+
+    $partialItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $partialOrder->id,
+        'item_id' => $this->item->id,
+        'quantity' => 10,
+        'unit_price' => 100,
+        'total' => 1000,
+    ]);
+
+    $receivingReport = ReceivingReport::query()->create([
+        'rr_number' => 'RR-NYD-002',
+        'purchase_order_id' => $partialOrder->id,
+        'received_date' => now()->toDateString(),
+        'created_by' => $this->manager->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $receivingReport->id,
+        'purchase_order_item_id' => $partialItem->id,
+        'qty_good' => 4,
+        'qty_bad' => 0,
+    ]);
+
+    $request = Request::create(
+        route('procurement.reports.po-not-yet-delivered'),
+        'POST',
+        [
+            'date_to' => now()->toDateString(),
+            'po_type' => 'cash',
+            'format' => 'excel',
+        ],
+    );
+    $request->setUserResolver(fn () => $this->manager);
+
+    $response = app(PurchasingReportController::class)->poNotYetDelivered($request);
+
+    ob_start();
+    $response->sendContent();
+    $content = ob_get_clean();
+
+    $tmp = tempnam(sys_get_temp_dir(), 'po-nyd-partial-xlsx');
+    file_put_contents($tmp, $content);
+
+    try {
+        $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp)->getActiveSheet();
+    } finally {
+        @unlink($tmp);
+    }
+
+    $highestRow = $sheet->getHighestDataRow();
+    $partialRow = null;
+    for ($row = 8; $row <= $highestRow; $row++) {
+        if ((string) $sheet->getCell('A'.$row)->getValue() === 'PO-PARTIAL-001') {
+            $partialRow = $row;
+            break;
+        }
+    }
+
+    expect($partialRow)->not->toBeNull();
+    expect((float) $sheet->getCell('I'.$partialRow)->getValue())->toBe(6.0);
+});
+
 it('renders the po not yet delivered pdf with compact table sizing', function () {
     $html = view('pdf.reports.po-not-yet-delivered', array_merge(
         PdfReport::withDefaults([

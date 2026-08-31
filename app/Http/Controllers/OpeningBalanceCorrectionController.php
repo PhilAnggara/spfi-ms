@@ -34,7 +34,7 @@ class OpeningBalanceCorrectionController extends Controller
             })
             ->latest('period_month')
             ->latest('id')
-            ->paginate(20)
+            ->paginate(30)
             ->withQueryString();
 
         return view('pages.opening-balance-corrections.index', [

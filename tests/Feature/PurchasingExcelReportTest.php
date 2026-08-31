@@ -153,6 +153,17 @@ it('exports po not yet delivered as openxml xlsx', function () {
     expect(loadPurchasingExcelSheet($response)->getCell('A8')->getValue())->toBe('PO-XLSX-001');
 });
 
+it('exports po not yet delivered as pdf', function () {
+    $response = $this->actingAs($this->manager)->post(route('procurement.reports.po-not-yet-delivered'), [
+        'date_to' => now()->toDateString(),
+        'po_type' => 'cash',
+        'format' => 'pdf',
+    ]);
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+});
+
 it('exports po register per period as openxml xlsx', function () {
     $response = $this->actingAs($this->manager)->post(route('procurement.reports.po-registered-period'), [
         'date_from' => now()->subWeek()->toDateString(),
