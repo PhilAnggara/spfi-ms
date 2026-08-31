@@ -39,6 +39,7 @@
     <link rel="stylesheet" href="{{ url('assets/vendors/aos/aos.css') }}">
     <link rel="stylesheet" href="{{ url('assets/styles/spfi-layout.css') }}">
     <link rel="stylesheet" href="{{ url('assets/styles/spfi-components.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/styles/spfi-list.css') }}">
     <link rel="stylesheet" href="{{ url('assets/styles/main.css') }}">
 
     @stack('addon-style')

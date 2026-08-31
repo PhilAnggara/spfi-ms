@@ -30,7 +30,7 @@ class ActiveSessionController extends Controller
             ->unique();
 
         $users = User::query()
-            ->with('department')
+            ->with(['department', 'latestActivityLog'])
             ->orderByRaw('case when last_seen_at is null then 1 else 0 end')
             ->orderByDesc('last_seen_at')
             ->orderBy('name')

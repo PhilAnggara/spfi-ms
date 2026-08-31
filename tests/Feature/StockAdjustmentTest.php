@@ -336,3 +336,88 @@ it('loads create page without embedding full item catalog', function () {
     $response->assertDontSee('data-items=', false);
     $response->assertSee('data-search-url', false);
 });
+
+it('paginates stock adjustments index with shared list theme and ajax wrapper', function () {
+    for ($i = 1; $i <= 21; $i++) {
+        StockAdjustment::factory()->create([
+            'sa_number' => 'SA-PAGE-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+            'created_by' => $this->user->id,
+            'updated_by' => $this->user->id,
+        ]);
+    }
+
+    $firstPage = $this->actingAs($this->user)
+        ->get(route('stock-adjustments.index'))
+        ->assertOk();
+
+    $html = $firstPage->getContent();
+    $containerPos = strpos($html, 'id="sa-page-container"');
+    $resultsPos = strpos($html, 'id="sa-page-results"');
+
+    expect($containerPos)->not->toBeFalse()
+        ->and($resultsPos)->not->toBeFalse()
+        ->and($containerPos)->toBeLessThan($resultsPos);
+
+    $firstPage
+        ->assertSee('SA-PAGE-021')
+        ->assertSee('SA-PAGE-002')
+        ->assertDontSee('SA-PAGE-001')
+        ->assertSee('id="sa-filter-form"', false)
+        ->assertSee('list-filter-grid', false)
+        ->assertSee('list-table', false)
+        ->assertSee('list-pagination', false)
+        ->assertSee('stock-adjustments-modern.js', false);
+
+    $this->actingAs($this->user)
+        ->get(route('stock-adjustments.index', ['page' => 2]))
+        ->assertOk()
+        ->assertSee('SA-PAGE-001')
+        ->assertDontSee('SA-PAGE-021');
+});
+
+it('filters stock adjustments index by keyword', function () {
+    StockAdjustment::factory()->create([
+        'sa_number' => 'SA-FILTER-ALPHA',
+        'reason' => 'Alpha reason',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    StockAdjustment::factory()->create([
+        'sa_number' => 'SA-FILTER-BETA',
+        'reason' => 'Beta reason',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('stock-adjustments.index', ['keyword' => 'ALPHA']))
+        ->assertOk()
+        ->assertSee('SA-FILTER-ALPHA')
+        ->assertDontSee('SA-FILTER-BETA');
+});
+
+it('filters stock adjustments index by date range', function () {
+    StockAdjustment::factory()->create([
+        'sa_number' => 'SA-DATE-MARCH',
+        'sa_date' => '2026-03-15',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    StockAdjustment::factory()->create([
+        'sa_number' => 'SA-DATE-APRIL',
+        'sa_date' => '2026-04-10',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('stock-adjustments.index', [
+            'date_start' => '2026-03-01',
+            'date_end' => '2026-03-31',
+        ]))
+        ->assertOk()
+        ->assertSee('SA-DATE-MARCH')
+        ->assertDontSee('SA-DATE-APRIL');
+});

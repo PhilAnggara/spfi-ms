@@ -8,6 +8,7 @@ use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
 use App\Services\DocumentNumberService;
 use App\Services\StockService;
+use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\Concerns\SearchesStockCorrectionItems;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -19,13 +20,16 @@ use Illuminate\View\View;
 
 class StockAdjustmentController extends Controller
 {
+    use PaginatesLegacySqlServer;
     use SearchesStockCorrectionItems;
 
     public function index(Request $request): View
     {
         $keyword = trim((string) $request->query('keyword'));
+        $dateStart = trim((string) $request->query('date_start'));
+        $dateEnd = trim((string) $request->query('date_end'));
 
-        $adjustments = StockAdjustment::query()
+        $adjustmentsQuery = StockAdjustment::query()
             ->with(['createdBy:id,name', 'items'])
             ->when($keyword !== '', function ($query) use ($keyword) {
                 $query->where(function ($inner) use ($keyword) {
@@ -33,14 +37,25 @@ class StockAdjustmentController extends Controller
                         ->orWhere('reason', 'like', "%{$keyword}%");
                 });
             })
-            ->latest('sa_date')
-            ->latest('id')
-            ->paginate(20)
-            ->withQueryString();
+            ->when($dateStart !== '', function ($query) use ($dateStart) {
+                $query->whereDate('sa_date', '>=', $dateStart);
+            })
+            ->when($dateEnd !== '', function ($query) use ($dateEnd) {
+                $query->whereDate('sa_date', '<=', $dateEnd);
+            });
+
+        $orderClause = 'stock_adjustments.sa_date DESC, stock_adjustments.id DESC';
+        $adjustmentsQuery->latest('sa_date')->latest('id');
+
+        $adjustments = $this->paginateEloquentForCurrentConnection($adjustmentsQuery, $orderClause, 20);
 
         return view('pages.stock-adjustments.index', [
             'adjustments' => $adjustments,
-            'filters' => ['keyword' => $keyword],
+            'filters' => [
+                'keyword' => $keyword,
+                'date_start' => $dateStart,
+                'date_end' => $dateEnd,
+            ],
         ]);
     }
 

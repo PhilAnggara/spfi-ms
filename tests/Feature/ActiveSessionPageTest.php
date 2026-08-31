@@ -299,6 +299,49 @@ it('defaults to last activity sorting in the list order', function () {
         ->toBeLessThan(strpos($content, 'data-username="admin-sessions"'));
 });
 
+it('shows latest activity history in the list and exposes sort option', function () {
+    UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_LOGIN,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => null,
+        'created_at' => now()->subHour(),
+        'updated_at' => now()->subHour(),
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get(route('active-sessions.index'))
+        ->assertSuccessful()
+        ->assertSee('Activity History')
+        ->assertSee('Logged in')
+        ->assertSee('value="activity_history"', false)
+        ->assertSee('data-last-history=', false)
+        ->assertSee('btn-light-secondary', false)
+        ->assertDontSee('list-pagination', false);
+});
+
+it('exposes activity history timestamps for client-side sorting', function () {
+    $this->travelTo(now()->startOfMinute());
+
+    $monitoredLog = UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_LOGIN,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => null,
+        'created_at' => now()->subMinutes(30),
+        'updated_at' => now()->subMinutes(30),
+    ]);
+
+    $content = $this->actingAs($this->admin)
+        ->get(route('active-sessions.index'))
+        ->assertSuccessful()
+        ->getContent();
+
+    expect($content)->toContain('data-last-history="'.$monitoredLog->created_at->timestamp.'"', false);
+});
+
 it('renders status data attributes for realtime client filtering', function () {
     insertSession($this->monitoredUser, now()->timestamp);
 

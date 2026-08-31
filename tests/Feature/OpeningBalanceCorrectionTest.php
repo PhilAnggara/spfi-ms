@@ -580,13 +580,85 @@ it('paginates opening balance corrections index and keeps ajax results wrapper',
     $firstPage
         ->assertSee('OBC-PAGE-031')
         ->assertSee('OBC-PAGE-002')
-        ->assertDontSee('OBC-PAGE-001');
+        ->assertDontSee('OBC-PAGE-001')
+        ->assertSee('id="obc-filter-form"', false)
+        ->assertSee('list-filter-grid', false)
+        ->assertSee('list-table', false)
+        ->assertSee('list-pagination', false)
+        ->assertSee('opening-balance-corrections-modern.js', false);
 
     $this->actingAs($this->user)
         ->get(route('opening-balance-corrections.index', ['page' => 2]))
         ->assertOk()
         ->assertSee('OBC-PAGE-001')
         ->assertDontSee('OBC-PAGE-031');
+});
+
+it('filters opening balance corrections index by keyword', function () {
+    OpeningBalanceCorrection::factory()->create([
+        'obc_number' => 'OBC-FILTER-ALPHA',
+        'reason' => 'Alpha reason',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    OpeningBalanceCorrection::factory()->create([
+        'obc_number' => 'OBC-FILTER-BETA',
+        'reason' => 'Beta reason',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('opening-balance-corrections.index', ['keyword' => 'ALPHA']))
+        ->assertOk()
+        ->assertSee('OBC-FILTER-ALPHA')
+        ->assertDontSee('OBC-FILTER-BETA');
+});
+
+it('filters opening balance corrections index by status and period', function () {
+    OpeningBalanceCorrection::factory()->create([
+        'obc_number' => 'OBC-STATUS-POSTED',
+        'period_month' => '2026-03-01',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    OpeningBalanceCorrection::factory()->create([
+        'obc_number' => 'OBC-STATUS-REVERSED',
+        'period_month' => '2026-03-01',
+        'reversed_at' => now(),
+        'reversed_by' => $this->user->id,
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    OpeningBalanceCorrection::factory()->create([
+        'obc_number' => 'OBC-PERIOD-APR',
+        'period_month' => '2026-04-01',
+        'created_by' => $this->user->id,
+        'updated_by' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('opening-balance-corrections.index', ['status' => 'reversed']))
+        ->assertOk()
+        ->assertSee('OBC-STATUS-REVERSED')
+        ->assertDontSee('OBC-STATUS-POSTED')
+        ->assertDontSee('OBC-PERIOD-APR');
+
+    $this->actingAs($this->user)
+        ->get(route('opening-balance-corrections.index', ['status' => 'posted']))
+        ->assertOk()
+        ->assertSee('OBC-STATUS-POSTED')
+        ->assertDontSee('OBC-STATUS-REVERSED');
+
+    $this->actingAs($this->user)
+        ->get(route('opening-balance-corrections.index', ['period' => '2026-04']))
+        ->assertOk()
+        ->assertSee('OBC-PERIOD-APR')
+        ->assertDontSee('OBC-STATUS-POSTED')
+        ->assertDontSee('OBC-STATUS-REVERSED');
 });
 
 function createMinimalSws(int $departmentId, int $userId): int

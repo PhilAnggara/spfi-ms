@@ -25,6 +25,12 @@ class OpeningBalanceCorrectionController extends Controller
     public function index(Request $request): View
     {
         $keyword = trim((string) $request->query('keyword'));
+        $status = trim((string) $request->query('status'));
+        $period = trim((string) $request->query('period'));
+
+        if ($period !== '' && ! preg_match('/^\d{4}-\d{2}$/', $period)) {
+            $period = '';
+        }
 
         $correctionsQuery = OpeningBalanceCorrection::query()
             ->with(['createdBy:id,name', 'items'])
@@ -33,16 +39,31 @@ class OpeningBalanceCorrectionController extends Controller
                     $inner->where('obc_number', 'like', "%{$keyword}%")
                         ->orWhere('reason', 'like', "%{$keyword}%");
                 });
+            })
+            ->when($status === 'posted', function ($query) {
+                $query->whereNull('reversed_at');
+            })
+            ->when($status === 'reversed', function ($query) {
+                $query->whereNotNull('reversed_at');
+            })
+            ->when($period !== '', function ($query) use ($period) {
+                [$year, $month] = array_map('intval', explode('-', $period));
+                $query->whereYear('period_month', $year)
+                    ->whereMonth('period_month', $month);
             });
 
         $orderClause = 'opening_balance_corrections.period_month DESC, opening_balance_corrections.id DESC';
         $correctionsQuery->orderByDesc('period_month')->orderByDesc('id');
 
-        $corrections = $this->paginateEloquentForCurrentConnection($correctionsQuery, $orderClause, 30);
+        $corrections = $this->paginateEloquentForCurrentConnection($correctionsQuery, $orderClause, 20);
 
         return view('pages.opening-balance-corrections.index', [
             'corrections' => $corrections,
-            'filters' => ['keyword' => $keyword],
+            'filters' => [
+                'keyword' => $keyword,
+                'status' => $status,
+                'period' => $period,
+            ],
         ]);
     }
 

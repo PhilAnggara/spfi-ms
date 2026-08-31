@@ -24,15 +24,17 @@
     </div>
 
     <section class="section">
-        <div class="uc-toolbar mb-4" data-aos="fade-down">
-            <div class="row g-2 align-items-center">
-                <div class="col-12 col-lg-6">
+        <div class="uc-toolbar mb-4 list-filter-grid" data-aos="fade-down">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-lg-5">
+                    <label for="user-search-input" class="form-label mb-1">Search</label>
                     <div class="uc-search-wrap">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input type="text" id="user-search-input" class="form-control" placeholder="Search name or username (fuzzy)..." autocomplete="off">
                     </div>
                 </div>
                 <div class="col-12 col-sm-6 col-lg-3">
+                    <label for="user-filter-department" class="form-label mb-1">Department</label>
                     <select id="user-filter-department" class="form-select">
                         <option value="">All Departments</option>
                         @foreach ($departments as $department)
@@ -41,6 +43,7 @@
                     </select>
                 </div>
                 <div class="col-12 col-sm-6 col-lg-2">
+                    <label for="user-filter-role" class="form-label mb-1">Role</label>
                     <select id="user-filter-role" class="form-select">
                         <option value="">All Roles</option>
                         <option value="General Manager">General Manager</option>
@@ -50,8 +53,12 @@
                         <option value="Programmer">Programmer</option>
                     </select>
                 </div>
-                <div class="col-12 col-lg-1 d-grid">
-                    <button type="button" id="user-filter-reset" class="btn btn-light border">Reset</button>
+                <div class="col-12 col-lg-2 d-grid">
+                    <label class="form-label mb-1 d-none d-lg-block">&nbsp;</label>
+                    <button type="button" id="user-filter-reset" class="btn btn-light-secondary w-100">
+                        <i class="fa-regular fa-rotate-left me-1"></i>
+                        Reset
+                    </button>
                 </div>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2">

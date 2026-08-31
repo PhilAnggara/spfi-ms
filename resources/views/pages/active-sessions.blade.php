@@ -31,8 +31,8 @@
     </div>
 
     <section class="section">
-        <div class="as-toolbar mb-4" data-aos="fade-down">
-            <div class="row g-2 align-items-end">
+        <div class="as-toolbar mb-4 list-filter-grid" data-aos="fade-down">
+            <div class="row g-3 align-items-end">
                 <div class="col-12 col-lg-5">
                     <label for="as-search" class="form-label mb-1">Search</label>
                     <div class="as-search-wrap">
@@ -52,6 +52,7 @@
                     <label for="as-sort" class="form-label mb-1">Sort by</label>
                     <select id="as-sort" class="form-select" aria-label="Sort users">
                         <option value="last_seen" selected>Last Activity</option>
+                        <option value="activity_history">Activity History</option>
                         <option value="online">Online First</option>
                         <option value="name_asc">Name A–Z</option>
                         <option value="name_desc">Name Z–A</option>
@@ -59,7 +60,11 @@
                     </select>
                 </div>
                 <div class="col-12 col-lg-2 d-grid">
-                    <button type="button" id="as-filter-reset" class="btn btn-light border">Reset</button>
+                    <label class="form-label mb-1 d-none d-lg-block">&nbsp;</label>
+                    <button type="button" id="as-filter-reset" class="btn btn-light-secondary w-100">
+                        <i class="fa-regular fa-rotate-left me-1"></i>
+                        Reset
+                    </button>
                 </div>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2">

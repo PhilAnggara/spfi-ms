@@ -3,7 +3,7 @@
     let pendingReplaceRequest = null;
 
     function setLoading(active) {
-        const loadingEl = document.getElementById('obc-page-loading');
+        const loadingEl = document.getElementById('sa-page-loading');
         if (!loadingEl) {
             return;
         }
@@ -46,8 +46,8 @@
             const html = await response.text();
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            const newResults = doc.querySelector('#obc-page-results');
-            const currentResults = document.querySelector('#obc-page-results');
+            const newResults = doc.querySelector('#sa-page-results');
+            const currentResults = document.querySelector('#sa-page-results');
 
             const hasNewerPendingRequest = pendingReplaceRequest && pendingReplaceRequest.url !== normalizedUrl;
             if (hasNewerPendingRequest) {
@@ -65,8 +65,8 @@
                 window.history.pushState({}, '', normalizedUrl);
             }
 
-            if (typeof window.initObcPage === 'function') {
-                window.initObcPage();
+            if (typeof window.initStockAdjustmentPage === 'function') {
+                window.initStockAdjustmentPage();
             }
         } catch (_) {
             showPaginationError();
@@ -83,10 +83,10 @@
         }
     }
 
-    window.obcReplacePageContent = replacePageContent;
+    window.saReplacePageContent = replacePageContent;
 
     document.addEventListener('click', function (event) {
-        const link = event.target.closest('#obc-page-container a[href*="page="]');
+        const link = event.target.closest('#sa-page-container a[href*="page="]');
         if (!link) {
             return;
         }

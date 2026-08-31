@@ -50,6 +50,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const deptB = (b.dataset.department || '').toLowerCase();
         const seenA = Number(a.dataset.lastSeen || 0);
         const seenB = Number(b.dataset.lastSeen || 0);
+        const historyA = Number(a.dataset.lastHistory || 0);
+        const historyB = Number(b.dataset.lastHistory || 0);
         const onlineA = a.dataset.status === 'online' ? 0 : 1;
         const onlineB = b.dataset.status === 'online' ? 0 : 1;
         const orderA = Number(a.dataset.order || 0);
@@ -75,6 +77,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (seenA === 0 && seenB !== 0) return 1;
             if (seenB === 0 && seenA !== 0) return -1;
             return seenB - seenA || nameA.localeCompare(nameB);
+        }
+
+        if (sort === 'activity_history') {
+            if (historyA === 0 && historyB !== 0) return 1;
+            if (historyB === 0 && historyA !== 0) return -1;
+            return historyB - historyA || nameA.localeCompare(nameB);
         }
 
         if (seenA === 0 && seenB !== 0) return 1;

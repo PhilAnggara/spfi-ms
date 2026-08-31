@@ -22,11 +22,12 @@
     </div>
 </div>
 
-<div class="as-table-wrap" data-aos="fade-up">
+<div class="as-table-wrap list-table-chrome" data-aos="fade-up">
     <div class="as-table-head d-none d-xl-grid">
         <div>User</div>
         <div>Status</div>
         <div>Last Activity</div>
+        <div>Activity History</div>
         <div>IP Address</div>
         <div>Device</div>
         <div class="text-end">Actions</div>
@@ -47,6 +48,8 @@
                 };
                 $device = $user->last_user_agent ? $user->deviceLabel() : '-';
                 $lastSeenTs = $user->last_seen_at?->timestamp ?? 0;
+                $latestLog = $user->latestActivityLog;
+                $lastHistoryTs = $latestLog?->created_at?->timestamp ?? 0;
             @endphp
             <div class="as-row"
                  data-as-row="true"
@@ -55,6 +58,7 @@
                  data-status="{{ $isOnline ? 'online' : 'offline' }}"
                  data-department="{{ $user->department?->name ?? '' }}"
                  data-last-seen="{{ $lastSeenTs }}"
+                 data-last-history="{{ $lastHistoryTs }}"
                  data-order="{{ $loop->index }}">
                 <div class="as-col as-col-user">
                     <div class="as-avatar-wrap">
@@ -95,6 +99,20 @@
                         <small class="text-muted d-block">{{ $user->last_seen_at->format('d M Y H:i') }}</small>
                     @else
                         <span class="as-info-value text-muted">Never</span>
+                    @endif
+                </div>
+
+                <div class="as-col as-col-history" data-label="Activity History">
+                    @if ($latestLog)
+                        <span class="as-info-value">{{ $latestLog->label() }}</span>
+                        @if ($latestLog->pageLabel() || $latestLog->subjectLabel())
+                            <small class="text-muted d-block text-truncate" title="{{ trim(($latestLog->pageLabel() ?? '').' '.($latestLog->subjectLabel() ?? '')) }}">
+                                {{ \Illuminate\Support\Str::limit(trim(($latestLog->pageLabel() ?? '').($latestLog->subjectLabel() ? ' · '.$latestLog->subjectLabel() : '')), 48) }}
+                            </small>
+                        @endif
+                        <small class="text-muted d-block">{{ $latestLog->created_at->diffForHumans() }}</small>
+                    @else
+                        <span class="as-info-value text-muted">No activity yet</span>
                     @endif
                 </div>
 

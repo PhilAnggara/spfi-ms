@@ -21,12 +21,6 @@
 
 .uc-search-wrap .form-control {
     padding-left: 2.1rem;
-    border-color: #cbd5e1;
-}
-
-.uc-search-wrap .form-control:focus {
-    border-color: #0284c7;
-    box-shadow: 0 0 0 .2rem rgba(2,132,199,.12);
 }
 
 .uc-card {

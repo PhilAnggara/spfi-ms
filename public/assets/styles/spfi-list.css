@@ -1,0 +1,203 @@
+/*
+ * Shared list-page theme: filters, tables, pagination.
+ * Uses rem only — scales with spfi-scale.css root font-size.
+ */
+
+/* --- Filter grid --- */
+.list-filter-grid .form-label,
+.po-filter-grid .form-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #576074;
+}
+
+.list-filter-grid .form-control,
+.list-filter-grid .form-select,
+.po-filter-grid .form-control,
+.po-filter-grid .form-select {
+    border-radius: 0.75rem;
+    border-color: #d7dde8;
+}
+
+.list-filter-grid .form-control:focus,
+.list-filter-grid .form-select:focus,
+.po-filter-grid .form-control:focus,
+.po-filter-grid .form-select:focus {
+    border-color: #1f7a8c;
+    box-shadow: 0 0 0 0.2rem rgba(31, 122, 140, 0.14);
+}
+
+/* --- HTML tables --- */
+.list-table thead th,
+.po-table thead th {
+    border-bottom-width: 1px;
+    border-color: #e3e8f0;
+    color: #506078;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.045em;
+    font-weight: 800;
+    background: #f8fafc;
+}
+
+.list-table tbody td,
+.po-table tbody td {
+    vertical-align: middle;
+    border-color: #eef2f7;
+}
+
+.list-table tbody tr,
+.po-table tbody tr {
+    transition: background-color 0.16s ease;
+}
+
+.list-table tbody tr:hover,
+.po-table tbody tr:hover {
+    background-color: #f9fcff;
+}
+
+/* --- Non-HTML table chrome (e.g. Active Sessions grid) --- */
+.list-table-chrome {
+    background: #fff;
+    border: 1px solid #e3e8f0;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 0.0625rem 0.1875rem rgba(15, 23, 42, 0.05);
+}
+
+.list-table-chrome .list-table-head,
+.list-table-chrome .as-table-head {
+    background: #f8fafc;
+    border-bottom: 1px solid #e3e8f0;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+    color: #506078;
+}
+
+.list-table-chrome .list-table-row:hover,
+.list-table-chrome .as-row:hover {
+    background-color: #f9fcff;
+}
+
+/* --- Pagination --- */
+.list-pagination nav,
+.employee-pagination-wrap nav,
+.sws-pagination-wrap nav,
+.sc-pagination-wrap nav,
+.canvassing-pagination-wrap nav,
+.po-page .list-pagination nav {
+    width: 100%;
+}
+
+.list-pagination .d-none.flex-sm-fill.d-sm-flex,
+.employee-pagination-wrap .d-none.flex-sm-fill.d-sm-flex,
+.sws-pagination-wrap .d-none.flex-sm-fill.d-sm-flex,
+.sc-pagination-wrap .d-none.flex-sm-fill.d-sm-flex,
+.canvassing-pagination-wrap .d-none.flex-sm-fill.d-sm-flex,
+.po-page .d-none.flex-sm-fill.d-sm-flex {
+    justify-content: space-between !important;
+    align-items: center;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.list-pagination .small.text-muted,
+.employee-pagination-wrap .small.text-muted,
+.sws-pagination-wrap .small.text-muted,
+.sc-pagination-wrap .small.text-muted,
+.canvassing-pagination-wrap .small.text-muted,
+.po-page .small.text-muted {
+    margin-bottom: 0;
+    text-align: left;
+}
+
+.list-pagination .pagination,
+.employee-pagination-wrap .pagination,
+.sws-pagination-wrap .pagination,
+.sc-pagination-wrap .pagination,
+.canvassing-pagination-wrap .pagination,
+.po-page .pagination {
+    gap: 0.35rem;
+    margin-bottom: 0;
+}
+
+.list-pagination .pagination .page-link,
+.employee-pagination-wrap .pagination .page-link,
+.sws-pagination-wrap .pagination .page-link,
+.sc-pagination-wrap .pagination .page-link,
+.canvassing-pagination-wrap .pagination .page-link,
+.po-page .pagination .page-link {
+    border-radius: 0.55rem;
+    border-color: #d7dde8;
+    color: #3b4b63;
+    font-weight: 600;
+    min-width: 2rem;
+    text-align: center;
+}
+
+.list-pagination .pagination .page-item.active .page-link,
+.employee-pagination-wrap .pagination .page-item.active .page-link,
+.sws-pagination-wrap .pagination .page-item.active .page-link,
+.sc-pagination-wrap .pagination .page-item.active .page-link,
+.canvassing-pagination-wrap .pagination .page-item.active .page-link,
+.po-page .pagination .page-item.active .page-link {
+    background: #1f7a8c;
+    border-color: #1f7a8c;
+    color: #fff;
+}
+
+.list-pagination .pagination .page-link:hover,
+.employee-pagination-wrap .pagination .page-link:hover,
+.sws-pagination-wrap .pagination .page-link:hover,
+.sc-pagination-wrap .pagination .page-link:hover,
+.canvassing-pagination-wrap .pagination .page-link:hover,
+.po-page .pagination .page-link:hover {
+    border-color: #1f7a8c;
+    color: #1f7a8c;
+}
+
+.list-pagination .list-pagination-mobile-info {
+    font-size: 0.8125rem;
+    color: #64748b;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    width: 100%;
+}
+
+.list-pagination .d-flex.justify-content-between.flex-fill.d-sm-none,
+.employee-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none,
+.sws-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none,
+.sc-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none,
+.canvassing-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+@media (max-width: 48rem) {
+    .list-filter-grid .btn,
+    .po-filter-grid .btn {
+        font-size: 0.8rem;
+        padding-inline: 0.7rem;
+    }
+
+    .list-pagination,
+    .employee-pagination-wrap,
+    .sws-pagination-wrap,
+    .sc-pagination-wrap,
+    .canvassing-pagination-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .list-pagination .d-flex.justify-content-between.flex-fill.d-sm-none .pagination,
+    .employee-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none .pagination,
+    .sws-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none .pagination,
+    .sc-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none .pagination,
+    .canvassing-pagination-wrap .d-flex.justify-content-between.flex-fill.d-sm-none .pagination {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
