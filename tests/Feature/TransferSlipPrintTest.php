@@ -3,8 +3,10 @@
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\PrintCalibrationProfile;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
+use App\Services\Print\PrintCalibrationService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -492,4 +494,29 @@ it('returns not found for a deleted transfer slip', function () {
         ->get(route('transfer-slips.print', $this->transferSlipId));
 
     $response->assertNotFound();
+});
+
+it('applies measured anchor calibration when printing transfer slip preview', function () {
+    $anchor = app(PrintCalibrationService::class)->getDesignAnchor(PrintCalibrationProfile::DOCUMENT_TYPE_TS);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('transfer-slips.print', [
+            'transferSlip' => $this->transferSlipId,
+            'mode' => 'preview',
+            'measured_anchor_x_mm' => $anchor['x'] + 1.5,
+            'measured_anchor_y_mm' => $anchor['y'] + 0.5,
+        ]));
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+});
+
+it('shows print calibration controls on transfer slips index', function () {
+    $response = $this->actingAs($this->user)
+        ->get(route('transfer-slips.index'));
+
+    $response->assertSuccessful();
+    $response->assertSee('Paper position adjustment');
+    $response->assertSee('Click here');
+    $response->assertSee('Show options');
 });

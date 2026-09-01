@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             EmployeeDepartmentSeeder::class,
             EmployeeSeeder::class,
             RolePermissionSeeder::class,
+            PrintCalibrationProfileSeeder::class,
             UserSeeder::class,
             UnitOfMeasureSeeder::class,
             ItemCategorySeeder::class,

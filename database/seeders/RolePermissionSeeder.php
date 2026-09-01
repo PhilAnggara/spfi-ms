@@ -118,6 +118,8 @@ class RolePermissionSeeder extends Seeder
                 'update-suppliers',
                 'delete-suppliers',
                 'view-purchase-history',
+                'view-print-calibration',
+                'manage-print-calibration',
             ],
             $this->crud('product-categories'),
             $this->crud('uom'),
@@ -243,6 +245,10 @@ class RolePermissionSeeder extends Seeder
             $this->crud('fish'),
             $this->crud('accounting-master'),
             $this->crud('employees'),
+            [
+                'view-print-calibration',
+                'manage-print-calibration',
+            ],
         );
 
         $imProductCreate = ['view-products', 'create-products'];

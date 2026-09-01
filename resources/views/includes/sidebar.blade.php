@@ -58,7 +58,7 @@
                             </a>
                         </li>
 
-                        @canany(['view-users', 'view-active-sessions', 'view-employees', 'view-roles', 'view-permissions', 'view-products', 'view-suppliers', 'view-product-categories', 'view-uom', 'view-buyers', 'view-currencies', 'view-batches', 'view-fish-suppliers', 'view-vessels', 'view-fish', 'view-accounting-master'])
+                        @canany(['view-users', 'view-active-sessions', 'view-employees', 'view-roles', 'view-permissions', 'view-products', 'view-suppliers', 'view-product-categories', 'view-uom', 'view-buyers', 'view-currencies', 'view-batches', 'view-fish-suppliers', 'view-vessels', 'view-fish', 'view-accounting-master', 'view-print-calibration'])
                             <li class="sidebar-item {{ is_active_menu(['master/*']) }} has-sub">
                                 <a href="#" class='sidebar-link'>
                                     <i class="fa-duotone fa-solid fa-user-tie {{ Request::is('master/*') ? 'fa-fade' : '' }}"></i>
@@ -182,6 +182,12 @@
                                                 <a href="{{ route('accounting.balance-sheet.index') }}" class="submenu-link">Balance Sheet Mapping</a>
                                             </li>
                                         </ul>
+                                    </li>
+                                    @endcan
+
+                                    @can('view-print-calibration')
+                                    <li class="submenu-item {{ Request::is('master/print-calibration-profiles*') ? 'active' : '' }}">
+                                        <a href="{{ route('print-calibration-profiles.index') }}" class="submenu-link">Print Calibration</a>
                                     </li>
                                     @endcan
 

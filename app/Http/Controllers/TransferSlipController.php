@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesPrintCalibration;
 use App\Models\Department;
+use App\Models\PrintCalibrationProfile;
 use App\Services\DocumentNumberService;
+use App\Services\Print\PrintCalibrationService;
 use App\Services\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
@@ -15,6 +18,8 @@ use Illuminate\Validation\ValidationException;
 
 class TransferSlipController extends Controller
 {
+    use ResolvesPrintCalibration;
+
     private const MM_TO_PT = 2.834645669;
 
     public function index(Request $request)
@@ -48,6 +53,8 @@ class TransferSlipController extends Controller
             'departmentOptions' => $departmentOptions,
             'filters' => $filters,
             'nextTsNumber' => app(DocumentNumberService::class)->previewNext('TS'),
+            'tsCalibrationProfiles' => PrintCalibrationProfile::forDocumentType(PrintCalibrationProfile::DOCUMENT_TYPE_TS),
+            'tsDesignAnchor' => app(PrintCalibrationService::class)->getDesignAnchor(PrintCalibrationProfile::DOCUMENT_TYPE_TS),
         ]);
     }
 
@@ -676,6 +683,7 @@ class TransferSlipController extends Controller
 
         $pageWidthMm = (float) config('transfer-slip.paper.width_mm', 215);
         $pageHeightMm = (float) config('transfer-slip.paper.height_mm', 105);
+        $calibrationOffsets = $this->resolvePrintCalibrationOffsets($request, PrintCalibrationProfile::DOCUMENT_TYPE_TS);
         $backgroundImageSrc = null;
         $backgroundWidthPt = $pageWidthMm * self::MM_TO_PT;
         $backgroundHeightPt = $pageHeightMm * self::MM_TO_PT;
@@ -699,6 +707,8 @@ class TransferSlipController extends Controller
             'backgroundHeightPt' => $backgroundHeightPt,
             'pageWidthMm' => $pageWidthMm,
             'pageHeightMm' => $pageHeightMm,
+            'offsetXMm' => $calibrationOffsets['x'],
+            'offsetYMm' => $calibrationOffsets['y'],
         ])
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true)

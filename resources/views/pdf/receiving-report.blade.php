@@ -20,7 +20,7 @@
         $mmY = static fn (float $mm): string => round($sy($mm) + $offsetYMm, 2).'mm';
         $oy = static fn (float $mm): string => round($mm + $offsetYMm, 2).'mm';
         $fieldFontSize = round(15.5 * $scaleY, 1);
-        $poNumberFontSize = round(24 * $scaleY, 1);
+        $poNumberFontSize = round(25.5 * $scaleY, 1);
         $capexFontSize = round(22 * $scaleY, 1);
         $cellFontSize = round(16 * $scaleY, 1);
         $acctCellFontSize = round(15.5 * $scaleY, 1);
@@ -169,9 +169,20 @@
         }
 
         .po-number-bold {
+            overflow: visible;
+            white-space: nowrap;
+        }
+
+        .po-number-bold-stroke {
+            position: absolute;
+            top: 0;
+            left: 0;
             font-size: {{ $poNumberFontSize }}px;
+            font-family: Courier, monospace;
             font-weight: bold;
-            letter-spacing: 0.2px;
+            line-height: 1.25;
+            letter-spacing: 0.05px;
+            color: #111827;
         }
 
         .capex-label {
@@ -344,6 +355,12 @@
         $poDateText = $po?->created_at ? $po->created_at->locale('id')->translatedFormat('d M Y') : '-';
         $rrDateText = $receivingReport->created_at ? $receivingReport->created_at->locale('id')->translatedFormat('d M Y') : '-';
         $isCapex = (bool) ($po?->items?->first()?->prsItem?->prs?->is_capex ?? false);
+        $poNumberText = $po?->po_number ?? '-';
+        $poNumberStrokeOffsetsMm = [
+            [0, 0],
+            [0.14, 0],
+            [0.28, 0],
+        ];
     @endphp
 
     <div class="rr-form-page">
@@ -363,7 +380,11 @@
         @endif
 
         <div class="field" style="left: {{ $mmX(37) }}; top: {{ $mmY(41) }}; width: {{ $mmW(100) }};">{{ $supplierDisplay }}</div>
-        <div class="field po-number-bold" style="left: {{ $mmX(161) }}; top: {{ $mmY(38) }}; width: {{ $mmW(48) }};">{{ $po?->po_number ?? '-' }}</div>
+        <div class="field po-number-bold" style="left: {{ $mmX(161) }}; top: {{ $mmY(38) }}; width: {{ $mmW(48) }};">
+            @foreach ($poNumberStrokeOffsetsMm as [$strokeX, $strokeY])
+                <span class="po-number-bold-stroke" style="left: {{ $strokeX }}mm; top: {{ $strokeY }}mm;">{{ $poNumberText }}</span>
+            @endforeach
+        </div>
         <div class="field" style="left: {{ $mmX(160) }}; top: {{ $mmY(49) }}; width: {{ $mmW(48) }};">{{ $poDateText }}</div>
 
         @foreach($layoutRows as $row)

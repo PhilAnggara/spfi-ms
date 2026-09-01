@@ -31,4 +31,19 @@ return [
     'offset_x_mm' => 0,
     'offset_y_mm' => 0,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Calibration Anchor (background table top-left)
+    |--------------------------------------------------------------------------
+    |
+    | Matches the From row on the pre-printed TS form (see pdf/transfer-slip).
+    |
+    */
+
+    'calibration_anchor' => [
+        'x_mm' => 10.5,
+        'y_mm' => 23.5,
+        'label' => 'Top-left corner of the background table (From row)',
+    ],
+
 ];

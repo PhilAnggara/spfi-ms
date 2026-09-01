@@ -23,6 +23,7 @@ use App\Http\Controllers\MainController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OpeningBalanceCorrectionController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PrintCalibrationProfileController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrsApprovalController;
@@ -205,6 +206,20 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:delete-currencies')->prefix('master')->group(function () {
         Route::delete('currency/{currency}', [CurrencyController::class, 'destroy'])->name('currency.destroy');
+    });
+
+    Route::middleware('permission:view-print-calibration')->prefix('master')->group(function () {
+        Route::get('print-calibration-profiles', [PrintCalibrationProfileController::class, 'index'])->name('print-calibration-profiles.index');
+        Route::get('print-calibration-profiles/preview-sample', [PrintCalibrationProfileController::class, 'previewSample'])->name('print-calibration-profiles.preview-sample');
+        Route::get('print-calibration-profiles/calibrate', [PrintCalibrationProfileController::class, 'calibrate'])->name('print-calibration-profiles.calibrate');
+        Route::get('print-calibration-profiles/{printCalibrationProfile}/calibrate', [PrintCalibrationProfileController::class, 'calibrate'])->name('print-calibration-profiles.calibrate.edit');
+    });
+
+    Route::middleware('permission:manage-print-calibration')->prefix('master')->group(function () {
+        Route::post('print-calibration-profiles', [PrintCalibrationProfileController::class, 'store'])->name('print-calibration-profiles.store');
+        Route::put('print-calibration-profiles/{printCalibrationProfile}', [PrintCalibrationProfileController::class, 'update'])->name('print-calibration-profiles.update');
+        Route::patch('print-calibration-profiles/{printCalibrationProfile}', [PrintCalibrationProfileController::class, 'update']);
+        Route::delete('print-calibration-profiles/{printCalibrationProfile}', [PrintCalibrationProfileController::class, 'destroy'])->name('print-calibration-profiles.destroy');
     });
 
     Route::middleware('permission:view-batches')->prefix('master')->group(function () {

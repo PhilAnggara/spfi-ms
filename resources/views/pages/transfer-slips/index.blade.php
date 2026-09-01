@@ -695,4 +695,5 @@
     <script src="{{ url('assets/scripts/modules/transfer-slips-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/transfer-slips-index.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/document-print-confirm.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/document-print-calibration.js') }}"></script>
 @endpush

@@ -3,6 +3,7 @@
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\PrintCalibrationProfile;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\ReceivingReport;
@@ -10,6 +11,7 @@ use App\Models\ReceivingReportItem;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
+use App\Services\Print\PrintCalibrationService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -282,7 +284,7 @@ it('uses flexible item row heights so a long name pushes the next row down', fun
         ->not->toContain('…');
 
     expect($html)->toMatch('/\.item-cell\s*\{[^}]*font-weight:\s*normal/s');
-    expect($html)->toMatch('/\.po-number-bold\s*\{[^}]*font-weight:\s*bold/s');
+    expect($html)->toMatch('/\.po-number-bold-stroke\s*\{[^}]*font-weight:\s*bold/s');
     expect($html)->toContain('PO-TEST-001');
 
     preg_match_all('/class="cell item-cell"[^>]*>(.*?)<\/div>/s', $html, $matches);
@@ -645,6 +647,32 @@ it('prints rr items in purchase order item order even when rr rows were inserted
     expect($html)
         ->toContain('po-number-bold')
         ->toContain('PO-TEST-001')
-        ->toMatch('/\.po-number-bold\s*\{[^}]*font-weight:\s*bold/s')
+        ->toMatch('/\.po-number-bold-stroke\s*\{[^}]*font-weight:\s*bold/s')
         ->toMatch('/class="field po-number"[^>]*>RR-TEST-001/');
+});
+
+it('applies measured anchor calibration when printing receiving report preview', function () {
+    $anchor = app(PrintCalibrationService::class)->getDesignAnchor(PrintCalibrationProfile::DOCUMENT_TYPE_RR);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('receiving-reports.print', [
+            'receivingReport' => $this->receivingReport,
+            'mode' => 'preview',
+            'measured_anchor_x_mm' => $anchor['x'] + 2,
+            'measured_anchor_y_mm' => $anchor['y'] + 1,
+            'nudge_x_mm' => 0.5,
+        ]));
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+});
+
+it('shows print calibration controls on receiving reports index', function () {
+    $response = $this->actingAs($this->user)
+        ->get(route('receiving-reports.index'));
+
+    $response->assertSuccessful();
+    $response->assertSee('Paper position adjustment');
+    $response->assertSee('Click here');
+    $response->assertSee('Show options');
 });

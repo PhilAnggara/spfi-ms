@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesPrintCalibration;
 use App\Models\CustomsDocumentType;
+use App\Models\PrintCalibrationProfile;
 use App\Models\PurchaseOrder;
 use App\Models\ReceivingReport;
 use App\Models\ReceivingReportItem;
@@ -11,6 +13,7 @@ use App\Services\Accounting\ReceivingReportEntryGenerator;
 use App\Services\CurrencyExchangeRateService;
 use App\Services\DocumentNumberService;
 use App\Services\NotificationRecipientService;
+use App\Services\Print\PrintCalibrationService;
 use App\Services\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
@@ -21,6 +24,8 @@ use Illuminate\Validation\ValidationException;
 
 class ReceivingReportController extends Controller
 {
+    use ResolvesPrintCalibration;
+
     private const MM_TO_PT = 2.834645669;
 
     public function index(Request $request)
@@ -52,6 +57,8 @@ class ReceivingReportController extends Controller
                 ->whereLike('name', '%Pemasukan%')
                 ->orWhere('code', 'BC 2.7')
                 ->get(['id', 'name', 'code']),
+            'rrCalibrationProfiles' => PrintCalibrationProfile::forDocumentType(PrintCalibrationProfile::DOCUMENT_TYPE_RR),
+            'rrDesignAnchor' => app(PrintCalibrationService::class)->getDesignAnchor(PrintCalibrationProfile::DOCUMENT_TYPE_RR),
         ]);
     }
 
@@ -535,6 +542,7 @@ class ReceivingReportController extends Controller
 
         $pageWidthMm = (float) config('receiving-report.paper.width_mm', 215);
         $pageHeightMm = (float) config('receiving-report.paper.height_mm', 160);
+        $calibrationOffsets = $this->resolvePrintCalibrationOffsets($request, PrintCalibrationProfile::DOCUMENT_TYPE_RR);
 
         $filename = sprintf(
             'RR-%s-%s.pdf',
@@ -549,6 +557,8 @@ class ReceivingReportController extends Controller
             'backgroundImageDataUri' => $backgroundImageDataUri,
             'pageWidthMm' => $pageWidthMm,
             'pageHeightMm' => $pageHeightMm,
+            'offsetXMm' => $calibrationOffsets['x'],
+            'offsetYMm' => $calibrationOffsets['y'],
             'currencyConversion' => $currencyConversion,
             'rrAccountingPayload' => $rrAccountingPayload,
         ])

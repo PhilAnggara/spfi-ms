@@ -4,9 +4,11 @@
     $tsNumberValue = old('ts_number', $transferSlip->ts_number ?: $suggestedNumber);
     $paperWidthMm = (int) config('transfer-slip.paper.width_mm', 215);
     $paperHeightMm = (int) config('transfer-slip.paper.height_mm', 105);
-    $paperLabel = (string) config('transfer-slip.paper.label', "TS Form {$paperWidthMm} x {$paperHeightMm} mm");
     $shouldReopenPrintModal = $errors->has('ts_number')
         && (int) old('print_confirm_id') === (int) $transferSlip->id;
+    $calibrationProfiles = $tsCalibrationProfiles ?? collect();
+    $designAnchor = $tsDesignAnchor ?? ['x' => 0, 'y' => 0, 'label' => 'Top-left corner of the background table'];
+    $previewBaseUrl = route('transfer-slips.print', ['transferSlip' => $transferSlip->id, 'mode' => 'preview']);
 @endphp
 
 <div
@@ -17,7 +19,7 @@
     aria-hidden="true"
     @if ($shouldReopenPrintModal) data-auto-show="1" @endif
 >
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <form
             method="post"
             action="{{ route('transfer-slips.print', ['transferSlip' => $transferSlip->id, 'mode' => 'print']) }}"
@@ -56,19 +58,16 @@
                     This number will be saved before the PDF opens in a new tab.
                 </div>
 
-                <div class="alert alert-light border mt-3 mb-0">
-                    <div class="fw-semibold mb-1">Paper form</div>
-                    <div class="mb-2">
-                        <span class="badge bg-light-primary text-primary">{{ $paperLabel }}</span>
-                        <span class="text-muted small ms-1">({{ $paperWidthMm }} &times; {{ $paperHeightMm }} mm)</span>
-                    </div>
-                    <div class="fw-semibold mb-1">Print checklist</div>
-                    <ul class="mb-0 ps-3 small">
-                        <li>Select paper/form <strong>{{ $paperWidthMm }} &times; {{ $paperHeightMm }} mm</strong> (Windows custom form if needed).</li>
-                        <li>Scale: <strong>Actual size / 100%</strong> — do not use Fit to page.</li>
-                        <li>Orientation: <strong>Portrait</strong> matching the pre-printed form.</li>
-                    </ul>
-                </div>
+                @include('partials.print-calibration-fields', [
+                    'documentType' => 'TS',
+                    'modalId' => $modalId,
+                    'calibrationProfiles' => $calibrationProfiles,
+                    'designAnchor' => $designAnchor,
+                    'previewBaseUrl' => $previewBaseUrl,
+                    'paperWidthMm' => $paperWidthMm,
+                    'paperHeightMm' => $paperHeightMm,
+                    'defaultCalibrationProfile' => $calibrationProfiles->firstWhere('is_default', true),
+                ])
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

@@ -605,4 +605,5 @@
     <script src="{{ url('assets/scripts/modules/rr-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/receiving-reports-index.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/document-print-confirm.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/document-print-calibration.js') }}"></script>
 @endpush
