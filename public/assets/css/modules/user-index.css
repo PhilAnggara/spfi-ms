@@ -216,6 +216,19 @@
     font-weight: 500;
 }
 
+.uc-access-direct {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .35rem;
+}
+
+.uc-access-chip-direct {
+    background: #f5f3ff;
+    color: #6d28d9;
+    border-color: #ddd6fe;
+}
+
 .uc-info {
     background: #f8fafc;
     border: 1px solid #e2e8f0;

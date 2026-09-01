@@ -150,6 +150,18 @@
                                     @endforeach
                                 @endif
                             </div>
+                            @php
+                                $directPermissionCount = $user->permissions->count();
+                                $directPermissionNames = $user->permissions->pluck('name')->sort()->values()->all();
+                            @endphp
+                            @if ($directPermissionCount > 0)
+                                <div class="uc-access-direct mt-2">
+                                    <span class="uc-access-chip uc-access-chip-direct"
+                                          data-bstooltip-toggle="tooltip"
+                                          data-bs-placement="top"
+                                          title="{{ implode(', ', $directPermissionNames) }}">{{ $directPermissionCount }} direct permission{{ $directPermissionCount === 1 ? '' : 's' }}</span>
+                                </div>
+                            @endif
 
                             {{-- Info --}}
                             <div class="uc-info mt-3">
