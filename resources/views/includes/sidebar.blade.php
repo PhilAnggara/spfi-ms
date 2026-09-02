@@ -240,6 +240,14 @@
                             </li>
                         @endcan
 
+                        @can('view-accounting-inventory')
+                            <li class="sidebar-item {{ Request::is('accounting/inventory-transactions*') ? 'active' : '' }}">
+                                <a href="{{ route('accounting.inventory-transactions.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-boxes-stacked {{ Request::is('accounting/inventory-transactions*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Accounting Inventory</span>
+                                </a>
+                            </li>
+                        @endcan
                         @can('view-doc-entries')
                             <li class="sidebar-item {{ Request::is('accounting/doc-entries*') ? 'active' : '' }}">
                                 <a href="{{ route('accounting.doc-entries.index') }}" class='sidebar-link'>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Item;
 use App\Models\ReceivingReportItem;
+use App\Services\Accounting\AccountingInventoryReportService;
 use App\Support\PdfReport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -12,6 +13,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AccountingReportController extends Controller
 {
+    public function __construct(
+        private readonly AccountingInventoryReportService $inventoryReportService,
+    ) {}
+
     public function index()
     {
         return view('pages.accounting-reports');
@@ -24,6 +29,26 @@ class AccountingReportController extends Controller
             'category' => ['required', 'in:OFFICE SUPPLIES,SPARE PARTS,FACTORY SUPPLIES,CHEMICAL,FUEL,LABEL,CARTON,CAN,RAW MATERIALS,SPICES AND INGREDIENTS,COAL,SLUDGE OIL,LABELING SUPPLIES,MATERIAL IN TRANSIT,FINISHED GOODS,FISH'],
             'format' => ['required', 'in:pdf,excel'],
         ]);
+
+        if ($this->inventoryReportService->hasEncodedData()) {
+            $rows = $this->inventoryReportService->stockCardRows($validated['month'], $validated['category']);
+
+            $data = [
+                'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
+                'title' => 'Accounting Stock Card',
+                'month' => $validated['month'],
+                'category' => $validated['category'],
+                'rows' => $rows,
+            ];
+
+            return $this->exportReport(
+                $validated['format'],
+                'exports.accounting-stock-card',
+                $data,
+                'accounting-stock-card',
+                'pdf.reports.accounting-stock-card'
+            );
+        }
 
         $selectedMonth = Carbon::createFromFormat('Y-m', $validated['month']);
         $year = $selectedMonth->year;
@@ -96,6 +121,30 @@ class AccountingReportController extends Controller
             'category' => ['required', 'in:OFFICE SUPPLIES,SPARE PARTS,FACTORY SUPPLIES,CHEMICAL,FUEL,LABEL,CARTON,CAN,RAW MATERIALS,SPICES AND INGREDIENTS,COAL,SLUDGE OIL,LABELING SUPPLIES,MATERIAL IN TRANSIT,FINISHED GOODS,FISH'],
             'format' => ['required', 'in:pdf,excel'],
         ]);
+
+        if ($this->inventoryReportService->hasEncodedData()) {
+            $rows = $this->inventoryReportService->transactionRows(
+                $validated['date_from'],
+                $validated['date_to'],
+                $validated['category'],
+            );
+
+            $data = [
+                'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
+                'title' => 'Transaction Report',
+                'month' => Carbon::parse($validated['date_from'])->format('Y-m'),
+                'category' => $validated['category'],
+                'rows' => $rows,
+            ];
+
+            return $this->exportReport(
+                $validated['format'],
+                'exports.accounting-stock-card',
+                $data,
+                'accounting-transaction-report',
+                'pdf.reports.accounting-stock-card'
+            );
+        }
 
         $selectedMonth = Carbon::createFromFormat('Y-m', Carbon::parse($validated['date_from'])->format('Y-m'));
         $year = $selectedMonth->year;
@@ -171,6 +220,26 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
+        if ($this->inventoryReportService->hasEncodedData()) {
+            $rows = $this->inventoryReportService->stockCardRows($validated['month'], $validated['category']);
+
+            $data = [
+                'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
+                'title' => 'Restatement Report',
+                'month' => $validated['month'],
+                'category' => $validated['category'],
+                'rows' => $rows,
+            ];
+
+            return $this->exportReport(
+                $validated['format'],
+                'exports.accounting-stock-card',
+                $data,
+                'accounting-restatement',
+                'pdf.reports.accounting-stock-card'
+            );
+        }
+
         $selectedMonth = Carbon::createFromFormat('Y-m', $validated['month']);
         $year = $selectedMonth->year;
         $month = $selectedMonth->month;
@@ -244,6 +313,26 @@ class AccountingReportController extends Controller
             'category' => ['required', 'in:OFFICE SUPPLIES,SPARE PARTS,FACTORY SUPPLIES,CHEMICAL,FUEL,LABEL,CARTON,CAN,RAW MATERIALS,SPICES AND INGREDIENTS,COAL,SLUDGE OIL,LABELING SUPPLIES,MATERIAL IN TRANSIT,FINISHED GOODS,FISH'],
             'format' => ['required', 'in:pdf,excel'],
         ]);
+
+        if ($this->inventoryReportService->hasEncodedData()) {
+            $rows = $this->inventoryReportService->stockCardRows($validated['month'], $validated['category']);
+
+            $data = [
+                'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
+                'title' => 'Stock Card per Count Report',
+                'month' => $validated['month'],
+                'category' => $validated['category'],
+                'rows' => $rows,
+            ];
+
+            return $this->exportReport(
+                $validated['format'],
+                'exports.accounting-stock-card',
+                $data,
+                'accounting-stock-card-count',
+                'pdf.reports.accounting-stock-card'
+            );
+        }
 
         $selectedMonth = Carbon::createFromFormat('Y-m', $validated['month']);
         $year = $selectedMonth->year;
@@ -329,27 +418,33 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        $groups = collect([
-            [
-                'type' => 'RR',
-                'title' => 'Receiving Report',
-                'rows' => $this->receivingReportSummaryRows($validated),
-            ],
-            [
-                'type' => 'TS',
-                'title' => 'Transfer Slip',
-                'rows' => $this->transferSlipSummaryRows($validated),
-            ],
-            [
-                'type' => 'DR',
-                'title' => 'Delivery Receipt',
-                'rows' => $this->deliverySummaryRows($validated),
-            ],
-        ])->map(function (array $group) {
-            $group['total'] = $group['rows']->sum('amount');
+        $groups = $this->inventoryReportService->hasEncodedData()
+            ? $this->inventoryReportService->documentSummaryGroups(
+                $validated['date_from'],
+                $validated['date_to'],
+                $validated['category'],
+            )
+            : collect([
+                [
+                    'type' => 'RR',
+                    'title' => 'Receiving Report',
+                    'rows' => $this->receivingReportSummaryRows($validated),
+                ],
+                [
+                    'type' => 'TS',
+                    'title' => 'Transfer Slip',
+                    'rows' => $this->transferSlipSummaryRows($validated),
+                ],
+                [
+                    'type' => 'DR',
+                    'title' => 'Delivery Receipt',
+                    'rows' => $this->deliverySummaryRows($validated),
+                ],
+            ])->map(function (array $group) {
+                $group['total'] = $group['rows']->sum('amount');
 
-            return $group;
-        });
+                return $group;
+            });
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
@@ -379,45 +474,51 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        $rows = ReceivingReportItem::with([
-            'receivingReport',
-            'purchaseOrderItem.purchaseOrder.supplier',
-            'purchaseOrderItem.purchaseOrder.currency',
-            'purchaseOrderItem.item.unit',
-            'purchaseOrderItem.item.category',
-        ])
-            ->whereHas('receivingReport', function ($query) use ($validated) {
-                $query->whereDate('received_date', '>=', $validated['date_from'])
-                    ->whereDate('received_date', '<=', $validated['date_to']);
-            })
-            ->whereHas('purchaseOrderItem.item.category', function ($query) use ($validated) {
-                $query->where('name', $validated['category']);
-            })
-            ->orderBy('receiving_report_id')
-            ->orderBy('id')
-            ->get()
-            ->map(function (ReceivingReportItem $receivedItem) {
-                $poItem = $receivedItem->purchaseOrderItem;
-                $po = $poItem?->purchaseOrder;
-                $rr = $receivedItem->receivingReport;
-                $quantity = (float) $receivedItem->qty_good;
-                $unitPrice = (float) ($poItem?->unit_price ?? 0);
-                $amount = $quantity * $unitPrice;
+        $rows = $this->inventoryReportService->hasEncodedData()
+            ? $this->inventoryReportService->purchaseRows(
+                $validated['date_from'],
+                $validated['date_to'],
+                $validated['category'],
+            )
+            : ReceivingReportItem::with([
+                'receivingReport',
+                'purchaseOrderItem.purchaseOrder.supplier',
+                'purchaseOrderItem.purchaseOrder.currency',
+                'purchaseOrderItem.item.unit',
+                'purchaseOrderItem.item.category',
+            ])
+                ->whereHas('receivingReport', function ($query) use ($validated) {
+                    $query->whereDate('received_date', '>=', $validated['date_from'])
+                        ->whereDate('received_date', '<=', $validated['date_to']);
+                })
+                ->whereHas('purchaseOrderItem.item.category', function ($query) use ($validated) {
+                    $query->where('name', $validated['category']);
+                })
+                ->orderBy('receiving_report_id')
+                ->orderBy('id')
+                ->get()
+                ->map(function (ReceivingReportItem $receivedItem) {
+                    $poItem = $receivedItem->purchaseOrderItem;
+                    $po = $poItem?->purchaseOrder;
+                    $rr = $receivedItem->receivingReport;
+                    $quantity = (float) $receivedItem->qty_good;
+                    $unitPrice = (float) ($poItem?->unit_price ?? 0);
+                    $amount = $quantity * $unitPrice;
 
-                return [
-                    'supplier_name' => $po?->supplier?->name,
-                    'po_number' => $po?->po_number ?? ($po ? '#' . $po->id : ''),
-                    'rr_number' => $rr?->rr_number,
-                    'date' => $rr?->received_date?->toDateString(),
-                    'currency' => $po?->currency?->code ?? 'IDR',
-                    'item_code' => $poItem?->item?->code,
-                    'item_name' => $poItem?->item?->name,
-                    'unit' => $poItem?->item?->unit?->name ?? '',
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                    'amount' => $amount,
-                ];
-            });
+                    return [
+                        'supplier_name' => $po?->supplier?->name,
+                        'po_number' => $po?->po_number ?? ($po ? '#'.$po->id : ''),
+                        'rr_number' => $rr?->rr_number,
+                        'date' => $rr?->received_date?->toDateString(),
+                        'currency' => $po?->currency?->code ?? 'IDR',
+                        'item_code' => $poItem?->item?->code,
+                        'item_name' => $poItem?->item?->name,
+                        'unit' => $poItem?->item?->unit?->name ?? '',
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'amount' => $amount,
+                    ];
+                });
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',

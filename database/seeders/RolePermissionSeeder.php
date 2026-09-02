@@ -139,6 +139,10 @@ class RolePermissionSeeder extends Seeder
             'view-accounting-reports',
             'view-doc-entries',
             'update-doc-entries',
+            'view-accounting-inventory',
+            'encode-accounting-inventory',
+            'create-accounting-inventory',
+            'void-accounting-inventory',
             'view-exchange-rates',
             'create-exchange-rates',
             'view-supplier-comparison',
@@ -258,6 +262,10 @@ class RolePermissionSeeder extends Seeder
             'view-accounting-reports',
             'view-doc-entries',
             'update-doc-entries',
+            'view-accounting-inventory',
+            'encode-accounting-inventory',
+            'create-accounting-inventory',
+            'void-accounting-inventory',
             'view-exchange-rates',
         ];
 

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Accounting\AccountingCodeController;
 use App\Http\Controllers\Accounting\AccountingDocEntryController;
 use App\Http\Controllers\Accounting\AccountingGroupCodeController;
+use App\Http\Controllers\Accounting\AccountingInventoryTransactionController;
 use App\Http\Controllers\Accounting\BsGroupingController;
 use App\Http\Controllers\Accounting\CurrencyExchangeRateController;
 use App\Http\Controllers\Accounting\GroupingController;
@@ -455,6 +456,48 @@ Route::middleware('auth')->group(function () {
             Route::get('doc-entries/{docType}/{id}', [AccountingDocEntryController::class, 'show'])
                 ->where(['docType' => 'rr|dr', 'id' => '[0-9]+'])
                 ->name('doc-entries.show');
+        });
+
+    Route::middleware('permission:view-accounting-inventory')
+        ->prefix('accounting')
+        ->name('accounting.')
+        ->group(function () {
+            Route::get('inventory-transactions', [AccountingInventoryTransactionController::class, 'index'])->name('inventory-transactions.index');
+            Route::get('inventory-transactions/items/search', [AccountingInventoryTransactionController::class, 'searchItems'])
+                ->name('inventory-transactions.items.search');
+            Route::get('inventory-transactions/transaction/{transaction}', [AccountingInventoryTransactionController::class, 'showTransaction'])
+                ->name('inventory-transactions.transaction');
+            Route::get('inventory-transactions/{docType}/{id}', [AccountingInventoryTransactionController::class, 'show'])
+                ->where(['docType' => 'rr|ts|dr', 'id' => '[0-9]+'])
+                ->name('inventory-transactions.show');
+        });
+
+    Route::middleware('permission:create-accounting-inventory')
+        ->prefix('accounting')
+        ->name('accounting.')
+        ->group(function () {
+            Route::get('inventory-transactions/create', [AccountingInventoryTransactionController::class, 'create'])
+                ->name('inventory-transactions.create');
+            Route::post('inventory-transactions', [AccountingInventoryTransactionController::class, 'store'])
+                ->name('inventory-transactions.store');
+        });
+
+    Route::middleware('permission:encode-accounting-inventory')
+        ->prefix('accounting')
+        ->name('accounting.')
+        ->group(function () {
+            Route::put('inventory-transactions/{transaction}', [AccountingInventoryTransactionController::class, 'update'])
+                ->name('inventory-transactions.update');
+            Route::post('inventory-transactions/bulk-encode', [AccountingInventoryTransactionController::class, 'bulkEncode'])
+                ->name('inventory-transactions.bulk-encode');
+        });
+
+    Route::middleware('permission:void-accounting-inventory')
+        ->prefix('accounting')
+        ->name('accounting.')
+        ->group(function () {
+            Route::post('inventory-transactions/{transaction}/void', [AccountingInventoryTransactionController::class, 'void'])
+                ->name('inventory-transactions.void');
         });
 
     Route::middleware('permission:update-doc-entries')
