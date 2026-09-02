@@ -54,10 +54,18 @@
                         <div class="text-muted small text-uppercase">PO Number</div>
                         <div class="fw-semibold">{{ $transaction->po_number ?: '—' }}</div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="text-muted small text-uppercase">Party</div>
-                        <div class="fw-semibold">{{ $transaction->party_name ?: '—' }}</div>
-                    </div>
+                    @if (! $transaction->isManual())
+                        <div class="col-md-3">
+                            <div class="text-muted small text-uppercase">
+                                @if ($transaction->doc_type === 'TS')
+                                    Transfer To
+                                @else
+                                    Supplier
+                                @endif
+                            </div>
+                            <div class="fw-semibold">{{ $transaction->party_name ?: '—' }}</div>
+                        </div>
+                    @endif
                     <div class="col-md-3">
                         <div class="text-muted small text-uppercase">Status</div>
                         <div>
@@ -95,7 +103,7 @@
                                     <th>UOM</th>
                                     <th class="text-end">Available</th>
                                     @if ($transaction->isManual())
-                                        <th class="text-center">+/−</th>
+                                        <th class="text-center">Direction</th>
                                     @endif
                                     <th class="text-end">Qty</th>
                                     <th class="text-end">Unit Cost</th>
@@ -112,7 +120,6 @@
                                             <div class="fw-semibold">{{ $line->item?->code }}</div>
                                             <div class="text-muted small">{{ $line->item?->name }}</div>
                                             <input type="hidden" name="lines[{{ $index }}][item_id]" value="{{ $line->item_id }}">
-                                            <input type="hidden" name="lines[{{ $index }}][direction]" value="{{ $line->direction }}">
                                             <input type="hidden" name="lines[{{ $index }}][unit_of_measure_id]" value="{{ $line->unit_of_measure_id }}">
                                             <input type="hidden" name="lines[{{ $index }}][prefill_quantity]" value="{{ $line->prefill_quantity }}">
                                             <input type="hidden" name="lines[{{ $index }}][prefill_unit_cost]" value="{{ $line->prefill_unit_cost }}">
@@ -120,7 +127,14 @@
                                         <td>{{ $line->item?->unit?->name ?? '—' }}</td>
                                         <td class="text-end font-monospace">{{ number_format((float) $line->available_qty_snapshot, 5, '.', ',') }}</td>
                                         @if ($transaction->isManual())
-                                            <td class="text-center text-uppercase fw-bold">{{ $line->direction === 'in' ? '+' : '−' }}</td>
+                                            <td class="text-center">
+                                                @include('pages.accounting.inventory-transactions.partials.direction-toggle', [
+                                                    'fieldName' => 'lines['.$index.'][direction]',
+                                                    'rowId' => $index,
+                                                    'selected' => old('lines.'.$index.'.direction', $line->direction),
+                                                    'readonly' => $isReadOnly,
+                                                ])
+                                            </td>
                                         @endif
                                         <td class="text-end">
                                             @if ($isReadOnly)
@@ -183,6 +197,7 @@
 
 @push('addon-style')
     <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/stock-correction-modern.css') }}">
 @endpush
 
 @push('addon-script')
@@ -205,6 +220,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('.inv-qty, .inv-cost').forEach((input) => {
         input.addEventListener('input', () => recalc(input.dataset.index));
+    });
+
+    document.querySelectorAll('#inventory-encode-form tbody tr').forEach((row) => {
+        const updateRowDirection = () => {
+            const isOut = Boolean(row.querySelector('.inv-direction-out:checked'));
+            row.classList.toggle('inv-row-direction-out', isOut);
+            row.classList.toggle('inv-row-direction-in', !isOut);
+        };
+
+        row.querySelectorAll('.inv-direction-input').forEach((input) => {
+            input.addEventListener('change', updateRowDirection);
+        });
+        updateRowDirection();
     });
 });
 </script>

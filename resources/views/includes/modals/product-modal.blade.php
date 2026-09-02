@@ -56,7 +56,7 @@
                         <div class="master-form-modal-grid">
                             <div class="master-form-modal-field">
                                 <label for="unit">Unit</label>
-                                <select id="unit" name="unit_of_measure_id" class="choices form-select {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('unit_of_measure_id') ? 'is-invalid' : '') : '' }}" required>
+                                <select id="unit" name="unit_of_measure_id" class="form-select {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('unit_of_measure_id') ? 'is-invalid' : '') : '' }}" required>
                                     <option value="" {{ ($errors->any() && !session('editing_product_id') && old('unit_of_measure_id')) ? '' : 'selected' }} disabled>-- Select Unit --</option>
                                     @foreach ($itemUnits as $unit)
                                         <option value="{{ $unit->id }}" {{ ($errors->any() && !session('editing_product_id') && (string) old('unit_of_measure_id') === (string) $unit->id) ? 'selected' : '' }}>{{ $unit->name }}</option>
@@ -71,7 +71,7 @@
 
                             <div class="master-form-modal-field">
                                 <label for="category">Category</label>
-                                <select id="category" name="category_id" class="choices form-select {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('category_id') ? 'is-invalid' : '') : '' }}" required>
+                                <select id="category" name="category_id" class="form-select {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('category_id') ? 'is-invalid' : '') : '' }}" required>
                                     <option value="" {{ ($errors->any() && !session('editing_product_id') && old('category_id')) ? '' : 'selected' }} disabled>-- Select Category --</option>
                                     @foreach ($itemCategories as $category)
                                         <option value="{{ $category->id }}" {{ ($errors->any() && !session('editing_product_id') && (string) old('category_id') === (string) $category->id) ? 'selected' : '' }}>{{ $category->name }}</option>
@@ -86,7 +86,7 @@
 
                             <div class="master-form-modal-field master-form-modal-field--full">
                                 <label for="type">Type</label>
-                                <select id="type" name="type" class="choices form-select {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}">
+                                <select id="type" name="type" class="form-select {{ ($errors->any() && !session('editing_product_id')) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}">
                                     <option value="" {{ ($errors->any() && !session('editing_product_id') && old('type')) ? '' : 'selected' }}>-- Select Type --</option>
                                     @foreach ($types as $t)
                                         <option value="{{ $t }}" {{ ($errors->any() && !session('editing_product_id') && old('type') === $t) ? 'selected' : '' }}>{{ $t }}</option>
@@ -177,7 +177,7 @@
                         <div class="master-form-modal-grid">
                             <div class="master-form-modal-field">
                                 <label for="edit-unit">Unit</label>
-                                <select id="edit-unit" name="unit_of_measure_id" class="choices form-select {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('unit_of_measure_id') ? 'is-invalid' : '') : '' }}" required>
+                                <select id="edit-unit" name="unit_of_measure_id" class="form-select {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('unit_of_measure_id') ? 'is-invalid' : '') : '' }}" required>
                                     <option value="" {{ ($errors->any() && session('editing_product_id') && old('unit_of_measure_id')) ? '' : 'selected' }} disabled>-- Select Unit --</option>
                                     @foreach ($itemUnits as $unit)
                                         <option value="{{ $unit->id }}" {{ ($errors->any() && session('editing_product_id')) ? ((string) old('unit_of_measure_id') === (string) $unit->id ? 'selected' : '') : (($editingItem && $editingItem->unit_of_measure_id == $unit->id) ? 'selected' : '') }}>{{ $unit->name }}</option>
@@ -192,7 +192,7 @@
 
                             <div class="master-form-modal-field">
                                 <label for="edit-category">Category</label>
-                                <select id="edit-category" name="category_id" class="choices form-select {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('category_id') ? 'is-invalid' : '') : '' }}" required>
+                                <select id="edit-category" name="category_id" class="form-select {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('category_id') ? 'is-invalid' : '') : '' }}" required>
                                     <option value="" {{ ($errors->any() && session('editing_product_id') && old('category_id')) ? '' : 'selected' }} disabled>-- Select Category --</option>
                                     @foreach ($itemCategories as $category)
                                         <option value="{{ $category->id }}" {{ ($errors->any() && session('editing_product_id')) ? ((string) old('category_id') === (string) $category->id ? 'selected' : '') : (($editingItem && $editingItem->category_id == $category->id) ? 'selected' : '') }}>{{ $category->name }}</option>
@@ -207,7 +207,7 @@
 
                             <div class="master-form-modal-field master-form-modal-field--full">
                                 <label for="edit-type">Type</label>
-                                <select id="edit-type" name="type" class="choices form-select {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}">
+                                <select id="edit-type" name="type" class="form-select {{ ($errors->any() && session('editing_product_id')) ? ($errors->has('type') ? 'is-invalid' : '') : '' }}">
                                     <option value="" {{ ($errors->any() && session('editing_product_id') && old('type')) ? '' : 'selected' }}>-- Select Type --</option>
                                     @foreach ($types as $t)
                                         <option value="{{ $t }}" {{ ($errors->any() && session('editing_product_id')) ? (old('type') === $t ? 'selected' : '') : (($editingItem && $editingItem->type === $t) ? 'selected' : '') }}>{{ $t }}</option>

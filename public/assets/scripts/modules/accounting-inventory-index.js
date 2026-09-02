@@ -135,4 +135,59 @@
     if (initialResults) {
         initBulkEncodeControls(initialResults);
     }
+
+    function initManualCreateModal() {
+        const modalEl = document.getElementById('inventory-manual-create-modal');
+        const modalBody = document.getElementById('inventory-manual-create-body');
+        const openBtn = document.getElementById('inventory-manual-create-btn');
+
+        if (!modalEl || !modalBody || !openBtn || !window.bootstrap) {
+            return;
+        }
+
+        const loadForm = async () => {
+            const categorySelect = document.getElementById('filter-inventory-category');
+            const categoryId = categorySelect?.value || '';
+            const url = new URL(openBtn.dataset.createUrl || '', window.location.origin);
+
+            if (categoryId) {
+                url.searchParams.set('category_id', categoryId);
+            }
+            url.searchParams.set('modal', '1');
+
+            modalBody.innerHTML = '<div class="text-center text-muted py-5">Loading...</div>';
+
+            try {
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        Accept: 'text/html',
+                    },
+                    credentials: 'same-origin',
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load create form');
+                }
+
+                modalBody.innerHTML = await response.text();
+
+                if (window.initAccountingInventoryCreateForm) {
+                    window.initAccountingInventoryCreateForm(modalBody);
+                }
+            } catch (_) {
+                modalBody.innerHTML = '<div class="alert alert-danger mb-0">Unable to load create form. Please try again.</div>';
+            }
+        };
+
+        modalEl.addEventListener('show.bs.modal', () => {
+            loadForm();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            modalBody.innerHTML = '<div class="text-center text-muted py-5">Loading...</div>';
+        });
+    }
+
+    initManualCreateModal();
 })();

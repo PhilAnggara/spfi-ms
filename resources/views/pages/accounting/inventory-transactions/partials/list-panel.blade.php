@@ -36,7 +36,7 @@
                     <th>Date</th>
                     <th>Category</th>
                     <th class="d-none d-lg-table-cell">Reference</th>
-                    <th>Party</th>
+                    <th>Supplier / Transfer To</th>
                     <th class="text-end">Amount</th>
                     <th>Status</th>
                     <th class="text-center">Action</th>

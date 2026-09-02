@@ -15,10 +15,17 @@
             <div class="col-12 col-lg-5">
                 <div class="po-top-actions">
                     @can('create-accounting-inventory')
-                        <a href="{{ route('accounting.inventory-transactions.create', ['category_id' => $filters['category_id'] ?? null]) }}" class="btn btn-success icon icon-left">
+                        <button
+                            type="button"
+                            class="btn btn-success icon icon-left"
+                            id="inventory-manual-create-btn"
+                            data-bs-toggle="modal"
+                            data-bs-target="#inventory-manual-create-modal"
+                            data-create-url="{{ route('accounting.inventory-transactions.create') }}"
+                        >
                             <i class="fa-duotone fa-solid fa-boxes-stacked"></i>
                             Create CV / JV
-                        </a>
+                        </button>
                     @endcan
                 </div>
             </div>
@@ -45,7 +52,7 @@
                 <div class="row g-3 align-items-end po-filter-grid" id="inventory-filter-form">
                     <div class="col-12 col-md-6 col-xl-3">
                         <label for="filter-inventory-keyword" class="form-label mb-1">Search</label>
-                        <input type="search" id="filter-inventory-keyword" class="form-control" placeholder="Doc no, party, reference..." value="{{ $filters['keyword'] ?? '' }}">
+                        <input type="search" id="filter-inventory-keyword" class="form-control" placeholder="Doc no, supplier, reference..." value="{{ $filters['keyword'] ?? '' }}">
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
                         <label for="filter-inventory-category" class="form-label mb-1">Category</label>
@@ -96,14 +103,32 @@
         </div>
     </section>
 </div>
+
+<div class="modal fade" id="inventory-manual-create-modal" tabindex="-1" aria-labelledby="inventory-manual-create-title" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="inventory-manual-create-title">Create CV / JV</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-3" id="inventory-manual-create-body">
+                <div class="text-center text-muted py-5">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
 </div>
 @endsection
 
 @push('addon-style')
     <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/stock-correction-modern.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
 @endpush
 
 @push('addon-script')
+    <script src="{{ url('assets/scripts/modules/stock-correction-item-search.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/accounting-inventory-create.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/accounting-inventory-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/accounting-inventory-index.js') }}"></script>
 @endpush

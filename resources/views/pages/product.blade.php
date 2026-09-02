@@ -156,20 +156,15 @@
 @endsection
 
 @push('prepend-style')
-    <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
 @endpush
 @push('addon-style')
-    <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
 @endpush
 @push('addon-script')
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
-    @if ($canCreateProducts || $canManageProducts)
-        <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
-        <script src="{{ url('assets/static/js/pages/form-element-select.js') }}"></script>
-    @endif
 @endpush
 
 @push('addon-script')

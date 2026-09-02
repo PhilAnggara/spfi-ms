@@ -46,6 +46,81 @@ window.StockCorrectionItemSearch = (function () {
 
         let activeIndex = -1;
         let currentItems = [];
+        const modalBody = picker.closest('.modal-body');
+        let floatingScrollTarget = null;
+
+        function isInsideModal() {
+            return Boolean(picker.closest('.modal'));
+        }
+
+        function positionFloatingResults() {
+            if (!isInsideModal() || !results.classList.contains('is-open')) {
+                return;
+            }
+
+            const anchor = input.classList.contains('d-none') ? selected : input;
+            const rect = anchor.getBoundingClientRect();
+            const viewportPadding = 8;
+            const gap = 4;
+            const maxHeight = 16 * 16;
+            const availableBelow = window.innerHeight - rect.bottom - viewportPadding;
+            const availableAbove = rect.top - viewportPadding;
+            const openBelow = availableBelow >= 120 || availableBelow >= availableAbove;
+            const maxVisibleHeight = Math.min(
+                maxHeight,
+                openBelow ? availableBelow - gap : availableAbove - gap,
+            );
+
+            results.classList.add('sc-item-results--floating');
+            results.style.position = 'fixed';
+            results.style.left = `${Math.max(viewportPadding, rect.left)}px`;
+            results.style.width = `${rect.width}px`;
+            results.style.maxHeight = `${Math.max(80, maxVisibleHeight)}px`;
+            results.style.zIndex = '1060';
+
+            if (openBelow) {
+                results.style.top = `${rect.bottom + gap}px`;
+                results.style.bottom = 'auto';
+            } else {
+                results.style.top = 'auto';
+                results.style.bottom = `${window.innerHeight - rect.top + gap}px`;
+            }
+        }
+
+        function resetFloatingResults() {
+            results.classList.remove('sc-item-results--floating');
+            results.style.position = '';
+            results.style.left = '';
+            results.style.top = '';
+            results.style.bottom = '';
+            results.style.width = '';
+            results.style.maxHeight = '';
+            results.style.zIndex = '';
+        }
+
+        function bindFloatingListeners() {
+            if (!isInsideModal()) {
+                return;
+            }
+
+            floatingScrollTarget = modalBody || picker.closest('.modal');
+            window.addEventListener('scroll', positionFloatingResults, true);
+            window.addEventListener('resize', positionFloatingResults);
+
+            if (floatingScrollTarget) {
+                floatingScrollTarget.addEventListener('scroll', positionFloatingResults, { passive: true });
+            }
+        }
+
+        function unbindFloatingListeners() {
+            window.removeEventListener('scroll', positionFloatingResults, true);
+            window.removeEventListener('resize', positionFloatingResults);
+
+            if (floatingScrollTarget) {
+                floatingScrollTarget.removeEventListener('scroll', positionFloatingResults);
+                floatingScrollTarget = null;
+            }
+        }
 
         function closeResults() {
             results.classList.remove('is-open');
@@ -53,12 +128,16 @@ window.StockCorrectionItemSearch = (function () {
             results.innerHTML = '';
             activeIndex = -1;
             currentItems = [];
+            resetFloatingResults();
+            unbindFloatingListeners();
         }
 
         function openResultsShell(html) {
             results.innerHTML = html;
             results.classList.add('is-open');
             picker.classList.add('is-open');
+            bindFloatingListeners();
+            positionFloatingResults();
         }
 
         function renderResults(items) {

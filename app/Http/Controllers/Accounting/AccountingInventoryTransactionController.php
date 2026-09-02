@@ -50,13 +50,21 @@ class AccountingInventoryTransactionController extends Controller
         ]);
     }
 
-    public function create(Request $request): View
+    public function create(Request $request): View|\Illuminate\Http\Response
     {
-        return view('pages.accounting.inventory-transactions.create', [
+        $payload = [
             'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'name']),
             'itemSearchUrl' => route('accounting.inventory-transactions.items.search'),
             'selectedCategoryId' => (int) $request->query('category_id', 0),
-        ]);
+            'formId' => $request->ajax() || $request->boolean('modal') ? 'inv-modal-create-form' : 'inv-create-form',
+            'isModal' => $request->ajax() || $request->boolean('modal'),
+        ];
+
+        if ($request->ajax() || $request->boolean('modal')) {
+            return response()->view('pages.accounting.inventory-transactions.partials.manual-create-form', $payload);
+        }
+
+        return view('pages.accounting.inventory-transactions.create', $payload);
     }
 
     public function store(StoreAccountingInventoryTransactionRequest $request): RedirectResponse

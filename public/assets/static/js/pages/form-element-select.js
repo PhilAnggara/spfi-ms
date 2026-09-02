@@ -1,18 +1,25 @@
-let choices = document.querySelectorAll(".choices")
+let choices = document.querySelectorAll("select.choices, .choices[data-type]")
 let initChoice
 for (let i = 0; i < choices.length; i++) {
-  if (choices[i].classList.contains("multiple-remove")) {
-    initChoice = new Choices(choices[i], {
+  const element = choices[i]
+  const isSelect = element.tagName === 'SELECT'
+
+  if (!isSelect || element.closest('.modal')) {
+    continue
+  }
+
+  if (element.classList.contains("multiple-remove")) {
+    initChoice = new Choices(element, {
       delimiter: ",",
       editItems: true,
       maxItemCount: -1,
       removeItemButton: true,
     })
   } else {
-    initChoice = new Choices(choices[i], {
-      position: choices[i].closest('.product-form-modal') ? 'auto' : 'bottom',
+    initChoice = new Choices(element, {
+      position: 'bottom',
     })
   }
-  // Simpan instance agar bisa diakses saat set value dari modal edit
-  choices[i].choicesInstance = initChoice
+
+  element.choicesInstance = initChoice
 }

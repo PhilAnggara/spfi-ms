@@ -70,7 +70,7 @@ class AccountingInventoryQueueService
 
             $items = DB::query()
                 ->fromSub(
-                    (clone $baseQuery)->selectRaw('*, ROW_NUMBER() OVER (ORDER BY doc_date DESC, doc_number DESC) as row_num'),
+                    (clone $baseQuery)->selectRaw('*, ROW_NUMBER() OVER (ORDER BY doc_date DESC, sort_doc_number DESC) as row_num'),
                     'ranked_documents',
                 )
                 ->whereBetween('row_num', [$startRow, $endRow])
@@ -80,7 +80,7 @@ class AccountingInventoryQueueService
         } else {
             $items = (clone $baseQuery)
                 ->orderByDesc('doc_date')
-                ->orderByDesc('doc_number')
+                ->orderByDesc('sort_doc_number')
                 ->forPage($page, $perPage)
                 ->get()
                 ->map(fn (object $row): object => $this->mapDocumentRow($row));
@@ -375,6 +375,7 @@ class AccountingInventoryQueueService
                 'ic.id as category_id',
                 'ic.name as category_name',
                 DB::raw($this->scopedDocNumberExpression("'RR'", 'rr.rr_number', 'ic.id').' as doc_number'),
+                'rr.rr_number as sort_doc_number',
                 'rr.received_date as doc_date',
                 'po.po_number as reference',
                 's.name as party_name',
@@ -431,6 +432,7 @@ class AccountingInventoryQueueService
                 'ic.id as category_id',
                 'ic.name as category_name',
                 DB::raw($this->scopedDocNumberExpression("'TS'", 'ts.ts_number', 'ic.id').' as doc_number'),
+                'ts.ts_number as sort_doc_number',
                 'ts.ts_date as doc_date',
                 DB::raw('NULL as reference'),
                 'ts.transfer_to as party_name',
@@ -490,6 +492,7 @@ class AccountingInventoryQueueService
                 'ic.id as category_id',
                 'ic.name as category_name',
                 DB::raw($this->scopedDocNumberExpression("'DR'", 'dr.dr_number', 'ic.id').' as doc_number'),
+                'dr.dr_number as sort_doc_number',
                 'dr.dr_date as doc_date',
                 'dr.or_number as reference',
                 DB::raw('COALESCE(s.name, dr.from_name) as party_name'),
@@ -523,6 +526,7 @@ class AccountingInventoryQueueService
                 'ic.id as category_id',
                 'ic.name as category_name',
                 'ait.doc_number as doc_number',
+                'ait.doc_number as sort_doc_number',
                 'ait.doc_date as doc_date',
                 DB::raw('NULL as reference'),
                 'ait.party_name as party_name',

@@ -197,7 +197,6 @@ it('creates and encodes manual cv transaction with direction toggle', function (
             'doc_type' => 'CV',
             'doc_number' => 'CV-TEST-001',
             'doc_date' => now()->toDateString(),
-            'party_name' => 'Test Party',
             'remarks' => 'Manual CV',
             'lines' => [
                 [
@@ -213,6 +212,7 @@ it('creates and encodes manual cv transaction with direction toggle', function (
 
     $transaction = AccountingInventoryTransaction::query()->where('doc_number', 'CV-TEST-001')->first();
     expect($transaction)->not->toBeNull();
+    expect($transaction->party_name)->toBeNull();
 
     $response->assertRedirect(route('accounting.inventory-transactions.transaction', $transaction));
 
@@ -415,4 +415,160 @@ it('opens transfer slip process screen with prefilled lines', function () {
 
     expect($transaction)->not->toBeNull();
     expect($transaction->lines()->count())->toBe(1);
+});
+
+it('returns manual create partial for modal requests', function () {
+    $response = $this->actingAs($this->user)
+        ->withHeader('X-Requested-With', 'XMLHttpRequest')
+        ->get(route('accounting.inventory-transactions.create', [
+            'modal' => 1,
+            'category_id' => $this->category->id,
+        ]));
+
+    $response->assertSuccessful();
+    $response->assertSee('inv-modal-create-form', false);
+    $response->assertSee('Save Draft');
+    $response->assertDontSee('Back to Queue');
+});
+
+it('searches accounting inventory items with optional category filter', function () {
+    $otherCategory = ItemCategory::query()->create([
+        'name' => 'OTHER',
+        'code' => 'OTHER-'.uniqid(),
+    ]);
+
+    $otherItem = Item::query()->create([
+        'name' => 'Other Item',
+        'code' => 'OTHER-ITEM-'.uniqid(),
+        'category_id' => $otherCategory->id,
+        'unit_of_measure_id' => $this->unit->id,
+        'is_active' => true,
+    ]);
+
+    $searchTerm = substr($this->item->code, 0, 6);
+
+    $filtered = $this->actingAs($this->user)
+        ->getJson(route('accounting.inventory-transactions.items.search', [
+            'q' => $searchTerm,
+            'category_id' => $this->category->id,
+        ]));
+
+    $filtered->assertSuccessful();
+    expect(collect($filtered->json('items'))->pluck('id'))->toContain($this->item->id);
+    expect(collect($filtered->json('items'))->pluck('id'))->not->toContain($otherItem->id);
+
+    $unfiltered = $this->actingAs($this->user)
+        ->getJson(route('accounting.inventory-transactions.items.search', [
+            'q' => $searchTerm,
+        ]));
+
+    $unfiltered->assertSuccessful();
+    expect(collect($unfiltered->json('items'))->pluck('id'))->toContain($this->item->id);
+});
+
+it('orders inventory queue by document date then display number not document type', function () {
+    $sharedDate = '2026-03-15';
+
+    $supplier = Supplier::query()->create([
+        'name' => 'Order Supplier',
+        'code' => 'ORD-SUP',
+        'created_by' => $this->user->id,
+    ]);
+
+    $po = PurchaseOrder::query()->create([
+        'po_number' => 'PO-ORDER-001',
+        'supplier_id' => $supplier->id,
+        'po_date' => $sharedDate,
+        'status' => 'APPROVED',
+        'created_by' => $this->user->id,
+    ]);
+
+    $poItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $po->id,
+        'item_id' => $this->item->id,
+        'quantity' => 10,
+        'unit_price' => 5,
+        'total' => 50,
+        'line_subtotal' => 50,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+    ]);
+
+    $rr = ReceivingReport::query()->create([
+        'rr_number' => 'RR-ORDER-ZZZ',
+        'purchase_order_id' => $po->id,
+        'received_date' => $sharedDate,
+        'created_by' => $this->user->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $rr->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 1,
+    ]);
+
+    $storeWithdrawalId = \Illuminate\Support\Facades\DB::table('store_withdrawals')->insertGetId([
+        'sws_number' => 'SWS-ORDER-001',
+        'sws_date' => $sharedDate,
+        'department_id' => $this->department->id,
+        'department_code' => $this->department->code,
+        'type' => 'regular',
+        'info' => 'Order test',
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $storeWithdrawalItemId = \Illuminate\Support\Facades\DB::table('store_withdrawal_items')->insertGetId([
+        'store_withdrawal_id' => $storeWithdrawalId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 1,
+        'uom' => $this->unit->name,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $transferSlipId = \Illuminate\Support\Facades\DB::table('transfer_slips')->insertGetId([
+        'ts_number' => 'TS-ORDER-AAA',
+        'ts_date' => $sharedDate,
+        'store_withdrawal_id' => $storeWithdrawalId,
+        'for_production' => false,
+        'transfer_to' => 'Line B',
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    \Illuminate\Support\Facades\DB::table('transfer_slip_items')->insert([
+        'transfer_slip_id' => $transferSlipId,
+        'store_withdrawal_item_id' => $storeWithdrawalItemId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 1,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('accounting.inventory-transactions.index', [
+            'status' => 'pending',
+            'category_id' => $this->category->id,
+            'date_from' => $sharedDate,
+            'date_to' => $sharedDate,
+        ]));
+
+    $response->assertSuccessful();
+
+    $rrPos = strpos($response->getContent(), 'RR-ORDER-ZZZ');
+    $tsPos = strpos($response->getContent(), 'TS-ORDER-AAA');
+
+    expect($rrPos)->not->toBeFalse();
+    expect($tsPos)->not->toBeFalse();
+    expect($rrPos)->toBeLessThan($tsPos);
 });

@@ -1058,14 +1058,3 @@
     border-bottom-left-radius: 1rem;
     border-bottom-right-radius: 1rem;
 }
-
-/* Choices.js: keep dropdown above sibling fields while body scrolls */
-.product-form-modal .choices.is-open {
-    position: relative;
-    z-index: 20;
-}
-
-.product-form-modal .choices__list--dropdown,
-.product-form-modal .choices__list[aria-expanded] {
-    z-index: 30;
-}
