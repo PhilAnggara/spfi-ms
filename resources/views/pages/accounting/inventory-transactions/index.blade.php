@@ -186,8 +186,8 @@
 
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/stock-correction-item-search.js') }}"></script>
-    <script src="{{ url('assets/scripts/modules/accounting-inventory-create.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/accounting-inventory-encode.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/accounting-inventory-create.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/accounting-inventory-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/accounting-inventory-index.js') }}"></script>
 @endpush

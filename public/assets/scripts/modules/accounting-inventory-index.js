@@ -460,14 +460,14 @@
             overlay.classList.toggle('is-visible', visible);
         }
 
-        async function swapEncodeBody(html, { animate = false } = {}) {
+        async function swapEncodeBody(html, { animate = false, skipLeave = false } = {}) {
             const reduceMotion = prefersReducedMotion();
             const stage = ensureBodyStage();
 
-            if (animate && !reduceMotion) {
+            if (animate && !reduceMotion && !skipLeave) {
                 stage.classList.remove('is-entering');
                 stage.classList.add('is-leaving');
-                await wait(300);
+                await wait(500);
             }
 
             stage.classList.remove('is-leaving', 'is-entering');
@@ -475,10 +475,9 @@
             stage.scrollTop = 0;
 
             if (animate && !reduceMotion) {
-                // Force reflow so the enter animation restarts cleanly.
                 void stage.offsetWidth;
                 stage.classList.add('is-entering');
-                await wait(320);
+                await wait(520);
                 stage.classList.remove('is-entering');
             }
         }
@@ -486,15 +485,17 @@
         async function loadEncodePanel(url, title, options = {}) {
             const animate = Boolean(options.animate);
             const keepChrome = Boolean(options.keepChrome);
+            const useTransition = animate || keepChrome;
+            const reduceMotion = prefersReducedMotion();
             const fetchUrl = new URL(url, window.location.origin);
             const queueParams = getQueueFilterParams();
             queueParams.set('modal', '1');
             queueParams.forEach((value, key) => fetchUrl.searchParams.set(key, value));
 
             showEncodeErrors([]);
-            ensureBodyStage();
+            const stage = ensureBodyStage();
 
-            if (animate || keepChrome) {
+            if (useTransition) {
                 setBodyOverlayVisible(true);
                 setEncodeFooterVisible(true, false);
             } else {
@@ -516,7 +517,15 @@
             }
 
             try {
-                const response = await fetch(fetchUrl.toString(), {
+                const leavePromise = (useTransition && !reduceMotion)
+                    ? (async () => {
+                        stage.classList.remove('is-entering');
+                        stage.classList.add('is-leaving');
+                        await wait(500);
+                    })()
+                    : Promise.resolve();
+
+                const fetchPromise = fetch(fetchUrl.toString(), {
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
                         Accept: 'text/html',
@@ -524,12 +533,17 @@
                     credentials: 'same-origin',
                 });
 
+                const [response] = await Promise.all([fetchPromise, leavePromise]);
+
                 if (!response.ok) {
                     throw new Error('Failed to load encode panel');
                 }
 
                 const html = await response.text();
-                await swapEncodeBody(html, { animate: animate || keepChrome });
+                await swapEncodeBody(html, {
+                    animate: useTransition,
+                    skipLeave: true,
+                });
                 setBodyOverlayVisible(false);
 
                 const panel = modalBody.querySelector('[data-inventory-encode-panel]');
@@ -568,6 +582,7 @@
             syncQueueHiddenFields(form);
 
             const formData = new FormData(form);
+            window.AccountingInventoryMoney?.writeNormalizedFormData(form, formData);
             formData.append('close_after', closeAfter ? '1' : '0');
 
             const encodeUrl = form.dataset.encodeUrl || form.getAttribute('action');

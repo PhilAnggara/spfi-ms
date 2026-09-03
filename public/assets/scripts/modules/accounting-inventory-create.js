@@ -32,9 +32,12 @@ window.initAccountingInventoryCreateForm = function (root) {
     }
 
     function recalcRow(row) {
-        const qty = parseFloat(row.querySelector('.inv-qty')?.value || '0');
-        const cost = parseFloat(row.querySelector('.inv-cost')?.value || '0');
-        const amount = Math.round(qty * cost * 100) / 100;
+        const money = window.AccountingInventoryMoney;
+        const qty = money ? money.parse(row.querySelector('.inv-qty')?.value || '0') : parseFloat(row.querySelector('.inv-qty')?.value || '0');
+        const cost = money ? money.parse(row.querySelector('.inv-cost')?.value || '0') : parseFloat(row.querySelector('.inv-cost')?.value || '0');
+        const safeQty = Number.isFinite(qty) ? qty : 0;
+        const safeCost = Number.isFinite(cost) ? cost : 0;
+        const amount = Math.round(safeQty * safeCost * 100) / 100;
         const amountEl = row.querySelector('.inv-amount');
         const amountInput = row.querySelector('.inv-amount-input');
         if (amountEl) {
@@ -83,8 +86,24 @@ window.initAccountingInventoryCreateForm = function (root) {
 
     function bindRow(row) {
         bindDirectionToggle(row);
-        row.querySelector('.inv-qty')?.addEventListener('input', () => recalcRow(row));
-        row.querySelector('.inv-cost')?.addEventListener('input', () => recalcRow(row));
+        const qtyInput = row.querySelector('.inv-qty');
+        const costInput = row.querySelector('.inv-cost');
+        if (qtyInput && window.AccountingInventoryMoney) {
+            window.AccountingInventoryMoney.bindInput(qtyInput, {
+                maxDecimals: 5,
+                onChange: () => recalcRow(row),
+            });
+        } else {
+            qtyInput?.addEventListener('input', () => recalcRow(row));
+        }
+        if (costInput && window.AccountingInventoryMoney) {
+            window.AccountingInventoryMoney.bindInput(costInput, {
+                maxDecimals: 5,
+                onChange: () => recalcRow(row),
+            });
+        } else {
+            costInput?.addEventListener('input', () => recalcRow(row));
+        }
         row.querySelector('.inv-remove-row')?.addEventListener('click', () => {
             if (linesBody.querySelectorAll('tr').length <= 1) {
                 return;
@@ -98,13 +117,15 @@ window.initAccountingInventoryCreateForm = function (root) {
             csrf,
             onSelect: (item, selectedRow) => {
                 if (!item) {
-                    selectedRow.querySelector('.inv-available').textContent = '0.00000';
+                    selectedRow.querySelector('.inv-available').textContent = '0';
                     return;
                 }
 
                 const available = Number(item.balance || 0);
                 const unitCost = Number(item.unit_cost || 0);
-                selectedRow.querySelector('.inv-available').textContent = available.toFixed(5);
+                selectedRow.querySelector('.inv-available').textContent = window.AccountingInventoryMoney
+                    ? window.AccountingInventoryMoney.format(available, 5)
+                    : available.toFixed(5);
 
                 const selectedSub = selectedRow.querySelector('.sc-item-selected-sub');
                 if (selectedSub) {
@@ -115,9 +136,11 @@ window.initAccountingInventoryCreateForm = function (root) {
                 if (uomInput) {
                     uomInput.value = item.unit_of_measure_id || '';
                 }
-                const costInput = selectedRow.querySelector('.inv-cost');
-                if (costInput && !costInput.value && unitCost > 0) {
-                    costInput.value = unitCost.toFixed(4);
+                const selectedCostInput = selectedRow.querySelector('.inv-cost');
+                if (selectedCostInput && !selectedCostInput.value && unitCost > 0) {
+                    selectedCostInput.value = window.AccountingInventoryMoney
+                        ? window.AccountingInventoryMoney.format(unitCost, 5)
+                        : unitCost.toFixed(5);
                 }
                 recalcRow(selectedRow);
             },
@@ -144,6 +167,11 @@ window.initAccountingInventoryCreateForm = function (root) {
         if (categorySelect.value) {
             addRow();
         }
+    });
+
+    const form = root.querySelector('.inv-manual-create-form') || root.querySelector('form');
+    form?.addEventListener('submit', () => {
+        window.AccountingInventoryMoney?.normalizeForm(form);
     });
 
     updateCategoryState();

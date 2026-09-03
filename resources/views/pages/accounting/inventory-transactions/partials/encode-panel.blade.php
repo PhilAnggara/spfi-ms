@@ -140,7 +140,7 @@
                                 @endif
                             </td>
                             <td>{{ $line->item?->unit?->name ?? '—' }}</td>
-                            <td class="text-end font-monospace">{{ number_format((float) $line->available_qty_snapshot, 5, '.', ',') }}</td>
+                            <td class="text-end font-monospace">{{ rtrim(rtrim(number_format((float) $line->available_qty_snapshot, 5, '.', ','), '0'), '.') }}</td>
                             @if ($transaction->isManual())
                                 <td class="text-center">
                                     @include('pages.accounting.inventory-transactions.partials.direction-toggle', [
@@ -153,16 +153,17 @@
                             @endif
                             <td class="text-end">
                                 @if ($isReadOnly)
-                                    <span class="font-monospace">{{ number_format((float) $line->quantity, 5, '.', ',') }}</span>
+                                    <span class="font-monospace">{{ rtrim(rtrim(number_format((float) $line->quantity, 5, '.', ','), '0'), '.') }}</span>
                                 @else
                                     <input
-                                        type="number"
-                                        step="0.00001"
-                                        min="0"
+                                        type="text"
+                                        inputmode="decimal"
+                                        autocomplete="off"
                                         class="form-control form-control-sm text-end inv-qty"
                                         name="lines[{{ $index }}][quantity]"
-                                        value="{{ old('lines.'.$index.'.quantity', $line->quantity) }}"
+                                        value="{{ rtrim(rtrim(number_format((float) old('lines.'.$index.'.quantity', $line->quantity), 5, '.', ','), '0'), '.') }}"
                                         data-index="{{ $index }}"
+                                        data-max-decimals="5"
                                         @if ($corrected) data-corrected="1" @endif
                                         required
                                     >
@@ -170,16 +171,17 @@
                             </td>
                             <td class="text-end">
                                 @if ($isReadOnly)
-                                    <span class="font-monospace">{{ number_format((float) $line->unit_cost, 4, '.', ',') }}</span>
+                                    <span class="font-monospace">{{ rtrim(rtrim(number_format((float) $line->unit_cost, 5, '.', ','), '0'), '.') }}</span>
                                 @else
                                     <input
-                                        type="number"
-                                        step="0.0001"
-                                        min="0"
+                                        type="text"
+                                        inputmode="decimal"
+                                        autocomplete="off"
                                         class="form-control form-control-sm text-end inv-cost"
                                         name="lines[{{ $index }}][unit_cost]"
-                                        value="{{ old('lines.'.$index.'.unit_cost', $line->unit_cost) }}"
+                                        value="{{ rtrim(rtrim(number_format((float) old('lines.'.$index.'.unit_cost', $line->unit_cost), 5, '.', ','), '0'), '.') }}"
                                         data-index="{{ $index }}"
+                                        data-max-decimals="5"
                                         required
                                     >
                                 @endif

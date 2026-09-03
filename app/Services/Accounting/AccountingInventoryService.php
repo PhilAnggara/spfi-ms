@@ -29,7 +29,7 @@ class AccountingInventoryService
 
     public function getWeightedUnitCost(int $categoryId, int $itemId): float
     {
-        return round((float) ($this->latestLedgerSnapshot($categoryId, $itemId)['weighted_unit_cost'] ?? 0), 4);
+        return round((float) ($this->latestLedgerSnapshot($categoryId, $itemId)['weighted_unit_cost'] ?? 0), 5);
     }
 
     /**
@@ -170,7 +170,7 @@ class AccountingInventoryService
             }
 
             $quantity = round(max(0, (float) ($line['quantity'] ?? 0)), 5);
-            $unitCost = round(max(0, (float) ($line['unit_cost'] ?? 0)), 4);
+            $unitCost = round(max(0, (float) ($line['unit_cost'] ?? 0)), 5);
             $amount = round($quantity * $unitCost, 4);
             $expectedAmount = round((float) ($line['amount'] ?? $amount), 4);
 
@@ -192,7 +192,7 @@ class AccountingInventoryService
                 'unit_cost' => $unitCost,
                 'amount' => $amount,
                 'prefill_quantity' => isset($line['prefill_quantity']) ? round((float) $line['prefill_quantity'], 5) : null,
-                'prefill_unit_cost' => isset($line['prefill_unit_cost']) ? round((float) $line['prefill_unit_cost'], 4) : null,
+                'prefill_unit_cost' => isset($line['prefill_unit_cost']) ? round((float) $line['prefill_unit_cost'], 5) : null,
             ];
         }
 
@@ -246,7 +246,7 @@ class AccountingInventoryService
         if ($line->direction === AccountingInventoryTransactionLine::DIRECTION_IN) {
             $newQty = $balanceQty + $quantity;
             $newAmount = $balanceAmount + $amount;
-            $weightedCost = $newQty > 0 ? round($newAmount / $newQty, 4) : 0.0;
+            $weightedCost = $newQty > 0 ? round($newAmount / $newQty, 5) : 0.0;
             $balanceQty = $newQty;
             $balanceAmount = $newAmount;
         } else {
@@ -256,7 +256,7 @@ class AccountingInventoryService
             $balanceAmount = max(0, $balanceAmount - $issueAmount);
             $amount = $issueAmount;
             $unitCost = $issueCost;
-            $weightedCost = $balanceQty > 0 ? round($balanceAmount / $balanceQty, 4) : 0.0;
+            $weightedCost = $balanceQty > 0 ? round($balanceAmount / $balanceQty, 5) : 0.0;
         }
 
         AccountingInventoryLedger::query()->create([

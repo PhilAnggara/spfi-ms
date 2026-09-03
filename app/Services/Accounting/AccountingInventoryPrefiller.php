@@ -201,7 +201,7 @@ class AccountingInventoryPrefiller
         int $categoryId,
     ): array {
         $quantity = round($quantity, 5);
-        $unitCost = round($unitCost, 4);
+        $unitCost = round($unitCost, 5);
         $amount = round($quantity * $unitCost, 4);
 
         return [
@@ -227,7 +227,7 @@ class AccountingInventoryPrefiller
             ->where('is_delete', false)
             ->value('average_price');
 
-        return round((float) ($average ?? 0), 4);
+        return round((float) ($average ?? 0), 5);
     }
 
     /**

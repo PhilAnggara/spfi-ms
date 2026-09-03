@@ -105,7 +105,7 @@
                 <input type="hidden" name="lines[__INDEX__][unit_of_measure_id]" class="inv-uom-id" value="">
             </div>
         </td>
-        <td class="text-end font-monospace inv-available">0.00000</td>
+        <td class="text-end font-monospace inv-available">0</td>
         <td class="text-center">
             @include('pages.accounting.inventory-transactions.partials.direction-toggle', [
                 'fieldName' => 'lines[__INDEX__][direction]',
@@ -113,8 +113,8 @@
                 'selected' => 'in',
             ])
         </td>
-        <td><input type="number" step="0.00001" min="0.00001" class="form-control text-end inv-qty" name="lines[__INDEX__][quantity]" required></td>
-        <td><input type="number" step="0.0001" min="0" class="form-control text-end inv-cost" name="lines[__INDEX__][unit_cost]" required></td>
+        <td><input type="text" inputmode="decimal" autocomplete="off" class="form-control text-end inv-qty" name="lines[__INDEX__][quantity]" data-max-decimals="5" required></td>
+        <td><input type="text" inputmode="decimal" autocomplete="off" class="form-control text-end inv-cost" name="lines[__INDEX__][unit_cost]" data-max-decimals="5" required></td>
         <td class="text-end font-monospace inv-amount">0.00</td>
         <td class="text-end">
             <input type="hidden" class="inv-amount-input" name="lines[__INDEX__][amount]" value="0">
