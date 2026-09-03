@@ -17,14 +17,40 @@ class AccountingInventoryService
 
     public function getAvailableQty(int $categoryId, int $itemId): float
     {
-        $latest = AccountingInventoryLedger::query()
+        return (float) ($this->getAvailableQtyMap($categoryId, [$itemId])[$itemId] ?? 0);
+    }
+
+    /**
+     * @param  list<int>  $itemIds
+     * @return array<int, float>
+     */
+    public function getAvailableQtyMap(int $categoryId, array $itemIds): array
+    {
+        $itemIds = array_values(array_unique(array_filter(array_map('intval', $itemIds))));
+        if ($itemIds === []) {
+            return [];
+        }
+
+        $map = array_fill_keys($itemIds, 0.0);
+        $seen = [];
+
+        $rows = AccountingInventoryLedger::query()
             ->where('category_id', $categoryId)
-            ->where('item_id', $itemId)
+            ->whereIn('item_id', $itemIds)
             ->orderByDesc('movement_date')
             ->orderByDesc('id')
-            ->first();
+            ->get(['item_id', 'balance_qty']);
 
-        return round((float) ($latest?->balance_qty ?? 0), 5);
+        foreach ($rows as $row) {
+            $itemId = (int) $row->item_id;
+            if (isset($seen[$itemId])) {
+                continue;
+            }
+            $seen[$itemId] = true;
+            $map[$itemId] = round((float) $row->balance_qty, 5);
+        }
+
+        return $map;
     }
 
     public function getWeightedUnitCost(int $categoryId, int $itemId): float
@@ -49,9 +75,13 @@ class AccountingInventoryService
             $normalized = $this->normalizeLines($transaction, $lines);
             $isCorrected = false;
             $totalAmount = 0.0;
+            $availableByItem = $this->getAvailableQtyMap(
+                $transaction->category_id,
+                array_map(fn (array $line): int => (int) $line['item_id'], $normalized),
+            );
 
             foreach ($normalized as $index => $line) {
-                $availableQty = $this->getAvailableQty($transaction->category_id, $line['item_id']);
+                $availableQty = (float) ($availableByItem[(int) $line['item_id']] ?? 0);
                 if ($line['direction'] === AccountingInventoryTransactionLine::DIRECTION_OUT) {
                     $availableQty += (float) ($line['prefill_quantity'] ?? 0);
                 }

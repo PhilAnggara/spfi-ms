@@ -128,11 +128,15 @@ function initAccountingInventoryFilters() {
 
     if (filterElements.reset) {
         filterElements.reset.addEventListener('click', function () {
+            const defaultDateFrom = new Date();
+            defaultDateFrom.setDate(defaultDateFrom.getDate() - 90);
+            const defaultDateFromValue = defaultDateFrom.toISOString().slice(0, 10);
+
             if (filterElements.keyword) filterElements.keyword.value = '';
             if (filterElements.category) filterElements.category.value = '';
             if (filterElements.docType) filterElements.docType.value = 'all';
             if (filterElements.status) filterElements.status.value = 'pending';
-            if (filterElements.dateFrom) filterElements.dateFrom.value = '';
+            if (filterElements.dateFrom) filterElements.dateFrom.value = defaultDateFromValue;
             if (filterElements.dateTo) filterElements.dateTo.value = '';
             syncStatusChip();
             applyServerFilter(false);

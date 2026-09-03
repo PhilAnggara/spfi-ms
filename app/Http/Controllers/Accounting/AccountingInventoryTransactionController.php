@@ -33,9 +33,7 @@ class AccountingInventoryTransactionController extends Controller
         $pageData = $this->queueService->paginateDocumentsWithSummary($filters, 15);
         $documents = $pageData['documents'];
         $summary = $pageData['summary'];
-        $firstPending = ($filters['status'] ?? 'pending') === 'pending'
-            ? $this->queueService->resolveFirstPendingDocument($filters)
-            : null;
+        $firstPending = $pageData['firstPending'] ?? null;
 
         if ($request->ajax()) {
             return response()->view('pages.accounting.inventory-transactions.partials.results-panel', [
@@ -160,8 +158,7 @@ class AccountingInventoryTransactionController extends Controller
 
         if ($request->ajax() || $request->expectsJson()) {
             $queueFilters = $this->resolveQueueFiltersFromRequest($request);
-            $next = $this->queueService->resolveNextPendingDocument($transaction->fresh(), $queueFilters);
-            $summary = $this->queueService->summarizeStatuses($queueFilters);
+            $queueState = $this->queueService->resolveEncodeQueueState($transaction->fresh(), $queueFilters);
 
             return response()->json([
                 'success' => true,
@@ -170,13 +167,8 @@ class AccountingInventoryTransactionController extends Controller
                     'doc_type' => $transaction->doc_type,
                     'doc_number' => $this->queueService->displayDocNumber($transaction),
                 ],
-                'next' => $next,
-                'queue_stats' => [
-                    'pending' => $summary['pending'],
-                    'encoded' => $summary['encoded'],
-                    'remaining_type' => $this->queueService->countPendingByType($transaction->doc_type, $queueFilters),
-                    'doc_type' => $transaction->doc_type,
-                ],
+                'next' => $queueState['next'],
+                'queue_stats' => $queueState['queue_stats'],
                 'close_after' => $request->boolean('close_after'),
             ]);
         }
@@ -242,6 +234,7 @@ class AccountingInventoryTransactionController extends Controller
     private function resolveFilters(Request $request): array
     {
         $docType = strtoupper($request->string('doc_type')->toString());
+        $defaultDateFrom = now()->subDays(90)->toDateString();
 
         return [
             'status' => in_array($request->string('status')->toString(), ['all', 'pending', 'encoded'], true)
@@ -252,7 +245,10 @@ class AccountingInventoryTransactionController extends Controller
                 : 'all',
             'category_id' => (int) $request->query('category_id', 0),
             'keyword' => trim($request->string('keyword')->toString()),
-            'date_from' => $request->string('date_from')->toString(),
+            // Default last 90 days on first visit; explicit empty clears the bound.
+            'date_from' => $request->query->has('date_from')
+                ? $request->string('date_from')->toString()
+                : $defaultDateFrom,
             'date_to' => $request->string('date_to')->toString(),
         ];
     }
@@ -281,9 +277,7 @@ class AccountingInventoryTransactionController extends Controller
         $transaction->loadMissing(['lines.item.unit', 'category', 'encodedBy', 'voidedBy']);
         $displayDocNumber = $this->queueService->displayDocNumber($transaction);
         $queueFilters = $this->resolveQueueFiltersFromRequest($request);
-        $nextDocument = $transaction->isDraft()
-            ? $this->queueService->resolveNextPendingDocument($transaction, $queueFilters)
-            : null;
+        $queueState = $this->queueService->resolveEncodeQueueState($transaction, $queueFilters);
 
         $payload = [
             'transaction' => $transaction,
@@ -291,10 +285,10 @@ class AccountingInventoryTransactionController extends Controller
             'canEncode' => $transaction->isDraft() && $request->user()?->can('encode-accounting-inventory'),
             'canVoid' => $transaction->isEncoded() && $request->user()?->can('void-accounting-inventory'),
             'inModal' => $request->ajax() || $request->boolean('modal'),
-            'queueStats' => $this->queueService->queueStatsForTransaction($transaction, $queueFilters),
+            'queueStats' => $queueState['queue_stats'],
             'queueFilters' => $queueFilters,
             'sourceUrl' => $this->resolveSourceDocumentUrl($transaction),
-            'nextDocument' => $nextDocument,
+            'nextDocument' => $transaction->isDraft() ? $queueState['next'] : null,
         ];
 
         if ($payload['inModal']) {

@@ -27,41 +27,60 @@ class AccountingInventoryQueueService
      */
     public function summarizeStatuses(array $filters): array
     {
-        $row = $this->filteredDocumentsQuery($filters)
-            ->selectRaw('COUNT(*) as total')
-            ->selectRaw('SUM(CASE WHEN is_encoded = 1 THEN 1 ELSE 0 END) as encoded')
-            ->first();
+        $status = (string) ($filters['status'] ?? 'all');
 
-        $total = (int) ($row->total ?? 0);
-        $encoded = (int) ($row->encoded ?? 0);
+        if ($status === 'pending') {
+            $pending = (int) $this->filteredDocumentsQuery($filters)->count();
+
+            return [
+                'total' => $pending,
+                'pending' => $pending,
+                'encoded' => 0,
+            ];
+        }
+
+        if ($status === 'encoded') {
+            $encoded = (int) $this->filteredDocumentsQuery($filters)->count();
+
+            return [
+                'total' => $encoded,
+                'pending' => 0,
+                'encoded' => $encoded,
+            ];
+        }
+
+        $pending = (int) $this->filteredDocumentsQuery(array_merge($filters, ['status' => 'pending']))->count();
+        $encoded = (int) $this->filteredDocumentsQuery(array_merge($filters, ['status' => 'encoded']))->count();
 
         return [
-            'total' => $total,
-            'pending' => max(0, $total - $encoded),
+            'total' => $pending + $encoded,
+            'pending' => $pending,
             'encoded' => $encoded,
         ];
     }
 
     /**
-     * @return array{documents: LengthAwarePaginator<int, object>, summary: array{total: int, pending: int, encoded: int}}
+     * @return array{
+     *     documents: LengthAwarePaginator<int, object>,
+     *     summary: array{total: int, pending: int, encoded: int},
+     *     firstPending: object|null
+     * }
      */
     public function paginateDocumentsWithSummary(array $filters, int $perPage = 15): array
     {
         $page = max(1, (int) ($filters['page'] ?? request()->integer('page') ?: 1));
+        $status = (string) ($filters['status'] ?? 'all');
         $baseQuery = $this->filteredDocumentsQuery($filters);
 
-        $summaryRow = (clone $baseQuery)
-            ->selectRaw('COUNT(*) as total')
-            ->selectRaw('SUM(CASE WHEN is_encoded = 1 THEN 1 ELSE 0 END) as encoded')
-            ->first();
-
-        $total = (int) ($summaryRow->total ?? 0);
-        $encoded = (int) ($summaryRow->encoded ?? 0);
-        $summary = [
-            'total' => $total,
-            'pending' => max(0, $total - $encoded),
-            'encoded' => $encoded,
-        ];
+        if ($status === 'all') {
+            $summary = $this->summarizeStatuses($filters);
+            $total = $summary['total'];
+        } else {
+            $total = (int) (clone $baseQuery)->count();
+            $summary = $status === 'pending'
+                ? ['total' => $total, 'pending' => $total, 'encoded' => 0]
+                : ['total' => $total, 'pending' => 0, 'encoded' => $total];
+        }
 
         $driver = DB::connection()->getDriverName();
 
@@ -101,6 +120,9 @@ class AccountingInventoryQueueService
         return [
             'documents' => $documents,
             'summary' => $summary,
+            'firstPending' => $status === 'pending'
+                ? $this->resolveFirstPendingDocument($filters)
+                : null,
         ];
     }
 
@@ -186,8 +208,17 @@ class AccountingInventoryQueueService
                 'updated_by' => $userId,
             ]);
 
+            $itemIds = collect($payload['lines'])
+                ->pluck('item_id')
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+            $availableByItem = $this->inventoryService->getAvailableQtyMap($transaction->category_id, $itemIds);
+
             foreach ($payload['lines'] as $index => $line) {
-                $availableQty = $this->inventoryService->getAvailableQty($transaction->category_id, (int) $line['item_id']);
+                $itemId = (int) $line['item_id'];
+                $availableQty = (float) ($availableByItem[$itemId] ?? 0);
                 if ($line['direction'] === 'out') {
                     $availableQty += (float) ($line['prefill_quantity'] ?? 0);
                 }
@@ -259,25 +290,27 @@ class AccountingInventoryQueueService
     private function filteredDocumentsQuery(array $filters): QueryBuilder
     {
         $docTypeFilter = strtoupper(trim((string) ($filters['doc_type'] ?? 'all')));
-        $status = (string) ($filters['status'] ?? 'all');
         $categoryId = (int) ($filters['category_id'] ?? 0);
         $queries = [];
 
         if ($docTypeFilter === 'ALL' || $docTypeFilter === 'RR') {
-            $queries[] = $this->receivingReportListQuery($categoryId);
+            $queries[] = $this->receivingReportListQuery($filters, $categoryId);
         }
         if ($docTypeFilter === 'ALL' || $docTypeFilter === 'TS') {
-            $queries[] = $this->transferSlipListQuery($categoryId);
+            $queries[] = $this->transferSlipListQuery($filters, $categoryId);
         }
         if ($docTypeFilter === 'ALL' || $docTypeFilter === 'DR') {
-            $queries[] = $this->deliveryListQuery($categoryId);
+            $queries[] = $this->deliveryListQuery($filters, $categoryId);
         }
         if ($docTypeFilter === 'ALL' || in_array($docTypeFilter, ['CV', 'JV'], true)) {
-            $queries[] = $this->manualTransactionListQuery($docTypeFilter, $categoryId);
+            $queries[] = $this->manualTransactionListQuery($filters, $docTypeFilter, $categoryId);
         }
 
         if ($queries === []) {
-            return DB::query()->fromSub($this->receivingReportListQuery($categoryId)->whereRaw('1 = 0'), 'documents');
+            return DB::query()->fromSub(
+                $this->receivingReportListQuery($filters, $categoryId)->whereRaw('1 = 0'),
+                'documents',
+            );
         }
 
         $union = array_shift($queries);
@@ -285,40 +318,53 @@ class AccountingInventoryQueueService
             $union->unionAll($query);
         }
 
-        $wrapped = DB::query()->fromSub($union, 'documents');
+        return DB::query()->fromSub($union, 'documents');
+    }
 
-        if ($status === 'pending') {
-            $wrapped->where('is_encoded', 0);
-        } elseif ($status === 'encoded') {
-            $wrapped->where('is_encoded', 1);
-        }
-
-        $dateFrom = (string) ($filters['date_from'] ?? '');
+    /**
+     * @param  array{status?: string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     * @param  list<string>  $keywordColumns
+     */
+    private function applySourceBranchFilters(
+        QueryBuilder $query,
+        array $filters,
+        string $dateColumn,
+        array $keywordColumns,
+    ): void {
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
         if ($dateFrom !== '') {
-            $wrapped->whereDate('doc_date', '>=', $dateFrom);
+            $query->where($dateColumn, '>=', $dateFrom);
         }
 
-        $dateTo = (string) ($filters['date_to'] ?? '');
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
         if ($dateTo !== '') {
-            $wrapped->whereDate('doc_date', '<=', $dateTo);
+            // Exclusive upper bound keeps indexes usable for both DATE and DATETIME columns.
+            $query->where($dateColumn, '<', Carbon::parse($dateTo)->addDay()->toDateString());
         }
 
-        $keyword = mb_strtolower(trim((string) ($filters['keyword'] ?? '')));
-        if ($keyword !== '') {
+        $status = (string) ($filters['status'] ?? 'all');
+        if ($status === 'pending') {
+            $query->where(function (QueryBuilder $nested): void {
+                $nested->whereNull('ait.id')
+                    ->orWhere('ait.status', '<>', AccountingInventoryTransaction::STATUS_ENCODED);
+            });
+        } elseif ($status === 'encoded') {
+            $query->where('ait.status', AccountingInventoryTransaction::STATUS_ENCODED);
+        }
+
+        $keyword = trim((string) ($filters['keyword'] ?? ''));
+        if ($keyword !== '' && $keywordColumns !== []) {
             $like = '%'.$keyword.'%';
-            $wrapped->where(function (QueryBuilder $query) use ($like): void {
-                $query->whereRaw('LOWER(doc_number) LIKE ?', [$like])
-                    ->orWhereRaw('LOWER(COALESCE(reference, ?)) LIKE ?', ['', $like])
-                    ->orWhereRaw('LOWER(COALESCE(party_name, ?)) LIKE ?', ['', $like])
-                    ->orWhereRaw('LOWER(COALESCE(category_name, ?)) LIKE ?', ['', $like]);
+            $query->where(function (QueryBuilder $nested) use ($like, $keywordColumns): void {
+                foreach ($keywordColumns as $index => $column) {
+                    if ($index === 0) {
+                        $nested->where($column, 'like', $like);
+                    } else {
+                        $nested->orWhere($column, 'like', $like);
+                    }
+                }
             });
         }
-
-        if ($categoryId > 0) {
-            $wrapped->where('category_id', $categoryId);
-        }
-
-        return $wrapped;
     }
 
     private function scopedDocNumberExpression(string $docTypeColumn, string $docNumberColumn, string $categoryIdColumn): string
@@ -336,13 +382,32 @@ class AccountingInventoryQueueService
         return "CONCAT({$docTypeColumn}, '|', {$docNumberColumn}, '|', {$categoryIdColumn})";
     }
 
-    private function receivingReportListQuery(int $categoryId): QueryBuilder
+    /**
+     * @param  array{status?: string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     */
+    private function receivingReportListQuery(array $filters, int $categoryId): QueryBuilder
     {
-        $query = DB::table('receiving_reports as rr')
-            ->join('receiving_report_items as rri', 'rri.receiving_report_id', '=', 'rr.id')
+        $lineAgg = DB::table('receiving_report_items as rri')
             ->join('purchase_order_items as poi', 'poi.id', '=', 'rri.purchase_order_item_id')
             ->join('items as i', 'i.id', '=', 'poi.item_id')
-            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->whereNull('rri.deleted_at')
+            ->where('rri.qty_good', '>', 0)
+            ->groupBy('rri.receiving_report_id', 'i.category_id')
+            ->select([
+                'rri.receiving_report_id',
+                'i.category_id',
+                DB::raw('ROUND(SUM(COALESCE(rri.qty_good, 0) * COALESCE(poi.unit_price, 0)), 4) as line_amount'),
+            ]);
+
+        if ($categoryId > 0) {
+            $lineAgg->where('i.category_id', $categoryId);
+        }
+
+        $query = DB::table('receiving_reports as rr')
+            ->joinSub($lineAgg, 'lines', function ($join): void {
+                $join->on('lines.receiving_report_id', '=', 'rr.id');
+            })
+            ->join('item_categories as ic', 'ic.id', '=', 'lines.category_id')
             ->leftJoin('purchase_orders as po', 'po.id', '=', 'rr.purchase_order_id')
             ->leftJoin('suppliers as s', 's.id', '=', 'po.supplier_id')
             ->leftJoin('accounting_inventory_transactions as ait', function ($join): void {
@@ -353,23 +418,6 @@ class AccountingInventoryQueueService
             })
             ->leftJoin('users as u', 'u.id', '=', 'ait.encoded_by')
             ->whereNull('rr.deleted_at')
-            ->whereNull('rri.deleted_at')
-            ->where('rri.qty_good', '>', 0)
-            ->groupBy(
-                'rr.id',
-                'rr.rr_number',
-                'rr.received_date',
-                'po.po_number',
-                's.name',
-                'ic.id',
-                'ic.name',
-                'ait.id',
-                'ait.status',
-                'ait.total_amount',
-                'ait.is_corrected',
-                'ait.encoded_at',
-                'u.name',
-            )
             ->select([
                 DB::raw("'RR' as doc_type"),
                 'rr.id as source_id',
@@ -380,7 +428,7 @@ class AccountingInventoryQueueService
                 'rr.received_date as doc_date',
                 'po.po_number as reference',
                 's.name as party_name',
-                DB::raw('COALESCE(NULLIF(ait.total_amount, 0), ROUND(SUM(COALESCE(rri.qty_good, 0) * COALESCE(poi.unit_price, 0)), 4)) as amount'),
+                DB::raw('COALESCE(NULLIF(ait.total_amount, 0), lines.line_amount) as amount'),
                 DB::raw("CASE WHEN ait.status = 'encoded' THEN 'encoded' WHEN ait.status = 'voided' THEN 'voided' ELSE 'pending' END as status"),
                 DB::raw("CASE WHEN ait.status = 'encoded' THEN 1 ELSE 0 END as is_encoded"),
                 DB::raw('COALESCE(ait.is_corrected, 0) as is_corrected'),
@@ -390,19 +438,40 @@ class AccountingInventoryQueueService
                 DB::raw('0 as is_manual'),
             ]);
 
-        if ($categoryId > 0) {
-            $query->where('ic.id', $categoryId);
-        }
+        $this->applySourceBranchFilters($query, $filters, 'rr.received_date', [
+            'rr.rr_number',
+            'po.po_number',
+            's.name',
+            'ic.name',
+        ]);
 
         return $query;
     }
 
-    private function transferSlipListQuery(int $categoryId): QueryBuilder
+    /**
+     * @param  array{status?: string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     */
+    private function transferSlipListQuery(array $filters, int $categoryId): QueryBuilder
     {
-        $query = DB::table('transfer_slips as ts')
-            ->join('transfer_slip_items as tsi', 'tsi.transfer_slip_id', '=', 'ts.id')
+        $lineAgg = DB::table('transfer_slip_items as tsi')
             ->join('items as i', 'i.id', '=', 'tsi.item_id')
-            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->whereNull('tsi.deleted_at')
+            ->where('tsi.quantity', '>', 0)
+            ->groupBy('tsi.transfer_slip_id', 'i.category_id')
+            ->select([
+                'tsi.transfer_slip_id',
+                'i.category_id',
+            ]);
+
+        if ($categoryId > 0) {
+            $lineAgg->where('i.category_id', $categoryId);
+        }
+
+        $query = DB::table('transfer_slips as ts')
+            ->joinSub($lineAgg, 'lines', function ($join): void {
+                $join->on('lines.transfer_slip_id', '=', 'ts.id');
+            })
+            ->join('item_categories as ic', 'ic.id', '=', 'lines.category_id')
             ->leftJoin('accounting_inventory_transactions as ait', function ($join): void {
                 $join->on('ait.source_id', '=', 'ts.id')
                     ->where('ait.source_type', '=', TransferSlip::class)
@@ -411,22 +480,6 @@ class AccountingInventoryQueueService
             })
             ->leftJoin('users as u', 'u.id', '=', 'ait.encoded_by')
             ->whereNull('ts.deleted_at')
-            ->whereNull('tsi.deleted_at')
-            ->where('tsi.quantity', '>', 0)
-            ->groupBy(
-                'ts.id',
-                'ts.ts_number',
-                'ts.ts_date',
-                'ts.transfer_to',
-                'ic.id',
-                'ic.name',
-                'ait.id',
-                'ait.status',
-                'ait.total_amount',
-                'ait.is_corrected',
-                'ait.encoded_at',
-                'u.name',
-            )
             ->select([
                 DB::raw("'TS' as doc_type"),
                 'ts.id as source_id',
@@ -447,19 +500,39 @@ class AccountingInventoryQueueService
                 DB::raw('0 as is_manual'),
             ]);
 
-        if ($categoryId > 0) {
-            $query->where('ic.id', $categoryId);
-        }
+        $this->applySourceBranchFilters($query, $filters, 'ts.ts_date', [
+            'ts.ts_number',
+            'ts.transfer_to',
+            'ic.name',
+        ]);
 
         return $query;
     }
 
-    private function deliveryListQuery(int $categoryId): QueryBuilder
+    /**
+     * @param  array{status?: string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     */
+    private function deliveryListQuery(array $filters, int $categoryId): QueryBuilder
     {
-        $query = DB::table('deliveries as dr')
-            ->join('delivery_items as di', 'di.delivery_id', '=', 'dr.id')
+        $lineAgg = DB::table('delivery_items as di')
             ->join('items as i', 'i.id', '=', 'di.item_id')
-            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
+            ->whereNull('di.deleted_at')
+            ->where('di.quantity', '>', 0)
+            ->groupBy('di.delivery_id', 'i.category_id')
+            ->select([
+                'di.delivery_id',
+                'i.category_id',
+            ]);
+
+        if ($categoryId > 0) {
+            $lineAgg->where('i.category_id', $categoryId);
+        }
+
+        $query = DB::table('deliveries as dr')
+            ->joinSub($lineAgg, 'lines', function ($join): void {
+                $join->on('lines.delivery_id', '=', 'dr.id');
+            })
+            ->join('item_categories as ic', 'ic.id', '=', 'lines.category_id')
             ->leftJoin('suppliers as s', 's.id', '=', 'dr.supplier_id')
             ->leftJoin('accounting_inventory_transactions as ait', function ($join): void {
                 $join->on('ait.source_id', '=', 'dr.id')
@@ -469,24 +542,6 @@ class AccountingInventoryQueueService
             })
             ->leftJoin('users as u', 'u.id', '=', 'ait.encoded_by')
             ->whereNull('dr.deleted_at')
-            ->whereNull('di.deleted_at')
-            ->where('di.quantity', '>', 0)
-            ->groupBy(
-                'dr.id',
-                'dr.dr_number',
-                'dr.dr_date',
-                'dr.or_number',
-                's.name',
-                'dr.from_name',
-                'ic.id',
-                'ic.name',
-                'ait.id',
-                'ait.status',
-                'ait.total_amount',
-                'ait.is_corrected',
-                'ait.encoded_at',
-                'u.name',
-            )
             ->select([
                 DB::raw("'DR' as doc_type"),
                 'dr.id as source_id',
@@ -507,14 +562,21 @@ class AccountingInventoryQueueService
                 DB::raw('0 as is_manual'),
             ]);
 
-        if ($categoryId > 0) {
-            $query->where('ic.id', $categoryId);
-        }
+        $this->applySourceBranchFilters($query, $filters, 'dr.dr_date', [
+            'dr.dr_number',
+            'dr.or_number',
+            's.name',
+            'dr.from_name',
+            'ic.name',
+        ]);
 
         return $query;
     }
 
-    private function manualTransactionListQuery(string $docTypeFilter, int $categoryId): QueryBuilder
+    /**
+     * @param  array{status?: string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     */
+    private function manualTransactionListQuery(array $filters, string $docTypeFilter, int $categoryId): QueryBuilder
     {
         $query = DB::table('accounting_inventory_transactions as ait')
             ->join('item_categories as ic', 'ic.id', '=', 'ait.category_id')
@@ -549,6 +611,33 @@ class AccountingInventoryQueueService
             $query->where('ic.id', $categoryId);
         }
 
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        if ($dateFrom !== '') {
+            $query->where('ait.doc_date', '>=', $dateFrom);
+        }
+
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        if ($dateTo !== '') {
+            $query->where('ait.doc_date', '<', Carbon::parse($dateTo)->addDay()->toDateString());
+        }
+
+        $status = (string) ($filters['status'] ?? 'all');
+        if ($status === 'pending') {
+            $query->where('ait.status', '<>', AccountingInventoryTransaction::STATUS_ENCODED);
+        } elseif ($status === 'encoded') {
+            $query->where('ait.status', AccountingInventoryTransaction::STATUS_ENCODED);
+        }
+
+        $keyword = trim((string) ($filters['keyword'] ?? ''));
+        if ($keyword !== '') {
+            $like = '%'.$keyword.'%';
+            $query->where(function (QueryBuilder $nested) use ($like): void {
+                $nested->where('ait.doc_number', 'like', $like)
+                    ->orWhere('ait.party_name', 'like', $like)
+                    ->orWhere('ic.name', 'like', $like);
+            });
+        }
+
         return $query;
     }
 
@@ -563,9 +652,7 @@ class AccountingInventoryQueueService
             'doc_type' => strtolower($docType),
         ]);
 
-        return (int) (clone $this->filteredDocumentsQuery($pendingFilters))
-            ->where('doc_type', $docType)
-            ->count();
+        return (int) (clone $this->filteredDocumentsQuery($pendingFilters))->count();
     }
 
     /**
@@ -585,21 +672,26 @@ class AccountingInventoryQueueService
 
     /**
      * @param  array{status?: string, doc_type?: string, category_id?: int|string, keyword?: string, date_from?: string, date_to?: string}  $filters
-     * @return array<string, mixed>|null
+     * @return array{
+     *     next: array<string, mixed>|null,
+     *     queue_stats: array{pending: int, encoded: int, remaining_type: int, position_type: int, doc_type: string}
+     * }
      */
-    public function resolveNextPendingDocument(AccountingInventoryTransaction $encoded, array $filters): ?array
+    public function resolveEncodeQueueState(AccountingInventoryTransaction $transaction, array $filters): array
     {
-        $docType = strtoupper(trim($encoded->doc_type));
-        $sortDocNumber = $this->displayDocNumber($encoded);
-        $docDate = $encoded->doc_date?->toDateString() ?? '';
+        $docType = strtoupper(trim($transaction->doc_type));
+        $sortDocNumber = $this->displayDocNumber($transaction);
+        $docDate = $transaction->doc_date?->toDateString() ?? '';
 
-        $pendingFilters = array_merge($filters, [
+        $pendingTypeFilters = array_merge($filters, [
             'status' => 'pending',
             'doc_type' => strtolower($docType),
         ]);
+        $base = $this->filteredDocumentsQuery($pendingTypeFilters);
 
-        $row = (clone $this->filteredDocumentsQuery($pendingFilters))
-            ->where('doc_type', $docType)
+        $remainingType = (int) (clone $base)->count();
+
+        $nextRow = (clone $base)
             ->where(function (QueryBuilder $query) use ($docDate, $sortDocNumber): void {
                 $query->whereDate('doc_date', '>', $docDate)
                     ->orWhere(function (QueryBuilder $nested) use ($docDate, $sortDocNumber): void {
@@ -611,44 +703,37 @@ class AccountingInventoryQueueService
             ->orderBy('sort_doc_number')
             ->first();
 
-        return $row !== null ? $this->mapNextDocumentPreview($row) : null;
+        $filterDocType = strtolower((string) ($filters['doc_type'] ?? 'all'));
+        $pending = $filterDocType === 'all' || $filterDocType === ''
+            ? (int) $this->filteredDocumentsQuery(array_merge($filters, ['status' => 'pending', 'doc_type' => 'all']))->count()
+            : $remainingType;
+
+        return [
+            'next' => $nextRow !== null ? $this->mapNextDocumentPreview($nextRow) : null,
+            'queue_stats' => [
+                'pending' => $pending,
+                'remaining_type' => $remainingType,
+                'doc_type' => $docType,
+            ],
+        ];
     }
 
     /**
      * @param  array{status?: string, doc_type?: string, category_id?: int|string, keyword?: string, date_from?: string, date_to?: string}  $filters
-     * @return array{pending: int, encoded: int, remaining_type: int, position_type: int, doc_type: string}
+     * @return array<string, mixed>|null
+     */
+    public function resolveNextPendingDocument(AccountingInventoryTransaction $encoded, array $filters): ?array
+    {
+        return $this->resolveEncodeQueueState($encoded, $filters)['next'];
+    }
+
+    /**
+     * @param  array{status?: string, doc_type?: string, category_id?: int|string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     * @return array{pending: int, remaining_type: int, doc_type: string}
      */
     public function queueStatsForTransaction(AccountingInventoryTransaction $transaction, array $filters): array
     {
-        $docType = strtoupper(trim($transaction->doc_type));
-        $summary = $this->summarizeStatuses($filters);
-        $remainingType = $this->countPendingByType($docType, $filters);
-        $sortDocNumber = $this->displayDocNumber($transaction);
-        $docDate = $transaction->doc_date?->toDateString() ?? '';
-
-        $pendingFilters = array_merge($filters, [
-            'status' => 'pending',
-            'doc_type' => strtolower($docType),
-        ]);
-
-        $ahead = (clone $this->filteredDocumentsQuery($pendingFilters))
-            ->where('doc_type', $docType)
-            ->where(function (QueryBuilder $query) use ($docDate, $sortDocNumber): void {
-                $query->whereDate('doc_date', '<', $docDate)
-                    ->orWhere(function (QueryBuilder $nested) use ($docDate, $sortDocNumber): void {
-                        $nested->whereDate('doc_date', $docDate)
-                            ->where('sort_doc_number', '<', $sortDocNumber);
-                    });
-            })
-            ->count();
-
-        return [
-            'pending' => $summary['pending'],
-            'encoded' => $summary['encoded'],
-            'remaining_type' => $remainingType,
-            'position_type' => (int) $ahead + 1,
-            'doc_type' => $docType,
-        ];
+        return $this->resolveEncodeQueueState($transaction, $filters)['queue_stats'];
     }
 
     private function mapDocumentOpenUrl(object $row): object

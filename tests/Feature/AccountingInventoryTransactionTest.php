@@ -693,8 +693,8 @@ it('encodes via json and returns next pending document of same type', function (
         return $rr;
     };
 
-    $firstRr = $createRr('RR-JSON-DAY1', 'PO-JSON-DAY1', '2026-04-01');
-    $secondRr = $createRr('RR-JSON-DAY2', 'PO-JSON-DAY2', '2026-04-02');
+    $firstRr = $createRr('RR-JSON-DAY1', 'PO-JSON-DAY1', now()->subDay()->toDateString());
+    $secondRr = $createRr('RR-JSON-DAY2', 'PO-JSON-DAY2', now()->toDateString());
 
     $this->actingAs($this->user)
         ->get(route('accounting.inventory-transactions.show', [
@@ -738,7 +738,7 @@ it('encodes via json and returns next pending document of same type', function (
     $response->assertJsonPath('next.doc_type', 'RR');
     $response->assertJsonPath('next.doc_number', 'RR-JSON-DAY2');
     $response->assertJsonPath('next.category_name', $this->category->name);
-    $response->assertJsonPath('next.doc_date_label', '02 Apr 2026');
+    $response->assertJsonPath('next.doc_date_label', now()->format('d M Y'));
     expect($response->json('queue_stats.pending'))->toBeGreaterThanOrEqual(1);
 });
 

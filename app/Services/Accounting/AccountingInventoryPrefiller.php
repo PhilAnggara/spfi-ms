@@ -88,6 +88,14 @@ class AccountingInventoryPrefiller
     {
         $transferSlip->loadMissing(['items.item.unit', 'items.item.category']);
 
+        $itemIds = $transferSlip->items
+            ->pluck('item_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $averagePrices = $this->operationalAveragePriceMap($itemIds);
+
         $lines = [];
         foreach ($transferSlip->items as $index => $slipItem) {
             $item = $slipItem->item;
@@ -100,7 +108,7 @@ class AccountingInventoryPrefiller
                 continue;
             }
 
-            $unitCost = $this->operationalAveragePrice((int) $item->id);
+            $unitCost = (float) ($averagePrices[(int) $item->id] ?? 0);
             $lines[] = $this->linePayload(
                 item: $item,
                 direction: AccountingInventoryTransactionLine::DIRECTION_OUT,
@@ -150,6 +158,14 @@ class AccountingInventoryPrefiller
                 'uom.name as unit_name',
             ]);
 
+        $itemIds = $rows->pluck('item_id')->map(fn ($id): int => (int) $id)->unique()->values()->all();
+        $items = Item::query()
+            ->with('unit')
+            ->whereIn('id', $itemIds)
+            ->get()
+            ->keyBy('id');
+        $averagePrices = $this->operationalAveragePriceMap($itemIds);
+
         $lines = [];
         foreach ($rows as $index => $row) {
             $quantity = (float) $row->quantity;
@@ -157,13 +173,13 @@ class AccountingInventoryPrefiller
                 continue;
             }
 
-            $meta = is_string($row->meta) ? json_decode($row->meta, true) : (array) ($row->meta ?? []);
-            $unitCost = (float) ($meta['legacy_unit_cost'] ?? $this->operationalAveragePrice((int) $row->item_id));
-
-            $item = Item::query()->with('unit')->find((int) $row->item_id);
+            $item = $items->get((int) $row->item_id);
             if ($item === null) {
                 continue;
             }
+
+            $meta = is_string($row->meta) ? json_decode($row->meta, true) : (array) ($row->meta ?? []);
+            $unitCost = (float) ($meta['legacy_unit_cost'] ?? ($averagePrices[(int) $row->item_id] ?? 0));
 
             $lines[] = $this->linePayload(
                 item: $item,
@@ -221,13 +237,32 @@ class AccountingInventoryPrefiller
 
     private function operationalAveragePrice(int $itemId): float
     {
-        $average = StockInventory::query()
-            ->where('item_id', $itemId)
+        return (float) ($this->operationalAveragePriceMap([$itemId])[$itemId] ?? 0);
+    }
+
+    /**
+     * @param  list<int>  $itemIds
+     * @return array<int, float>
+     */
+    private function operationalAveragePriceMap(array $itemIds): array
+    {
+        $itemIds = array_values(array_unique(array_filter(array_map('intval', $itemIds))));
+        if ($itemIds === []) {
+            return [];
+        }
+
+        $map = array_fill_keys($itemIds, 0.0);
+        $rows = StockInventory::query()
+            ->whereIn('item_id', $itemIds)
             ->where('wh_code', StockService::DEFAULT_WH_CODE)
             ->where('is_delete', false)
-            ->value('average_price');
+            ->get(['item_id', 'average_price']);
 
-        return round((float) ($average ?? 0), 5);
+        foreach ($rows as $row) {
+            $map[(int) $row->item_id] = round((float) ($row->average_price ?? 0), 5);
+        }
+
+        return $map;
     }
 
     /**

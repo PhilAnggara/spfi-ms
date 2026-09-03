@@ -71,7 +71,7 @@
         @if ($queueStats)
             <div class="mt-3 d-flex flex-wrap align-items-center gap-2">
                 <span class="inv-encode-progress-chip" data-inv-queue-progress>
-                    {{ $queueStats['doc_type'] }} &middot; {{ $queueStats['position_type'] }} of {{ $queueStats['remaining_type'] }} pending
+                    {{ $queueStats['doc_type'] }} &middot; {{ $queueStats['remaining_type'] }} pending
                 </span>
             </div>
         @endif

@@ -2,6 +2,7 @@
     let isLoading = false;
     let pendingReplaceRequest = null;
     let encodeSubmitting = false;
+    let encodeListNeedsRefresh = false;
 
     function setLoading(active) {
         const loadingEl = document.getElementById('inventory-page-loading');
@@ -87,14 +88,19 @@
         const encodedEl = document.querySelector('[data-summary-encoded]');
         const totalEl = document.querySelector('[data-summary-total]');
 
-        if (pendingEl) {
+        if (pendingEl && stats.pending !== undefined) {
             pendingEl.textContent = `Pending ${Number(stats.pending || 0).toLocaleString()}`;
         }
-        if (encodedEl) {
+        if (encodedEl && stats.encoded !== undefined) {
             encodedEl.textContent = `Encoded ${Number(stats.encoded || 0).toLocaleString()}`;
         }
         if (totalEl && stats.pending !== undefined && stats.encoded !== undefined) {
             totalEl.textContent = `Total ${Number(stats.pending + stats.encoded).toLocaleString()}`;
+        } else if (totalEl && stats.pending !== undefined && stats.encoded === undefined) {
+            const encodedText = encodedEl?.textContent || '';
+            const encodedMatch = encodedText.match(/(\d[\d,]*)/);
+            const encodedCount = encodedMatch ? Number(encodedMatch[1].replace(/,/g, '')) : 0;
+            totalEl.textContent = `Total ${Number(stats.pending + encodedCount).toLocaleString()}`;
         }
     }
 
@@ -613,6 +619,7 @@
                 }
 
                 updateSummaryBadges(data.queue_stats);
+                encodeListNeedsRefresh = true;
 
                 if (modalFooter) {
                     modalFooter.classList.add('is-success-flash');
@@ -624,9 +631,12 @@
                 showEncodeToast(nextLabel ? `Encoded ${encodedLabel} · Next: ${nextLabel}` : `Encoded ${encodedLabel}`);
                 updateNextPreview(data.next);
 
-                replacePageContent(window.location.href, false);
-
+                // Avoid reloading the full queue UNION on every Encode & Next; refresh once when closing.
                 if (closeAfter || !data.next?.url) {
+                    if (encodeListNeedsRefresh) {
+                        replacePageContent(window.location.href, false);
+                        encodeListNeedsRefresh = false;
+                    }
                     updateNextPreview(null);
                     setEncodeFooterVisible(false, false);
                     encodeSubmitting = false;
@@ -654,6 +664,10 @@
         submitCloseBtn?.addEventListener('click', () => submitEncode(true));
 
         modalEl.addEventListener('hidden.bs.modal', () => {
+            if (encodeListNeedsRefresh) {
+                replacePageContent(window.location.href, false);
+                encodeListNeedsRefresh = false;
+            }
             setBodyOverlayVisible(false);
             const stage = ensureBodyStage();
             stage.classList.remove('is-leaving', 'is-entering');
