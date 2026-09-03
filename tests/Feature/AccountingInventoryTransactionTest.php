@@ -572,3 +572,170 @@ it('orders inventory queue by document date then display number not document typ
     expect($tsPos)->not->toBeFalse();
     expect($rrPos)->toBeLessThan($tsPos);
 });
+
+it('returns encode panel partial for modal requests', function () {
+    $supplier = Supplier::query()->create([
+        'name' => 'Modal Encode Supplier',
+        'code' => 'MOD-SUP',
+        'created_by' => $this->user->id,
+    ]);
+
+    $po = PurchaseOrder::query()->create([
+        'po_number' => 'PO-MODAL-001',
+        'supplier_id' => $supplier->id,
+        'po_date' => now()->toDateString(),
+        'status' => 'APPROVED',
+        'created_by' => $this->user->id,
+    ]);
+
+    $poItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $po->id,
+        'item_id' => $this->item->id,
+        'quantity' => 10,
+        'unit_price' => 6,
+        'total' => 60,
+        'line_subtotal' => 60,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+    ]);
+
+    $rr = ReceivingReport::query()->create([
+        'rr_number' => 'RR-MODAL-001',
+        'purchase_order_id' => $po->id,
+        'received_date' => now()->toDateString(),
+        'created_by' => $this->user->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $rr->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 2,
+    ]);
+
+    $rrEarlier = ReceivingReport::query()->create([
+        'rr_number' => 'RR-MODAL-000',
+        'purchase_order_id' => $po->id,
+        'received_date' => now()->toDateString(),
+        'created_by' => $this->user->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $rrEarlier->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 1,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->withHeader('X-Requested-With', 'XMLHttpRequest')
+        ->get(route('accounting.inventory-transactions.show', [
+            'docType' => 'rr',
+            'id' => $rr->id,
+            'category_id' => $this->category->id,
+            'modal' => 1,
+        ]));
+
+    $response->assertSuccessful();
+    $response->assertSee('data-inventory-encode-panel', false);
+    $response->assertSee('inventory-encode-form', false);
+    $response->assertSee('Next after Encode &amp; Next', false);
+    $response->assertSee('RR-MODAL-000', false);
+    $response->assertDontSee('Back to Queue');
+});
+
+it('encodes via json and returns next pending document of same type', function () {
+    $sharedDate = '2026-04-01';
+    $supplier = Supplier::query()->create([
+        'name' => 'Json Encode Supplier',
+        'code' => 'JSON-SUP',
+        'created_by' => $this->user->id,
+    ]);
+
+    $createRr = function (string $rrNumber, string $poNumber) use ($supplier, $sharedDate): ReceivingReport {
+        $po = PurchaseOrder::query()->create([
+            'po_number' => $poNumber,
+            'supplier_id' => $supplier->id,
+            'po_date' => $sharedDate,
+            'status' => 'APPROVED',
+            'created_by' => $this->user->id,
+        ]);
+
+        $poItem = PurchaseOrderItem::query()->create([
+            'purchase_order_id' => $po->id,
+            'item_id' => $this->item->id,
+            'quantity' => 10,
+            'unit_price' => 7,
+            'total' => 70,
+            'line_subtotal' => 70,
+            'discount_amount' => 0,
+            'ppn_rate' => 0,
+            'ppn_amount' => 0,
+            'pph_rate' => 0,
+            'pph_amount' => 0,
+        ]);
+
+        $rr = ReceivingReport::query()->create([
+            'rr_number' => $rrNumber,
+            'purchase_order_id' => $po->id,
+            'received_date' => $sharedDate,
+            'created_by' => $this->user->id,
+        ]);
+
+        ReceivingReportItem::query()->create([
+            'receiving_report_id' => $rr->id,
+            'purchase_order_item_id' => $poItem->id,
+            'qty_good' => 2,
+        ]);
+
+        return $rr;
+    };
+
+    $firstRr = $createRr('RR-JSON-ZZZ', 'PO-JSON-ZZZ');
+    $secondRr = $createRr('RR-JSON-AAA', 'PO-JSON-AAA');
+
+    $this->actingAs($this->user)
+        ->get(route('accounting.inventory-transactions.show', [
+            'docType' => 'rr',
+            'id' => $firstRr->id,
+            'category_id' => $this->category->id,
+        ]))
+        ->assertSuccessful();
+
+    $transaction = AccountingInventoryTransaction::query()
+        ->where('source_id', $firstRr->id)
+        ->where('doc_type', 'RR')
+        ->first();
+
+    expect($transaction)->not->toBeNull();
+
+    $line = $transaction->lines()->first();
+    expect($line)->not->toBeNull();
+
+    $response = $this->actingAs($this->user)
+        ->withHeader('X-Requested-With', 'XMLHttpRequest')
+        ->putJson(route('accounting.inventory-transactions.update', $transaction), [
+            'queue_category_id' => $this->category->id,
+            'lines' => [
+                [
+                    'item_id' => $line->item_id,
+                    'direction' => $line->direction,
+                    'quantity' => 2,
+                    'unit_of_measure_id' => $line->unit_of_measure_id,
+                    'unit_cost' => 7,
+                    'amount' => 14,
+                    'prefill_quantity' => 2,
+                    'prefill_unit_cost' => 7,
+                ],
+            ],
+        ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('success', true);
+    $response->assertJsonPath('next.doc_type', 'RR');
+    $response->assertJsonPath('next.doc_number', 'RR-JSON-AAA');
+    $response->assertJsonPath('next.category_name', $this->category->name);
+    $response->assertJsonPath('next.doc_date_label', '01 Apr 2026');
+    expect($response->json('queue_stats.pending'))->toBeGreaterThanOrEqual(1);
+});

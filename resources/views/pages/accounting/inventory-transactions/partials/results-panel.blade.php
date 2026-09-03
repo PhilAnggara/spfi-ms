@@ -10,11 +10,31 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <h5 class="card-title mb-0">Inventory Queue</h5>
-                <span class="badge bg-light-warning text-warning">Pending {{ number_format($summary['pending']) }}</span>
-                <span class="badge bg-light-success text-success">Encoded {{ number_format($summary['encoded']) }}</span>
-                <span class="badge bg-light-secondary text-secondary">Total {{ number_format($summary['total']) }}</span>
+                <span class="badge bg-light-warning text-warning" id="inventory-summary-pending" data-summary-pending>Pending {{ number_format($summary['pending']) }}</span>
+                <span class="badge bg-light-success text-success" id="inventory-summary-encoded" data-summary-encoded>Encoded {{ number_format($summary['encoded']) }}</span>
+                <span class="badge bg-light-secondary text-secondary" id="inventory-summary-total" data-summary-total>Total {{ number_format($summary['total']) }}</span>
             </div>
-            <span class="badge bg-light-primary" id="inventory-filter-result">{{ $documents->total() }} records</span>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                @can('encode-accounting-inventory')
+                    @if (($filters['status'] ?? 'pending') === 'pending' && $firstPending)
+                        <button
+                            type="button"
+                            class="btn btn-success btn-sm icon icon-left"
+                            id="inventory-start-encode-btn"
+                            data-open-url="{{ $firstPending->open_url }}"
+                            data-title="{{ $firstPending->title }}"
+                        >
+                            <i class="fa-regular fa-play"></i>
+                            @if (($filters['doc_type'] ?? 'all') !== 'all')
+                                Start Encode {{ strtoupper($filters['doc_type']) }}
+                            @else
+                                Start Encode
+                            @endif
+                        </button>
+                    @endif
+                @endcan
+                <span class="badge bg-light-primary" id="inventory-filter-result">{{ $documents->total() }} records</span>
+            </div>
         </div>
 
         <div class="po-status-chip-group mb-3">

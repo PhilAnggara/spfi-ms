@@ -117,6 +117,61 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="inventory-encode-modal" tabindex="-1" aria-labelledby="inventory-encode-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content border-0 shadow inv-encode-modal-content">
+            <div class="modal-header inv-encode-modal-header border-0">
+                <div class="min-w-0">
+                    <h5 class="modal-title mb-0" id="inventory-encode-modal-title">Encode Inventory</h5>
+                    <div class="inv-encode-modal-subtitle" id="inventory-encode-modal-subtitle">Review and encode lines</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-3" id="inventory-encode-body">
+                <div class="text-center text-muted py-5">
+                    <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                    <div class="mt-2">Loading document...</div>
+                </div>
+            </div>
+            <div class="inv-encode-modal-footer d-none" id="inv-encode-modal-footer">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="inv-encode-footer-left">
+                        <div class="inv-encode-footer-total-label">Total Amount</div>
+                        <div class="inv-encode-footer-total-value font-monospace" id="inv-encode-footer-total">0.00</div>
+                        <div class="inv-encode-shortcut-hint mt-1">
+                            <kbd>Ctrl</kbd>+<kbd>Enter</kbd> encode &amp; next · <kbd>Esc</kbd> close
+                        </div>
+                    </div>
+                    <div class="inv-encode-next-up d-none" id="inv-encode-next-up" aria-live="polite">
+                        <div class="inv-encode-next-up-label">
+                            <i class="fa-regular fa-forward-step me-1"></i>
+                            Next after Encode &amp; Next
+                        </div>
+                        <div class="inv-encode-next-up-body">
+                            <span class="inv-encode-doc-badge inv-encode-doc-badge--sm" id="inv-encode-next-type"></span>
+                            <span class="inv-encode-next-doc-number" id="inv-encode-next-number"></span>
+                        </div>
+                        <div class="inv-encode-next-up-meta text-truncate" id="inv-encode-next-meta"></div>
+                    </div>
+                    <div class="inv-encode-footer-actions d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-outline-success" id="inv-encode-submit-close" disabled>
+                            <i class="fa-regular fa-check me-1"></i>
+                            Encode &amp; Close
+                        </button>
+                        <button type="button" class="btn btn-success" id="inv-encode-submit-next" disabled>
+                            <i class="fa-regular fa-forward me-1"></i>
+                            Encode &amp; Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="inventory-encode-toast-container" aria-live="polite" aria-atomic="true"></div>
 </div>
 @endsection
 
@@ -124,11 +179,13 @@
     <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/stock-correction-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/accounting-inventory-encode.css') }}">
 @endpush
 
 @push('addon-script')
     <script src="{{ url('assets/scripts/modules/stock-correction-item-search.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/accounting-inventory-create.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/accounting-inventory-encode.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/accounting-inventory-modern.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/accounting-inventory-index.js') }}"></script>
 @endpush

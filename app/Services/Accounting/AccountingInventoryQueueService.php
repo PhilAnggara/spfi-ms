@@ -11,6 +11,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Pagination\LengthAwarePaginator as ConcretePaginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -549,5 +550,174 @@ class AccountingInventoryQueueService
         }
 
         return $query;
+    }
+
+    /**
+     * @param  array{status?: string, doc_type?: string, category_id?: int|string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     */
+    public function countPendingByType(string $docType, array $filters): int
+    {
+        $docType = strtoupper(trim($docType));
+        $pendingFilters = array_merge($filters, [
+            'status' => 'pending',
+            'doc_type' => strtolower($docType),
+        ]);
+
+        return (int) (clone $this->filteredDocumentsQuery($pendingFilters))
+            ->where('doc_type', $docType)
+            ->count();
+    }
+
+    /**
+     * @param  array{status?: string, doc_type?: string, category_id?: int|string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     */
+    public function resolveFirstPendingDocument(array $filters): ?object
+    {
+        $pendingFilters = array_merge($filters, ['status' => 'pending']);
+
+        $row = (clone $this->filteredDocumentsQuery($pendingFilters))
+            ->orderByDesc('doc_date')
+            ->orderByDesc('sort_doc_number')
+            ->first();
+
+        return $row !== null ? $this->mapDocumentOpenUrl($row) : null;
+    }
+
+    /**
+     * @param  array{status?: string, doc_type?: string, category_id?: int|string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     * @return array<string, mixed>|null
+     */
+    public function resolveNextPendingDocument(AccountingInventoryTransaction $encoded, array $filters): ?array
+    {
+        $docType = strtoupper(trim($encoded->doc_type));
+        $sortDocNumber = $this->displayDocNumber($encoded);
+        $docDate = $encoded->doc_date?->toDateString() ?? '';
+
+        $pendingFilters = array_merge($filters, [
+            'status' => 'pending',
+            'doc_type' => strtolower($docType),
+        ]);
+
+        $row = (clone $this->filteredDocumentsQuery($pendingFilters))
+            ->where('doc_type', $docType)
+            ->where(function (QueryBuilder $query) use ($docDate, $sortDocNumber): void {
+                $query->whereDate('doc_date', '<', $docDate)
+                    ->orWhere(function (QueryBuilder $nested) use ($docDate, $sortDocNumber): void {
+                        $nested->whereDate('doc_date', $docDate)
+                            ->where('sort_doc_number', '<', $sortDocNumber);
+                    });
+            })
+            ->orderByDesc('doc_date')
+            ->orderByDesc('sort_doc_number')
+            ->first();
+
+        return $row !== null ? $this->mapNextDocumentPreview($row) : null;
+    }
+
+    /**
+     * @param  array{status?: string, doc_type?: string, category_id?: int|string, keyword?: string, date_from?: string, date_to?: string}  $filters
+     * @return array{pending: int, encoded: int, remaining_type: int, position_type: int, doc_type: string}
+     */
+    public function queueStatsForTransaction(AccountingInventoryTransaction $transaction, array $filters): array
+    {
+        $docType = strtoupper(trim($transaction->doc_type));
+        $summary = $this->summarizeStatuses($filters);
+        $remainingType = $this->countPendingByType($docType, $filters);
+        $sortDocNumber = $this->displayDocNumber($transaction);
+        $docDate = $transaction->doc_date?->toDateString() ?? '';
+
+        $pendingFilters = array_merge($filters, [
+            'status' => 'pending',
+            'doc_type' => strtolower($docType),
+        ]);
+
+        $ahead = (clone $this->filteredDocumentsQuery($pendingFilters))
+            ->where('doc_type', $docType)
+            ->where(function (QueryBuilder $query) use ($docDate, $sortDocNumber): void {
+                $query->whereDate('doc_date', '>', $docDate)
+                    ->orWhere(function (QueryBuilder $nested) use ($docDate, $sortDocNumber): void {
+                        $nested->whereDate('doc_date', $docDate)
+                            ->where('sort_doc_number', '>', $sortDocNumber);
+                    });
+            })
+            ->count();
+
+        return [
+            'pending' => $summary['pending'],
+            'encoded' => $summary['encoded'],
+            'remaining_type' => $remainingType,
+            'position_type' => (int) $ahead + 1,
+            'doc_type' => $docType,
+        ];
+    }
+
+    private function mapDocumentOpenUrl(object $row): object
+    {
+        $displayNumber = (string) $row->doc_number;
+        if (preg_match('/^(RR|TS|DR)\|(.+)\|\d+$/', $displayNumber, $matches)) {
+            $displayNumber = $matches[2];
+        }
+
+        $isManual = (bool) ($row->is_manual ?? false);
+        $transactionId = $row->transaction_id !== null ? (int) $row->transaction_id : null;
+
+        $openUrl = $isManual || $transactionId
+            ? route('accounting.inventory-transactions.transaction', $transactionId)
+            : route('accounting.inventory-transactions.show', [
+                'docType' => strtolower((string) $row->doc_type),
+                'id' => (int) $row->source_id,
+                'category_id' => (int) $row->category_id,
+            ]);
+
+        return (object) [
+            'doc_type' => (string) $row->doc_type,
+            'doc_number' => $displayNumber,
+            'category_id' => (int) $row->category_id,
+            'source_id' => $row->source_id !== null ? (int) $row->source_id : null,
+            'transaction_id' => $transactionId,
+            'is_manual' => $isManual,
+            'open_url' => $openUrl,
+            'title' => trim((string) $row->doc_type).' '.$displayNumber,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     url: string,
+     *     title: string,
+     *     doc_type: string,
+     *     doc_number: string,
+     *     category_name: string,
+     *     party_name: string,
+     *     doc_date: string,
+     *     doc_date_label: string,
+     *     amount: float,
+     *     amount_label: string
+     * }
+     */
+    private function mapNextDocumentPreview(object $row): array
+    {
+        $mapped = $this->mapDocumentOpenUrl($row);
+        $docDate = $row->doc_date ?? null;
+        $docDateLabel = '';
+
+        if ($docDate !== null && $docDate !== '') {
+            $docDateLabel = Carbon::parse($docDate)->format('d M Y');
+        }
+
+        $amount = (float) ($row->amount ?? 0);
+
+        return [
+            'url' => $mapped->open_url,
+            'title' => $mapped->title,
+            'doc_type' => $mapped->doc_type,
+            'doc_number' => $mapped->doc_number,
+            'category_name' => (string) ($row->category_name ?? ''),
+            'party_name' => (string) ($row->party_name ?? ''),
+            'doc_date' => $docDateLabel !== '' ? Carbon::parse($docDate)->toDateString() : '',
+            'doc_date_label' => $docDateLabel,
+            'amount' => $amount,
+            'amount_label' => number_format($amount, 2, '.', ','),
+        ];
     }
 }

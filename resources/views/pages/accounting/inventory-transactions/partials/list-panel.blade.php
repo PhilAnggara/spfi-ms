@@ -112,7 +112,14 @@
                             @endif
                         </td>
                         <td class="text-center">
-                            <a href="{{ $openUrl }}" class="btn btn-sm {{ $document->is_encoded ? 'btn-outline-secondary' : 'btn-primary' }}">
+                            <a
+                                href="{{ $openUrl }}"
+                                class="btn btn-sm {{ $document->is_encoded ? 'btn-outline-secondary' : 'btn-primary' }}"
+                                data-inventory-encode-open
+                                data-title="{{ $actionLabel }} {{ $document->doc_type }} {{ $displayNumber }}"
+                                data-doc-type="{{ $document->doc_type }}"
+                                data-transaction-id="{{ $document->transaction_id }}"
+                            >
                                 <i class="fa-light {{ $document->is_encoded ? 'fa-eye' : 'fa-pen-to-square' }} me-1"></i>
                                 {{ $actionLabel }}
                             </a>

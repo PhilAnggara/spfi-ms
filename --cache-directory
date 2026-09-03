@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="1" assertions="6" errors="0" failures="1" skipped="0" time="1.824421">
+    <testsuite name="Tests\Feature\AccountingInventoryTransactionTest" file="tests\Feature\AccountingInventoryTransactionTest.php" tests="1" assertions="6" errors="0" failures="1" skipped="0" time="1.824421">
+      <testcase name="it encodes via json and returns next pending document of same type" file="tests\Feature\AccountingInventoryTransactionTest.php::it encodes via json and returns next pending document of same type" class="Tests\Feature\AccountingInventoryTransactionTest" classname="Tests.Feature.AccountingInventoryTransactionTest" assertions="6" time="1.824421">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">it encodes via json and returns next pending document of same typeFailed asserting that null is identical to 'RR'.&#13;
+at vendor\laravel\framework\src\Illuminate\Testing\AssertableJsonString.php:243
+at vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:879
+at tests\Feature\AccountingInventoryTransactionTest.php:721</failure>
+      </testcase>
+    </testsuite>
+  </testsuite>
+</testsuites>

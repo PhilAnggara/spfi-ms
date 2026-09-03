@@ -14,6 +14,8 @@ use App\Support\Concerns\SearchesAccountingInventoryItems;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AccountingInventoryTransactionController extends Controller
@@ -25,18 +27,22 @@ class AccountingInventoryTransactionController extends Controller
         private readonly AccountingInventoryService $inventoryService,
     ) {}
 
-    public function index(Request $request): View|\Illuminate\Http\Response
+    public function index(Request $request): View|Response
     {
         $filters = $this->resolveFilters($request);
         $pageData = $this->queueService->paginateDocumentsWithSummary($filters, 15);
         $documents = $pageData['documents'];
         $summary = $pageData['summary'];
+        $firstPending = ($filters['status'] ?? 'pending') === 'pending'
+            ? $this->queueService->resolveFirstPendingDocument($filters)
+            : null;
 
         if ($request->ajax()) {
             return response()->view('pages.accounting.inventory-transactions.partials.results-panel', [
                 'documents' => $documents,
                 'filters' => $filters,
                 'summary' => $summary,
+                'firstPending' => $firstPending,
             ]);
         }
 
@@ -47,10 +53,11 @@ class AccountingInventoryTransactionController extends Controller
             'filters' => $filters,
             'summary' => $summary,
             'categories' => $categories,
+            'firstPending' => $firstPending,
         ]);
     }
 
-    public function create(Request $request): View|\Illuminate\Http\Response
+    public function create(Request $request): View|Response
     {
         $payload = [
             'categories' => ItemCategory::query()->orderBy('name')->get(['id', 'name']),
@@ -88,7 +95,7 @@ class AccountingInventoryTransactionController extends Controller
             ->with('success', 'Manual transaction draft created. Review and encode when ready.');
     }
 
-    public function show(Request $request, string $docType, int $id): View|RedirectResponse
+    public function show(Request $request, string $docType, int $id): View|RedirectResponse|Response|JsonResponse
     {
         $categoryId = (int) $request->query('category_id');
         abort_if($categoryId <= 0, 404);
@@ -101,36 +108,78 @@ class AccountingInventoryTransactionController extends Controller
                 $request->user()?->id,
             );
         } catch (\InvalidArgumentException $exception) {
+            if ($request->ajax() || $request->boolean('modal')) {
+                return response()->json(['message' => $exception->getMessage()], 400);
+            }
+
             return redirect()
                 ->route('accounting.inventory-transactions.index')
                 ->with('error', $exception->getMessage());
         }
 
-        return $this->renderEncodeScreen($transaction);
+        return $this->renderEncodeScreen($request, $transaction);
     }
 
-    public function showTransaction(AccountingInventoryTransaction $transaction): View
+    public function showTransaction(Request $request, AccountingInventoryTransaction $transaction): View|Response
     {
         $transaction->load(['lines.item.unit', 'category', 'encodedBy', 'voidedBy']);
 
-        return $this->renderEncodeScreen($transaction);
+        return $this->renderEncodeScreen($request, $transaction);
     }
 
-    public function update(EncodeAccountingInventoryTransactionRequest $request, AccountingInventoryTransaction $transaction): RedirectResponse
+    public function update(EncodeAccountingInventoryTransactionRequest $request, AccountingInventoryTransaction $transaction): RedirectResponse|JsonResponse
     {
         if ($transaction->isEncoded()) {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['message' => 'This document is already encoded and cannot be edited.'], 409);
+            }
+
             return redirect()
                 ->route('accounting.inventory-transactions.index')
                 ->with('error', 'This document is already encoded and cannot be edited.');
         }
 
-        $transaction = $this->inventoryService->syncLines(
-            $transaction,
-            $request->validated('lines'),
-            $request->user()?->id,
-        );
+        try {
+            $transaction = $this->inventoryService->syncLines(
+                $transaction,
+                $request->validated('lines'),
+                $request->user()?->id,
+            );
 
-        $this->inventoryService->encode($transaction, $request->user());
+            $this->inventoryService->encode($transaction, $request->user());
+        } catch (ValidationException $exception) {
+            if ($request->ajax() || $request->expectsJson()) {
+                throw $exception;
+            }
+
+            return redirect()
+                ->back()
+                ->withErrors($exception->errors())
+                ->withInput();
+        }
+
+        if ($request->ajax() || $request->expectsJson()) {
+            $queueFilters = $this->resolveQueueFiltersFromRequest($request);
+            $next = $this->queueService->resolveNextPendingDocument($transaction->fresh(), $queueFilters);
+            $summary = $this->queueService->summarizeStatuses($queueFilters);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Accounting inventory transaction encoded successfully.',
+                'encoded' => [
+                    'doc_type' => $transaction->doc_type,
+                    'doc_number' => $this->queueService->displayDocNumber($transaction),
+                ],
+                'next' => $next,
+                'queue_stats' => [
+                    'pending' => $summary['pending'],
+                    'encoded' => $summary['encoded'],
+                    'remaining_type' => $this->queueService->countPendingByType($transaction->doc_type, $queueFilters),
+                    'doc_type' => $transaction->doc_type,
+                ],
+                'close_after' => $request->boolean('close_after'),
+            ]);
+        }
 
         return redirect()
             ->route('accounting.inventory-transactions.index', ['status' => 'encoded'])
@@ -208,16 +257,63 @@ class AccountingInventoryTransactionController extends Controller
         ];
     }
 
-    private function renderEncodeScreen(AccountingInventoryTransaction $transaction): View
+    /**
+     * @return array{status: string, doc_type: string, category_id: int, keyword: string, date_from: string, date_to: string}
+     */
+    private function resolveQueueFiltersFromRequest(Request $request): array
+    {
+        return [
+            'status' => 'pending',
+            'doc_type' => 'all',
+            'category_id' => (int) ($request->input('queue_category_id') ?? $request->query('queue_category_id', 0)),
+            'keyword' => trim((string) ($request->input('queue_keyword') ?? $request->query('queue_keyword', ''))),
+            'date_from' => (string) ($request->input('queue_date_from') ?? $request->query('queue_date_from', '')),
+            'date_to' => (string) ($request->input('queue_date_to') ?? $request->query('queue_date_to', '')),
+        ];
+    }
+
+    private function renderEncodeScreen(Request $request, AccountingInventoryTransaction $transaction): View|Response
     {
         $transaction->loadMissing(['lines.item.unit', 'category', 'encodedBy', 'voidedBy']);
         $displayDocNumber = $this->queueService->displayDocNumber($transaction);
+        $queueFilters = $this->resolveQueueFiltersFromRequest($request);
+        $nextDocument = $transaction->isDraft()
+            ? $this->queueService->resolveNextPendingDocument($transaction, $queueFilters)
+            : null;
 
-        return view('pages.accounting.inventory-transactions.show', [
+        $payload = [
             'transaction' => $transaction,
             'displayDocNumber' => $displayDocNumber,
-            'canEncode' => $transaction->isDraft() && auth()->user()?->can('encode-accounting-inventory'),
-            'canVoid' => $transaction->isEncoded() && auth()->user()?->can('void-accounting-inventory'),
-        ]);
+            'canEncode' => $transaction->isDraft() && $request->user()?->can('encode-accounting-inventory'),
+            'canVoid' => $transaction->isEncoded() && $request->user()?->can('void-accounting-inventory'),
+            'inModal' => $request->ajax() || $request->boolean('modal'),
+            'queueStats' => $this->queueService->queueStatsForTransaction($transaction, $queueFilters),
+            'queueFilters' => $queueFilters,
+            'sourceUrl' => $this->resolveSourceDocumentUrl($transaction),
+            'nextDocument' => $nextDocument,
+        ];
+
+        if ($payload['inModal']) {
+            return response()->view('pages.accounting.inventory-transactions.partials.encode-panel', $payload);
+        }
+
+        return view('pages.accounting.inventory-transactions.show', $payload);
+    }
+
+    private function resolveSourceDocumentUrl(AccountingInventoryTransaction $transaction): ?string
+    {
+        if ($transaction->source_id === null || $transaction->source_id <= 0) {
+            return null;
+        }
+
+        return match (strtoupper($transaction->doc_type)) {
+            'RR' => route('receiving-reports.print', [
+                'receivingReport' => $transaction->source_id,
+                'mode' => 'preview',
+            ]),
+            'TS' => null,
+            'DR' => route('deliveries.print', $transaction->source_id),
+            default => null,
+        };
     }
 }
