@@ -211,6 +211,11 @@ class AccountingInventoryService
             return;
         }
 
+        // Source-backed RR/TS/DR only book warehouse movements already done; do not block on ledger qty.
+        if (! $transaction->isManual() && $transaction->source_id) {
+            return;
+        }
+
         $available = $this->getAvailableQty($transaction->category_id, (int) $line->item_id);
         if ((float) $line->quantity > $available + 0.00001) {
             $itemCode = $line->item?->code ?? (string) $line->item_id;

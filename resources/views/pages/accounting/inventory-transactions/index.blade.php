@@ -63,7 +63,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-3 col-xl-2">
+                    <div class="col-6 col-md-3 col-xl-1">
                         <label for="filter-inventory-doc-type" class="form-label mb-1">Document Type</label>
                         <select id="filter-inventory-doc-type" class="form-select">
                             <option value="all" @selected(($filters['doc_type'] ?? 'all') === 'all')>All</option>
@@ -72,7 +72,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-3 col-xl-2">
+                    <div class="col-6 col-md-3 col-xl-1">
                         <label for="filter-inventory-status" class="form-label mb-1">Status</label>
                         <select id="filter-inventory-status" class="form-select">
                             <option value="pending" @selected(($filters['status'] ?? 'pending') === 'pending')>Pending</option>
@@ -119,7 +119,7 @@
 </div>
 
 <div class="modal fade" id="inventory-encode-modal" tabindex="-1" aria-labelledby="inventory-encode-modal-title" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered inv-encode-modal-dialog">
         <div class="modal-content border-0 shadow inv-encode-modal-content">
             <div class="modal-header inv-encode-modal-header border-0">
                 <div class="min-w-0">
@@ -128,10 +128,12 @@
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body pt-3" id="inventory-encode-body">
-                <div class="text-center text-muted py-5">
-                    <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
-                    <div class="mt-2">Loading document...</div>
+            <div class="modal-body pt-3 inv-encode-modal-body" id="inventory-encode-body">
+                <div class="inv-encode-body-stage" data-inv-encode-stage>
+                    <div class="text-center text-muted py-5">
+                        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                        <div class="mt-2">Loading document...</div>
+                    </div>
                 </div>
             </div>
             <div class="inv-encode-modal-footer d-none" id="inv-encode-modal-footer">

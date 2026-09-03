@@ -570,7 +570,8 @@ it('orders inventory queue by document date then display number not document typ
 
     expect($rrPos)->not->toBeFalse();
     expect($tsPos)->not->toBeFalse();
-    expect($rrPos)->toBeLessThan($tsPos);
+    // List stays newest/highest first (DESC): TS-ORDER-AAA > RR-ORDER-ZZZ
+    expect($tsPos)->toBeLessThan($rrPos);
 });
 
 it('returns encode panel partial for modal requests', function () {
@@ -602,7 +603,7 @@ it('returns encode panel partial for modal requests', function () {
         'pph_amount' => 0,
     ]);
 
-    $rr = ReceivingReport::query()->create([
+    $rrLater = ReceivingReport::query()->create([
         'rr_number' => 'RR-MODAL-001',
         'purchase_order_id' => $po->id,
         'received_date' => now()->toDateString(),
@@ -610,12 +611,12 @@ it('returns encode panel partial for modal requests', function () {
     ]);
 
     ReceivingReportItem::query()->create([
-        'receiving_report_id' => $rr->id,
+        'receiving_report_id' => $rrLater->id,
         'purchase_order_item_id' => $poItem->id,
         'qty_good' => 2,
     ]);
 
-    $rrEarlier = ReceivingReport::query()->create([
+    $rr = ReceivingReport::query()->create([
         'rr_number' => 'RR-MODAL-000',
         'purchase_order_id' => $po->id,
         'received_date' => now()->toDateString(),
@@ -623,7 +624,7 @@ it('returns encode panel partial for modal requests', function () {
     ]);
 
     ReceivingReportItem::query()->create([
-        'receiving_report_id' => $rrEarlier->id,
+        'receiving_report_id' => $rr->id,
         'purchase_order_item_id' => $poItem->id,
         'qty_good' => 1,
     ]);
@@ -640,24 +641,24 @@ it('returns encode panel partial for modal requests', function () {
     $response->assertSuccessful();
     $response->assertSee('data-inventory-encode-panel', false);
     $response->assertSee('inventory-encode-form', false);
-    $response->assertSee('Next after Encode &amp; Next', false);
-    $response->assertSee('RR-MODAL-000', false);
+    $response->assertSee('data-next-document', false);
+    $response->assertSee('RR-MODAL-001', false);
+    $response->assertDontSee('data-inv-next-card', false);
     $response->assertDontSee('Back to Queue');
 });
 
 it('encodes via json and returns next pending document of same type', function () {
-    $sharedDate = '2026-04-01';
     $supplier = Supplier::query()->create([
         'name' => 'Json Encode Supplier',
         'code' => 'JSON-SUP',
         'created_by' => $this->user->id,
     ]);
 
-    $createRr = function (string $rrNumber, string $poNumber) use ($supplier, $sharedDate): ReceivingReport {
+    $createRr = function (string $rrNumber, string $poNumber, string $docDate) use ($supplier): ReceivingReport {
         $po = PurchaseOrder::query()->create([
             'po_number' => $poNumber,
             'supplier_id' => $supplier->id,
-            'po_date' => $sharedDate,
+            'po_date' => $docDate,
             'status' => 'APPROVED',
             'created_by' => $this->user->id,
         ]);
@@ -679,7 +680,7 @@ it('encodes via json and returns next pending document of same type', function (
         $rr = ReceivingReport::query()->create([
             'rr_number' => $rrNumber,
             'purchase_order_id' => $po->id,
-            'received_date' => $sharedDate,
+            'received_date' => $docDate,
             'created_by' => $this->user->id,
         ]);
 
@@ -692,8 +693,8 @@ it('encodes via json and returns next pending document of same type', function (
         return $rr;
     };
 
-    $firstRr = $createRr('RR-JSON-ZZZ', 'PO-JSON-ZZZ');
-    $secondRr = $createRr('RR-JSON-AAA', 'PO-JSON-AAA');
+    $firstRr = $createRr('RR-JSON-DAY1', 'PO-JSON-DAY1', '2026-04-01');
+    $secondRr = $createRr('RR-JSON-DAY2', 'PO-JSON-DAY2', '2026-04-02');
 
     $this->actingAs($this->user)
         ->get(route('accounting.inventory-transactions.show', [
@@ -716,6 +717,7 @@ it('encodes via json and returns next pending document of same type', function (
     $response = $this->actingAs($this->user)
         ->withHeader('X-Requested-With', 'XMLHttpRequest')
         ->putJson(route('accounting.inventory-transactions.update', $transaction), [
+            'queue_doc_type' => 'RR',
             'queue_category_id' => $this->category->id,
             'lines' => [
                 [
@@ -734,8 +736,110 @@ it('encodes via json and returns next pending document of same type', function (
     $response->assertSuccessful();
     $response->assertJsonPath('success', true);
     $response->assertJsonPath('next.doc_type', 'RR');
-    $response->assertJsonPath('next.doc_number', 'RR-JSON-AAA');
+    $response->assertJsonPath('next.doc_number', 'RR-JSON-DAY2');
     $response->assertJsonPath('next.category_name', $this->category->name);
-    $response->assertJsonPath('next.doc_date_label', '01 Apr 2026');
+    $response->assertJsonPath('next.doc_date_label', '02 Apr 2026');
     expect($response->json('queue_stats.pending'))->toBeGreaterThanOrEqual(1);
+});
+
+it('encodes prefilled transfer slip without requiring prior accounting balance', function () {
+    $storeWithdrawalId = \Illuminate\Support\Facades\DB::table('store_withdrawals')->insertGetId([
+        'sws_number' => 'SWS-TS-ENC-001',
+        'sws_date' => now()->toDateString(),
+        'department_id' => $this->department->id,
+        'department_code' => $this->department->code,
+        'type' => 'regular',
+        'info' => 'TS encode without inbound',
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $storeWithdrawalItemId = \Illuminate\Support\Facades\DB::table('store_withdrawal_items')->insertGetId([
+        'store_withdrawal_id' => $storeWithdrawalId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 5,
+        'uom' => $this->unit->name,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $transferSlipId = \Illuminate\Support\Facades\DB::table('transfer_slips')->insertGetId([
+        'ts_number' => 'TS-ENC-001',
+        'ts_date' => now()->toDateString(),
+        'store_withdrawal_id' => $storeWithdrawalId,
+        'for_production' => false,
+        'transfer_to' => 'Production Line B',
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    \Illuminate\Support\Facades\DB::table('transfer_slip_items')->insert([
+        'transfer_slip_id' => $transferSlipId,
+        'store_withdrawal_item_id' => $storeWithdrawalItemId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 3,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('accounting.inventory-transactions.show', [
+            'docType' => 'ts',
+            'id' => $transferSlipId,
+            'category_id' => $this->category->id,
+        ]))
+        ->assertSuccessful();
+
+    $transaction = AccountingInventoryTransaction::query()
+        ->where('source_id', $transferSlipId)
+        ->where('doc_type', 'TS')
+        ->first();
+
+    expect($transaction)->not->toBeNull();
+
+    $line = $transaction->lines()->first();
+    expect($line)->not->toBeNull();
+    expect($line->direction)->toBe(AccountingInventoryTransactionLine::DIRECTION_OUT);
+    expect(app(\App\Services\Accounting\AccountingInventoryService::class)->getAvailableQty(
+        $this->category->id,
+        $line->item_id,
+    ))->toBe(0.0);
+
+    $quantity = (float) $line->quantity;
+    $unitCost = (float) $line->unit_cost;
+    $amount = round($quantity * $unitCost, 4);
+
+    $response = $this->actingAs($this->user)
+        ->withHeader('X-Requested-With', 'XMLHttpRequest')
+        ->putJson(route('accounting.inventory-transactions.update', $transaction), [
+            'queue_doc_type' => 'TS',
+            'queue_category_id' => $this->category->id,
+            'lines' => [
+                [
+                    'item_id' => $line->item_id,
+                    'direction' => $line->direction,
+                    'quantity' => $quantity,
+                    'unit_of_measure_id' => $line->unit_of_measure_id,
+                    'unit_cost' => $unitCost,
+                    'amount' => $amount,
+                    'prefill_quantity' => $line->prefill_quantity,
+                    'prefill_unit_cost' => $line->prefill_unit_cost,
+                ],
+            ],
+        ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('success', true);
+
+    expect($transaction->fresh()->status)->toBe(AccountingInventoryTransaction::STATUS_ENCODED);
+    expect(AccountingInventoryLedger::query()
+        ->where('category_id', $this->category->id)
+        ->where('item_id', $line->item_id)
+        ->exists())->toBeTrue();
 });

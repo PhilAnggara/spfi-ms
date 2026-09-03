@@ -75,30 +75,6 @@
                 </span>
             </div>
         @endif
-        @if ($nextDocument && $canEncode)
-            <div class="inv-encode-next-card mt-3" data-inv-next-card>
-                <div class="inv-encode-next-card-label">
-                    <i class="fa-regular fa-forward-step me-1"></i>
-                    Next after Encode &amp; Next
-                </div>
-                <div class="inv-encode-next-card-body">
-                    <span class="inv-encode-doc-badge inv-encode-doc-badge--sm">{{ $nextDocument['doc_type'] }}</span>
-                    <span class="inv-encode-next-doc-number">{{ $nextDocument['doc_number'] }}</span>
-                    @if ($nextDocument['category_name'])
-                        <span class="inv-encode-next-meta">{{ $nextDocument['category_name'] }}</span>
-                    @endif
-                    @if ($nextDocument['doc_date_label'])
-                        <span class="inv-encode-next-meta">{{ $nextDocument['doc_date_label'] }}</span>
-                    @endif
-                    @if ($nextDocument['party_name'])
-                        <span class="inv-encode-next-meta">{{ $nextDocument['party_name'] }}</span>
-                    @endif
-                    @if ($nextDocument['amount_label'])
-                        <span class="inv-encode-next-amount font-monospace">{{ $nextDocument['amount_label'] }}</span>
-                    @endif
-                </div>
-            </div>
-        @endif
     </div>
 
     @if ($isReadOnly)
@@ -119,6 +95,7 @@
         @method('PUT')
 
         @if ($inModal && $canEncode)
+            <input type="hidden" name="queue_doc_type" value="{{ $queueFilters['doc_type'] ?? 'all' }}" class="inv-queue-filter" data-filter="doc_type">
             <input type="hidden" name="queue_category_id" value="{{ (int) ($queueFilters['category_id'] ?? 0) }}" class="inv-queue-filter" data-filter="category_id">
             <input type="hidden" name="queue_keyword" value="{{ $queueFilters['keyword'] ?? '' }}" class="inv-queue-filter" data-filter="keyword">
             <input type="hidden" name="queue_date_from" value="{{ $queueFilters['date_from'] ?? '' }}" class="inv-queue-filter" data-filter="date_from">

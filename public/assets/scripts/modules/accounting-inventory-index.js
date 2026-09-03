@@ -1,7 +1,6 @@
 (function () {
     let isLoading = false;
     let pendingReplaceRequest = null;
-    let sessionEncodedCount = 0;
     let encodeSubmitting = false;
 
     function setLoading(active) {
@@ -20,11 +19,15 @@
 
     function getQueueFilterParams() {
         const params = new URLSearchParams();
+        const docType = document.getElementById('filter-inventory-doc-type')?.value || 'all';
         const category = document.getElementById('filter-inventory-category')?.value || '';
         const keyword = document.getElementById('filter-inventory-keyword')?.value || '';
         const dateFrom = document.getElementById('filter-inventory-date-from')?.value || '';
         const dateTo = document.getElementById('filter-inventory-date-to')?.value || '';
 
+        if (docType) {
+            params.set('queue_doc_type', docType);
+        }
         if (category) {
             params.set('queue_category_id', category);
         }
@@ -46,16 +49,21 @@
             return;
         }
 
+        const docType = document.getElementById('filter-inventory-doc-type')?.value || 'all';
         const category = document.getElementById('filter-inventory-category')?.value || '';
         const keyword = document.getElementById('filter-inventory-keyword')?.value || '';
         const dateFrom = document.getElementById('filter-inventory-date-from')?.value || '';
         const dateTo = document.getElementById('filter-inventory-date-to')?.value || '';
 
+        const docTypeInput = form.querySelector('[name="queue_doc_type"]');
         const categoryInput = form.querySelector('[name="queue_category_id"]');
         const keywordInput = form.querySelector('[name="queue_keyword"]');
         const dateFromInput = form.querySelector('[name="queue_date_from"]');
         const dateToInput = form.querySelector('[name="queue_date_to"]');
 
+        if (docTypeInput) {
+            docTypeInput.value = docType;
+        }
         if (categoryInput) {
             categoryInput.value = category;
         }
@@ -331,7 +339,6 @@
         }
 
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-        let currentDocType = '';
 
         function formatNextMeta(next) {
             const parts = [];
@@ -409,15 +416,97 @@
             }
         }
 
-        async function loadEncodePanel(url, title) {
+        function prefersReducedMotion() {
+            return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        }
+
+        function wait(ms) {
+            return new Promise((resolve) => setTimeout(resolve, ms));
+        }
+
+        function ensureBodyStage() {
+            let stage = modalBody.querySelector('[data-inv-encode-stage]');
+            if (!stage) {
+                stage = document.createElement('div');
+                stage.className = 'inv-encode-body-stage';
+                stage.dataset.invEncodeStage = '1';
+                while (modalBody.firstChild) {
+                    stage.appendChild(modalBody.firstChild);
+                }
+                modalBody.appendChild(stage);
+            }
+            return stage;
+        }
+
+        function ensureBodyOverlay() {
+            let overlay = modalBody.querySelector('[data-inv-encode-overlay]');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'inv-encode-body-overlay';
+                overlay.dataset.invEncodeOverlay = '1';
+                overlay.innerHTML = `
+                    <div class="inv-encode-body-overlay-card">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></div>
+                        <span>Loading next document...</span>
+                    </div>
+                `;
+                modalBody.appendChild(overlay);
+            }
+            return overlay;
+        }
+
+        function setBodyOverlayVisible(visible) {
+            const overlay = ensureBodyOverlay();
+            overlay.classList.toggle('is-visible', visible);
+        }
+
+        async function swapEncodeBody(html, { animate = false } = {}) {
+            const reduceMotion = prefersReducedMotion();
+            const stage = ensureBodyStage();
+
+            if (animate && !reduceMotion) {
+                stage.classList.remove('is-entering');
+                stage.classList.add('is-leaving');
+                await wait(300);
+            }
+
+            stage.classList.remove('is-leaving', 'is-entering');
+            stage.innerHTML = html;
+            stage.scrollTop = 0;
+
+            if (animate && !reduceMotion) {
+                // Force reflow so the enter animation restarts cleanly.
+                void stage.offsetWidth;
+                stage.classList.add('is-entering');
+                await wait(320);
+                stage.classList.remove('is-entering');
+            }
+        }
+
+        async function loadEncodePanel(url, title, options = {}) {
+            const animate = Boolean(options.animate);
+            const keepChrome = Boolean(options.keepChrome);
             const fetchUrl = new URL(url, window.location.origin);
             const queueParams = getQueueFilterParams();
             queueParams.set('modal', '1');
             queueParams.forEach((value, key) => fetchUrl.searchParams.set(key, value));
 
-            modalBody.innerHTML = '<div class="text-center text-muted py-5"><div class="spinner-border text-primary" role="status" aria-hidden="true"></div><div class="mt-2">Loading document...</div></div>';
-            setEncodeFooterVisible(false, false);
             showEncodeErrors([]);
+            ensureBodyStage();
+
+            if (animate || keepChrome) {
+                setBodyOverlayVisible(true);
+                setEncodeFooterVisible(true, false);
+            } else {
+                setBodyOverlayVisible(false);
+                await swapEncodeBody(`
+                    <div class="text-center text-muted py-5">
+                        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                        <div class="mt-2">Loading document...</div>
+                    </div>
+                `);
+                setEncodeFooterVisible(false, false);
+            }
 
             if (modalTitle) {
                 modalTitle.textContent = title || 'Encode Inventory';
@@ -439,14 +528,15 @@
                     throw new Error('Failed to load encode panel');
                 }
 
-                modalBody.innerHTML = await response.text();
+                const html = await response.text();
+                await swapEncodeBody(html, { animate: animate || keepChrome });
+                setBodyOverlayVisible(false);
 
                 const panel = modalBody.querySelector('[data-inventory-encode-panel]');
                 const form = modalBody.querySelector('#inventory-encode-form');
                 const canEncode = Boolean(form);
 
                 if (panel) {
-                    currentDocType = panel.dataset.docType || '';
                     syncNextPreviewFromPanel(panel);
                 } else {
                     updateNextPreview(null);
@@ -461,21 +551,10 @@
                     setEncodeFooterVisible(false, false);
                 }
             } catch (_) {
-                modalBody.innerHTML = '<div class="alert alert-danger mb-0">Unable to load encode panel. Please try again.</div>';
+                setBodyOverlayVisible(false);
+                await swapEncodeBody('<div class="alert alert-danger mb-0">Unable to load encode panel. Please try again.</div>');
                 setEncodeFooterVisible(false, false);
             }
-        }
-
-        function showCompleteState(docType) {
-            modalBody.innerHTML = `
-                <div class="inv-encode-complete-state">
-                    <i class="fa-solid fa-circle-check"></i>
-                    <h5 class="mb-2">All pending ${docType || 'documents'} completed</h5>
-                    <p class="text-muted mb-3">You encoded ${sessionEncodedCount} document(s) this session.</p>
-                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
-                </div>
-            `;
-            setEncodeFooterVisible(false, false);
         }
 
         async function submitEncode(closeAfter) {
@@ -518,7 +597,6 @@
                     return;
                 }
 
-                sessionEncodedCount += 1;
                 updateSummaryBadges(data.queue_stats);
 
                 if (modalFooter) {
@@ -534,35 +612,39 @@
                 replacePageContent(window.location.href, false);
 
                 if (closeAfter || !data.next?.url) {
-                    if (!data.next?.url) {
-                        showCompleteState(data.queue_stats?.doc_type || currentDocType);
-                    } else if (closeAfter) {
-                        modal.hide();
-                    }
+                    updateNextPreview(null);
+                    setEncodeFooterVisible(false, false);
+                    encodeSubmitting = false;
+                    modal.hide();
                 } else {
-                    await loadEncodePanel(data.next.url, data.next.title);
+                    encodeSubmitting = false;
+                    await loadEncodePanel(data.next.url, data.next.title, {
+                        animate: true,
+                        keepChrome: true,
+                    });
                 }
             } catch (_) {
                 showEncodeErrors({ message: 'Network error while encoding. Please try again.' });
                 setEncodeFooterVisible(true, true);
-            } finally {
                 encodeSubmitting = false;
             }
         }
 
         function openEncodeModal(url, title) {
             modal.show();
-            loadEncodePanel(url, title);
+            loadEncodePanel(url, title, { animate: false, keepChrome: false });
         }
 
         submitNextBtn?.addEventListener('click', () => submitEncode(false));
         submitCloseBtn?.addEventListener('click', () => submitEncode(true));
 
         modalEl.addEventListener('hidden.bs.modal', () => {
-            modalBody.innerHTML = '<div class="text-center text-muted py-5"><div class="spinner-border text-primary" role="status" aria-hidden="true"></div><div class="mt-2">Loading document...</div></div>';
+            setBodyOverlayVisible(false);
+            const stage = ensureBodyStage();
+            stage.classList.remove('is-leaving', 'is-entering');
+            stage.innerHTML = '<div class="text-center text-muted py-5"><div class="spinner-border text-primary" role="status" aria-hidden="true"></div><div class="mt-2">Loading document...</div></div>';
             setEncodeFooterVisible(false, false);
             updateNextPreview(null);
-            sessionEncodedCount = 0;
         });
 
         pageContainer?.addEventListener('click', (event) => {

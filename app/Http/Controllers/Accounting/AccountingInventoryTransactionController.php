@@ -262,9 +262,13 @@ class AccountingInventoryTransactionController extends Controller
      */
     private function resolveQueueFiltersFromRequest(Request $request): array
     {
+        $docType = strtoupper(trim((string) ($request->input('queue_doc_type') ?? $request->query('queue_doc_type', 'all'))));
+
         return [
             'status' => 'pending',
-            'doc_type' => 'all',
+            'doc_type' => in_array($docType, ['ALL', 'RR', 'TS', 'DR', 'CV', 'JV'], true)
+                ? ($docType === 'ALL' ? 'all' : $docType)
+                : 'all',
             'category_id' => (int) ($request->input('queue_category_id') ?? $request->query('queue_category_id', 0)),
             'keyword' => trim((string) ($request->input('queue_keyword') ?? $request->query('queue_keyword', ''))),
             'date_from' => (string) ($request->input('queue_date_from') ?? $request->query('queue_date_from', '')),

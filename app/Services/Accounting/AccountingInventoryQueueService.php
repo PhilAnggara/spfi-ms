@@ -576,8 +576,8 @@ class AccountingInventoryQueueService
         $pendingFilters = array_merge($filters, ['status' => 'pending']);
 
         $row = (clone $this->filteredDocumentsQuery($pendingFilters))
-            ->orderByDesc('doc_date')
-            ->orderByDesc('sort_doc_number')
+            ->orderBy('doc_date')
+            ->orderBy('sort_doc_number')
             ->first();
 
         return $row !== null ? $this->mapDocumentOpenUrl($row) : null;
@@ -601,14 +601,14 @@ class AccountingInventoryQueueService
         $row = (clone $this->filteredDocumentsQuery($pendingFilters))
             ->where('doc_type', $docType)
             ->where(function (QueryBuilder $query) use ($docDate, $sortDocNumber): void {
-                $query->whereDate('doc_date', '<', $docDate)
+                $query->whereDate('doc_date', '>', $docDate)
                     ->orWhere(function (QueryBuilder $nested) use ($docDate, $sortDocNumber): void {
                         $nested->whereDate('doc_date', $docDate)
-                            ->where('sort_doc_number', '<', $sortDocNumber);
+                            ->where('sort_doc_number', '>', $sortDocNumber);
                     });
             })
-            ->orderByDesc('doc_date')
-            ->orderByDesc('sort_doc_number')
+            ->orderBy('doc_date')
+            ->orderBy('sort_doc_number')
             ->first();
 
         return $row !== null ? $this->mapNextDocumentPreview($row) : null;
@@ -634,10 +634,10 @@ class AccountingInventoryQueueService
         $ahead = (clone $this->filteredDocumentsQuery($pendingFilters))
             ->where('doc_type', $docType)
             ->where(function (QueryBuilder $query) use ($docDate, $sortDocNumber): void {
-                $query->whereDate('doc_date', '>', $docDate)
+                $query->whereDate('doc_date', '<', $docDate)
                     ->orWhere(function (QueryBuilder $nested) use ($docDate, $sortDocNumber): void {
                         $nested->whereDate('doc_date', $docDate)
-                            ->where('sort_doc_number', '>', $sortDocNumber);
+                            ->where('sort_doc_number', '<', $sortDocNumber);
                     });
             })
             ->count();
