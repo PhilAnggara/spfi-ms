@@ -13,6 +13,7 @@ class AccountingInventoryService
 {
     public function __construct(
         private readonly GlJournalEncoder $glJournalEncoder,
+        private readonly AccountingInventoryLegacyPostingService $legacyPostingService,
     ) {}
 
     public function getAvailableQty(int $categoryId, int $itemId): float
@@ -131,6 +132,9 @@ class AccountingInventoryService
                 $this->postLineToLedger($transaction, $line, $user);
             }
 
+            // Posted inventory source of truth for reports: DocTran-shaped + monthly (not GL).
+            $this->legacyPostingService->postEncodedTransaction($transaction, $user);
+
             $this->glJournalEncoder->encodeIfEnabled($transaction, $user);
 
             $transaction->update([
@@ -138,6 +142,7 @@ class AccountingInventoryService
                 'encoded_by' => $user->id,
                 'encoded_at' => now(),
                 'updated_by' => $user->id,
+                'gl_status' => 'not_required',
             ]);
 
             return $transaction->fresh(['lines.item.unit', 'category', 'encodedBy']) ?? $transaction;
@@ -161,6 +166,8 @@ class AccountingInventoryService
 
         return DB::transaction(function () use ($transaction, $user, $reason): AccountingInventoryTransaction {
             $transaction->load('lines');
+
+            $this->legacyPostingService->reverseEncodedTransaction($transaction);
 
             foreach ($transaction->lines as $line) {
                 $this->postReversalLine($transaction, $line, $user);
@@ -319,9 +326,11 @@ class AccountingInventoryService
             ? AccountingInventoryTransactionLine::DIRECTION_OUT
             : AccountingInventoryTransactionLine::DIRECTION_IN;
 
+        $originalLineId = (int) $line->id;
         $reversalLine = $line->replicate(['id']);
         $reversalLine->direction = $reversalDirection;
         $reversalLine->exists = false;
+        $reversalLine->setAttribute('id', $originalLineId);
 
         $this->postLineToLedger($transaction, $reversalLine, $user, true);
     }

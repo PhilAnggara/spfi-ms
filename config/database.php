@@ -22,7 +22,7 @@ return [
 
     'default' => env('APP_ENV') === 'testing'
         ? env('DB_CONNECTION', 'sqlite')
-        : match (env('DB_PROFILE', '1')) {
+        : match ((string) env('DB_PROFILE', '1')) {
             '2' => 'sqlsrv',  // Office - SQL Server
             '1' => 'mysql',   // Home - MySQL
             default => env('DB_CONNECTION', 'sqlite'),
