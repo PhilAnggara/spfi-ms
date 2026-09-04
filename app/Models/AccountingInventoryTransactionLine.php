@@ -2,59 +2,61 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-class AccountingInventoryTransactionLine extends Model
+/**
+ * In-memory encode line for Accounting Inventory UI (not a DB table).
+ */
+class AccountingInventoryTransactionLine
 {
     public const DIRECTION_IN = 'in';
 
     public const DIRECTION_OUT = 'out';
 
-    protected $fillable = [
-        'accounting_inventory_transaction_id',
-        'item_id',
-        'direction',
-        'quantity',
-        'unit_of_measure_id',
-        'unit_cost',
-        'amount',
-        'prefill_quantity',
-        'prefill_unit_cost',
-        'available_qty_snapshot',
-        'sort_order',
-    ];
+    public ?int $id = null;
 
-    protected function casts(): array
-    {
-        return [
-            'id' => 'integer',
-            'accounting_inventory_transaction_id' => 'integer',
-            'item_id' => 'integer',
-            'unit_of_measure_id' => 'integer',
-            'quantity' => 'decimal:5',
-            'unit_cost' => 'decimal:4',
-            'amount' => 'decimal:4',
-            'prefill_quantity' => 'decimal:5',
-            'prefill_unit_cost' => 'decimal:4',
-            'available_qty_snapshot' => 'decimal:5',
-            'sort_order' => 'integer',
-        ];
-    }
+    public int $item_id = 0;
 
-    public function transaction(): BelongsTo
-    {
-        return $this->belongsTo(AccountingInventoryTransaction::class, 'accounting_inventory_transaction_id');
-    }
+    public string $direction = self::DIRECTION_IN;
 
-    public function item(): BelongsTo
-    {
-        return $this->belongsTo(Item::class, 'item_id');
-    }
+    public float $quantity = 0.0;
 
-    public function unit(): BelongsTo
+    public ?int $unit_of_measure_id = null;
+
+    public float $unit_cost = 0.0;
+
+    public float $amount = 0.0;
+
+    public ?float $prefill_quantity = null;
+
+    public ?float $prefill_unit_cost = null;
+
+    public ?float $available_qty_snapshot = null;
+
+    public int $sort_order = 0;
+
+    public ?Item $item = null;
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function make(array $attributes = []): self
     {
-        return $this->belongsTo(UnitOfMeasure::class, 'unit_of_measure_id');
+        $line = new self;
+
+        foreach ($attributes as $key => $value) {
+            if ($key === 'item') {
+                if ($value instanceof Item) {
+                    $line->item = $value;
+                }
+
+                continue;
+            }
+
+            if (property_exists($line, $key)) {
+                $line->{$key} = $value;
+            }
+        }
+
+        return $line;
     }
 
     public function wasCorrected(): bool

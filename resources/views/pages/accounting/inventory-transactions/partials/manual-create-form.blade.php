@@ -83,7 +83,7 @@
         @endif
         <button type="submit" class="btn btn-primary icon icon-left">
             <i class="fa-regular fa-floppy-disk"></i>
-            Save Draft
+            Save & Encode
         </button>
     </div>
 </form>

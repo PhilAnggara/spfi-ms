@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AccountingInventoryDocTran;
 use App\Models\AccountingInventoryTransaction;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -18,6 +19,9 @@ class StoreAccountingInventoryTransactionRequest extends FormRequest
      */
     public function rules(): array
     {
+        $docType = strtoupper((string) $this->input('doc_type'));
+        $categoryId = (int) $this->input('category_id');
+
         return [
             'category_id' => ['required', 'integer', 'exists:item_categories,id'],
             'doc_type' => ['required', Rule::in(AccountingInventoryTransaction::MANUAL_DOC_TYPES)],
@@ -25,8 +29,17 @@ class StoreAccountingInventoryTransactionRequest extends FormRequest
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('accounting_inventory_transactions', 'doc_number')
-                    ->where(fn ($query) => $query->where('doc_type', strtoupper((string) $this->input('doc_type')))),
+                function (string $attribute, mixed $value, \Closure $fail) use ($docType, $categoryId): void {
+                    $exists = AccountingInventoryDocTran::query()
+                        ->where('doc_code', $docType)
+                        ->where('doc_no', trim((string) $value))
+                        ->where('category_id', $categoryId)
+                        ->exists();
+
+                    if ($exists) {
+                        $fail('This document number is already encoded for the selected category.');
+                    }
+                },
             ],
             'doc_date' => ['required', 'date'],
             'party_name' => ['nullable', 'string', 'max:255'],

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class AccountingInventoryDocTran extends Model
 {
@@ -29,8 +30,16 @@ class AccountingInventoryDocTran extends Model
         'amount',
         'item_id',
         'category_id',
-        'accounting_inventory_transaction_id',
-        'accounting_inventory_transaction_line_id',
+        'source_type',
+        'source_id',
+        'supplier_id',
+        'purchase_order_id',
+        'party_code',
+        'party_name',
+        'remarks',
+        'is_corrected',
+        'encoded_by',
+        'encoded_at',
     ];
 
     protected function casts(): array
@@ -47,8 +56,12 @@ class AccountingInventoryDocTran extends Model
             'amount' => 'decimal:4',
             'item_id' => 'integer',
             'category_id' => 'integer',
-            'accounting_inventory_transaction_id' => 'integer',
-            'accounting_inventory_transaction_line_id' => 'integer',
+            'source_id' => 'integer',
+            'supplier_id' => 'integer',
+            'purchase_order_id' => 'integer',
+            'is_corrected' => 'boolean',
+            'encoded_by' => 'integer',
+            'encoded_at' => 'datetime',
         ];
     }
 
@@ -62,14 +75,24 @@ class AccountingInventoryDocTran extends Model
         return $this->belongsTo(ItemCategory::class, 'category_id');
     }
 
-    public function transaction(): BelongsTo
+    public function source(): MorphTo
     {
-        return $this->belongsTo(AccountingInventoryTransaction::class, 'accounting_inventory_transaction_id');
+        return $this->morphTo();
     }
 
-    public function transactionLine(): BelongsTo
+    public function supplier(): BelongsTo
     {
-        return $this->belongsTo(AccountingInventoryTransactionLine::class, 'accounting_inventory_transaction_line_id');
+        return $this->belongsTo(Supplier::class);
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function encodedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'encoded_by');
     }
 
     public function monthlyRows(): HasMany

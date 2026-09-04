@@ -2,9 +2,11 @@
 
 namespace App\Services\Accounting;
 
-use App\Models\AccountingInventoryLedger;
+use App\Models\AccountingInventoryDocTran;
 use App\Models\AccountingInventoryTransaction;
 use App\Models\AccountingInventoryTransactionLine;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -33,22 +35,10 @@ class AccountingInventoryService
         }
 
         $map = array_fill_keys($itemIds, 0.0);
-        $seen = [];
 
-        $rows = AccountingInventoryLedger::query()
-            ->where('category_id', $categoryId)
-            ->whereIn('item_id', $itemIds)
-            ->orderByDesc('movement_date')
-            ->orderByDesc('id')
-            ->get(['item_id', 'balance_qty']);
-
-        foreach ($rows as $row) {
-            $itemId = (int) $row->item_id;
-            if (isset($seen[$itemId])) {
-                continue;
-            }
-            $seen[$itemId] = true;
-            $map[$itemId] = round((float) $row->balance_qty, 5);
+        foreach ($itemIds as $itemId) {
+            $snapshot = $this->legacyPostingService->latestBalanceSnapshotByIds($categoryId, $itemId);
+            $map[$itemId] = round((float) $snapshot['ending'], 5);
         }
 
         return $map;
@@ -56,102 +46,71 @@ class AccountingInventoryService
 
     public function getWeightedUnitCost(int $categoryId, int $itemId): float
     {
-        return round((float) ($this->latestLedgerSnapshot($categoryId, $itemId)['weighted_unit_cost'] ?? 0), 5);
+        $snapshot = $this->legacyPostingService->latestBalanceSnapshotByIds($categoryId, $itemId);
+
+        return round((float) ($snapshot['u_cost'] ?? 0), 5);
     }
 
     /**
      * @param  list<array<string, mixed>>  $lines
      */
-    public function syncLines(AccountingInventoryTransaction $transaction, array $lines, ?int $userId = null): AccountingInventoryTransaction
+    public function encodeDocument(AccountingInventoryTransaction $document, array $lines, User $user): AccountingInventoryTransaction
     {
-        if ($transaction->isEncoded()) {
-            throw ValidationException::withMessages([
-                'transaction' => 'Encoded transactions cannot be edited.',
-            ]);
-        }
-
-        return DB::transaction(function () use ($transaction, $lines, $userId): AccountingInventoryTransaction {
-            $transaction->lines()->delete();
-
-            $normalized = $this->normalizeLines($transaction, $lines);
-            $isCorrected = false;
-            $totalAmount = 0.0;
-            $availableByItem = $this->getAvailableQtyMap(
-                $transaction->category_id,
-                array_map(fn (array $line): int => (int) $line['item_id'], $normalized),
-            );
-
-            foreach ($normalized as $index => $line) {
-                $availableQty = (float) ($availableByItem[(int) $line['item_id']] ?? 0);
-                if ($line['direction'] === AccountingInventoryTransactionLine::DIRECTION_OUT) {
-                    $availableQty += (float) ($line['prefill_quantity'] ?? 0);
-                }
-
-                $lineModel = $transaction->lines()->create([
-                    ...$line,
-                    'available_qty_snapshot' => round($availableQty, 5),
-                    'sort_order' => $index,
-                ]);
-
-                if ($lineModel->wasCorrected()) {
-                    $isCorrected = true;
-                }
-
-                $totalAmount += (float) $line['amount'];
-            }
-
-            $transaction->update([
-                'total_amount' => round($totalAmount, 4),
-                'is_corrected' => $isCorrected,
-                'updated_by' => $userId,
-            ]);
-
-            return $transaction->fresh(['lines.item.unit', 'category']) ?? $transaction;
-        });
-    }
-
-    public function encode(AccountingInventoryTransaction $transaction, User $user): AccountingInventoryTransaction
-    {
-        if ($transaction->isEncoded()) {
+        if ($document->isEncoded()) {
             throw ValidationException::withMessages([
                 'transaction' => 'This document is already encoded.',
             ]);
         }
 
-        if ($transaction->lines()->count() === 0) {
+        $normalized = $this->normalizeLines($lines);
+        $this->hydrateDocumentLines($document, $normalized);
+
+        if ($document->lines->isEmpty()) {
             throw ValidationException::withMessages([
                 'lines' => 'At least one line is required before encoding.',
             ]);
         }
 
-        return DB::transaction(function () use ($transaction, $user): AccountingInventoryTransaction {
-            $transaction->load(['lines.item']);
+        if ($this->isDocumentEncoded($document->doc_type, $document->displayDocNumber(), $document->category_id)) {
+            throw ValidationException::withMessages([
+                'transaction' => 'This document is already encoded.',
+            ]);
+        }
 
-            foreach ($transaction->lines as $line) {
-                $this->assertLineCanPost($transaction, $line);
-                $this->postLineToLedger($transaction, $line, $user);
+        return DB::transaction(function () use ($document, $user): AccountingInventoryTransaction {
+            $projected = $this->getAvailableQtyMap(
+                $document->category_id,
+                $document->lines->map(fn (AccountingInventoryTransactionLine $line): int => (int) $line->item_id)->all(),
+            );
+
+            foreach ($document->lines as $line) {
+                $this->assertLineCanPost($document, $line, $projected);
+
+                $itemId = (int) $line->item_id;
+                if ($line->direction === AccountingInventoryTransactionLine::DIRECTION_IN) {
+                    $projected[$itemId] = round(($projected[$itemId] ?? 0) + (float) $line->quantity, 5);
+                } else {
+                    $projected[$itemId] = round(($projected[$itemId] ?? 0) - (float) $line->quantity, 5);
+                }
             }
 
-            // Posted inventory source of truth for reports: DocTran-shaped + monthly (not GL).
-            $this->legacyPostingService->postEncodedTransaction($transaction, $user);
+            $this->legacyPostingService->postEncodedTransaction($document, $user);
+            $this->glJournalEncoder->encodeIfEnabled($document, $user);
 
-            $this->glJournalEncoder->encodeIfEnabled($transaction, $user);
+            $document->status = AccountingInventoryTransaction::STATUS_ENCODED;
+            $document->encoded_by = $user->id;
+            $document->encoded_at = now();
+            $document->encodedBy = $user;
+            $document->is_corrected = $document->lines->contains(fn (AccountingInventoryTransactionLine $line): bool => $line->wasCorrected());
+            $document->total_amount = round($document->lines->sum(fn (AccountingInventoryTransactionLine $line): float => (float) $line->amount), 4);
 
-            $transaction->update([
-                'status' => AccountingInventoryTransaction::STATUS_ENCODED,
-                'encoded_by' => $user->id,
-                'encoded_at' => now(),
-                'updated_by' => $user->id,
-                'gl_status' => 'not_required',
-            ]);
-
-            return $transaction->fresh(['lines.item.unit', 'category', 'encodedBy']) ?? $transaction;
+            return $document;
         });
     }
 
-    public function voidTransaction(AccountingInventoryTransaction $transaction, User $user, string $reason): AccountingInventoryTransaction
+    public function voidDocument(AccountingInventoryTransaction $document, User $user, string $reason): AccountingInventoryTransaction
     {
-        if (! $transaction->isEncoded()) {
+        if (! $document->isEncoded()) {
             throw ValidationException::withMessages([
                 'transaction' => 'Only encoded transactions can be voided.',
             ]);
@@ -164,32 +123,33 @@ class AccountingInventoryService
             ]);
         }
 
-        return DB::transaction(function () use ($transaction, $user, $reason): AccountingInventoryTransaction {
-            $transaction->load('lines');
+        return DB::transaction(function () use ($document): AccountingInventoryTransaction {
+            $this->legacyPostingService->reverseEncodedDocument(
+                $document->doc_type,
+                $document->displayDocNumber(),
+                $document->category_id,
+            );
 
-            $this->legacyPostingService->reverseEncodedTransaction($transaction);
+            $document->status = AccountingInventoryTransaction::STATUS_VOIDED;
 
-            foreach ($transaction->lines as $line) {
-                $this->postReversalLine($transaction, $line, $user);
-            }
-
-            $transaction->update([
-                'status' => AccountingInventoryTransaction::STATUS_VOIDED,
-                'voided_by' => $user->id,
-                'voided_at' => now(),
-                'void_reason' => $reason,
-                'updated_by' => $user->id,
-            ]);
-
-            return $transaction->fresh(['lines.item.unit', 'category', 'voidedBy']) ?? $transaction;
+            return $document;
         });
+    }
+
+    public function isDocumentEncoded(string $docCode, string $docNo, int $categoryId): bool
+    {
+        return AccountingInventoryDocTran::query()
+            ->where('doc_code', strtoupper($docCode))
+            ->where('doc_no', $docNo)
+            ->where('category_id', $categoryId)
+            ->exists();
     }
 
     /**
      * @param  list<array<string, mixed>>  $lines
      * @return list<array<string, mixed>>
      */
-    private function normalizeLines(AccountingInventoryTransaction $transaction, array $lines): array
+    public function normalizeLines(array $lines): array
     {
         $normalized = [];
 
@@ -242,115 +202,63 @@ class AccountingInventoryService
         return $normalized;
     }
 
-    private function assertLineCanPost(AccountingInventoryTransaction $transaction, AccountingInventoryTransactionLine $line): void
+    /**
+     * @param  list<array<string, mixed>>  $normalized
+     */
+    public function hydrateDocumentLines(AccountingInventoryTransaction $document, array $normalized): void
     {
+        $itemIds = array_map(fn (array $line): int => (int) $line['item_id'], $normalized);
+        $items = Item::query()->with('unit')->whereIn('id', $itemIds)->get()->keyBy('id');
+        $availableByItem = $this->getAvailableQtyMap($document->category_id, $itemIds);
+
+        $lines = collect();
+        foreach ($normalized as $index => $line) {
+            $itemId = (int) $line['item_id'];
+            $availableQty = (float) ($availableByItem[$itemId] ?? 0);
+            if ($line['direction'] === AccountingInventoryTransactionLine::DIRECTION_OUT) {
+                $availableQty += (float) ($line['prefill_quantity'] ?? 0);
+            }
+
+            $lines->push(AccountingInventoryTransactionLine::make([
+                ...$line,
+                'available_qty_snapshot' => round($availableQty, 5),
+                'sort_order' => $index,
+                'item' => $items->get($itemId),
+            ]));
+        }
+
+        $document->lines = $lines;
+        $document->total_amount = round($lines->sum(fn (AccountingInventoryTransactionLine $line): float => (float) $line->amount), 4);
+        $document->is_corrected = $lines->contains(fn (AccountingInventoryTransactionLine $line): bool => $line->wasCorrected());
+
+        if ($document->category === null && $document->category_id > 0) {
+            $document->category = ItemCategory::query()->find($document->category_id);
+        }
+    }
+
+    /**
+     * @param  array<int, float>  $projectedAvailable
+     */
+    private function assertLineCanPost(
+        AccountingInventoryTransaction $document,
+        AccountingInventoryTransactionLine $line,
+        array $projectedAvailable,
+    ): void {
         if ($line->direction !== AccountingInventoryTransactionLine::DIRECTION_OUT) {
             return;
         }
 
-        // Source-backed RR/TS/DR only book warehouse movements already done; do not block on ledger qty.
-        if (! $transaction->isManual() && $transaction->source_id) {
+        // Source-backed RR/TS/DR only book warehouse movements already done; do not block on qty.
+        if (! $document->isManual() && $document->source_id) {
             return;
         }
 
-        $available = $this->getAvailableQty($transaction->category_id, (int) $line->item_id);
+        $available = (float) ($projectedAvailable[(int) $line->item_id] ?? 0);
         if ((float) $line->quantity > $available + 0.00001) {
             $itemCode = $line->item?->code ?? (string) $line->item_id;
             throw ValidationException::withMessages([
                 'lines' => "Insufficient accounting quantity for item {$itemCode}. Available: {$available}.",
             ]);
         }
-    }
-
-    private function postLineToLedger(
-        AccountingInventoryTransaction $transaction,
-        AccountingInventoryTransactionLine $line,
-        User $user,
-        bool $isReversal = false,
-    ): void {
-        $categoryId = (int) $transaction->category_id;
-        $itemId = (int) $line->item_id;
-        $latest = $this->latestLedgerSnapshot($categoryId, $itemId);
-
-        $balanceQty = (float) ($latest['balance_qty'] ?? 0);
-        $balanceAmount = (float) ($latest['balance_amount'] ?? 0);
-        $weightedCost = (float) ($latest['weighted_unit_cost'] ?? 0);
-
-        $quantity = (float) $line->quantity;
-        $unitCost = (float) $line->unit_cost;
-        $amount = (float) $line->amount;
-
-        if ($line->direction === AccountingInventoryTransactionLine::DIRECTION_IN) {
-            $newQty = $balanceQty + $quantity;
-            $newAmount = $balanceAmount + $amount;
-            $weightedCost = $newQty > 0 ? round($newAmount / $newQty, 5) : 0.0;
-            $balanceQty = $newQty;
-            $balanceAmount = $newAmount;
-        } else {
-            $issueCost = $weightedCost > 0 ? $weightedCost : $unitCost;
-            $issueAmount = round($quantity * $issueCost, 4);
-            $balanceQty = max(0, $balanceQty - $quantity);
-            $balanceAmount = max(0, $balanceAmount - $issueAmount);
-            $amount = $issueAmount;
-            $unitCost = $issueCost;
-            $weightedCost = $balanceQty > 0 ? round($balanceAmount / $balanceQty, 5) : 0.0;
-        }
-
-        AccountingInventoryLedger::query()->create([
-            'accounting_inventory_transaction_id' => $transaction->id,
-            'accounting_inventory_transaction_line_id' => $line->id,
-            'category_id' => $categoryId,
-            'item_id' => $itemId,
-            'doc_type' => $transaction->doc_type,
-            'doc_number' => $transaction->doc_number,
-            'doc_date' => $transaction->doc_date,
-            'movement_date' => $isReversal ? now()->toDateString() : $transaction->doc_date,
-            'direction' => $line->direction,
-            'quantity' => $quantity,
-            'unit_cost' => $unitCost,
-            'amount' => $amount,
-            'balance_qty' => round($balanceQty, 5),
-            'balance_amount' => round($balanceAmount, 4),
-            'weighted_unit_cost' => $weightedCost,
-            'is_reversal' => $isReversal,
-            'created_by' => $user->id,
-        ]);
-    }
-
-    private function postReversalLine(
-        AccountingInventoryTransaction $transaction,
-        AccountingInventoryTransactionLine $line,
-        User $user,
-    ): void {
-        $reversalDirection = $line->direction === AccountingInventoryTransactionLine::DIRECTION_IN
-            ? AccountingInventoryTransactionLine::DIRECTION_OUT
-            : AccountingInventoryTransactionLine::DIRECTION_IN;
-
-        $originalLineId = (int) $line->id;
-        $reversalLine = $line->replicate(['id']);
-        $reversalLine->direction = $reversalDirection;
-        $reversalLine->exists = false;
-        $reversalLine->setAttribute('id', $originalLineId);
-
-        $this->postLineToLedger($transaction, $reversalLine, $user, true);
-    }
-
-    /**
-     * @return array{balance_qty: float, balance_amount: float, weighted_unit_cost: float}
-     */
-    private function latestLedgerSnapshot(int $categoryId, int $itemId): array
-    {
-        $latest = AccountingInventoryLedger::query()
-            ->where('category_id', $categoryId)
-            ->where('item_id', $itemId)
-            ->orderByDesc('movement_date')
-            ->orderByDesc('id')
-            ->first();
-
-        return [
-            'balance_qty' => (float) ($latest?->balance_qty ?? 0),
-            'balance_amount' => (float) ($latest?->balance_amount ?? 0),
-            'weighted_unit_cost' => (float) ($latest?->weighted_unit_cost ?? 0),
-        ];
     }
 }

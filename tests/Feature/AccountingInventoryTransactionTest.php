@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\AccountingInventoryLedger;
+use App\Models\AccountingInventoryDocTran;
 use App\Models\AccountingInventoryTransaction;
 use App\Models\AccountingInventoryTransactionLine;
 use App\Models\Department;
@@ -13,6 +13,7 @@ use App\Models\ReceivingReportItem;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
+use App\Services\Accounting\AccountingInventoryService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -103,7 +104,7 @@ it('lists pending receiving report in accounting inventory queue', function () {
     $response->assertSee('Pending');
 });
 
-it('encodes prefilled receiving report into accounting ledger', function () {
+it('encodes prefilled receiving report into doc_tran', function () {
     $supplier = Supplier::query()->create([
         'name' => 'Chem Supplier',
         'code' => 'CHEM-SUP-2',
@@ -153,21 +154,21 @@ it('encodes prefilled receiving report into accounting ledger', function () {
         ]));
 
     $show->assertSuccessful();
-
-    $transaction = AccountingInventoryTransaction::query()->first();
-    expect($transaction)->not->toBeNull();
-
-    $line = $transaction->lines()->first();
-    expect($line)->not->toBeNull();
+    $show->assertSee($this->item->code);
 
     $response = $this->actingAs($this->user)
-        ->put(route('accounting.inventory-transactions.update', $transaction), [
+        ->put(route('accounting.inventory-transactions.update', [
+            'docType' => 'rr',
+            'id' => $rr->id,
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
             'lines' => [
                 [
-                    'item_id' => $line->item_id,
-                    'direction' => $line->direction,
+                    'item_id' => $this->item->id,
+                    'direction' => 'in',
                     'quantity' => 4,
-                    'unit_of_measure_id' => $line->unit_of_measure_id,
+                    'unit_of_measure_id' => $this->unit->id,
                     'unit_cost' => 12.5,
                     'amount' => 50,
                     'prefill_quantity' => 4,
@@ -178,19 +179,22 @@ it('encodes prefilled receiving report into accounting ledger', function () {
 
     $response->assertRedirect(route('accounting.inventory-transactions.index', ['status' => 'encoded']));
 
-    $transaction->refresh();
-    expect($transaction->status)->toBe(AccountingInventoryTransaction::STATUS_ENCODED);
-
-    $ledger = AccountingInventoryLedger::query()
-        ->where('accounting_inventory_transaction_id', $transaction->id)
+    $row = AccountingInventoryDocTran::query()
+        ->where('doc_code', 'RR')
+        ->where('doc_no', 'RR-INV-002')
+        ->where('category_id', $this->category->id)
         ->first();
 
-    expect($ledger)->not->toBeNull();
-    expect((float) $ledger->balance_qty)->toBe(4.0);
-    expect((float) $ledger->weighted_unit_cost)->toBe(12.5);
+    expect($row)->not->toBeNull();
+    expect((float) $row->qty)->toBe(4.0);
+    expect((float) $row->t_qty)->toBe(4.0);
+    expect($row->item_id)->toBe($this->item->id);
+    expect($row->source_id)->toBe($rr->id);
+    expect($row->supplier_id)->toBe($supplier->id);
+    expect($row->purchase_order_id)->toBe($po->id);
 });
 
-it('creates and encodes manual cv transaction with direction toggle', function () {
+it('creates and encodes manual cv transaction immediately', function () {
     $response = $this->actingAs($this->user)
         ->post(route('accounting.inventory-transactions.store'), [
             'category_id' => $this->category->id,
@@ -210,79 +214,64 @@ it('creates and encodes manual cv transaction with direction toggle', function (
             ],
         ]);
 
-    $transaction = AccountingInventoryTransaction::query()->where('doc_number', 'CV-TEST-001')->first();
-    expect($transaction)->not->toBeNull();
-    expect($transaction->party_name)->toBeNull();
+    $response->assertRedirect(route('accounting.inventory-transactions.manual', [
+        'docType' => 'cv',
+        'docNumber' => 'CV-TEST-001',
+        'category_id' => $this->category->id,
+    ]));
 
-    $response->assertRedirect(route('accounting.inventory-transactions.transaction', $transaction));
-
-    $this->actingAs($this->user)
-        ->put(route('accounting.inventory-transactions.update', $transaction), [
-            'lines' => [
-                [
-                    'item_id' => $this->item->id,
-                    'direction' => 'in',
-                    'quantity' => 2,
-                    'unit_of_measure_id' => $this->unit->id,
-                    'unit_cost' => 5,
-                    'amount' => 10,
-                ],
-            ],
-        ])
-        ->assertRedirect();
-
-    expect($transaction->fresh()->status)->toBe(AccountingInventoryTransaction::STATUS_ENCODED);
-    expect(AccountingInventoryTransactionLine::query()->where('direction', 'in')->exists())->toBeTrue();
+    expect(AccountingInventoryDocTran::query()
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-TEST-001')
+        ->where('category_id', $this->category->id)
+        ->exists())->toBeTrue();
 });
 
 it('blocks encode when outbound quantity exceeds available accounting balance', function () {
-    $inbound = AccountingInventoryTransaction::query()->create([
+    $service = app(AccountingInventoryService::class);
+
+    $inbound = AccountingInventoryTransaction::make([
         'category_id' => $this->category->id,
         'doc_type' => 'CV',
         'doc_number' => 'CV-SEED-001',
         'doc_date' => now()->toDateString(),
         'status' => AccountingInventoryTransaction::STATUS_DRAFT,
-        'gl_status' => 'not_required',
-        'created_by' => $this->user->id,
+        'category' => $this->category,
     ]);
 
-    $inLine = $inbound->lines()->create([
-        'item_id' => $this->item->id,
-        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
-        'quantity' => 3,
-        'unit_of_measure_id' => $this->unit->id,
-        'unit_cost' => 10,
-        'amount' => 30,
-        'sort_order' => 0,
-    ]);
+    $service->encodeDocument($inbound, [
+        [
+            'item_id' => $this->item->id,
+            'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+            'quantity' => 3,
+            'unit_of_measure_id' => $this->unit->id,
+            'unit_cost' => 10,
+            'amount' => 30,
+        ],
+    ], $this->user);
 
-    app(\App\Services\Accounting\AccountingInventoryService::class)->encode($inbound, $this->user);
-
-    $outbound = AccountingInventoryTransaction::query()->create([
+    $outbound = AccountingInventoryTransaction::make([
         'category_id' => $this->category->id,
         'doc_type' => 'CV',
         'doc_number' => 'CV-SEED-002',
         'doc_date' => now()->toDateString(),
         'status' => AccountingInventoryTransaction::STATUS_DRAFT,
-        'gl_status' => 'not_required',
-        'created_by' => $this->user->id,
+        'category' => $this->category,
     ]);
 
-    $outbound->lines()->create([
-        'item_id' => $this->item->id,
-        'direction' => AccountingInventoryTransactionLine::DIRECTION_OUT,
-        'quantity' => 5,
-        'unit_of_measure_id' => $this->unit->id,
-        'unit_cost' => 10,
-        'amount' => 50,
-        'sort_order' => 0,
-    ]);
-
-    expect(fn () => app(\App\Services\Accounting\AccountingInventoryService::class)->encode($outbound, $this->user))
-        ->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => $service->encodeDocument($outbound, [
+        [
+            'item_id' => $this->item->id,
+            'direction' => AccountingInventoryTransactionLine::DIRECTION_OUT,
+            'quantity' => 5,
+            'unit_of_measure_id' => $this->unit->id,
+            'unit_cost' => 10,
+            'amount' => 50,
+        ],
+    ], $this->user))->toThrow(\Illuminate\Validation\ValidationException::class);
 });
 
-it('bulk encodes uncorrected draft transactions', function () {
+it('bulk encodes uncorrected source documents', function () {
     $supplier = Supplier::query()->create([
         'name' => 'Bulk Supplier',
         'code' => 'BULK-SUP',
@@ -331,23 +320,20 @@ it('bulk encodes uncorrected draft transactions', function () {
     $firstRr = $createRr('RR-BULK-001', 'PO-BULK-001');
     $secondRr = $createRr('RR-BULK-002', 'PO-BULK-002');
 
-    $transactionIds = AccountingInventoryTransaction::query()
-        ->whereIn('source_id', [$firstRr->id, $secondRr->id])
-        ->pluck('id')
-        ->all();
-
-    expect($transactionIds)->toHaveCount(2);
-
     $response = $this->actingAs($this->user)
         ->post(route('accounting.inventory-transactions.bulk-encode'), [
-            'transaction_ids' => $transactionIds,
+            'documents' => [
+                ['doc_type' => 'RR', 'source_id' => $firstRr->id, 'category_id' => $this->category->id],
+                ['doc_type' => 'RR', 'source_id' => $secondRr->id, 'category_id' => $this->category->id],
+            ],
         ]);
 
     $response->assertRedirect(route('accounting.inventory-transactions.index', ['status' => 'encoded']));
 
-    expect(AccountingInventoryTransaction::query()
-        ->whereIn('id', $transactionIds)
-        ->where('status', AccountingInventoryTransaction::STATUS_ENCODED)
+    expect(AccountingInventoryDocTran::query()
+        ->where('doc_code', 'RR')
+        ->whereIn('doc_no', ['RR-BULK-001', 'RR-BULK-002'])
+        ->where('category_id', $this->category->id)
         ->count())->toBe(2);
 });
 
@@ -407,14 +393,7 @@ it('opens transfer slip process screen with prefilled lines', function () {
     $response->assertSuccessful();
     $response->assertSee('TS-INV-001');
     $response->assertSee($this->item->code);
-
-    $transaction = AccountingInventoryTransaction::query()
-        ->where('source_id', $transferSlipId)
-        ->where('doc_type', 'TS')
-        ->first();
-
-    expect($transaction)->not->toBeNull();
-    expect($transaction->lines()->count())->toBe(1);
+    $response->assertSee('Pending');
 });
 
 it('returns manual create partial for modal requests', function () {
@@ -427,7 +406,6 @@ it('returns manual create partial for modal requests', function () {
 
     $response->assertSuccessful();
     $response->assertSee('inv-modal-create-form', false);
-    $response->assertSee('Save Draft');
     $response->assertDontSee('Back to Queue');
 });
 
@@ -570,7 +548,6 @@ it('orders inventory queue by document date then display number not document typ
 
     expect($rrPos)->not->toBeFalse();
     expect($tsPos)->not->toBeFalse();
-    // List stays newest/highest first (DESC): TS-ORDER-AAA > RR-ORDER-ZZZ
     expect($tsPos)->toBeLessThan($rrPos);
 });
 
@@ -643,7 +620,6 @@ it('returns encode panel partial for modal requests', function () {
     $response->assertSee('inventory-encode-form', false);
     $response->assertSee('data-next-document', false);
     $response->assertSee('RR-MODAL-001', false);
-    $response->assertDontSee('data-inv-next-card', false);
     $response->assertDontSee('Back to Queue');
 });
 
@@ -694,7 +670,7 @@ it('encodes via json and returns next pending document of same type', function (
     };
 
     $firstRr = $createRr('RR-JSON-DAY1', 'PO-JSON-DAY1', now()->subDay()->toDateString());
-    $secondRr = $createRr('RR-JSON-DAY2', 'PO-JSON-DAY2', now()->toDateString());
+    $createRr('RR-JSON-DAY2', 'PO-JSON-DAY2', now()->toDateString());
 
     $this->actingAs($this->user)
         ->get(route('accounting.inventory-transactions.show', [
@@ -704,27 +680,22 @@ it('encodes via json and returns next pending document of same type', function (
         ]))
         ->assertSuccessful();
 
-    $transaction = AccountingInventoryTransaction::query()
-        ->where('source_id', $firstRr->id)
-        ->where('doc_type', 'RR')
-        ->first();
-
-    expect($transaction)->not->toBeNull();
-
-    $line = $transaction->lines()->first();
-    expect($line)->not->toBeNull();
-
     $response = $this->actingAs($this->user)
         ->withHeader('X-Requested-With', 'XMLHttpRequest')
-        ->putJson(route('accounting.inventory-transactions.update', $transaction), [
+        ->putJson(route('accounting.inventory-transactions.update', [
+            'docType' => 'rr',
+            'id' => $firstRr->id,
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
             'queue_doc_type' => 'RR',
             'queue_category_id' => $this->category->id,
             'lines' => [
                 [
-                    'item_id' => $line->item_id,
-                    'direction' => $line->direction,
+                    'item_id' => $this->item->id,
+                    'direction' => 'in',
                     'quantity' => 2,
-                    'unit_of_measure_id' => $line->unit_of_measure_id,
+                    'unit_of_measure_id' => $this->unit->id,
                     'unit_cost' => 7,
                     'amount' => 14,
                     'prefill_quantity' => 2,
@@ -796,40 +767,31 @@ it('encodes prefilled transfer slip without requiring prior accounting balance',
         ]))
         ->assertSuccessful();
 
-    $transaction = AccountingInventoryTransaction::query()
-        ->where('source_id', $transferSlipId)
-        ->where('doc_type', 'TS')
-        ->first();
-
-    expect($transaction)->not->toBeNull();
-
-    $line = $transaction->lines()->first();
-    expect($line)->not->toBeNull();
-    expect($line->direction)->toBe(AccountingInventoryTransactionLine::DIRECTION_OUT);
-    expect(app(\App\Services\Accounting\AccountingInventoryService::class)->getAvailableQty(
+    expect(app(AccountingInventoryService::class)->getAvailableQty(
         $this->category->id,
-        $line->item_id,
+        $this->item->id,
     ))->toBe(0.0);
-
-    $quantity = (float) $line->quantity;
-    $unitCost = (float) $line->unit_cost;
-    $amount = round($quantity * $unitCost, 4);
 
     $response = $this->actingAs($this->user)
         ->withHeader('X-Requested-With', 'XMLHttpRequest')
-        ->putJson(route('accounting.inventory-transactions.update', $transaction), [
+        ->putJson(route('accounting.inventory-transactions.update', [
+            'docType' => 'ts',
+            'id' => $transferSlipId,
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
             'queue_doc_type' => 'TS',
             'queue_category_id' => $this->category->id,
             'lines' => [
                 [
-                    'item_id' => $line->item_id,
-                    'direction' => $line->direction,
-                    'quantity' => $quantity,
-                    'unit_of_measure_id' => $line->unit_of_measure_id,
-                    'unit_cost' => $unitCost,
-                    'amount' => $amount,
-                    'prefill_quantity' => $line->prefill_quantity,
-                    'prefill_unit_cost' => $line->prefill_unit_cost,
+                    'item_id' => $this->item->id,
+                    'direction' => 'out',
+                    'quantity' => 3,
+                    'unit_of_measure_id' => $this->unit->id,
+                    'unit_cost' => 0,
+                    'amount' => 0,
+                    'prefill_quantity' => 3,
+                    'prefill_unit_cost' => 0,
                 ],
             ],
         ]);
@@ -837,9 +799,9 @@ it('encodes prefilled transfer slip without requiring prior accounting balance',
     $response->assertSuccessful();
     $response->assertJsonPath('success', true);
 
-    expect($transaction->fresh()->status)->toBe(AccountingInventoryTransaction::STATUS_ENCODED);
-    expect(AccountingInventoryLedger::query()
+    expect(AccountingInventoryDocTran::query()
+        ->where('doc_code', 'TS')
+        ->where('doc_no', 'TS-ENC-001')
         ->where('category_id', $this->category->id)
-        ->where('item_id', $line->item_id)
         ->exists())->toBeTrue();
 });

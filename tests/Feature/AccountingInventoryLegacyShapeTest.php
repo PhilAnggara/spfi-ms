@@ -49,40 +49,38 @@ beforeEach(function () {
 });
 
 it('posts signed qty into doc_tran and monthly when encoding', function () {
-    $transaction = AccountingInventoryTransaction::query()->create([
+    $document = AccountingInventoryTransaction::make([
         'category_id' => $this->category->id,
         'doc_type' => 'CV',
         'doc_number' => 'CV-LEGACY-001',
         'doc_date' => '2024-03-15',
         'status' => AccountingInventoryTransaction::STATUS_DRAFT,
-        'gl_status' => 'not_required',
-        'created_by' => $this->user->id,
+        'category' => $this->category,
     ]);
 
-    $transaction->lines()->create([
-        'item_id' => $this->item->id,
-        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
-        'quantity' => 10,
-        'unit_of_measure_id' => $this->unit->id,
-        'unit_cost' => 100,
-        'amount' => 1000,
-        'sort_order' => 0,
-    ]);
-
-    $transaction->lines()->create([
-        'item_id' => $this->item->id,
-        'direction' => AccountingInventoryTransactionLine::DIRECTION_OUT,
-        'quantity' => 3,
-        'unit_of_measure_id' => $this->unit->id,
-        'unit_cost' => 100,
-        'amount' => 300,
-        'sort_order' => 1,
-    ]);
-
-    app(AccountingInventoryService::class)->encode($transaction->fresh(['lines.item.unit', 'category']), $this->user);
+    $document = app(AccountingInventoryService::class)->encodeDocument($document, [
+        [
+            'item_id' => $this->item->id,
+            'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+            'quantity' => 10,
+            'unit_of_measure_id' => $this->unit->id,
+            'unit_cost' => 100,
+            'amount' => 1000,
+        ],
+        [
+            'item_id' => $this->item->id,
+            'direction' => AccountingInventoryTransactionLine::DIRECTION_OUT,
+            'quantity' => 3,
+            'unit_of_measure_id' => $this->unit->id,
+            'unit_cost' => 100,
+            'amount' => 300,
+        ],
+    ], $this->user);
 
     $rows = AccountingInventoryDocTran::query()
-        ->where('accounting_inventory_transaction_id', $transaction->id)
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-LEGACY-001')
+        ->where('category_id', $this->category->id)
         ->orderBy('id')
         ->get();
 
@@ -92,7 +90,10 @@ it('posts signed qty into doc_tran and monthly when encoding', function () {
     expect($rows[0]->doc_code)->toBe('CV');
     expect($rows[0]->doc_no)->toBe('CV-LEGACY-001');
     expect($rows[0]->item_code)->toBe('10006');
+    expect($rows[0]->item_id)->toBe($this->item->id);
     expect($rows[0]->category)->toBe('SPICES AND INGREDIENTS');
+    expect($rows[0]->category_id)->toBe($this->category->id);
+    expect($document->isEncoded())->toBeTrue();
 
     $monthly = AccountingInventoryMonthly::query()
         ->whereIn('accounting_inventory_doc_tran_id', $rows->pluck('id'))
@@ -127,33 +128,43 @@ it('registers legacy import and parity artisan commands', function () {
 });
 
 it('removes doc_tran and monthly rows when voiding an encoded transaction', function () {
-    $transaction = AccountingInventoryTransaction::query()->create([
+    $document = AccountingInventoryTransaction::make([
         'category_id' => $this->category->id,
         'doc_type' => 'JV',
         'doc_number' => 'JV-LEGACY-VOID',
         'doc_date' => '2024-04-01',
         'status' => AccountingInventoryTransaction::STATUS_DRAFT,
-        'gl_status' => 'not_required',
-        'created_by' => $this->user->id,
-    ]);
-
-    $transaction->lines()->create([
-        'item_id' => $this->item->id,
-        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
-        'quantity' => 5,
-        'unit_of_measure_id' => $this->unit->id,
-        'unit_cost' => 20,
-        'amount' => 100,
-        'sort_order' => 0,
+        'category' => $this->category,
     ]);
 
     $service = app(AccountingInventoryService::class);
-    $encoded = $service->encode($transaction->fresh(['lines.item.unit', 'category']), $this->user);
+    $encoded = $service->encodeDocument($document, [
+        [
+            'item_id' => $this->item->id,
+            'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+            'quantity' => 5,
+            'unit_of_measure_id' => $this->unit->id,
+            'unit_cost' => 20,
+            'amount' => 100,
+        ],
+    ], $this->user);
 
-    expect(AccountingInventoryDocTran::query()->where('accounting_inventory_transaction_id', $encoded->id)->count())->toBe(1);
+    expect(AccountingInventoryDocTran::query()
+        ->where('doc_code', 'JV')
+        ->where('doc_no', 'JV-LEGACY-VOID')
+        ->where('category_id', $this->category->id)
+        ->count())->toBe(1);
 
-    $service->voidTransaction($encoded->fresh(['lines']), $this->user, 'test void');
+    $service->voidDocument($encoded, $this->user, 'test void');
 
-    expect(AccountingInventoryDocTran::query()->where('accounting_inventory_transaction_id', $encoded->id)->count())->toBe(0);
-    expect(AccountingInventoryMonthly::query()->whereHas('docTran', fn ($q) => $q->where('accounting_inventory_transaction_id', $encoded->id))->count())->toBe(0);
+    expect(AccountingInventoryDocTran::query()
+        ->where('doc_code', 'JV')
+        ->where('doc_no', 'JV-LEGACY-VOID')
+        ->where('category_id', $this->category->id)
+        ->count())->toBe(0);
+    expect(AccountingInventoryMonthly::query()
+        ->where('doc_code', 'JV')
+        ->where('doc_no', 'JV-LEGACY-VOID')
+        ->where('category_id', $this->category->id)
+        ->count())->toBe(0);
 });

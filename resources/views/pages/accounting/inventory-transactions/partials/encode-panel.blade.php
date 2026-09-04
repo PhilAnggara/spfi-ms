@@ -10,7 +10,7 @@
 <div
     class="inv-encode-panel"
     data-inventory-encode-panel
-    data-transaction-id="{{ $transaction->id }}"
+    data-transaction-id="{{ $transaction->source_id ?? $transaction->doc_number }}"
     data-doc-type="{{ $transaction->doc_type }}"
     data-display-number="{{ $displayDocNumber }}"
     @if ($nextDocument) data-next-document='@json($nextDocument)' @endif
@@ -86,13 +86,14 @@
 
     <form
         method="POST"
-        action="{{ route('accounting.inventory-transactions.update', $transaction) }}"
+        action="{{ $encodeUrl }}"
         id="inventory-encode-form"
         class="inv-encode-form"
-        data-encode-url="{{ route('accounting.inventory-transactions.update', $transaction) }}"
+        data-encode-url="{{ $encodeUrl }}"
     >
         @csrf
         @method('PUT')
+        <input type="hidden" name="category_id" value="{{ $transaction->category_id }}">
 
         @if ($inModal && $canEncode)
             <input type="hidden" name="queue_doc_type" value="{{ $queueFilters['doc_type'] ?? 'all' }}" class="inv-queue-filter" data-filter="doc_type">

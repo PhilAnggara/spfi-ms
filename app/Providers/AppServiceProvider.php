@@ -2,12 +2,6 @@
 
 namespace App\Providers;
 
-use App\Models\Delivery;
-use App\Models\ReceivingReport;
-use App\Models\ReceivingReportItem;
-use App\Models\TransferSlip;
-use App\Models\TransferSlipItem;
-use App\Observers\AccountingInventoryDraftObserver;
 use App\Services\Accounting\GlJournalEncoder;
 use App\Services\Accounting\NullGlJournalEncoder;
 use App\Support\PdfFormatters;
@@ -31,12 +25,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Paginator::useBootstrapFive();
-
-        ReceivingReport::observe(AccountingInventoryDraftObserver::class);
-        ReceivingReportItem::observe(AccountingInventoryDraftObserver::class);
-        TransferSlip::observe(AccountingInventoryDraftObserver::class);
-        TransferSlipItem::observe(AccountingInventoryDraftObserver::class);
-        Delivery::observe(AccountingInventoryDraftObserver::class);
 
         View::composer(['pdf.layouts.analytical', 'pdf.reports.*'], function ($view) {
             $view->with([

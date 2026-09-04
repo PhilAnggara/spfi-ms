@@ -75,7 +75,7 @@ class AccountingInventoryTransactionController extends Controller
     public function store(StoreAccountingInventoryTransactionRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $transaction = $this->queueService->createManualDraft(
+        $document = $this->queueService->createAndEncodeManual(
             [
                 'category_id' => $validated['category_id'],
                 'doc_type' => $validated['doc_type'],
@@ -89,8 +89,12 @@ class AccountingInventoryTransactionController extends Controller
         );
 
         return redirect()
-            ->route('accounting.inventory-transactions.transaction', $transaction)
-            ->with('success', 'Manual transaction draft created. Review and encode when ready.');
+            ->route('accounting.inventory-transactions.manual', [
+                'docType' => strtolower($document->doc_type),
+                'docNumber' => $document->displayDocNumber(),
+                'category_id' => $document->category_id,
+            ])
+            ->with('success', 'Manual inventory document encoded successfully.');
     }
 
     public function show(Request $request, string $docType, int $id): View|RedirectResponse|Response|JsonResponse
@@ -100,11 +104,7 @@ class AccountingInventoryTransactionController extends Controller
 
         try {
             $source = $this->queueService->resolveSourceModel($docType, $id);
-            $transaction = $this->queueService->findOrCreateDraftForSource(
-                $source,
-                $categoryId,
-                $request->user()?->id,
-            );
+            $document = $this->queueService->buildDocumentForSource($source, $categoryId);
         } catch (\InvalidArgumentException $exception) {
             if ($request->ajax() || $request->boolean('modal')) {
                 return response()->json(['message' => $exception->getMessage()], 400);
@@ -115,19 +115,44 @@ class AccountingInventoryTransactionController extends Controller
                 ->with('error', $exception->getMessage());
         }
 
-        return $this->renderEncodeScreen($request, $transaction);
+        return $this->renderEncodeScreen($request, $document);
     }
 
-    public function showTransaction(Request $request, AccountingInventoryTransaction $transaction): View|Response
+    public function showManual(Request $request, string $docType, string $docNumber): View|RedirectResponse|Response
     {
-        $transaction->load(['lines.item.unit', 'category', 'encodedBy', 'voidedBy']);
+        $categoryId = (int) $request->query('category_id');
+        abort_if($categoryId <= 0, 404);
 
-        return $this->renderEncodeScreen($request, $transaction);
+        try {
+            $document = $this->queueService->buildManualDocument($docType, $docNumber, $categoryId);
+        } catch (\InvalidArgumentException $exception) {
+            return redirect()
+                ->route('accounting.inventory-transactions.index')
+                ->with('error', $exception->getMessage());
+        }
+
+        return $this->renderEncodeScreen($request, $document);
     }
 
-    public function update(EncodeAccountingInventoryTransactionRequest $request, AccountingInventoryTransaction $transaction): RedirectResponse|JsonResponse
+    public function update(EncodeAccountingInventoryTransactionRequest $request, string $docType, int $id): RedirectResponse|JsonResponse
     {
-        if ($transaction->isEncoded()) {
+        $categoryId = (int) ($request->input('category_id') ?: $request->query('category_id'));
+        abort_if($categoryId <= 0, 404);
+
+        try {
+            $source = $this->queueService->resolveSourceModel($docType, $id);
+            $document = $this->queueService->buildDocumentForSource($source, $categoryId);
+        } catch (\InvalidArgumentException $exception) {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['message' => $exception->getMessage()], 400);
+            }
+
+            return redirect()
+                ->route('accounting.inventory-transactions.index')
+                ->with('error', $exception->getMessage());
+        }
+
+        if ($document->isEncoded()) {
             if ($request->ajax() || $request->expectsJson()) {
                 return response()->json(['message' => 'This document is already encoded and cannot be edited.'], 409);
             }
@@ -138,13 +163,11 @@ class AccountingInventoryTransactionController extends Controller
         }
 
         try {
-            $transaction = $this->inventoryService->syncLines(
-                $transaction,
+            $document = $this->inventoryService->encodeDocument(
+                $document,
                 $request->validated('lines'),
-                $request->user()?->id,
+                $request->user(),
             );
-
-            $this->inventoryService->encode($transaction, $request->user());
         } catch (ValidationException $exception) {
             if ($request->ajax() || $request->expectsJson()) {
                 throw $exception;
@@ -158,14 +181,14 @@ class AccountingInventoryTransactionController extends Controller
 
         if ($request->ajax() || $request->expectsJson()) {
             $queueFilters = $this->resolveQueueFiltersFromRequest($request);
-            $queueState = $this->queueService->resolveEncodeQueueState($transaction->fresh(), $queueFilters);
+            $queueState = $this->queueService->resolveEncodeQueueState($document, $queueFilters);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Accounting inventory transaction encoded successfully.',
                 'encoded' => [
-                    'doc_type' => $transaction->doc_type,
-                    'doc_number' => $this->queueService->displayDocNumber($transaction),
+                    'doc_type' => $document->doc_type,
+                    'doc_number' => $document->displayDocNumber(),
                 ],
                 'next' => $queueState['next'],
                 'queue_stats' => $queueState['queue_stats'],
@@ -178,10 +201,34 @@ class AccountingInventoryTransactionController extends Controller
             ->with('success', 'Accounting inventory transaction encoded successfully.');
     }
 
-    public function void(VoidAccountingInventoryTransactionRequest $request, AccountingInventoryTransaction $transaction): RedirectResponse
+    public function void(VoidAccountingInventoryTransactionRequest $request, string $docType, int $id): RedirectResponse
     {
-        $this->inventoryService->voidTransaction(
-            $transaction,
+        $categoryId = (int) ($request->input('category_id') ?: $request->query('category_id'));
+        abort_if($categoryId <= 0, 404);
+
+        $source = $this->queueService->resolveSourceModel($docType, $id);
+        $document = $this->queueService->buildDocumentForSource($source, $categoryId);
+
+        $this->inventoryService->voidDocument(
+            $document,
+            $request->user(),
+            $request->validated('void_reason'),
+        );
+
+        return redirect()
+            ->route('accounting.inventory-transactions.index')
+            ->with('success', 'Transaction voided successfully.');
+    }
+
+    public function voidManual(VoidAccountingInventoryTransactionRequest $request, string $docType, string $docNumber): RedirectResponse
+    {
+        $categoryId = (int) ($request->input('category_id') ?: $request->query('category_id'));
+        abort_if($categoryId <= 0, 404);
+
+        $document = $this->queueService->buildManualDocument($docType, $docNumber, $categoryId);
+
+        $this->inventoryService->voidDocument(
+            $document,
             $request->user(),
             $request->validated('void_reason'),
         );
@@ -196,25 +243,37 @@ class AccountingInventoryTransactionController extends Controller
         abort_unless($request->user()?->can('encode-accounting-inventory'), 403);
 
         $validated = $request->validate([
-            'transaction_ids' => ['required', 'array', 'min:1'],
-            'transaction_ids.*' => ['integer', 'exists:accounting_inventory_transactions,id'],
+            'documents' => ['required', 'array', 'min:1'],
+            'documents.*.doc_type' => ['required', 'string', 'in:RR,TS,DR'],
+            'documents.*.source_id' => ['required', 'integer'],
+            'documents.*.category_id' => ['required', 'integer'],
         ]);
 
         $encoded = 0;
-        foreach ($validated['transaction_ids'] as $transactionId) {
-            $transaction = AccountingInventoryTransaction::query()
-                ->with('lines')
-                ->find($transactionId);
-
-            if ($transaction === null || $transaction->isEncoded() || $transaction->lines->isEmpty()) {
+        foreach ($validated['documents'] as $row) {
+            try {
+                $source = $this->queueService->resolveSourceModel($row['doc_type'], (int) $row['source_id']);
+                $document = $this->queueService->buildDocumentForSource($source, (int) $row['category_id']);
+            } catch (\InvalidArgumentException) {
                 continue;
             }
 
-            if ($transaction->is_corrected) {
+            if ($document->isEncoded() || $document->lines->isEmpty() || $document->is_corrected) {
                 continue;
             }
 
-            $this->inventoryService->encode($transaction, $request->user());
+            $lines = $document->lines->map(fn ($line): array => [
+                'item_id' => $line->item_id,
+                'direction' => $line->direction,
+                'quantity' => $line->quantity,
+                'unit_of_measure_id' => $line->unit_of_measure_id,
+                'unit_cost' => $line->unit_cost,
+                'amount' => $line->amount,
+                'prefill_quantity' => $line->prefill_quantity,
+                'prefill_unit_cost' => $line->prefill_unit_cost,
+            ])->all();
+
+            $this->inventoryService->encodeDocument($document, $lines, $request->user());
             $encoded++;
         }
 
@@ -245,7 +304,6 @@ class AccountingInventoryTransactionController extends Controller
                 : 'all',
             'category_id' => (int) $request->query('category_id', 0),
             'keyword' => trim($request->string('keyword')->toString()),
-            // Default last 90 days on first visit; explicit empty clears the bound.
             'date_from' => $request->query->has('date_from')
                 ? $request->string('date_from')->toString()
                 : $defaultDateFrom,
@@ -274,7 +332,6 @@ class AccountingInventoryTransactionController extends Controller
 
     private function renderEncodeScreen(Request $request, AccountingInventoryTransaction $transaction): View|Response
     {
-        $transaction->loadMissing(['lines.item.unit', 'category', 'encodedBy', 'voidedBy']);
         $displayDocNumber = $this->queueService->displayDocNumber($transaction);
         $queueFilters = $this->resolveQueueFiltersFromRequest($request);
         $queueState = $this->queueService->resolveEncodeQueueState($transaction, $queueFilters);
@@ -289,6 +346,8 @@ class AccountingInventoryTransactionController extends Controller
             'queueFilters' => $queueFilters,
             'sourceUrl' => $this->resolveSourceDocumentUrl($transaction),
             'nextDocument' => $transaction->isDraft() ? $queueState['next'] : null,
+            'encodeUrl' => $this->resolveEncodeUrl($transaction),
+            'voidUrl' => $this->resolveVoidUrl($transaction),
         ];
 
         if ($payload['inModal']) {
@@ -296,6 +355,44 @@ class AccountingInventoryTransactionController extends Controller
         }
 
         return view('pages.accounting.inventory-transactions.show', $payload);
+    }
+
+    private function resolveEncodeUrl(AccountingInventoryTransaction $transaction): string
+    {
+        if ($transaction->isManual()) {
+            return route('accounting.inventory-transactions.manual', [
+                'docType' => strtolower($transaction->doc_type),
+                'docNumber' => $transaction->displayDocNumber(),
+                'category_id' => $transaction->category_id,
+            ]);
+        }
+
+        return route('accounting.inventory-transactions.update', [
+            'docType' => strtolower($transaction->doc_type),
+            'id' => $transaction->source_id,
+            'category_id' => $transaction->category_id,
+        ]);
+    }
+
+    private function resolveVoidUrl(AccountingInventoryTransaction $transaction): ?string
+    {
+        if ($transaction->isManual()) {
+            return route('accounting.inventory-transactions.void-manual', [
+                'docType' => strtolower($transaction->doc_type),
+                'docNumber' => $transaction->displayDocNumber(),
+                'category_id' => $transaction->category_id,
+            ]);
+        }
+
+        if ($transaction->source_id === null) {
+            return null;
+        }
+
+        return route('accounting.inventory-transactions.void', [
+            'docType' => strtolower($transaction->doc_type),
+            'id' => $transaction->source_id,
+            'category_id' => $transaction->category_id,
+        ]);
     }
 
     private function resolveSourceDocumentUrl(AccountingInventoryTransaction $transaction): ?string

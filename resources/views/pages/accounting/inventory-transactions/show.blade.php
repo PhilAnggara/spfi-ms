@@ -52,14 +52,17 @@
             'queueStats' => $queueStats ?? null,
             'queueFilters' => $queueFilters ?? [],
             'sourceUrl' => $sourceUrl ?? null,
+            'encodeUrl' => $encodeUrl ?? '#',
+            'nextDocument' => $nextDocument ?? null,
         ])
 
-        @if ($canVoid)
+        @if ($canVoid && ($voidUrl ?? null))
             <div class="card shadow-sm border-0 mt-4">
                 <div class="card-body">
                     <h5 class="card-title">Void Transaction</h5>
-                    <form method="POST" action="{{ route('accounting.inventory-transactions.void', $transaction) }}" class="row g-3">
+                    <form method="POST" action="{{ $voidUrl }}" class="row g-3">
                         @csrf
+                        <input type="hidden" name="category_id" value="{{ $transaction->category_id }}">
                         <div class="col-12">
                             <label class="form-label">Reason</label>
                             <textarea name="void_reason" class="form-control" rows="3" required></textarea>

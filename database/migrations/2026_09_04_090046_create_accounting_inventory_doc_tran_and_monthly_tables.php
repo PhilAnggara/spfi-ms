@@ -28,14 +28,6 @@ return new class extends Migration
             $table->decimal('amount', 21, 4)->default(0);
             $table->foreignId('item_id')->nullable()->constrained('items')->onDelete(fk_on_delete('set null'));
             $table->foreignId('category_id')->nullable()->constrained('item_categories')->onDelete(fk_on_delete('set null'));
-            $table->foreignId('accounting_inventory_transaction_id')
-                ->nullable()
-                ->constrained('accounting_inventory_transactions', indexName: 'acct_inv_doc_tran_txn_fk')
-                ->onDelete(fk_on_delete('set null'));
-            $table->foreignId('accounting_inventory_transaction_line_id')
-                ->nullable()
-                ->constrained('accounting_inventory_transaction_lines', indexName: 'acct_inv_doc_tran_line_fk')
-                ->onDelete(fk_on_delete('set null'));
             $table->timestamps();
 
             $table->index(['tran_date', 'category'], 'acct_inv_doc_tran_date_cat_idx');

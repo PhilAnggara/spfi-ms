@@ -465,8 +465,9 @@ Route::middleware('auth')->group(function () {
             Route::get('inventory-transactions', [AccountingInventoryTransactionController::class, 'index'])->name('inventory-transactions.index');
             Route::get('inventory-transactions/items/search', [AccountingInventoryTransactionController::class, 'searchItems'])
                 ->name('inventory-transactions.items.search');
-            Route::get('inventory-transactions/transaction/{transaction}', [AccountingInventoryTransactionController::class, 'showTransaction'])
-                ->name('inventory-transactions.transaction');
+            Route::get('inventory-transactions/manual/{docType}/{docNumber}', [AccountingInventoryTransactionController::class, 'showManual'])
+                ->where(['docType' => 'cv|jv'])
+                ->name('inventory-transactions.manual');
             Route::get('inventory-transactions/{docType}/{id}', [AccountingInventoryTransactionController::class, 'show'])
                 ->where(['docType' => 'rr|ts|dr', 'id' => '[0-9]+'])
                 ->name('inventory-transactions.show');
@@ -486,7 +487,8 @@ Route::middleware('auth')->group(function () {
         ->prefix('accounting')
         ->name('accounting.')
         ->group(function () {
-            Route::put('inventory-transactions/{transaction}', [AccountingInventoryTransactionController::class, 'update'])
+            Route::put('inventory-transactions/{docType}/{id}', [AccountingInventoryTransactionController::class, 'update'])
+                ->where(['docType' => 'rr|ts|dr', 'id' => '[0-9]+'])
                 ->name('inventory-transactions.update');
             Route::post('inventory-transactions/bulk-encode', [AccountingInventoryTransactionController::class, 'bulkEncode'])
                 ->name('inventory-transactions.bulk-encode');
@@ -496,7 +498,11 @@ Route::middleware('auth')->group(function () {
         ->prefix('accounting')
         ->name('accounting.')
         ->group(function () {
-            Route::post('inventory-transactions/{transaction}/void', [AccountingInventoryTransactionController::class, 'void'])
+            Route::post('inventory-transactions/manual/{docType}/{docNumber}/void', [AccountingInventoryTransactionController::class, 'voidManual'])
+                ->where(['docType' => 'cv|jv'])
+                ->name('inventory-transactions.void-manual');
+            Route::post('inventory-transactions/{docType}/{id}/void', [AccountingInventoryTransactionController::class, 'void'])
+                ->where(['docType' => 'rr|ts|dr', 'id' => '[0-9]+'])
                 ->name('inventory-transactions.void');
         });
 

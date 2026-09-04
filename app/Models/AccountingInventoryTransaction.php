@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
-class AccountingInventoryTransaction extends Model
+/**
+ * In-memory encode document for Accounting Inventory UI (not a DB table).
+ */
+class AccountingInventoryTransaction
 {
     public const STATUS_DRAFT = 'draft';
 
@@ -25,85 +26,98 @@ class AccountingInventoryTransaction extends Model
      */
     public const MANUAL_DOC_TYPES = ['CV', 'JV'];
 
-    protected $fillable = [
-        'category_id',
-        'doc_type',
-        'doc_number',
-        'doc_date',
-        'po_number',
-        'party_code',
-        'party_name',
-        'remarks',
-        'status',
-        'is_corrected',
-        'total_amount',
-        'source_type',
-        'source_id',
-        'gl_status',
-        'accounting_doc_transaction_id',
-        'encoded_by',
-        'encoded_at',
-        'voided_by',
-        'voided_at',
-        'void_reason',
-        'created_by',
-        'updated_by',
-    ];
+    public ?int $id = null;
 
-    protected function casts(): array
+    public int $category_id = 0;
+
+    public string $doc_type = '';
+
+    public string $doc_number = '';
+
+    public ?Carbon $doc_date = null;
+
+    public ?string $po_number = null;
+
+    public ?string $party_code = null;
+
+    public ?string $party_name = null;
+
+    public ?string $remarks = null;
+
+    public string $status = self::STATUS_DRAFT;
+
+    public bool $is_corrected = false;
+
+    public float $total_amount = 0.0;
+
+    public ?string $source_type = null;
+
+    public ?int $source_id = null;
+
+    public ?int $supplier_id = null;
+
+    public ?int $purchase_order_id = null;
+
+    public ?int $encoded_by = null;
+
+    public ?Carbon $encoded_at = null;
+
+    public ?ItemCategory $category = null;
+
+    public ?User $encodedBy = null;
+
+    public ?User $voidedBy = null;
+
+    /** @var Collection<int, AccountingInventoryTransactionLine> */
+    public Collection $lines;
+
+    public function __construct()
     {
-        return [
-            'id' => 'integer',
-            'category_id' => 'integer',
-            'is_corrected' => 'boolean',
-            'total_amount' => 'decimal:4',
-            'source_id' => 'integer',
-            'accounting_doc_transaction_id' => 'integer',
-            'encoded_by' => 'integer',
-            'voided_by' => 'integer',
-            'created_by' => 'integer',
-            'updated_by' => 'integer',
-            'doc_date' => 'date',
-            'encoded_at' => 'datetime',
-            'voided_at' => 'datetime',
-        ];
+        $this->lines = collect();
     }
 
-    public function category(): BelongsTo
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function make(array $attributes = []): self
     {
-        return $this->belongsTo(ItemCategory::class, 'category_id');
-    }
+        $document = new self;
 
-    public function lines(): HasMany
-    {
-        return $this->hasMany(AccountingInventoryTransactionLine::class, 'accounting_inventory_transaction_id')
-            ->orderBy('sort_order')
-            ->orderBy('id');
-    }
+        foreach ($attributes as $key => $value) {
+            if ($key === 'lines' || $key === 'category' || $key === 'encodedBy' || $key === 'voidedBy') {
+                continue;
+            }
 
-    public function ledgerEntries(): HasMany
-    {
-        return $this->hasMany(AccountingInventoryLedger::class, 'accounting_inventory_transaction_id');
-    }
+            if ($key === 'doc_date' && $value !== null && ! $value instanceof Carbon) {
+                $document->doc_date = Carbon::parse((string) $value);
 
-    public function source(): MorphTo
-    {
-        return $this->morphTo();
-    }
+                continue;
+            }
 
-    public function encodedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'encoded_by');
-    }
+            if ($key === 'encoded_at' && $value !== null && ! $value instanceof Carbon) {
+                $document->encoded_at = Carbon::parse((string) $value);
 
-    public function voidedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'voided_by');
-    }
+                continue;
+            }
 
-    public function createdBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
+            if (property_exists($document, $key)) {
+                $document->{$key} = $value;
+            }
+        }
+
+        if (isset($attributes['category']) && $attributes['category'] instanceof ItemCategory) {
+            $document->category = $attributes['category'];
+        }
+
+        if (isset($attributes['encodedBy']) && $attributes['encodedBy'] instanceof User) {
+            $document->encodedBy = $attributes['encodedBy'];
+        }
+
+        if (isset($attributes['lines'])) {
+            $document->lines = collect($attributes['lines']);
+        }
+
+        return $document;
     }
 
     public function isEncoded(): bool
@@ -124,5 +138,38 @@ class AccountingInventoryTransaction extends Model
     public function isManual(): bool
     {
         return in_array(strtoupper($this->doc_type), self::MANUAL_DOC_TYPES, true);
+    }
+
+    public function displayDocNumber(): string
+    {
+        $parts = explode('|', $this->doc_number, 3);
+        if (count($parts) === 3 && in_array($parts[0], ['RR', 'TS', 'DR'], true)) {
+            return $parts[1];
+        }
+
+        return $this->doc_number;
+    }
+
+    /**
+     * Compatibility no-op for callers that previously eager-loaded relations.
+     *
+     * @param  list<string>|string  $relations
+     */
+    public function load(array|string $relations): self
+    {
+        return $this;
+    }
+
+    /**
+     * @param  list<string>|string  $relations
+     */
+    public function loadMissing(array|string $relations): self
+    {
+        return $this;
+    }
+
+    public function fresh(array|string $relations = []): self
+    {
+        return $this;
     }
 }

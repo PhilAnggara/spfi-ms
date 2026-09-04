@@ -7,7 +7,7 @@
                     <i class="fa-regular fa-check-double"></i>
                     Bulk Encode Selected
                 </button>
-                <span class="text-muted small">Only uncorrected draft transactions can be bulk encoded.</span>
+                <span class="text-muted small">Only uncorrected source documents can be bulk encoded.</span>
             </div>
         </form>
     @endif
@@ -46,12 +46,13 @@
                 @foreach ($documents as $document)
                     @php
                         $displayNumber = $document->doc_number;
-                        if (preg_match('/^(RR|TS|DR)\|(.+)\|\d+$/', $document->doc_number, $matches)) {
-                            $displayNumber = $matches[2];
-                        }
 
-                        $openUrl = $document->is_manual || $document->transaction_id
-                            ? route('accounting.inventory-transactions.transaction', $document->transaction_id)
+                        $openUrl = $document->is_manual
+                            ? route('accounting.inventory-transactions.manual', [
+                                'docType' => strtolower($document->doc_type),
+                                'docNumber' => $displayNumber,
+                                'category_id' => $document->category_id,
+                            ])
                             : route('accounting.inventory-transactions.show', [
                                 'docType' => strtolower($document->doc_type),
                                 'id' => $document->source_id,
@@ -59,7 +60,8 @@
                             ]);
                         $actionLabel = $document->is_encoded ? 'View' : 'Process';
                         $canBulkSelect = ! $document->is_encoded
-                            && $document->transaction_id
+                            && ! $document->is_manual
+                            && $document->source_id
                             && ! $document->is_corrected
                             && ($filters['status'] ?? 'pending') === 'pending';
                     @endphp
@@ -71,9 +73,10 @@
                                         <input
                                             type="checkbox"
                                             class="form-check-input bulk-encode-checkbox"
-                                            name="transaction_ids[]"
-                                            value="{{ $document->transaction_id }}"
                                             form="bulk-encode-form"
+                                            data-bulk-doc-type="{{ $document->doc_type }}"
+                                            data-bulk-source-id="{{ $document->source_id }}"
+                                            data-bulk-category-id="{{ $document->category_id }}"
                                             aria-label="Select {{ $displayNumber }}"
                                         >
                                     @endif
@@ -118,7 +121,8 @@
                                 data-inventory-encode-open
                                 data-title="{{ $actionLabel }} {{ $document->doc_type }} {{ $displayNumber }}"
                                 data-doc-type="{{ $document->doc_type }}"
-                                data-transaction-id="{{ $document->transaction_id }}"
+                                data-source-id="{{ $document->source_id }}"
+                                data-category-id="{{ $document->category_id }}"
                             >
                                 <i class="fa-light {{ $document->is_encoded ? 'fa-eye' : 'fa-pen-to-square' }} me-1"></i>
                                 {{ $actionLabel }}

@@ -15,12 +15,11 @@ class AccountingInventoryLegacyPostingService
 {
     public function postEncodedTransaction(AccountingInventoryTransaction $transaction, User $user): void
     {
-        $transaction->loadMissing(['lines.item.unit', 'category']);
-
         $categoryName = (string) ($transaction->category?->name ?? '');
-        $docNo = $this->displayDocNumber($transaction);
+        $docNo = $transaction->displayDocNumber();
         $tranDate = $transaction->doc_date?->toDateString() ?? now()->toDateString();
         $inputTime = now()->format('H:i:s');
+        $encodedAt = now();
 
         foreach ($transaction->lines as $line) {
             $this->postLine(
@@ -30,14 +29,18 @@ class AccountingInventoryLegacyPostingService
                 docNo: $docNo,
                 tranDate: $tranDate,
                 inputTime: $inputTime,
+                user: $user,
+                encodedAt: $encodedAt,
             );
         }
     }
 
-    public function reverseEncodedTransaction(AccountingInventoryTransaction $transaction): void
+    public function reverseEncodedDocument(string $docCode, string $docNo, int $categoryId): void
     {
         $docTranIds = AccountingInventoryDocTran::query()
-            ->where('accounting_inventory_transaction_id', $transaction->id)
+            ->where('doc_code', strtoupper($docCode))
+            ->where('doc_no', $docNo)
+            ->where('category_id', $categoryId)
             ->pluck('id');
 
         if ($docTranIds->isEmpty()) {
@@ -60,6 +63,8 @@ class AccountingInventoryLegacyPostingService
         string $docNo,
         string $tranDate,
         string $inputTime,
+        User $user,
+        Carbon $encodedAt,
     ): void {
         $item = $line->item;
         $itemCode = (string) ($item?->code ?? '');
@@ -99,8 +104,16 @@ class AccountingInventoryLegacyPostingService
             'amount' => $amount,
             'item_id' => $line->item_id,
             'category_id' => $transaction->category_id,
-            'accounting_inventory_transaction_id' => $transaction->id,
-            'accounting_inventory_transaction_line_id' => $line->id,
+            'source_type' => $transaction->source_type,
+            'source_id' => $transaction->source_id,
+            'supplier_id' => $transaction->supplier_id,
+            'purchase_order_id' => $transaction->purchase_order_id,
+            'party_code' => $transaction->party_code,
+            'party_name' => $transaction->party_name,
+            'remarks' => $transaction->remarks,
+            'is_corrected' => $line->wasCorrected() || $transaction->is_corrected,
+            'encoded_by' => $user->id,
+            'encoded_at' => $encodedAt,
         ]);
 
         $monthEnd = Carbon::parse($tranDate)->endOfMonth()->toDateString();
@@ -119,6 +132,10 @@ class AccountingInventoryLegacyPostingService
             'begining_u_cost' => $beginingUCost > 0 ? round($beginingUCost, 8) : null,
             'item_id' => $line->item_id,
             'category_id' => $transaction->category_id,
+            'source_type' => $transaction->source_type,
+            'source_id' => $transaction->source_id,
+            'supplier_id' => $transaction->supplier_id,
+            'purchase_order_id' => $transaction->purchase_order_id,
             'accounting_inventory_doc_tran_id' => $docTran->id,
         ]);
     }
@@ -126,7 +143,7 @@ class AccountingInventoryLegacyPostingService
     /**
      * @return array{ending: float, u_cost: float}
      */
-    private function latestBalanceSnapshot(string $itemCode, string $categoryName, string $beforeOrOnDate): array
+    public function latestBalanceSnapshot(string $itemCode, string $categoryName, string $beforeOrOnDate): array
     {
         $row = AccountingInventoryMonthly::query()
             ->where('item_code', $itemCode)
@@ -158,6 +175,42 @@ class AccountingInventoryLegacyPostingService
         return [
             'ending' => (float) $row->ending,
             'u_cost' => (float) ($row->u_cost ?? 0),
+        ];
+    }
+
+    /**
+     * @return array{ending: float, u_cost: float}
+     */
+    public function latestBalanceSnapshotByIds(int $categoryId, int $itemId): array
+    {
+        $row = AccountingInventoryMonthly::query()
+            ->where('category_id', $categoryId)
+            ->where('item_id', $itemId)
+            ->orderByDesc('tran_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($row !== null) {
+            return [
+                'ending' => (float) $row->ending,
+                'u_cost' => (float) ($row->u_cost ?? 0),
+            ];
+        }
+
+        $docTran = AccountingInventoryDocTran::query()
+            ->where('category_id', $categoryId)
+            ->where('item_id', $itemId)
+            ->orderByDesc('tran_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($docTran === null) {
+            return ['ending' => 0.0, 'u_cost' => 0.0];
+        }
+
+        return [
+            'ending' => (float) ($docTran->t_qty ?? 0),
+            'u_cost' => (float) ($docTran->ave_cost ?? $docTran->u_cost ?? 0),
         ];
     }
 
@@ -207,15 +260,5 @@ class AccountingInventoryLegacyPostingService
             'item_id' => $itemCache[$itemKey] !== null ? (int) $itemCache[$itemKey] : null,
             'category_id' => $categoryCache[$categoryKey] !== null ? (int) $categoryCache[$categoryKey] : null,
         ];
-    }
-
-    private function displayDocNumber(AccountingInventoryTransaction $transaction): string
-    {
-        $parts = explode('|', (string) $transaction->doc_number, 3);
-        if (count($parts) === 3) {
-            return $parts[1];
-        }
-
-        return (string) $transaction->doc_number;
     }
 }

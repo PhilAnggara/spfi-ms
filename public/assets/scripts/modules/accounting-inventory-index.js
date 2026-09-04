@@ -181,6 +181,27 @@
             });
         });
 
+        form.addEventListener('submit', () => {
+            form.querySelectorAll('[data-bulk-payload]').forEach((node) => node.remove());
+
+            Array.from(root.querySelectorAll('.bulk-encode-checkbox:checked')).forEach((checkbox, index) => {
+                const fields = {
+                    doc_type: checkbox.dataset.bulkDocType,
+                    source_id: checkbox.dataset.bulkSourceId,
+                    category_id: checkbox.dataset.bulkCategoryId,
+                };
+
+                Object.entries(fields).forEach(([key, value]) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = `documents[${index}][${key}]`;
+                    input.value = value ?? '';
+                    input.setAttribute('data-bulk-payload', '1');
+                    form.appendChild(input);
+                });
+            });
+        });
+
         updateSubmit();
     }
 
