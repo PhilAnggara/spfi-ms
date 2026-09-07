@@ -23,8 +23,17 @@ class PrsHoldService
             throw ValidationException::withMessages(['message' => 'PRS with created PO cannot be held.']);
         }
 
-        if ($prs->status === 'CANVASSER_HOLD') {
-            throw ValidationException::withMessages(['message' => 'PRS is awaiting quantity revision from the requester.']);
+        $hasLockedItems = $prs->items()
+            ->where(function ($query) {
+                $query->whereNotNull('purchase_order_id')
+                    ->orWhere('is_direct_purchase', true);
+            })
+            ->exists();
+
+        if ($hasLockedItems) {
+            throw ValidationException::withMessages([
+                'message' => 'PRS cannot be held because one or more items already have a PO or are marked as direct purchase.',
+            ]);
         }
 
         $previousStatus = $prs->status;
@@ -41,9 +50,20 @@ class PrsHoldService
             ],
         ]);
 
+        $assignedCanvassers = collect();
+        if (in_array($previousStatus, ['CANVASSING', 'CANVASSER_HOLD'], true)) {
+            $assignedCanvassers = $prs->items()
+                ->whereNotNull('canvasser_id')
+                ->with('canvasser')
+                ->get()
+                ->pluck('canvasser')
+                ->filter();
+        }
+
         $recipients = $this->notificationRecipientService->uniqueUsers(
             collect([$prs->user])->filter(),
-            $this->notificationRecipientService->purchasingManagers()
+            $this->notificationRecipientService->purchasingManagers(),
+            $assignedCanvassers
         );
 
         $this->notificationRecipientService->notify($recipients, [

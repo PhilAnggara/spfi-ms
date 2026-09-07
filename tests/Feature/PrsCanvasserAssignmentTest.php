@@ -197,7 +197,7 @@ it('assigns the same canvasser to all items in one approve request', function ()
     expect($items[1]->fresh()->canvasser_id)->toBe($this->canvasser->id);
 });
 
-it('shows process for requested and edit canvasser for canvassing prs', function () {
+it('shows process for requested and edit canvasser plus hold for canvassing prs', function () {
     $requestedPrs = createRequestedPrsWithItems(1);
     $canvassingPrs = assignPrsToCanvassing(createRequestedPrsWithItems(1), $this->canvasser);
 
@@ -207,6 +207,7 @@ it('shows process for requested and edit canvasser for canvassing prs', function
     $response->assertSuccessful()
         ->assertSee('data-bs-target="#approve-modal-'.$requestedPrs->id.'"', false)
         ->assertSee('data-bs-target="#reassign-modal-'.$canvassingPrs->id.'"', false)
+        ->assertSee('data-bs-target="#hold-modal-'.$canvassingPrs->id.'"', false)
         ->assertSee('Edit Canvasser')
         ->assertDontSee('data-bs-target="#approve-modal-'.$canvassingPrs->id.'"', false);
 });

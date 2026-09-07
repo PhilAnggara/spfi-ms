@@ -126,9 +126,17 @@
                                                     </button>
                                                 </div>
                                             @elseif (in_array($item->status, ['CANVASSING', 'CANVASSER_HOLD'], true))
+                                                @php
+                                                    $cannotHoldAfterCanvassing = $item->items->contains(
+                                                        fn ($prsItem) => $prsItem->purchase_order_id !== null || (bool) $prsItem->is_direct_purchase
+                                                    );
+                                                @endphp
                                                 <div class="btn-group btn-group-sm">
                                                     <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#reassign-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Edit Canvasser">
                                                         <i class="fa-duotone fa-solid fa-user-pen text-primary"></i>
+                                                    </button>
+                                                    <button type="button" class="btn icon" data-bs-toggle="modal" data-bs-target="#hold-modal-{{ $item->id }}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Hold" @disabled($cannotHoldAfterCanvassing)>
+                                                        <i class="fa-duotone fa-solid fa-circle-pause text-warning"></i>
                                                     </button>
                                                 </div>
                                             @else
@@ -384,6 +392,11 @@
                 <form action="{{ route('prs.hold', $item->id) }}" method="post" class="form">
                     @csrf
                     <div class="modal-body">
+                        @if (in_array($item->status, ['CANVASSING', 'CANVASSER_HOLD'], true))
+                            <div class="alert alert-warning py-2 mb-3">
+                                Holding from canvassing requires a full resubmit. After the requester edits this PRS, canvasser assignments and quotes are cleared and you must Process / assign canvassers again.
+                            </div>
+                        @endif
                         <div class="form-floating">
                             <textarea class="form-control" placeholder="Reason" id="hold-message-{{ $item->id }}" name="message" required></textarea>
                             <label for="hold-message-{{ $item->id }}">Reason for hold</label>
