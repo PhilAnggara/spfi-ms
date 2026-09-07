@@ -1,6 +1,6 @@
 <style>
     @page {
-        size: A4 landscape;
+        size: A4 {{ ! empty($landscape) ? 'landscape' : 'portrait' }};
         margin: 26mm 10mm 8mm 10mm;
     }
     body {

@@ -281,6 +281,45 @@ it('enriches import stock card rows when local item code matches', function () {
     expect($rows->first()['unit'])->toBe($this->unit->name);
 });
 
+it('exports document summary with grand total as RR minus TS', function () {
+    AccountingInventoryDocTran::query()->create([
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-SUM-001',
+        'doc_date' => now()->toDateString(),
+        'item_code' => $this->item->code,
+        'qty' => 10,
+        'u_cost' => 5,
+        'amount' => 100,
+        'tran_date' => now()->toDateString(),
+        'category' => $this->category->name,
+    ]);
+
+    AccountingInventoryDocTran::query()->create([
+        'doc_code' => 'TS',
+        'doc_no' => 'TS-SUM-001',
+        'doc_date' => now()->toDateString(),
+        'item_code' => $this->item->code,
+        'qty' => -3,
+        'u_cost' => 5,
+        'amount' => -30,
+        'tran_date' => now()->toDateString(),
+        'category' => $this->category->name,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->post(route('accounting.reports.document-summary'), [
+            'date_from' => now()->subDay()->toDateString(),
+            'date_to' => now()->addDay()->toDateString(),
+            'category' => $this->category->name,
+            'format' => 'excel',
+        ]);
+
+    $response->assertSuccessful();
+    $content = $response->streamedContent();
+    expect($content)->toContain('Grand Total (RR - TS)');
+    expect($content)->toContain('70,00');
+});
+
 it('maps SPARE PARTS filter to stored PARTS category', function () {
     $itemCode = 'IMP-PARTS-'.uniqid();
 

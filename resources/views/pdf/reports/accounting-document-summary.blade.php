@@ -8,15 +8,17 @@
 @section('content')
     @foreach ($groups as $group)
         <table class="data-table" style="margin-bottom: 4mm;">
-            <tbody>
+            <thead>
                 <tr class="group-title">
                     <td colspan="3">{{ $group['type'] }} - {{ $group['title'] }}</td>
                 </tr>
                 <tr>
-                    <th class="section-col" style="width: 35%;">Number</th>
-                    <th class="section-col center" style="width: 25%;">Date</th>
+                    <th class="section-col col-sep" style="width: 35%;">Number</th>
+                    <th class="section-col col-sep center" style="width: 25%;">Date</th>
                     <th class="section-col right" style="width: 40%;">Amount</th>
                 </tr>
+            </thead>
+            <tbody>
                 @forelse ($group['rows'] as $row)
                     <tr>
                         <td>{{ $row['number'] }}</td>
@@ -39,7 +41,7 @@
     <table class="data-table">
         <tbody>
             <tr class="total-row">
-                <td colspan="2" class="right bold" style="width: 60%;">Grand Total</td>
+                <td colspan="2" class="right bold" style="width: 60%;">Grand Total (RR - TS)</td>
                 <td class="right bold">{{ $fmtMoney($grand_total) }}</td>
             </tr>
         </tbody>

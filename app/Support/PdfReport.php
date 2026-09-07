@@ -33,12 +33,13 @@ class PdfReport
             ->stream($filename);
     }
 
-    public static function analytical(string $view, array $data, string $filename): Response
+    public static function analytical(string $view, array $data, string $filename, bool $landscape = true): Response
     {
         $data = self::withDefaults($data);
+        $data['landscape'] = $landscape;
 
         return self::build($view, $data)
-            ->setPaper('a4', 'landscape')
+            ->setPaper('a4', $landscape ? 'landscape' : 'portrait')
             ->setOption('isPhpEnabled', true)
             ->stream($filename);
     }

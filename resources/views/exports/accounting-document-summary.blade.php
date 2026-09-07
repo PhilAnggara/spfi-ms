@@ -7,7 +7,7 @@
         body { font-family: Arial, sans-serif; font-size: 9px; color: #111; }
         table { width: 100%; border-collapse: separate; border-spacing: 0 3px; margin-bottom: 10px; }
         th, td { border: none; padding: 2px 7px; vertical-align: top; }
-        th { font-size: 8px; text-align: left; font-weight: bold; text-transform: uppercase; }
+        th { font-size: 8px; text-align: left; font-weight: bold; text-transform: uppercase; border-bottom: 1.5px solid #374151; padding-bottom: 4px; }
         .no-border td { padding: 1px 0; }
         .section-title td { font-weight: bold; padding-top: 8px; }
         .center { text-align: center; }
@@ -66,7 +66,7 @@
 
     <table>
         <tr>
-            <td colspan="2" class="right bold">Grand Total</td>
+            <td colspan="2" class="right bold">Grand Total (RR - TS)</td>
             <td class="right bold">{{ $fmtMoney($grand_total) }}</td>
         </tr>
     </table>

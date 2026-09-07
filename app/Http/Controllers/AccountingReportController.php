@@ -147,6 +147,9 @@ class AccountingReportController extends Controller
             $validated['category'],
         );
 
+        $rrTotal = (float) ($groups->firstWhere('type', 'RR')['total'] ?? 0);
+        $tsTotal = (float) ($groups->firstWhere('type', 'TS')['total'] ?? 0);
+
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
             'title' => 'Document Summary per Document',
@@ -154,7 +157,7 @@ class AccountingReportController extends Controller
             'date_to' => $validated['date_to'],
             'category' => $validated['category'],
             'groups' => $groups,
-            'grand_total' => $groups->sum('total'),
+            'grand_total' => $rrTotal - $tsTotal,
         ];
 
         return $this->exportReport(
@@ -162,7 +165,8 @@ class AccountingReportController extends Controller
             'exports.accounting-document-summary',
             $data,
             'accounting-document-summary',
-            'pdf.reports.accounting-document-summary'
+            'pdf.reports.accounting-document-summary',
+            landscape: false,
         );
     }
 
@@ -206,7 +210,8 @@ class AccountingReportController extends Controller
         string $excelView,
         array $data,
         string $filePrefix,
-        string $pdfView
+        string $pdfView,
+        bool $landscape = true,
     ) {
         if ($format === 'excel') {
             return $this->streamExcel($filePrefix, $excelView, $data);
@@ -214,7 +219,7 @@ class AccountingReportController extends Controller
 
         $filename = sprintf('%s-%s.pdf', $filePrefix, now()->format('Ymd-His'));
 
-        return PdfReport::analytical($pdfView, $data, $filename);
+        return PdfReport::analytical($pdfView, $data, $filename, $landscape);
     }
 
     private function streamExcel(string $filePrefix, string $view, array $data): StreamedResponse
