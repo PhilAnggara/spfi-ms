@@ -2,13 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Item;
-use App\Models\ReceivingReportItem;
 use App\Services\Accounting\AccountingInventoryReportService;
 use App\Support\PdfReport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AccountingReportController extends Controller
@@ -30,71 +27,7 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        if ($this->inventoryReportService->hasEncodedData()) {
-            $rows = $this->inventoryReportService->stockCardRows($validated['month'], $validated['category']);
-
-            $data = [
-                'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
-                'title' => 'Accounting Stock Card',
-                'month' => $validated['month'],
-                'category' => $validated['category'],
-                'rows' => $rows,
-            ];
-
-            return $this->exportReport(
-                $validated['format'],
-                'exports.accounting-stock-card',
-                $data,
-                'accounting-stock-card',
-                'pdf.reports.accounting-stock-card'
-            );
-        }
-
-        $selectedMonth = Carbon::createFromFormat('Y-m', $validated['month']);
-        $year = $selectedMonth->year;
-        $month = $selectedMonth->month;
-
-        $legacyRows = DB::connection('legacy_sqlsrv_2')
-            ->table('tbl_InventoryMonthly')
-            ->selectRaw('ItemCode, UCost, SUM(Ending) AS Ending, SUM(Begining) AS Beginning')
-            ->where('Category', $validated['category'])
-            ->whereRaw('YEAR(TranDate) = ? AND MONTH(TranDate) = ?', [$year, $month])
-            ->groupBy('ItemCode', 'UCost')
-            ->orderBy('ItemCode')
-            ->get();
-
-        $itemCodes = $legacyRows->pluck('ItemCode')
-            ->map(fn ($code) => strtoupper((string) $code))
-            ->unique()
-            ->values()
-            ->all();
-
-        $localItems = Item::whereIn(DB::raw('UPPER(code)'), $itemCodes)
-            ->with('unit')
-            ->get()
-            ->keyBy(fn (Item $item) => strtoupper($item->code));
-
-        $rows = $legacyRows->map(function ($row) use ($localItems) {
-            $itemCode = strtoupper((string) $row->ItemCode);
-            $item = $localItems->get($itemCode);
-            $ending = (float) $row->Ending;
-            $beginning = (float) $row->Beginning;
-            $unitCost = (float) $row->UCost;
-            $amount = $ending * $unitCost;
-            $beginningAmount = $beginning * $unitCost;
-            $transaction = $amount - $beginningAmount;
-
-            return [
-                'item_code' => $row->ItemCode,
-                'item_description' => $item?->name,
-                'unit' => $item?->unit?->name,
-                'qty' => $ending,
-                'unit_cost' => $unitCost,
-                'amount' => $amount,
-                'beginning_amount' => $beginningAmount,
-                'transaction' => $transaction,
-            ];
-        });
+        $rows = $this->inventoryReportService->stockCardRows($validated['month'], $validated['category']);
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
@@ -122,75 +55,11 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        if ($this->inventoryReportService->hasEncodedData()) {
-            $rows = $this->inventoryReportService->transactionRows(
-                $validated['date_from'],
-                $validated['date_to'],
-                $validated['category'],
-            );
-
-            $data = [
-                'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
-                'title' => 'Transaction Report',
-                'month' => Carbon::parse($validated['date_from'])->format('Y-m'),
-                'category' => $validated['category'],
-                'rows' => $rows,
-            ];
-
-            return $this->exportReport(
-                $validated['format'],
-                'exports.accounting-stock-card',
-                $data,
-                'accounting-transaction-report',
-                'pdf.reports.accounting-stock-card'
-            );
-        }
-
-        $selectedMonth = Carbon::createFromFormat('Y-m', Carbon::parse($validated['date_from'])->format('Y-m'));
-        $year = $selectedMonth->year;
-        $month = $selectedMonth->month;
-
-        $legacyRows = DB::connection('legacy_sqlsrv_2')
-            ->table('tbl_InventoryMonthly')
-            ->selectRaw('ItemCode, UCost, SUM(Ending) AS Ending, SUM(Begining) AS Beginning')
-            ->where('Category', $validated['category'])
-            ->whereRaw('YEAR(TranDate) = ? AND MONTH(TranDate) = ?', [$year, $month])
-            ->groupBy('ItemCode', 'UCost')
-            ->orderBy('ItemCode')
-            ->get();
-
-        $itemCodes = $legacyRows->pluck('ItemCode')
-            ->map(fn ($code) => strtoupper((string) $code))
-            ->unique()
-            ->values()
-            ->all();
-
-        $localItems = Item::whereIn(DB::raw('UPPER(code)'), $itemCodes)
-            ->with('unit')
-            ->get()
-            ->keyBy(fn (Item $item) => strtoupper($item->code));
-
-        $rows = $legacyRows->map(function ($row) use ($localItems) {
-            $itemCode = strtoupper((string) $row->ItemCode);
-            $item = $localItems->get($itemCode);
-            $ending = (float) $row->Ending;
-            $beginning = (float) $row->Beginning;
-            $unitCost = (float) $row->UCost;
-            $amount = $ending * $unitCost;
-            $beginningAmount = $beginning * $unitCost;
-            $transaction = $amount - $beginningAmount;
-
-            return [
-                'item_code' => $row->ItemCode,
-                'item_description' => $item?->name,
-                'unit' => $item?->unit?->name,
-                'qty' => $ending,
-                'unit_cost' => $unitCost,
-                'amount' => $amount,
-                'beginning_amount' => $beginningAmount,
-                'transaction' => $transaction,
-            ];
-        });
+        $rows = $this->inventoryReportService->transactionRows(
+            $validated['date_from'],
+            $validated['date_to'],
+            $validated['category'],
+        );
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
@@ -207,9 +76,6 @@ class AccountingReportController extends Controller
             'accounting-transaction-report',
             'pdf.reports.accounting-stock-card'
         );
-
-        // Implementation will be added later
-        return response()->json(['message' => 'Transaction report - Implementation pending']);
     }
 
     public function restatement(Request $request)
@@ -220,71 +86,7 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        if ($this->inventoryReportService->hasEncodedData()) {
-            $rows = $this->inventoryReportService->stockCardRows($validated['month'], $validated['category']);
-
-            $data = [
-                'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
-                'title' => 'Restatement Report',
-                'month' => $validated['month'],
-                'category' => $validated['category'],
-                'rows' => $rows,
-            ];
-
-            return $this->exportReport(
-                $validated['format'],
-                'exports.accounting-stock-card',
-                $data,
-                'accounting-restatement',
-                'pdf.reports.accounting-stock-card'
-            );
-        }
-
-        $selectedMonth = Carbon::createFromFormat('Y-m', $validated['month']);
-        $year = $selectedMonth->year;
-        $month = $selectedMonth->month;
-
-        $legacyRows = DB::connection('legacy_sqlsrv_2')
-            ->table('tbl_InventoryMonthly')
-            ->selectRaw('ItemCode, UCost, SUM(Ending) AS Ending, SUM(Begining) AS Beginning')
-            ->where('Category', $validated['category'])
-            ->whereRaw('YEAR(TranDate) = ? AND MONTH(TranDate) = ?', [$year, $month])
-            ->groupBy('ItemCode', 'UCost')
-            ->orderBy('ItemCode')
-            ->get();
-
-        $itemCodes = $legacyRows->pluck('ItemCode')
-            ->map(fn ($code) => strtoupper((string) $code))
-            ->unique()
-            ->values()
-            ->all();
-
-        $localItems = Item::whereIn(DB::raw('UPPER(code)'), $itemCodes)
-            ->with('unit')
-            ->get()
-            ->keyBy(fn (Item $item) => strtoupper($item->code));
-
-        $rows = $legacyRows->map(function ($ros) use ($localItems) {
-            $itemCode = strtoupper((string) $ros->ItemCode);
-            $item = $localItems->get($itemCode);
-            $ending = (float) $ros->Ending;
-            $beginning = (float) $ros->Beginning;
-            $unitCost = (float) $ros->UCost;
-            $amount = $ending * $unitCost;
-            $beginningAmount = $beginning * $unitCost;
-            $transaction = $amount - $beginningAmount;
-
-            return [
-                'item_code' => $ros->ItemCode,
-                'item_description' => $item?->name,
-                'unit' => $item?->unit?->name,
-                'qty' => $ending,
-                'unit_cost' => $unitCost,
-                'amount' => $amount,
-                'beginning_amount' => $beginningAmount,
-                'transaction' => $transaction,
-            ];
-        });
+        $rows = $this->inventoryReportService->stockCardRows($validated['month'], $validated['category']);
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
@@ -301,9 +103,6 @@ class AccountingReportController extends Controller
             'accounting-restatement',
             'pdf.reports.accounting-stock-card'
         );
-
-        // Implementation will be added later
-        return response()->json(['message' => 'Restatement report - Implementation pending']);
     }
 
     public function stockCardCount(Request $request)
@@ -314,71 +113,7 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        if ($this->inventoryReportService->hasEncodedData()) {
-            $rows = $this->inventoryReportService->stockCardRows($validated['month'], $validated['category']);
-
-            $data = [
-                'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
-                'title' => 'Stock Card per Count Report',
-                'month' => $validated['month'],
-                'category' => $validated['category'],
-                'rows' => $rows,
-            ];
-
-            return $this->exportReport(
-                $validated['format'],
-                'exports.accounting-stock-card',
-                $data,
-                'accounting-stock-card-count',
-                'pdf.reports.accounting-stock-card'
-            );
-        }
-
-        $selectedMonth = Carbon::createFromFormat('Y-m', $validated['month']);
-        $year = $selectedMonth->year;
-        $month = $selectedMonth->month;
-
-        $legacyRows = DB::connection('legacy_sqlsrv_2')
-            ->table('tbl_InventoryMonthly')
-            ->selectRaw('ItemCode, UCost, SUM(Ending) AS Ending, SUM(Begining) AS Beginning')
-            ->where('Category', $validated['category'])
-            ->whereRaw('YEAR(TranDate) = ? AND MONTH(TranDate) = ?', [$year, $month])
-            ->groupBy('ItemCode', 'UCost')
-            ->orderBy('ItemCode')
-            ->get();
-
-        $itemCodes = $legacyRows->pluck('ItemCode')
-            ->map(fn ($code) => strtoupper((string) $code))
-            ->unique()
-            ->values()
-            ->all();
-
-        $localItems = Item::whereIn(DB::raw('UPPER(code)'), $itemCodes)
-            ->with('unit')
-            ->get()
-            ->keyBy(fn (Item $item) => strtoupper($item->code));
-
-        $rows = $legacyRows->map(function ($ros) use ($localItems) {
-            $itemCode = strtoupper((string) $ros->ItemCode);
-            $item = $localItems->get($itemCode);
-            $ending = (float) $ros->Ending;
-            $beginning = (float) $ros->Beginning;
-            $unitCost = (float) $ros->UCost;
-            $amount = $ending * $unitCost;
-            $beginningAmount = $beginning * $unitCost;
-            $transaction = $amount - $beginningAmount;
-
-            return [
-                'item_code' => $ros->ItemCode,
-                'item_description' => $item?->name,
-                'unit' => $item?->unit?->name,
-                'qty' => $ending,
-                'unit_cost' => $unitCost,
-                'amount' => $amount,
-                'beginning_amount' => $beginningAmount,
-                'transaction' => $transaction,
-            ];
-        });
+        $rows = $this->inventoryReportService->stockCardRows($validated['month'], $validated['category']);
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
@@ -395,18 +130,6 @@ class AccountingReportController extends Controller
             'accounting-stock-card-count',
             'pdf.reports.accounting-stock-card'
         );
-
-        return response()->json([
-            'message' => 'Stock Card per Count report - Implementation pending',
-            'month' => $validated['month'],
-            'year' => $year,
-            'category' => $validated['category'],
-            'data' => $legacyRows,
-            'item_codes' => $itemCodes,
-        ]);
-
-        // Implementation will be added later
-        return response()->json(['message' => 'Stock Card per Count report - Implementation pending']);
     }
 
     public function documentSummary(Request $request)
@@ -418,33 +141,11 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        $groups = $this->inventoryReportService->hasEncodedData()
-            ? $this->inventoryReportService->documentSummaryGroups(
-                $validated['date_from'],
-                $validated['date_to'],
-                $validated['category'],
-            )
-            : collect([
-                [
-                    'type' => 'RR',
-                    'title' => 'Receiving Report',
-                    'rows' => $this->receivingReportSummaryRows($validated),
-                ],
-                [
-                    'type' => 'TS',
-                    'title' => 'Transfer Slip',
-                    'rows' => $this->transferSlipSummaryRows($validated),
-                ],
-                [
-                    'type' => 'DR',
-                    'title' => 'Delivery Receipt',
-                    'rows' => $this->deliverySummaryRows($validated),
-                ],
-            ])->map(function (array $group) {
-                $group['total'] = $group['rows']->sum('amount');
-
-                return $group;
-            });
+        $groups = $this->inventoryReportService->documentSummaryGroups(
+            $validated['date_from'],
+            $validated['date_to'],
+            $validated['category'],
+        );
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
@@ -474,51 +175,11 @@ class AccountingReportController extends Controller
             'format' => ['required', 'in:pdf,excel'],
         ]);
 
-        $rows = $this->inventoryReportService->hasEncodedData()
-            ? $this->inventoryReportService->purchaseRows(
-                $validated['date_from'],
-                $validated['date_to'],
-                $validated['category'],
-            )
-            : ReceivingReportItem::with([
-                'receivingReport',
-                'purchaseOrderItem.purchaseOrder.supplier',
-                'purchaseOrderItem.purchaseOrder.currency',
-                'purchaseOrderItem.item.unit',
-                'purchaseOrderItem.item.category',
-            ])
-                ->whereHas('receivingReport', function ($query) use ($validated) {
-                    $query->whereDate('received_date', '>=', $validated['date_from'])
-                        ->whereDate('received_date', '<=', $validated['date_to']);
-                })
-                ->whereHas('purchaseOrderItem.item.category', function ($query) use ($validated) {
-                    $query->where('name', $validated['category']);
-                })
-                ->orderBy('receiving_report_id')
-                ->orderBy('id')
-                ->get()
-                ->map(function (ReceivingReportItem $receivedItem) {
-                    $poItem = $receivedItem->purchaseOrderItem;
-                    $po = $poItem?->purchaseOrder;
-                    $rr = $receivedItem->receivingReport;
-                    $quantity = (float) $receivedItem->qty_good;
-                    $unitPrice = (float) ($poItem?->unit_price ?? 0);
-                    $amount = $quantity * $unitPrice;
-
-                    return [
-                        'supplier_name' => $po?->supplier?->name,
-                        'po_number' => $po?->po_number ?? ($po ? '#'.$po->id : ''),
-                        'rr_number' => $rr?->rr_number,
-                        'date' => $rr?->received_date?->toDateString(),
-                        'currency' => $po?->currency?->code ?? 'IDR',
-                        'item_code' => $poItem?->item?->code,
-                        'item_name' => $poItem?->item?->name,
-                        'unit' => $poItem?->item?->unit?->name ?? '',
-                        'quantity' => $quantity,
-                        'unit_price' => $unitPrice,
-                        'amount' => $amount,
-                    ];
-                });
+        $rows = $this->inventoryReportService->purchaseRows(
+            $validated['date_from'],
+            $validated['date_to'],
+            $validated['category'],
+        );
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
@@ -565,96 +226,5 @@ class AccountingReportController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.ms-excel',
         ]);
-    }
-
-    private function receivingReportSummaryRows(array $filters)
-    {
-        return DB::table('receiving_reports as rr')
-            ->join('receiving_report_items as rri', 'rri.receiving_report_id', '=', 'rr.id')
-            ->join('purchase_order_items as poi', 'poi.id', '=', 'rri.purchase_order_item_id')
-            ->join('items as i', 'i.id', '=', 'poi.item_id')
-            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
-            ->whereNull('rr.deleted_at')
-            ->whereDate('rr.received_date', '>=', $filters['date_from'])
-            ->whereDate('rr.received_date', '<=', $filters['date_to'])
-            ->where('ic.name', $filters['category'])
-            ->groupBy('rr.id', 'rr.rr_number', 'rr.received_date')
-            ->orderBy('rr.received_date')
-            ->orderBy('rr.rr_number')
-            ->select([
-                'rr.rr_number as number',
-                'rr.received_date as date',
-                DB::raw('SUM(COALESCE(rri.qty_good, 0) * COALESCE(poi.unit_price, 0)) as amount'),
-            ])
-            ->get()
-            ->map(fn ($row) => [
-                'number' => $row->number,
-                'date' => $row->date,
-                'amount' => (float) $row->amount,
-            ]);
-    }
-
-    private function transferSlipSummaryRows(array $filters)
-    {
-        return DB::table('transfer_slips as ts')
-            ->join('transfer_slip_items as tsi', 'tsi.transfer_slip_id', '=', 'ts.id')
-            ->join('items as i', 'i.id', '=', 'tsi.item_id')
-            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
-            ->leftJoin('stock_inventories as si', function ($join) {
-                $join->on('si.item_id', '=', 'tsi.item_id')
-                    ->where('si.is_active', true)
-                    ->where('si.is_delete', false);
-            })
-            ->whereNull('ts.deleted_at')
-            ->whereNull('tsi.deleted_at')
-            ->whereDate('ts.ts_date', '>=', $filters['date_from'])
-            ->whereDate('ts.ts_date', '<=', $filters['date_to'])
-            ->where('ic.name', $filters['category'])
-            ->groupBy('ts.id', 'ts.ts_number', 'ts.ts_date')
-            ->orderBy('ts.ts_date')
-            ->orderBy('ts.ts_number')
-            ->select([
-                'ts.ts_number as number',
-                'ts.ts_date as date',
-                DB::raw('SUM(COALESCE(tsi.quantity, 0) * COALESCE(si.average_price, 0)) as amount'),
-            ])
-            ->get()
-            ->map(fn ($row) => [
-                'number' => $row->number,
-                'date' => $row->date,
-                'amount' => (float) $row->amount,
-            ]);
-    }
-
-    private function deliverySummaryRows(array $filters)
-    {
-        return DB::table('deliveries as d')
-            ->join('delivery_items as di', 'di.delivery_id', '=', 'd.id')
-            ->join('items as i', 'i.id', '=', 'di.item_id')
-            ->join('item_categories as ic', 'ic.id', '=', 'i.category_id')
-            ->leftJoin('stock_inventories as si', function ($join) {
-                $join->on('si.item_id', '=', 'di.item_id')
-                    ->where('si.is_active', true)
-                    ->where('si.is_delete', false);
-            })
-            ->whereNull('d.deleted_at')
-            ->whereNull('di.deleted_at')
-            ->whereDate('d.dr_date', '>=', $filters['date_from'])
-            ->whereDate('d.dr_date', '<=', $filters['date_to'])
-            ->where('ic.name', $filters['category'])
-            ->groupBy('d.id', 'd.dr_number', 'd.dr_date')
-            ->orderBy('d.dr_date')
-            ->orderBy('d.dr_number')
-            ->select([
-                'd.dr_number as number',
-                'd.dr_date as date',
-                DB::raw('SUM(COALESCE(di.quantity, 0) * COALESCE(si.average_price, 0)) as amount'),
-            ])
-            ->get()
-            ->map(fn ($row) => [
-                'number' => $row->number,
-                'date' => $row->date,
-                'amount' => (float) $row->amount,
-            ]);
     }
 }

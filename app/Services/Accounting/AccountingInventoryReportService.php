@@ -3,9 +3,7 @@
 namespace App\Services\Accounting;
 
 use App\Models\AccountingInventoryDocTran;
-use App\Models\AccountingInventoryMonthly;
 use App\Models\Item;
-use App\Models\ItemCategory;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +11,16 @@ use Illuminate\Support\Facades\Schema;
 
 class AccountingInventoryReportService
 {
+    /**
+     * Report dropdown labels that differ from stored Category values (AISystem / local master).
+     *
+     * @var array<string, list<string>>
+     */
+    private const CATEGORY_NAME_ALIASES = [
+        'SPARE PARTS' => ['SPARE PARTS', 'PARTS'],
+        'CHEMICAL' => ['CHEMICAL', 'CHEM'],
+    ];
+
     public function ledgerAvailable(): bool
     {
         return Schema::hasTable('accounting_inventory_doc_tran');
@@ -32,50 +40,49 @@ class AccountingInventoryReportService
      */
     public function stockCardRows(string $month, string $categoryName): Collection
     {
-        $category = $this->resolveCategory($categoryName);
-        if ($category === null) {
-            return collect();
-        }
-
+        $categoryKeys = $this->categoryKeysForFilter($categoryName);
         $selectedMonth = Carbon::createFromFormat('Y-m', $month);
         $monthStart = $selectedMonth->copy()->startOfMonth()->toDateString();
         $monthEnd = $selectedMonth->copy()->endOfMonth()->toDateString();
 
-        $itemIds = $this->itemIdsForCategory($category->id);
-        if ($itemIds === []) {
-            return collect();
+        $legacyRows = $this->monthlyRowsForMonth($categoryKeys, $monthStart, $monthEnd);
+
+        if ($legacyRows->isEmpty()) {
+            $legacyRows = $this->docTranFallbackRowsForMonth($categoryKeys, $monthEnd);
         }
 
-        $rows = collect();
+        $legacyRows = $legacyRows->filter(function (object $row): bool {
+            return (float) $row->ending > 0 || (float) $row->beginning > 0;
+        })->values();
 
-        foreach ($itemIds as $itemId) {
-            $beginning = $this->snapshotAt($category->id, $itemId, Carbon::parse($monthStart)->subDay()->toDateString());
-            $ending = $this->snapshotAt($category->id, $itemId, $monthEnd);
-            if ($beginning['balance_qty'] <= 0 && $ending['balance_qty'] <= 0) {
-                continue;
-            }
+        $localItems = $this->localItemsByCode(
+            $legacyRows->pluck('item_code')->all()
+        );
 
-            $unitCost = $ending['weighted_unit_cost'] > 0 ? $ending['weighted_unit_cost'] : $beginning['weighted_unit_cost'];
-            $endingQty = $ending['balance_qty'];
-            $beginningQty = $beginning['balance_qty'];
-            $amount = $endingQty * $unitCost;
-            $beginningAmount = $beginningQty * $unitCost;
+        return $legacyRows
+            ->map(function (object $row) use ($localItems): array {
+                $itemCode = strtoupper(trim((string) $row->item_code));
+                $item = $localItems->get($itemCode);
+                $ending = (float) $row->ending;
+                $beginning = (float) $row->beginning;
+                $unitCost = (float) $row->u_cost;
 
-            $item = Item::query()->with('unit')->find($itemId);
+                $amount = $ending * $unitCost;
+                $beginningAmount = $beginning * $unitCost;
 
-            $rows->push([
-                'item_code' => $item?->code,
-                'item_description' => $item?->name,
-                'unit' => $item?->unit?->name,
-                'qty' => $endingQty,
-                'unit_cost' => $unitCost,
-                'amount' => $amount,
-                'beginning_amount' => $beginningAmount,
-                'transaction' => $amount - $beginningAmount,
-            ]);
-        }
-
-        return $rows->sortBy('item_code')->values();
+                return [
+                    'item_code' => (string) $row->item_code,
+                    'item_description' => $item?->name,
+                    'unit' => $item?->unit?->name,
+                    'qty' => $ending,
+                    'unit_cost' => $unitCost,
+                    'amount' => $amount,
+                    'beginning_amount' => $beginningAmount,
+                    'transaction' => $amount - $beginningAmount,
+                ];
+            })
+            ->sortBy('item_code')
+            ->values();
     }
 
     /**
@@ -94,13 +101,10 @@ class AccountingInventoryReportService
      */
     public function documentSummaryGroups(string $dateFrom, string $dateTo, string $categoryName): Collection
     {
-        $category = $this->resolveCategory($categoryName);
-        if ($category === null) {
-            return collect();
-        }
+        $categoryKeys = $this->categoryKeysForFilter($categoryName);
 
         $groups = AccountingInventoryDocTran::query()
-            ->where('category_id', $category->id)
+            ->tap(fn ($query) => $this->applyCategoryFilter($query, $categoryKeys))
             ->whereDate('doc_date', '>=', $dateFrom)
             ->whereDate('doc_date', '<=', $dateTo)
             ->select([
@@ -142,16 +146,11 @@ class AccountingInventoryReportService
      */
     public function purchaseRows(string $dateFrom, string $dateTo, string $categoryName): Collection
     {
-        $category = $this->resolveCategory($categoryName);
-        if ($category === null) {
-            return collect();
-        }
+        $categoryKeys = $this->categoryKeysForFilter($categoryName);
 
-        return DB::table('accounting_inventory_doc_tran as dt')
-            ->leftJoin('items as i', 'i.id', '=', 'dt.item_id')
-            ->leftJoin('unit_of_measures as uom', 'uom.id', '=', 'i.unit_of_measure_id')
+        $rows = DB::table('accounting_inventory_doc_tran as dt')
             ->where('dt.doc_code', 'RR')
-            ->where('dt.category_id', $category->id)
+            ->tap(fn ($query) => $this->applyCategoryFilter($query, $categoryKeys, 'dt.category'))
             ->whereDate('dt.doc_date', '>=', $dateFrom)
             ->whereDate('dt.doc_date', '<=', $dateTo)
             ->orderBy('dt.doc_date')
@@ -162,25 +161,30 @@ class AccountingInventoryReportService
                 'dt.po_no',
                 'dt.party_name',
                 'dt.item_code',
-                'i.name as item_name',
-                'uom.name as unit',
                 'dt.qty',
                 'dt.u_cost',
                 'dt.amount',
-            ])
-            ->map(fn ($row): array => [
+            ]);
+
+        $localItems = $this->localItemsByCode($rows->pluck('item_code')->all());
+
+        return $rows->map(function (object $row) use ($localItems): array {
+            $item = $localItems->get(strtoupper(trim((string) $row->item_code)));
+
+            return [
                 'supplier_name' => $row->party_name,
                 'po_number' => $row->po_no,
                 'rr_number' => $row->doc_no,
                 'date' => $row->doc_date,
                 'currency' => 'IDR',
                 'item_code' => $row->item_code,
-                'item_name' => $row->item_name,
-                'unit' => $row->unit ?? '',
+                'item_name' => $item?->name,
+                'unit' => $item?->unit?->name ?? '',
                 'quantity' => abs((float) $row->qty),
                 'unit_price' => abs((float) $row->u_cost),
                 'amount' => abs((float) $row->amount),
-            ]);
+            ];
+        });
     }
 
     /**
@@ -188,96 +192,140 @@ class AccountingInventoryReportService
      */
     public function documentSummaryPerItem(string $dateFrom, string $dateTo, string $categoryName): Collection
     {
-        $category = $this->resolveCategory($categoryName);
-        if ($category === null) {
-            return collect();
-        }
+        $categoryKeys = $this->categoryKeysForFilter($categoryName);
 
-        return DB::table('accounting_inventory_doc_tran as dt')
-            ->leftJoin('items as i', 'i.id', '=', 'dt.item_id')
-            ->leftJoin('unit_of_measures as uom', 'uom.id', '=', 'i.unit_of_measure_id')
-            ->where('dt.category_id', $category->id)
+        $rows = DB::table('accounting_inventory_doc_tran as dt')
+            ->tap(fn ($query) => $this->applyCategoryFilter($query, $categoryKeys, 'dt.category'))
             ->whereDate('dt.doc_date', '>=', $dateFrom)
             ->whereDate('dt.doc_date', '<=', $dateTo)
-            ->groupBy('dt.item_code', 'i.name', 'uom.name')
+            ->groupBy('dt.item_code')
             ->orderBy('dt.item_code')
             ->select([
                 'dt.item_code as item_code',
-                'i.name as item_name',
-                'uom.name as unit',
                 DB::raw('SUM(CASE WHEN dt.qty > 0 THEN dt.qty ELSE 0 END) as qty_in'),
                 DB::raw('SUM(CASE WHEN dt.qty < 0 THEN ABS(dt.qty) ELSE 0 END) as qty_out'),
                 DB::raw('SUM(dt.amount) as net_amount'),
             ])
-            ->get()
-            ->map(fn ($row): array => [
+            ->get();
+
+        $localItems = $this->localItemsByCode($rows->pluck('item_code')->all());
+
+        return $rows->map(function (object $row) use ($localItems): array {
+            $item = $localItems->get(strtoupper(trim((string) $row->item_code)));
+
+            return [
                 'item_code' => $row->item_code,
-                'item_name' => $row->item_name,
-                'unit' => $row->unit,
+                'item_name' => $item?->name,
+                'unit' => $item?->unit?->name,
                 'qty_in' => (float) $row->qty_in,
                 'qty_out' => (float) $row->qty_out,
                 'net_amount' => (float) $row->net_amount,
+            ];
+        });
+    }
+
+    /**
+     * @param  list<string>  $categoryKeys
+     * @return Collection<int, object{item_code: string, u_cost: float|int|string, ending: float|int|string, beginning: float|int|string}>
+     */
+    private function monthlyRowsForMonth(array $categoryKeys, string $monthStart, string $monthEnd): Collection
+    {
+        return DB::table('accounting_inventory_monthly')
+            ->tap(fn ($query) => $this->applyCategoryFilter($query, $categoryKeys))
+            ->whereDate('tran_date', '>=', $monthStart)
+            ->whereDate('tran_date', '<=', $monthEnd)
+            ->groupBy('item_code', 'u_cost')
+            ->orderBy('item_code')
+            ->select([
+                'item_code',
+                'u_cost',
+                DB::raw('SUM(ending) as ending'),
+                DB::raw('SUM(begining) as beginning'),
+            ])
+            ->get();
+    }
+
+    /**
+     * @param  list<string>  $categoryKeys
+     * @return Collection<int, object{item_code: string, u_cost: float|int|string, ending: float|int|string, beginning: float|int|string}>
+     */
+    private function docTranFallbackRowsForMonth(array $categoryKeys, string $monthEnd): Collection
+    {
+        $latestIds = AccountingInventoryDocTran::query()
+            ->tap(fn ($query) => $this->applyCategoryFilter($query, $categoryKeys))
+            ->whereDate('tran_date', '<=', $monthEnd)
+            ->selectRaw('MAX(id) as id')
+            ->groupBy('item_code')
+            ->pluck('id');
+
+        if ($latestIds->isEmpty()) {
+            return collect();
+        }
+
+        return AccountingInventoryDocTran::query()
+            ->whereIn('id', $latestIds)
+            ->orderBy('item_code')
+            ->get(['item_code', 'ave_cost', 'u_cost', 't_qty'])
+            ->map(fn (AccountingInventoryDocTran $row): object => (object) [
+                'item_code' => $row->item_code,
+                'u_cost' => (float) ($row->ave_cost ?? $row->u_cost ?? 0),
+                'ending' => (float) ($row->t_qty ?? 0),
+                'beginning' => 0.0,
             ]);
     }
 
     /**
-     * @return list<int>
+     * @param  list<mixed>  $itemCodes
+     * @return Collection<string, Item>
      */
-    private function itemIdsForCategory(int $categoryId): array
+    private function localItemsByCode(array $itemCodes): Collection
     {
-        return Item::query()
-            ->where('category_id', $categoryId)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
+        $codes = collect($itemCodes)
+            ->map(fn ($code): string => strtoupper(trim((string) $code)))
+            ->filter()
+            ->unique()
+            ->values()
             ->all();
+
+        if ($codes === []) {
+            return collect();
+        }
+
+        return collect($codes)
+            ->chunk(1000)
+            ->flatMap(function (Collection $chunk): Collection {
+                $placeholders = implode(',', array_fill(0, $chunk->count(), '?'));
+
+                return Item::query()
+                    ->with('unit')
+                    ->whereRaw('UPPER(code) IN ('.$placeholders.')', $chunk->values()->all())
+                    ->get();
+            })
+            ->keyBy(fn (Item $item): string => strtoupper((string) $item->code));
     }
 
     /**
-     * @return array{balance_qty: float, balance_amount: float, weighted_unit_cost: float}
+     * @return list<string>
      */
-    private function snapshotAt(int $categoryId, int $itemId, string $asOfDate): array
+    private function categoryKeysForFilter(string $categoryName): array
     {
-        $monthly = AccountingInventoryMonthly::query()
-            ->where('category_id', $categoryId)
-            ->where('item_id', $itemId)
-            ->whereDate('tran_date', '<=', $asOfDate)
-            ->orderByDesc('tran_date')
-            ->orderByDesc('id')
-            ->first();
+        $normalized = mb_strtoupper(trim($categoryName));
+        $aliases = self::CATEGORY_NAME_ALIASES[$normalized] ?? [$normalized];
 
-        if ($monthly !== null) {
-            $ending = (float) $monthly->ending;
-            $unitCost = (float) ($monthly->u_cost ?? 0);
-
-            return [
-                'balance_qty' => $ending,
-                'balance_amount' => round($ending * $unitCost, 4),
-                'weighted_unit_cost' => $unitCost,
-            ];
-        }
-
-        $latest = AccountingInventoryDocTran::query()
-            ->where('category_id', $categoryId)
-            ->where('item_id', $itemId)
-            ->whereDate('tran_date', '<=', $asOfDate)
-            ->orderByDesc('tran_date')
-            ->orderByDesc('id')
-            ->first();
-
-        $ending = (float) ($latest?->t_qty ?? 0);
-        $unitCost = (float) ($latest?->ave_cost ?? $latest?->u_cost ?? 0);
-
-        return [
-            'balance_qty' => $ending,
-            'balance_amount' => round($ending * $unitCost, 4),
-            'weighted_unit_cost' => $unitCost,
-        ];
+        return array_values(array_unique(array_map(
+            fn (string $name): string => mb_strtoupper(trim($name)),
+            $aliases,
+        )));
     }
 
-    private function resolveCategory(string $categoryName): ?ItemCategory
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\AccountingInventoryDocTran>|\Illuminate\Database\Query\Builder  $query
+     * @param  list<string>  $categoryKeys
+     */
+    private function applyCategoryFilter(mixed $query, array $categoryKeys, string $column = 'category'): void
     {
-        return ItemCategory::query()
-            ->whereRaw('UPPER(name) = ?', [mb_strtoupper(trim($categoryName))])
-            ->first();
+        $placeholders = implode(',', array_fill(0, count($categoryKeys), '?'));
+
+        $query->whereRaw('UPPER(LTRIM(RTRIM('.$column.'))) IN ('.$placeholders.')', $categoryKeys);
     }
 }
