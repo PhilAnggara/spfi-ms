@@ -102,11 +102,11 @@
                                         </td>
                                         <td><i class="fa-duotone fa-solid fa-calendar-days text-danger"></i> {{ tgl($item->prs_date) }}</td>
                                         {{-- <td>{{ $item->remarks ? Str::limit($item->remarks, 40, '...') : '-' }}</td> --}}
-                                        <td>
+                                        <td class="text-start">
                                             <span
                                                 data-bstooltip-toggle="tooltip"
                                                 data-bs-placement="top"
-                                                title="{{ $item->remarks }}">{{ $item->remarks ? Str::limit($item->remarks, 40, '...') : '-' }}
+                                                title="{{ $item->remarks }}">{{ $item->remarks ? Str::limit($item->remarks, 50, '...') : '-' }}
                                             </span>
                                         </td>
                                         <td>
