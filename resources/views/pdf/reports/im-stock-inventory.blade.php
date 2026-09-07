@@ -41,6 +41,11 @@
         font-size: 7.5px;
         margin-top: 2px;
     }
+    .data-table thead th.stack-label {
+        line-height: 1.15;
+        vertical-align: middle;
+        text-transform: uppercase;
+    }
 </style>
 @endpush
 
@@ -52,21 +57,19 @@
             <thead>
                 <tr>
                     <th colspan="3" class="center section-head section-sep">Item</th>
-                    <th colspan="1" class="center section-head section-sep">Beginning</th>
+                    <th rowspan="2" class="section-col section-sep right stack-label">Beginning<br>Balance</th>
                     <th colspan="2" class="center section-head section-sep">Receipt / ADJ</th>
                     <th colspan="2" class="center section-head section-sep">Issuances</th>
-                    <th colspan="1" class="center section-head">Ending</th>
+                    <th rowspan="2" class="section-col right stack-label">Ending<br>Balance</th>
                 </tr>
                 <tr>
                     <th class="section-col col-sep">Name</th>
                     <th class="section-col col-sep">Code</th>
                     <th class="section-col section-sep">Unit</th>
-                    <th class="section-col section-start section-sep right">Balance</th>
                     <th class="section-col section-start col-sep right">RR</th>
                     <th class="section-col section-sep right">ADJ</th>
                     <th class="section-col section-start col-sep right">TS</th>
                     <th class="section-col section-sep right">DR</th>
-                    <th class="section-col section-start right">Balance</th>
                 </tr>
             </thead>
             <tbody>

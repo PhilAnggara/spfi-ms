@@ -12,6 +12,8 @@
         .section-title td { font-weight: bold; padding-top: 8px; }
         .center { text-align: center; }
         .right { text-align: right; }
+        th.right { text-align: right; }
+        th.center { text-align: center; }
         .bold { font-weight: bold; }
     </style>
 </head>

@@ -54,6 +54,9 @@
         .number-right {
             text-align: right;
         }
+        th.number-right {
+            text-align: right;
+        }
         .nowrap {
             white-space: nowrap;
         }

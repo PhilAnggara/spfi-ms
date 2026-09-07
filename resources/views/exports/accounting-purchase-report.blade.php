@@ -11,6 +11,8 @@
         .no-border td { padding: 1px 0; }
         .center { text-align: center; }
         .right { text-align: right; }
+        th.right { text-align: right; }
+        th.center { text-align: center; }
         .bold { font-weight: bold; }
     </style>
 </head>

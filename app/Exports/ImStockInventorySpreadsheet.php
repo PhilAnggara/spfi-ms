@@ -86,10 +86,8 @@ class ImStockInventorySpreadsheet
 
         $groups = [
             ['A', 'C', 'Item'],
-            ['D', 'D', 'Beginning'],
             ['E', 'F', 'Receipt / ADJ'],
             ['G', 'H', 'Issuances'],
-            ['I', 'I', 'Ending'],
         ];
 
         foreach ($groups as [$from, $to, $label]) {
@@ -100,16 +98,19 @@ class ImStockInventorySpreadsheet
             }
         }
 
+        $sheet->mergeCells("D{$groupRow}:D{$columnRow}");
+        $sheet->setCellValue("D{$groupRow}", "Beginning\nBalance");
+        $sheet->mergeCells("I{$groupRow}:I{$columnRow}");
+        $sheet->setCellValue("I{$groupRow}", "Ending\nBalance");
+
         $columns = [
             'A' => 'Name',
             'B' => 'Code',
             'C' => 'Unit',
-            'D' => 'Balance',
             'E' => 'RR',
             'F' => 'ADJ',
             'G' => 'TS',
             'H' => 'DR',
-            'I' => 'Balance',
         ];
 
         foreach ($columns as $col => $label) {
@@ -179,6 +180,15 @@ class ImStockInventorySpreadsheet
                 'startColor' => ['rgb' => 'F3F4F6'],
             ],
         ]);
+
+        $sheet->getStyle("D{$groupRow}:D{$columnRow}")->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_RIGHT)
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setWrapText(true);
+        $sheet->getStyle("I{$groupRow}:I{$columnRow}")->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_RIGHT)
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setWrapText(true);
 
         $sheet->getStyle("A{$columnRow}:{$lastCol}{$columnRow}")->getFont()->setSize(9);
 

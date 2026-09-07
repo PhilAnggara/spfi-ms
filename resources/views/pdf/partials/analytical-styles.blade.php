@@ -29,6 +29,8 @@
     .data-table td, .data-table th { border: none; padding: 2px 4px; vertical-align: top; }
     .data-table thead { display: table-header-group; }
     .data-table th { font-size: 7px; font-weight: bold; text-align: left; text-transform: uppercase; }
+    .data-table th.right { text-align: right; }
+    .data-table th.center { text-align: center; }
     .data-table thead th.section-head {
         border-bottom: 1.5px solid #374151;
         padding-bottom: 4px;
