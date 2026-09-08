@@ -1,19 +1,5 @@
-.prs-page .prs-hero h3,
 .prs-create-page h3 {
     font-weight: 700;
-}
-
-.prs-top-actions {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-}
-
-.prs-filter-grid .form-label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--bs-secondary);
 }
 
 .prs-page .card,

@@ -37,7 +37,15 @@ class StoreWithdrawalController extends Controller
             'sws_start' => trim((string) $request->query('sws_start', '')),
             'sws_end' => trim((string) $request->query('sws_end', '')),
             'type' => trim((string) $request->query('type', '')),
+            'ts_status' => trim((string) $request->query('ts_status', '')),
         ];
+
+        $tsStatus = mb_strtolower($filters['ts_status']);
+        if (! in_array($tsStatus, ['not_taken', 'partial', 'taken'], true)) {
+            $filters['ts_status'] = '';
+        } else {
+            $filters['ts_status'] = $tsStatus;
+        }
 
         $storeWithdrawals = $this->paginateStoreWithdrawals(
             canViewAll: $canViewAll,
@@ -1384,6 +1392,7 @@ class StoreWithdrawalController extends Controller
         $keywordLike = "%{$keyword}%";
 
         $typeFilter = mb_strtolower(trim((string) ($filters['type'] ?? '')));
+        $tsStatusFilter = mb_strtolower(trim((string) ($filters['ts_status'] ?? '')));
 
         $query = DB::table('store_withdrawals as sw')
             ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
@@ -1430,6 +1439,9 @@ class StoreWithdrawalController extends Controller
             })
             ->when(in_array($typeFilter, ['normal', 'confirmatory', 'capex'], true), function ($subQuery) use ($typeFilter) {
                 $subQuery->where('sw.type', $typeFilter);
+            })
+            ->when(in_array($tsStatusFilter, ['not_taken', 'partial', 'taken'], true), function ($subQuery) use ($tsStatusFilter) {
+                $this->applyTsStatusFilter($subQuery, $tsStatusFilter);
             })
             ->orderByDesc('sw.sws_date')
             ->orderByDesc('sw.id');
@@ -1500,6 +1512,56 @@ class StoreWithdrawalController extends Controller
     private function isSqlServer(): bool
     {
         return $this->isSqlServerConnection();
+    }
+
+    /**
+     * Filter SWS rows by derived transfer-slip take status.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     */
+    private function applyTsStatusFilter($query, string $tsStatusFilter): void
+    {
+        $hasActiveTransferSlip = function ($subQuery): void {
+            $subQuery->select(DB::raw(1))
+                ->from('transfer_slips as ts_filter')
+                ->whereColumn('ts_filter.store_withdrawal_id', 'sw.id')
+                ->whereNull('ts_filter.deleted_at');
+        };
+
+        $hasRemainingQuantity = function ($subQuery): void {
+            $subQuery->select(DB::raw(1))
+                ->from('store_withdrawal_items as swi_filter')
+                ->whereColumn('swi_filter.store_withdrawal_id', 'sw.id')
+                ->whereNull('swi_filter.deleted_at')
+                ->whereRaw(
+                    '(swi_filter.quantity - COALESCE((
+                        SELECT SUM(tsi_filter.quantity)
+                        FROM transfer_slip_items as tsi_filter
+                        INNER JOIN transfer_slips as ts_qty ON ts_qty.id = tsi_filter.transfer_slip_id
+                        WHERE tsi_filter.store_withdrawal_item_id = swi_filter.id
+                          AND ts_qty.deleted_at IS NULL
+                          AND tsi_filter.deleted_at IS NULL
+                    ), 0)) > 0.00001'
+                );
+        };
+
+        if ($tsStatusFilter === 'not_taken') {
+            $query->whereNotExists($hasActiveTransferSlip);
+
+            return;
+        }
+
+        if ($tsStatusFilter === 'partial') {
+            $query->whereExists($hasActiveTransferSlip)
+                ->whereExists($hasRemainingQuantity);
+
+            return;
+        }
+
+        if ($tsStatusFilter === 'taken') {
+            $query->whereExists($hasActiveTransferSlip)
+                ->whereNotExists($hasRemainingQuantity);
+        }
     }
 
     /**

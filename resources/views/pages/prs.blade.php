@@ -3,17 +3,17 @@
 
 @section('content')
 <div id="prs-page-container">
-<div class="page-heading prs-page">
+<div class="page-heading po-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
             <div class="col-12 col-lg-7">
-                <div class="prs-hero">
+                <div class="po-hero">
                     <h3 class="mb-1">Purchase Requisition Slip</h3>
                     <p class="text-muted mb-0">Manage PRS submissions faster with comprehensive filters and a responsive layout.</p>
                 </div>
             </div>
             <div class="col-12 col-lg-5">
-                <div class="prs-top-actions">
+                <div class="po-top-actions">
                     {{-- <button type="button" class="btn btn-outline-primary icon icon-left" data-bs-toggle="modal" data-bs-target="#export-modal">
                         <i class="fa-duotone fa-solid fa-file-pdf"></i>
                         Export PDF
@@ -36,7 +36,7 @@
     <section class="section">
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
-                <div class="row g-3 align-items-end prs-filter-grid" id="prs-filter-form">
+                <div class="row g-3 align-items-end po-filter-grid" id="prs-filter-form">
                     <div class="col-12 col-md-6 col-xl-{{ $canFilterDepartment ? 3 : 2 }}">
                         <label for="filter-keyword" class="form-label mb-1">Search PRS</label>
                         <input type="text" id="filter-keyword" class="form-control" value="{{ request('keyword') }}" placeholder="PRS number / remarks{{ $canFilterDepartment ? ' / department' : '' }}">
@@ -81,13 +81,11 @@
                         <label for="filter-needed-end" class="form-label mb-1">Needed (to)</label>
                         <input type="date" id="filter-needed-end" class="form-control" value="{{ request('needed_end') }}">
                     </div>
-                    <div class="col-12 col-md-6 col-xl-3">
-                        <div class="d-flex gap-2">
-                            <button type="button" id="reset-prs-filter" class="btn btn-light-secondary w-100">
-                                <i class="fa-regular fa-rotate-left me-1"></i>
-                                Reset
-                            </button>
-                        </div>
+                    <div class="col-6 col-md-3 col-xl-1">
+                        <button type="button" id="reset-prs-filter" class="btn btn-light-secondary w-100">
+                            <i class="fa-regular fa-rotate-left me-1"></i>
+                            Reset
+                        </button>
                     </div>
                 </div>
             </div>
@@ -107,15 +105,15 @@
                     <span class="badge bg-light-primary" id="prs-filter-result">{{ $items->total() }} records</span>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-striped text-center text-nowrap" id="table1">
+                    <table class="table table-striped align-middle po-table text-nowrap" id="table1">
                         <thead>
                             <tr>
-                                <th class="text-center">PRS Number</th>
-                                <th class="text-center">Dept.</th>
-                                <th class="text-center">PRS Date</th>
-                                <th class="text-center">Status</th>
-                                <th class="text-center">Remarks</th>
-                                <th class="text-center">Action</th>
+                                <th>PRS Number</th>
+                                <th>Dept.</th>
+                                <th>PRS Date</th>
+                                <th>Status</th>
+                                <th>Remarks</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="prs-table-body">
@@ -241,6 +239,7 @@
 @endsection
 
 @push('addon-style')
+    <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
 @endpush
 @push('addon-script')

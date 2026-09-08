@@ -173,7 +173,21 @@ it('loads sws by number when the query has trailing whitespace or different case
         ]));
 
     $response->assertOk()
-        ->assertJsonPath('store_withdrawal.sws_number', $swsNumber);
+        ->assertJsonPath('store_withdrawal.sws_number', $swsNumber)
+        ->assertJsonPath('items.0.stock_available', 100);
+});
+
+it('includes main warehouse stock when loading sws items for transfer slip', function () {
+    [, , $swsNumber] = createSwsForValidation($this, 'DEP0009005');
+
+    $response = $this->actingAs($this->user)
+        ->getJson(route('transfer-slips.sws-by-number', [
+            'sws_number' => $swsNumber,
+        ]));
+
+    $response->assertOk()
+        ->assertJsonPath('items.0.item_id', $this->item->id)
+        ->assertJsonPath('items.0.stock_available', 100);
 });
 
 it('updates a transfer slip when posted sws_number has trailing whitespace', function () {
@@ -203,10 +217,15 @@ it('updates a transfer slip when posted sws_number has trailing whitespace', fun
         ->whereNull('deleted_at')
         ->value('id');
 
+    $currentTsNumber = (string) DB::table('transfer_slips')
+        ->where('id', $transferSlipId)
+        ->value('ts_number');
+
     $response = $this->actingAs($this->user)
         ->from(route('transfer-slips.index'))
         ->put(route('transfer-slips.update', $transferSlipId), [
             'ts_date' => $now->toDateString(),
+            'ts_number' => $currentTsNumber,
             'for_production' => '0',
             'remarks' => 'Updated with padded sws',
             'sws_number' => $swsNumber."\u{00A0}",

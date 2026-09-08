@@ -27,12 +27,12 @@
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
                 <div class="row g-3 align-items-end po-filter-grid" id="sws-filter-form">
-                    <div class="col-12 col-md-6 col-xl-{{ $canFilterDepartment ? 4 : 5 }}">
+                    <div class="col-12 col-md-6 col-xl-{{ $canFilterDepartment ? 3 : 4 }}">
                         <label for="filter-sws-keyword" class="form-label mb-1">Search Stores Withdrawal</label>
                         <input type="text" id="filter-sws-keyword" class="form-control" value="{{ $filters['keyword'] ?? '' }}" placeholder="SWS number / dept / info / creator">
                     </div>
                     @if ($canFilterDepartment)
-                        <div class="col-6 col-md-3 col-xl-3">
+                        <div class="col-6 col-md-3 col-xl-2">
                             <label for="filter-sws-department" class="form-label mb-1">Department</label>
                             <select id="filter-sws-department" class="form-select">
                                 <option value="">All Department</option>
@@ -54,10 +54,19 @@
                         </select>
                     </div>
                     <div class="col-6 col-md-3 col-xl-2">
+                        <label for="filter-sws-ts-status" class="form-label mb-1">TS Status</label>
+                        <select id="filter-sws-ts-status" class="form-select">
+                            <option value="">All Status</option>
+                            <option value="not_taken" @selected(($filters['ts_status'] ?? '') === 'not_taken')>Not Taken</option>
+                            <option value="partial" @selected(($filters['ts_status'] ?? '') === 'partial')>Partial</option>
+                            <option value="taken" @selected(($filters['ts_status'] ?? '') === 'taken')>Taken</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3 col-xl-{{ $canFilterDepartment ? 1 : 2 }}">
                         <label for="filter-sws-date-start" class="form-label mb-1">SWS Date (from)</label>
                         <input type="date" id="filter-sws-date-start" class="form-control" value="{{ $filters['sws_start'] ?? '' }}">
                     </div>
-                    <div class="col-6 col-md-3 col-xl-2">
+                    <div class="col-6 col-md-3 col-xl-{{ $canFilterDepartment ? 1 : 2 }}">
                         <label for="filter-sws-date-end" class="form-label mb-1">SWS Date (to)</label>
                         <input type="date" id="filter-sws-date-end" class="form-control" value="{{ $filters['sws_end'] ?? '' }}">
                     </div>
@@ -101,6 +110,7 @@
                                         <th>SWS Date</th>
                                         <th>Department Code</th>
                                         <th>Info</th>
+                                        <th>TS Status</th>
                                         <th>Created By</th>
                                         <th>Actions</th>
                                     </tr>
@@ -146,6 +156,27 @@
                                                     title="{{ $sws->department_name ?? '-' }}">{{ $sws->department_code }}</span>
                                             </td>
                                             <td>{{ \Illuminate\Support\Str::limit($sws->info ?? '-', 50) }}</td>
+                                            <td>
+                                                @php
+                                                    if ($isLocked) {
+                                                        $tsStatusText = 'Taken';
+                                                        $tsStatusColor = 'bg-light-success text-success';
+                                                        $tsStatusIcon = 'fa-duotone fa-solid fa-boxes-packing text-success';
+                                                    } elseif ($isDeleteLocked) {
+                                                        $tsStatusText = 'Partial';
+                                                        $tsStatusColor = 'bg-light-warning text-warning';
+                                                        $tsStatusIcon = 'fa-duotone fa-solid fa-truck-ramp-box text-warning';
+                                                    } else {
+                                                        $tsStatusText = 'Not Taken';
+                                                        $tsStatusColor = 'bg-light-secondary text-secondary';
+                                                        $tsStatusIcon = 'fa-duotone fa-solid fa-inbox text-secondary';
+                                                    }
+                                                @endphp
+                                                <span class="badge {{ $tsStatusColor }}">
+                                                    <i class="{{ $tsStatusIcon }}"></i>
+                                                    {{ $tsStatusText }}
+                                                </span>
+                                            </td>
                                             <td>{{ $sws->created_by_name ?? '-' }}</td>
                                             <td>
                                                 <div class="btn-group btn-group-sm">
@@ -200,6 +231,8 @@
                             @foreach ($storeWithdrawals as $sws)
                             @php
                                 $detailItems = collect($storeWithdrawalItems[$sws->id] ?? []);
+                                $isLocked = (bool) ($lockedStoreWithdrawalLookup[$sws->id] ?? false);
+                                $isDeleteLocked = (bool) ($deleteLockedStoreWithdrawalLookup[$sws->id] ?? false);
                                 $actor = auth()->user();
                                 $isOwner = (int) $actor?->id === (int) ($sws->created_by ?? 0);
                                 $sameDept = $actor?->department_id
@@ -226,6 +259,25 @@
                                                 @if (strtolower((string) ($sws->type ?? '')) === 'capex')
                                                     <span class="badge bg-light-warning text-dark">CAPEX</span>
                                                 @endif
+                                                @php
+                                                    if ($isLocked) {
+                                                        $tsStatusText = 'Taken';
+                                                        $tsStatusColor = 'bg-light-success text-success';
+                                                        $tsStatusIcon = 'fa-duotone fa-solid fa-boxes-packing text-success';
+                                                    } elseif ($isDeleteLocked) {
+                                                        $tsStatusText = 'Partial';
+                                                        $tsStatusColor = 'bg-light-warning text-warning';
+                                                        $tsStatusIcon = 'fa-duotone fa-solid fa-truck-ramp-box text-warning';
+                                                    } else {
+                                                        $tsStatusText = 'Not Taken';
+                                                        $tsStatusColor = 'bg-light-secondary text-secondary';
+                                                        $tsStatusIcon = 'fa-duotone fa-solid fa-inbox text-secondary';
+                                                    }
+                                                @endphp
+                                                <span class="badge {{ $tsStatusColor }}">
+                                                    <i class="{{ $tsStatusIcon }}"></i>
+                                                    {{ $tsStatusText }}
+                                                </span>
                                                 <span class="badge bg-light-secondary">{{ $detailItems->count() }} item(s)</span>
                                             </div>
 

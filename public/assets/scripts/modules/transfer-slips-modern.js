@@ -271,7 +271,7 @@ function initTransferSlipCreateModal(swsLookupUrl) {
     };
 
     const renderEmptyState = (message) => {
-        createItemsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">' + message + '</td></tr>';
+        createItemsBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">' + message + '</td></tr>';
         if (createStoreWithdrawalIdInput) {
             createStoreWithdrawalIdInput.value = '';
         }
@@ -337,6 +337,7 @@ function initTransferSlipCreateModal(swsLookupUrl) {
                     <td class="text-end">${formatNumber(item.quantity_source)}</td>
                     <td class="text-end">${formatNumber(item.quantity_transferred)}</td>
                     <td class="text-end">${formatNumber(item.quantity_remaining)}</td>
+                    <td class="text-end">${formatNumber(item.stock_available ?? 0)}</td>
                     <td>
                         <div class="input-group">
                             <input

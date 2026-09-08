@@ -96,6 +96,11 @@ class TransferSlipController extends Controller
         $sourceItems = DB::table('store_withdrawal_items as swi')
             ->leftJoin('items as i', 'i.id', '=', 'swi.item_id')
             ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->leftJoin('stock_inventories as si', function ($join) {
+                $join->on('si.item_id', '=', 'swi.item_id')
+                    ->where('si.wh_code', '=', StockService::DEFAULT_WH_CODE)
+                    ->where('si.is_delete', '=', false);
+            })
             ->where('swi.store_withdrawal_id', $storeWithdrawal->id)
             ->whereNull('swi.deleted_at')
             ->orderBy('swi.id')
@@ -108,6 +113,7 @@ class TransferSlipController extends Controller
                 'swi.meta',
                 'i.name as item_name',
                 'u.name as unit_name',
+                'si.balance as stock_available',
             ])
             ->get();
 
@@ -136,6 +142,7 @@ class TransferSlipController extends Controller
                 'quantity_source' => $sourceQuantity,
                 'quantity_transferred' => $transferred,
                 'quantity_remaining' => $remaining,
+                'stock_available' => round((float) ($item->stock_available ?? 0), 5),
                 'uom' => $item->uom ?? $item->unit_name ?? 'PCS',
                 'is_capex' => $isCapex,
                 'prs_number' => $meta['prs_number'] ?? null,
@@ -1024,6 +1031,11 @@ class TransferSlipController extends Controller
         $sourceItems = DB::table('store_withdrawal_items as swi')
             ->leftJoin('items as i', 'i.id', '=', 'swi.item_id')
             ->leftJoin('unit_of_measures as u', 'u.id', '=', 'i.unit_of_measure_id')
+            ->leftJoin('stock_inventories as si', function ($join) {
+                $join->on('si.item_id', '=', 'swi.item_id')
+                    ->where('si.wh_code', '=', StockService::DEFAULT_WH_CODE)
+                    ->where('si.is_delete', '=', false);
+            })
             ->whereIn('swi.store_withdrawal_id', $storeWithdrawalIds)
             ->whereNull('swi.deleted_at')
             ->orderBy('swi.id')
@@ -1036,6 +1048,7 @@ class TransferSlipController extends Controller
                 'swi.uom',
                 'i.name as item_name',
                 'u.name as unit_name',
+                'si.balance as stock_available',
             ])
             ->get();
 
@@ -1089,6 +1102,7 @@ class TransferSlipController extends Controller
                     'quantity_transferred' => $transferredByOthersQty,
                     'quantity_remaining' => $remaining,
                     'quantity_current' => $currentQuantity,
+                    'stock_available' => round((float) ($item->stock_available ?? 0), 5),
                     'uom' => $item->uom ?? $item->unit_name ?? 'PCS',
                 ];
             })->values()->all();

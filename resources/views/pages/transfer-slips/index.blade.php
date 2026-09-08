@@ -57,7 +57,7 @@
     <section class="section">
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
-                <div class="row g-3 align-items-end" id="ts-filter-form">
+                <div class="row g-3 align-items-end po-filter-grid" id="ts-filter-form">
                     <div class="col-12 col-md-6 col-xl-3">
                         <label for="filter-ts-keyword" class="form-label mb-1">Search Transfer Slip</label>
                         <input type="text" id="filter-ts-keyword" class="form-control" value="{{ $filters['keyword'] ?? '' }}" placeholder="TS number / SWS / dept / remarks / creator">
@@ -429,6 +429,7 @@
                                                                 <th class="text-end">SWS Qty</th>
                                                                 <th class="text-end">Other TS</th>
                                                                 <th class="text-end">Available</th>
+                                                                <th class="text-end">Stock</th>
                                                                 <th class="spfi-col-min-narrow">Qty Out</th>
                                                             </tr>
                                                         </thead>
@@ -450,6 +451,7 @@
                                                                     <td class="text-end">{{ number_format((float) $editItem['quantity_source'], 3) }}</td>
                                                                     <td class="text-end">{{ number_format((float) $editItem['quantity_transferred'], 3) }}</td>
                                                                     <td class="text-end">{{ number_format((float) $editItem['quantity_remaining'], 3) }}</td>
+                                                                    <td class="text-end">{{ number_format((float) ($editItem['stock_available'] ?? 0), 3) }}</td>
                                                                     <td>
                                                                         <div class="input-group">
                                                                             <input
@@ -468,7 +470,7 @@
                                                                 </tr>
                                                             @empty
                                                                 <tr>
-                                                                    <td colspan="6" class="text-center text-muted py-4">No SWS items available for this transfer slip.</td>
+                                                                    <td colspan="7" class="text-center text-muted py-4">No SWS items available for this transfer slip.</td>
                                                                 </tr>
                                                             @endforelse
                                                         </tbody>
@@ -629,12 +631,13 @@
                                             <th class="text-end">SWS Qty</th>
                                             <th class="text-end">Transferred</th>
                                             <th class="text-end">Remaining</th>
+                                            <th class="text-end">Stock</th>
                                             <th class="spfi-col-min-narrow">Qty Out</th>
                                         </tr>
                                     </thead>
                                     <tbody id="create-ts-items-body">
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted py-4">Load an SWS number to display transferable items.</td>
+                                            <td colspan="7" class="text-center text-muted py-4">Load an SWS number to display transferable items.</td>
                                         </tr>
                                     </tbody>
                                 </table>
