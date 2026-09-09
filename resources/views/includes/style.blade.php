@@ -41,5 +41,6 @@
     <link rel="stylesheet" href="{{ url('assets/styles/spfi-components.css') }}">
     <link rel="stylesheet" href="{{ url('assets/styles/spfi-list.css') }}">
     <link rel="stylesheet" href="{{ url('assets/styles/main.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/screen-messages.css') }}">
 
     @stack('addon-style')

@@ -29,6 +29,7 @@ class PermissionModuleGroups
         'master_data' => 'Master Data',
         'accounting' => 'Accounting',
         'reports' => 'Reports',
+        'screen_messages' => 'Screen Messages',
         'general' => 'General',
         'other' => 'Other',
     ];
@@ -60,6 +61,8 @@ class PermissionModuleGroups
         'canvasser' => 'canvassing',
         'canvassing' => 'canvassing',
         'purchase-history' => 'po',
+        'screen-message-replies' => 'screen_messages',
+        'screen-messages' => 'screen_messages',
         'products' => 'products',
         'suppliers' => 'suppliers',
         'employees' => 'employees',
@@ -109,6 +112,21 @@ class PermissionModuleGroups
         'approve-po' => 'po',
         'submit-po' => 'po',
         'cancel-po' => 'po',
+        'view-own-screen-messages' => 'screen-messages',
+        'view-department-screen-messages' => 'screen-messages',
+        'view-all-screen-messages' => 'screen-messages',
+        'view-own-screen-message-replies' => 'screen-message-replies',
+        'view-department-screen-message-replies' => 'screen-message-replies',
+        'view-all-screen-message-replies' => 'screen-message-replies',
+        'create-department-screen-messages' => 'screen-messages',
+        'create-all-screen-messages' => 'screen-messages',
+        'create-permanent-screen-messages' => 'screen-messages',
+        'deactivate-own-screen-messages' => 'screen-messages',
+        'deactivate-department-screen-messages' => 'screen-messages',
+        'deactivate-all-screen-messages' => 'screen-messages',
+        'delete-own-screen-messages' => 'screen-messages',
+        'delete-department-screen-messages' => 'screen-messages',
+        'delete-all-screen-messages' => 'screen-messages',
     ];
 
     /**
@@ -133,6 +151,8 @@ class PermissionModuleGroups
         'procurement-reports' => 'Procurement reports',
         'accounting-reports' => 'Accounting reports',
         'im-reports' => 'IM reports',
+        'screen-messages' => 'Screen messages',
+        'screen-message-replies' => 'Screen message replies',
     ];
 
     /**

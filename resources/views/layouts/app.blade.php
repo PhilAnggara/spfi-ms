@@ -27,6 +27,7 @@
             @include('includes.footer')
         </div>
     </div>
+    @include('partials.screen-message-overlay')
     @include('includes.script')
     @livewireScripts
 

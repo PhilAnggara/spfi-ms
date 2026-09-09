@@ -1,0 +1,206 @@
+.sm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+}
+
+.sm-overlay[hidden] {
+    display: none !important;
+}
+
+.sm-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.62);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    transition: opacity 280ms ease;
+}
+
+.sm-overlay.is-visible .sm-overlay__backdrop {
+    opacity: 1;
+}
+
+.sm-overlay__panel {
+    position: relative;
+    width: min(520px, 100%);
+    max-height: min(85vh, 720px);
+    overflow: auto;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 18px;
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+    padding: 1.75rem 1.75rem 1.5rem;
+    transform: translateY(28px) scale(0.96);
+    opacity: 0;
+    transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease;
+}
+
+.sm-overlay.is-visible .sm-overlay__panel {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.sm-overlay.is-leaving .sm-overlay__backdrop {
+    opacity: 0;
+}
+
+.sm-overlay.is-leaving .sm-overlay__panel {
+    transform: translateY(16px) scale(0.98);
+    opacity: 0;
+}
+
+.sm-overlay__accent {
+    position: absolute;
+    top: 0;
+    left: 1.5rem;
+    right: 1.5rem;
+    height: 4px;
+    border-radius: 0 0 999px 999px;
+    background: linear-gradient(90deg, #0f766e, #2563eb, #7c3aed);
+}
+
+.sm-overlay__header {
+    margin-bottom: 1rem;
+}
+
+.sm-overlay__badge {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0.65rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #7c2d12;
+    background: #ffedd5;
+}
+
+.sm-overlay__title {
+    margin: 0;
+    font-size: 1.45rem;
+    line-height: 1.25;
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.sm-overlay__body {
+    color: #334155;
+    font-size: 1rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    margin-bottom: 1.25rem;
+}
+
+.sm-overlay__timer {
+    margin-bottom: 1.15rem;
+}
+
+.sm-overlay__timer-track {
+    height: 6px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+
+.sm-overlay__timer-bar {
+    height: 100%;
+    width: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #0f766e, #2563eb);
+    transform-origin: left center;
+    transition: width 200ms linear;
+}
+
+.sm-overlay__timer-text {
+    display: inline-block;
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.sm-overlay__reply {
+    margin-bottom: 1rem;
+}
+
+.sm-overlay__reply-label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.sm-overlay__reply-input {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    resize: vertical;
+    min-height: 84px;
+    background: #fff;
+    color: #0f172a;
+}
+
+.sm-overlay__reply-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.sm-overlay__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.sm-overlay__btn {
+    appearance: none;
+    border: 0;
+    border-radius: 12px;
+    padding: 0.7rem 1.2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.sm-overlay__btn--primary {
+    color: #fff;
+    background: linear-gradient(135deg, #0f766e, #1d4ed8);
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+}
+
+.sm-overlay__btn--secondary {
+    margin-top: 0.65rem;
+    color: #0f172a;
+    background: #e2e8f0;
+}
+
+.sm-overlay__btn--primary:hover {
+    transform: translateY(-1px);
+}
+
+.sm-overlay__note {
+    margin: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sm-overlay__backdrop,
+    .sm-overlay__panel,
+    .sm-overlay__btn {
+        transition: none !important;
+    }
+}

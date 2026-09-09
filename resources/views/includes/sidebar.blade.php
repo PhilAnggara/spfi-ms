@@ -51,6 +51,15 @@
                             </a>
                         </li>
 
+                        @canany(['view-own-screen-messages', 'view-department-screen-messages', 'view-all-screen-messages'])
+                        <li class="sidebar-item {{ Request::is('screen-messages*') ? 'active' : '' }}">
+                            <a href="{{ route('screen-messages.index') }}" class="sidebar-link">
+                                <i class="fa-duotone fa-solid fa-message-lines {{ Request::is('screen-messages*') ? 'fa-fade' : '' }}"></i>
+                                <span>Screen Messages</span>
+                            </a>
+                        </li>
+                        @endcanany
+
                         <li class="sidebar-item">
                             <a href="{{ config('services.fish_system.url') }}" class="sidebar-link" target="_blank" rel="noopener noreferrer">
                                 <i class="fa-duotone fa-solid fa-fish"></i>

@@ -34,6 +34,8 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchasingReportController;
 use App\Http\Controllers\ReceivingReportController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\ScreenMessageController;
+use App\Http\Controllers\ScreenMessageInboxController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StoreWithdrawalController;
 use App\Http\Controllers\SupplierComparisonController;
@@ -669,6 +671,22 @@ Route::middleware('auth')->group(function () {
         Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
         Route::post('/clear-read', [NotificationController::class, 'clearRead'])->name('notifications.clear-read');
+    });
+
+    Route::prefix('screen-messages/inbox')->name('screen-messages.inbox.')->group(function () {
+        Route::get('/pending', [ScreenMessageInboxController::class, 'pending'])->name('pending');
+        Route::post('/{screenMessage}/seen', [ScreenMessageInboxController::class, 'markSeen'])->name('seen');
+        Route::post('/{screenMessage}/dismiss', [ScreenMessageInboxController::class, 'dismiss'])->name('dismiss');
+        Route::post('/{screenMessage}/reply', [ScreenMessageInboxController::class, 'reply'])->name('reply');
+    });
+
+    Route::prefix('screen-messages')->name('screen-messages.')->group(function () {
+        Route::get('/', [ScreenMessageController::class, 'index'])->name('index');
+        Route::get('/create', [ScreenMessageController::class, 'create'])->name('create');
+        Route::post('/', [ScreenMessageController::class, 'store'])->name('store');
+        Route::get('/{screenMessage}', [ScreenMessageController::class, 'show'])->name('show');
+        Route::post('/{screenMessage}/deactivate', [ScreenMessageController::class, 'deactivate'])->name('deactivate');
+        Route::delete('/{screenMessage}', [ScreenMessageController::class, 'destroy'])->name('destroy');
     });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

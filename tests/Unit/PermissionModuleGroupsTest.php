@@ -39,4 +39,17 @@ it('groups elevated prs and stores withdrawal permissions into modules', functio
     expect(PermissionModuleGroups::resolveGroup('update-all-stores-withdrawal'))->toBe('stores_withdrawal');
     expect(PermissionModuleGroups::resolveGroup('delete-rr'))->toBe('rr');
     expect(PermissionModuleGroups::resolveGroup('update-all-po'))->toBe('po');
+    expect(PermissionModuleGroups::resolveGroup('view-own-screen-messages'))->toBe('screen_messages');
+    expect(PermissionModuleGroups::resolveGroup('create-permanent-screen-messages'))->toBe('screen_messages');
+    expect(PermissionModuleGroups::resolveGroup('view-all-screen-message-replies'))->toBe('screen_messages');
+});
+
+it('parses screen message permissions into the other column', function () {
+    expect(PermissionModuleGroups::parse('view-own-screen-messages'))->toMatchArray([
+        'column' => 'other',
+        'resource' => 'screen-messages',
+    ]);
+    expect(PermissionModuleGroups::parse('create-permanent-screen-messages')['column'])->toBe('other');
+    expect(PermissionModuleGroups::parse('deactivate-all-screen-messages')['resource'])->toBe('screen-messages');
+    expect(PermissionModuleGroups::parse('view-department-screen-message-replies')['resource'])->toBe('screen-message-replies');
 });

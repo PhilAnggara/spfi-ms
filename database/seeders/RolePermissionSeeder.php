@@ -157,6 +157,24 @@ class RolePermissionSeeder extends Seeder
             'view-permissions',
         ];
 
+        $permissionsScreenMessages = [
+            'view-own-screen-messages',
+            'view-department-screen-messages',
+            'view-all-screen-messages',
+            'view-own-screen-message-replies',
+            'view-department-screen-message-replies',
+            'view-all-screen-message-replies',
+            'create-department-screen-messages',
+            'create-all-screen-messages',
+            'create-permanent-screen-messages',
+            'deactivate-own-screen-messages',
+            'deactivate-department-screen-messages',
+            'deactivate-all-screen-messages',
+            'delete-own-screen-messages',
+            'delete-department-screen-messages',
+            'delete-all-screen-messages',
+        ];
+
         $allPermissions = array_values(array_unique(array_merge(
             $permissionsUsers,
             $permissionsPrs,
@@ -171,6 +189,7 @@ class RolePermissionSeeder extends Seeder
             $permissionsMaster,
             $permissionsReportsOps,
             $permissionsRbac,
+            $permissionsScreenMessages,
         )));
 
         foreach ($allPermissions as $permission) {
