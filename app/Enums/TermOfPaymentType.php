@@ -105,4 +105,68 @@ enum TermOfPaymentType: string
 
         return $type?->isCash() ?? false;
     }
+
+    /**
+     * Human-readable label for UI badges (legacy "cash" stays "Cash").
+     */
+    public static function displayLabel(?string $value): string
+    {
+        $normalized = strtolower(trim((string) $value));
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        if ($normalized === 'cash') {
+            return 'Cash';
+        }
+
+        $type = self::tryFrom($normalized);
+
+        if ($type !== null) {
+            return $type->label();
+        }
+
+        return ucfirst($normalized);
+    }
+
+    /**
+     * Bootstrap light badge classes aligned with PO status/meta badges.
+     */
+    public static function badgeClass(?string $value): string
+    {
+        $normalized = strtolower(trim((string) $value));
+
+        if ($normalized === '') {
+            return 'badge bg-light-secondary text-secondary';
+        }
+
+        if ($normalized === 'credit') {
+            return 'badge bg-light-info text-info';
+        }
+
+        if (self::isCashValue($normalized)) {
+            return 'badge bg-light-primary text-primary';
+        }
+
+        return 'badge bg-light-secondary text-secondary';
+    }
+
+    /**
+     * Plain-text display for PDF prints: "CREDIT • DP 50%".
+     */
+    public static function formatDisplay(?string $type, ?string $description = null): string
+    {
+        $typeLabel = self::displayLabel($type);
+        $typeDisplay = $typeLabel !== '' ? strtoupper($typeLabel) : '';
+        $descriptionDisplay = trim((string) $description);
+
+        $parts = array_values(array_filter([$typeDisplay, $descriptionDisplay], fn (string $part): bool => $part !== ''));
+
+        if ($parts === []) {
+            return '-';
+        }
+
+        return implode(' • ', $parts);
+    }
 }

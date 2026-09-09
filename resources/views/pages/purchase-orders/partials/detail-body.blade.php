@@ -5,13 +5,9 @@
 @php
     $currencyCode = $purchaseOrder->currency?->code ?? $purchaseOrder->currency?->symbol ?? 'Rp';
     $firstItemMeta = $purchaseOrder->items->first()?->meta ?? [];
-    $termOfPaymentType = $purchaseOrder->term_of_payment_type ?? ($firstItemMeta['term_of_payment_type'] ?? null);
-    $termOfPaymentTypeEnum = \App\Enums\TermOfPaymentType::fromStored($termOfPaymentType);
+    $termTypeRaw = trim((string) ($purchaseOrder->term_of_payment_type ?? ($firstItemMeta['term_of_payment_type'] ?? '')));
     $termOfPayment = $purchaseOrder->term_of_payment ?? ($firstItemMeta['term_of_payment'] ?? null);
     $termOfDelivery = $purchaseOrder->term_of_delivery ?? ($firstItemMeta['term_of_delivery'] ?? null);
-    $termTypeLabel = $termOfPaymentTypeEnum?->label() ?? ($termOfPaymentType ? ucfirst((string) $termOfPaymentType) : '');
-    $termPaymentDisplay = trim(($termOfPayment ? $termOfPayment.' ' : '').$termTypeLabel);
-    $termPaymentDisplay = $termPaymentDisplay !== '' ? $termPaymentDisplay : '-';
     $feeItems = collect($purchaseOrder->fees_breakdown ?? [])
         ->filter(fn ($row) => is_array($row))
         ->map(fn (array $row) => [
@@ -47,6 +43,14 @@
                     <div class="po-detail-meta-value">{{ $purchaseOrder->createdBy?->name ?? '-' }}</div>
                 </div>
                 <div class="po-detail-meta-card">
+                    <div class="po-preview-kicker">Created Date</div>
+                    <div class="po-detail-meta-value">{{ $purchaseOrder->created_at ? format_date($purchaseOrder->created_at) : '-' }}</div>
+                </div>
+                <div class="po-detail-meta-card">
+                    <div class="po-preview-kicker">Approved Date</div>
+                    <div class="po-detail-meta-value">{{ $purchaseOrder->approved_at ? format_date($purchaseOrder->approved_at) : '-' }}</div>
+                </div>
+                <div class="po-detail-meta-card">
                     <div class="po-preview-kicker">Status</div>
                     <div class="po-detail-meta-value">{{ $purchaseOrder->status }}</div>
                 </div>
@@ -61,7 +65,19 @@
                 </div>
                 <div class="po-detail-meta-card po-detail-meta-card--full">
                     <div class="po-preview-kicker">Term of Payment</div>
-                    <div class="po-detail-meta-value">{{ $termPaymentDisplay }}</div>
+                    <div class="po-detail-meta-value d-flex flex-wrap align-items-center gap-2">
+                        @if ($termTypeRaw !== '')
+                            <span class="{{ \App\Enums\TermOfPaymentType::badgeClass($termTypeRaw) }}">
+                                {{ \App\Enums\TermOfPaymentType::displayLabel($termTypeRaw) }}
+                            </span>
+                        @endif
+                        @if (filled($termOfPayment))
+                            <span>{{ $termOfPayment }}</span>
+                        @endif
+                        @if ($termTypeRaw === '' && blank($termOfPayment))
+                            -
+                        @endif
+                    </div>
                     @if ($termOfDelivery)
                         <div class="po-detail-meta-sub">Term of Delivery: {{ $termOfDelivery }}</div>
                     @endif

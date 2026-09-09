@@ -40,6 +40,10 @@ beforeEach(function () {
         'po_number' => 'PO-MODAL-001',
         'subtotal' => 1000,
         'total' => 1000,
+        'term_of_payment_type' => 'credit',
+        'term_of_payment' => 'DP 50%',
+        'approved_at' => now()->setDate(2026, 3, 15)->setTime(10, 0),
+        'created_at' => now()->setDate(2026, 3, 10)->setTime(9, 0),
     ]);
 });
 
@@ -76,4 +80,12 @@ it('shows po detail in a modal and opens print confirm before printing', functio
         'href="'.route('purchase-orders.print', $this->purchaseOrder).'" target="_blank"',
         false
     );
+    $response->assertSee('badge bg-light-info text-info', false);
+    $response->assertSee('Credit');
+    $response->assertSee('DP 50%');
+    $response->assertDontSee('DP 50% Credit');
+    $response->assertSee('Created Date');
+    $response->assertSee('Approved Date');
+    $response->assertSee(format_date($this->purchaseOrder->created_at));
+    $response->assertSee(format_date($this->purchaseOrder->approved_at));
 });

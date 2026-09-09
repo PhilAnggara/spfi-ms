@@ -72,8 +72,6 @@
                     $termOfPaymentType = $termOfPaymentTypeEnum?->value ?? (string) $rawTermOfPaymentType;
                     $termOfPayment = old('term_of_payment', $purchaseOrder->term_of_payment ?? ($firstItemMeta['term_of_payment'] ?? ''));
                     $termOfDelivery = old('term_of_delivery', $purchaseOrder->term_of_delivery ?? ($firstItemMeta['term_of_delivery'] ?? ''));
-                    $termPaymentDisplay = trim(($termOfPayment ? $termOfPayment.' ' : '').($termOfPaymentTypeEnum?->label() ?? ($termOfPaymentType ? ucfirst((string) $termOfPaymentType) : '')));
-                    $termPaymentDisplay = $termPaymentDisplay !== '' ? $termPaymentDisplay : '-';
                 @endphp
                 @if ($canEdit)
                 <div class="row g-3 mb-4">

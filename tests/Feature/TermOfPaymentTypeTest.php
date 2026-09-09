@@ -36,3 +36,28 @@ it('maps canvassing cash default to materials in transit for po forms', function
         ->and(TermOfPaymentType::fromCanvassingDefault('credit'))->toBe('credit')
         ->and(TermOfPaymentType::fromCanvassingDefault(null))->toBeNull();
 });
+
+it('builds display labels for ui badges', function () {
+    expect(TermOfPaymentType::displayLabel('credit'))->toBe('Credit')
+        ->and(TermOfPaymentType::displayLabel('cash'))->toBe('Cash')
+        ->and(TermOfPaymentType::displayLabel('cash_advance'))->toBe('Cash Advance')
+        ->and(TermOfPaymentType::displayLabel('materials_in_transit'))->toBe('Materials In Transit')
+        ->and(TermOfPaymentType::displayLabel(null))->toBe('');
+});
+
+it('maps badge classes for payment types', function () {
+    expect(TermOfPaymentType::badgeClass('credit'))->toBe('badge bg-light-info text-info')
+        ->and(TermOfPaymentType::badgeClass('cash'))->toBe('badge bg-light-primary text-primary')
+        ->and(TermOfPaymentType::badgeClass('cash_advance'))->toBe('badge bg-light-primary text-primary')
+        ->and(TermOfPaymentType::badgeClass('materials_in_transit'))->toBe('badge bg-light-primary text-primary')
+        ->and(TermOfPaymentType::badgeClass(null))->toBe('badge bg-light-secondary text-secondary')
+        ->and(TermOfPaymentType::badgeClass('unknown'))->toBe('badge bg-light-secondary text-secondary');
+});
+
+it('formats pdf term of payment display with a bullet separator', function () {
+    expect(TermOfPaymentType::formatDisplay('credit', 'DP 50%'))->toBe('CREDIT • DP 50%')
+        ->and(TermOfPaymentType::formatDisplay('cash_advance', null))->toBe('CASH ADVANCE')
+        ->and(TermOfPaymentType::formatDisplay(null, 'DP 50%'))->toBe('DP 50%')
+        ->and(TermOfPaymentType::formatDisplay('cash', 'COD'))->toBe('CASH • COD')
+        ->and(TermOfPaymentType::formatDisplay(null, null))->toBe('-');
+});

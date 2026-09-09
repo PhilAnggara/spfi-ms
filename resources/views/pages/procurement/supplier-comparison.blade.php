@@ -160,9 +160,22 @@
                                                             <td class="text-center" data-label="Lead Time">{{ $canvassing->lead_time_days ?? '-' }}</td>
                                                             <td data-label="Term of Payment">
                                                                 @php
-                                                                    $payment = trim(($canvassing->term_of_payment ? $canvassing->term_of_payment . ' ' : '') . ($canvassing->term_of_payment_type ?? ''));
+                                                                    $termTypeRaw = trim((string) ($canvassing->term_of_payment_type ?? ''));
+                                                                    $termPaymentDesc = $canvassing->term_of_payment;
                                                                 @endphp
-                                                                {{ $payment !== '' ? $payment : '-' }}
+                                                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                                                    @if ($termTypeRaw !== '')
+                                                                        <span class="{{ \App\Enums\TermOfPaymentType::badgeClass($termTypeRaw) }}">
+                                                                            {{ \App\Enums\TermOfPaymentType::displayLabel($termTypeRaw) }}
+                                                                        </span>
+                                                                    @endif
+                                                                    @if (filled($termPaymentDesc))
+                                                                        <span>{{ $termPaymentDesc }}</span>
+                                                                    @endif
+                                                                    @if ($termTypeRaw === '' && blank($termPaymentDesc))
+                                                                        -
+                                                                    @endif
+                                                                </div>
                                                             </td>
                                                             <td data-label="Term of Delivery">{{ $canvassing->term_of_delivery ?? '-' }}</td>
                                                             <td data-label="Notes">

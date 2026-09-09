@@ -231,8 +231,7 @@
         $firstMeta = $firstItem?->meta ?? [];
         $termType = $purchaseOrder->term_of_payment_type ?? ($firstMeta['term_of_payment_type'] ?? null);
         $termValue = $purchaseOrder->term_of_payment ?? ($firstMeta['term_of_payment'] ?? null);
-        $termTypeDisplay = \App\Enums\TermOfPaymentType::fromStored($termType)?->label();
-        $termTypeDisplay = $termTypeDisplay ? strtoupper($termTypeDisplay) : ($termType ? strtoupper((string) $termType) : null);
+        $termPaymentDisplay = \App\Enums\TermOfPaymentType::formatDisplay($termType, $termValue);
         $firstPoItem = $purchaseOrder->items->first();
         $firstPoMeta = $firstPoItem?->meta ?? [];
         $isCapex = (bool) ($firstPoItem?->prsItem?->prs?->is_capex ?? ($firstPoMeta['is_capex'] ?? false));
@@ -293,7 +292,7 @@
             </tr>
             <tr>
                 <td class="label">Term Payment</td>
-                <td colspan="3">: @if($termTypeDisplay || $termValue){{ trim(implode(' • ', array_filter([$termTypeDisplay, $termValue]))) }}@else-@endif</td>
+                <td colspan="3">: {{ $termPaymentDisplay }}</td>
             </tr>
             <tr>
                 <td class="label">Transaction Type</td>
