@@ -137,13 +137,15 @@ class PurchaseOrderController extends Controller
         $collection = collect();
 
         if (! empty($ids)) {
-            $itemsById = PurchaseOrder::with([
-                'supplier',
-                'createdBy',
-                'currency',
-                'items.item.unit',
-                'items.prsItem.prs.department',
-            ])
+            $itemsById = PurchaseOrder::query()
+                ->withReceiptQuantitySelects()
+                ->with([
+                    'supplier',
+                    'createdBy',
+                    'currency',
+                    'items.item.unit',
+                    'items.prsItem.prs.department',
+                ])
                 ->withCount(['items', 'receivingReports'])
                 ->whereIn('id', $ids)
                 ->get()
@@ -726,7 +728,7 @@ class PurchaseOrderController extends Controller
             'items.prsItem.prs.department',
             'createdBy',
             'receivingReports',
-        ]);
+        ])->ensureReceiptQuantities();
 
         return view('pages.purchase-orders.show', [
             'purchaseOrder' => $purchaseOrder,

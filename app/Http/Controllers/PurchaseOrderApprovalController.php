@@ -97,13 +97,15 @@ class PurchaseOrderApprovalController extends Controller
         $collection = collect();
 
         if (! empty($ids)) {
-            $itemsById = PurchaseOrder::with([
-                'supplier',
-                'createdBy',
-                'currency',
-                'items.item.unit',
-                'items.prsItem.prs.department',
-            ])
+            $itemsById = PurchaseOrder::query()
+                ->withReceiptQuantitySelects()
+                ->with([
+                    'supplier',
+                    'createdBy',
+                    'currency',
+                    'items.item.unit',
+                    'items.prsItem.prs.department',
+                ])
                 ->withCount('items')
                 ->whereIn('id', $ids)
                 ->get()

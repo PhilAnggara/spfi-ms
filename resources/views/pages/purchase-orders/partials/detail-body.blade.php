@@ -55,6 +55,16 @@
                     <div class="po-detail-meta-value">{{ $purchaseOrder->status }}</div>
                 </div>
                 <div class="po-detail-meta-card">
+                    <div class="po-preview-kicker">Receipt Status</div>
+                    @php
+                        $receiptStatus = $purchaseOrder->receiptStatus();
+                    @endphp
+                    <div class="po-detail-meta-value">
+                        <span class="{{ $receiptStatus->badgeClass() }}">{{ $receiptStatus->label() }}</span>
+                    </div>
+                    <div class="po-detail-meta-sub">{{ $purchaseOrder->receiptQuantitySummary() }}</div>
+                </div>
+                <div class="po-detail-meta-card">
                     <div class="po-preview-kicker">Currency</div>
                     <div class="po-detail-meta-value">{{ $currencyCode }}</div>
                 </div>

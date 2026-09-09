@@ -116,6 +116,7 @@
                                     <th>Total</th>
                                     <th class="d-none d-md-table-cell">Created At</th>
                                     <th>Status</th>
+                                    <th>Receipt</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -138,6 +139,8 @@
                                             'DRAFT' => 'fa-solid fa-file-pen',
                                             default => 'fa-solid fa-circle-info',
                                         };
+
+                                        $receiptStatus = $po->receiptStatus();
                                     @endphp
                                     <tr>
                                         <td>
@@ -173,6 +176,9 @@
                                                 <i class="{{ $statusIcon }}"></i>
                                                 {{ $po->status }}
                                             </span>
+                                        </td>
+                                        <td>
+                                            <span class="{{ $receiptStatus->badgeClass() }}">{{ $receiptStatus->label() }}</span>
                                         </td>
                                         <td>
                                             <div class="btn-group btn-group-sm">

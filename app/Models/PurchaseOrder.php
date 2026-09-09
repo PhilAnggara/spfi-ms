@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\PoReceiptStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class PurchaseOrder extends Model
 {
@@ -130,5 +133,60 @@ class PurchaseOrder extends Model
             'purchase-order.signature.approved_by_below_threshold_name',
             'Denny Tuhatelu'
         );
+    }
+
+    /**
+     * @param  Builder<PurchaseOrder>  $query
+     * @return Builder<PurchaseOrder>
+     */
+    public function scopeWithReceiptQuantitySelects(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        if ($query->getQuery()->columns === null) {
+            $query->select("{$table}.*");
+        }
+
+        return $query
+            ->selectRaw(PoReceiptStatus::qtyOrderedSubquerySql($table).' as qty_ordered')
+            ->selectRaw(PoReceiptStatus::qtyReceivedSubquerySql($table).' as qty_received');
+    }
+
+    public function ensureReceiptQuantities(): static
+    {
+        if (! array_key_exists('qty_ordered', $this->attributes)) {
+            $this->attributes['qty_ordered'] = (float) $this->items()->sum('quantity');
+        }
+
+        if (! array_key_exists('qty_received', $this->attributes)) {
+            $this->attributes['qty_received'] = (float) DB::table('receiving_report_items as rri')
+                ->join('receiving_reports as rr', 'rr.id', '=', 'rri.receiving_report_id')
+                ->where('rr.purchase_order_id', $this->getKey())
+                ->whereNull('rr.deleted_at')
+                ->whereNull('rri.deleted_at')
+                ->sum(DB::raw('rri.qty_good + rri.qty_bad'));
+        }
+
+        return $this;
+    }
+
+    public function receiptStatus(): PoReceiptStatus
+    {
+        $this->ensureReceiptQuantities();
+
+        return PoReceiptStatus::fromQuantities(
+            (float) ($this->attributes['qty_ordered'] ?? 0),
+            (float) ($this->attributes['qty_received'] ?? 0),
+        );
+    }
+
+    public function receiptQuantitySummary(): string
+    {
+        $this->ensureReceiptQuantities();
+
+        $ordered = (float) ($this->attributes['qty_ordered'] ?? 0);
+        $received = (float) ($this->attributes['qty_received'] ?? 0);
+
+        return format_po_decimal($received).' / '.format_po_decimal($ordered);
     }
 }
