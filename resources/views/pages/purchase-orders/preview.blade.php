@@ -8,6 +8,8 @@
     $feeItemsForForm = old('fee_items', $feeItems ?? []);
     $hasCapexItems = collect($lineItems)->contains(fn ($item) => (bool) ($item['is_capex'] ?? false));
     $selectedTermType = old('term_of_payment_type', $termOfPaymentType ?? '');
+    $selectedTermTypeEnum = \App\Enums\TermOfPaymentType::fromStored($selectedTermType);
+    $selectedTermType = $selectedTermTypeEnum?->value ?? $selectedTermType;
     $selectedTermPayment = old('term_of_payment', $termOfPayment ?? '');
     $selectedTermDelivery = old('term_of_delivery', $termOfDelivery ?? '');
     $selectedPoNumber = old('po_number', $nextPoNumber ?? '');
@@ -92,8 +94,9 @@
                             <div class="po-preview-split-control">
                                 <select name="term_of_payment_type" id="term-of-payment-type" class="form-select" required>
                                     <option value="">Type</option>
-                                    <option value="cash" @selected($selectedTermType === 'cash')>Cash</option>
-                                    <option value="credit" @selected($selectedTermType === 'credit')>Credit</option>
+                                    @foreach (\App\Enums\TermOfPaymentType::poFormOptions() as $value => $label)
+                                        <option value="{{ $value }}" @selected($selectedTermType === $value)>{{ $label }}</option>
+                                    @endforeach
                                 </select>
                                 <input type="text" name="term_of_payment" class="form-control" value="{{ $selectedTermPayment }}" placeholder="Optional description">
                             </div>

@@ -136,7 +136,7 @@ it('keeps prs status canvassing when only some items get a purchase order', func
             'action' => 'draft',
             'remark_type' => 'Normal',
             'remark_text' => null,
-            'term_of_payment_type' => 'cash',
+            'term_of_payment_type' => 'materials_in_transit',
             'term_of_payment' => 'COD',
             'term_of_delivery' => '7 days',
             'items' => [
@@ -170,7 +170,7 @@ it('sets prs status to po_created when all open items have purchase orders', fun
             'action' => 'draft',
             'remark_type' => 'Normal',
             'remark_text' => null,
-            'term_of_payment_type' => 'cash',
+            'term_of_payment_type' => 'materials_in_transit',
             'term_of_payment' => 'COD',
             'term_of_delivery' => '7 days',
             'items' => [

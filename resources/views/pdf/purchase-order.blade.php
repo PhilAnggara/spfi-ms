@@ -231,7 +231,8 @@
         $firstMeta = $firstItem?->meta ?? [];
         $termType = $purchaseOrder->term_of_payment_type ?? ($firstMeta['term_of_payment_type'] ?? null);
         $termValue = $purchaseOrder->term_of_payment ?? ($firstMeta['term_of_payment'] ?? null);
-        $termTypeDisplay = $termType ? strtoupper((string) $termType) : null;
+        $termTypeDisplay = \App\Enums\TermOfPaymentType::fromStored($termType)?->label();
+        $termTypeDisplay = $termTypeDisplay ? strtoupper($termTypeDisplay) : ($termType ? strtoupper((string) $termType) : null);
         $firstPoItem = $purchaseOrder->items->first();
         $firstPoMeta = $firstPoItem?->meta ?? [];
         $isCapex = (bool) ($firstPoItem?->prsItem?->prs?->is_capex ?? ($firstPoMeta['is_capex'] ?? false));

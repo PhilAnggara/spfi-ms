@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TermOfPaymentType;
 use App\Models\Currency;
 use App\Models\Prs;
 use App\Models\PrsItem;
@@ -335,7 +336,7 @@ class PurchaseOrderController extends Controller
             'fee_items.*.amount' => ['nullable', 'numeric', 'min:0'],
             'remark_type' => ['required', 'in:Normal,Confirmatory'],
             'remark_text' => ['nullable', 'string', 'max:255'],
-            'term_of_payment_type' => ['required', 'in:cash,credit'],
+            'term_of_payment_type' => ['required', TermOfPaymentType::validationRule()],
             'term_of_payment' => ['nullable', 'string', 'max:255'],
             'term_of_delivery' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1', 'max:'.self::MAX_ITEMS_PER_PO],
@@ -753,7 +754,7 @@ class PurchaseOrderController extends Controller
             'fee_items.*.amount' => ['nullable', 'numeric', 'min:0'],
             'remark_type' => ['required', 'in:Normal,Confirmatory'],
             'remark_text' => ['nullable', 'string', 'max:255'],
-            'term_of_payment_type' => ['required', 'in:cash,credit'],
+            'term_of_payment_type' => ['required', TermOfPaymentType::validationRule()],
             'term_of_payment' => ['nullable', 'string', 'max:255'],
             'term_of_delivery' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
@@ -980,7 +981,9 @@ class PurchaseOrderController extends Controller
         }
 
         return [
-            'term_of_payment_type' => strtolower(trim((string) ($selectedCanvassing?->term_of_payment_type ?? ''))),
+            'term_of_payment_type' => TermOfPaymentType::fromCanvassingDefault(
+                $selectedCanvassing?->term_of_payment_type
+            ) ?? '',
             'term_of_payment' => $selectedCanvassing?->term_of_payment,
             'term_of_delivery' => $selectedCanvassing?->term_of_delivery,
         ];

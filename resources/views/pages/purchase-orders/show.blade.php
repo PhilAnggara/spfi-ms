@@ -64,10 +64,15 @@
                         ->filter(fn (array $row) => $row['type'] !== '' || $row['amount'] > 0)
                         ->values();
                     $firstItemMeta = $purchaseOrder->items->first()?->meta ?? [];
-                    $termOfPaymentType = old('term_of_payment_type', $purchaseOrder->term_of_payment_type ?? ($firstItemMeta['term_of_payment_type'] ?? ''));
+                    $rawTermOfPaymentType = old(
+                        'term_of_payment_type',
+                        $purchaseOrder->term_of_payment_type ?? ($firstItemMeta['term_of_payment_type'] ?? '')
+                    );
+                    $termOfPaymentTypeEnum = \App\Enums\TermOfPaymentType::fromStored($rawTermOfPaymentType);
+                    $termOfPaymentType = $termOfPaymentTypeEnum?->value ?? (string) $rawTermOfPaymentType;
                     $termOfPayment = old('term_of_payment', $purchaseOrder->term_of_payment ?? ($firstItemMeta['term_of_payment'] ?? ''));
                     $termOfDelivery = old('term_of_delivery', $purchaseOrder->term_of_delivery ?? ($firstItemMeta['term_of_delivery'] ?? ''));
-                    $termPaymentDisplay = trim(($termOfPayment ? $termOfPayment . ' ' : '') . ($termOfPaymentType ? ucfirst($termOfPaymentType) : ''));
+                    $termPaymentDisplay = trim(($termOfPayment ? $termOfPayment.' ' : '').($termOfPaymentTypeEnum?->label() ?? ($termOfPaymentType ? ucfirst((string) $termOfPaymentType) : '')));
                     $termPaymentDisplay = $termPaymentDisplay !== '' ? $termPaymentDisplay : '-';
                 @endphp
                 @if ($canEdit)
@@ -122,8 +127,9 @@
                                 <div class="input-group">
                                     <select name="term_of_payment_type" class="form-select spfi-col-select-sm" required>
                                         <option value="">Select</option>
-                                        <option value="cash" @selected($termOfPaymentType === 'cash')>Cash</option>
-                                        <option value="credit" @selected($termOfPaymentType === 'credit')>Credit</option>
+                                        @foreach (\App\Enums\TermOfPaymentType::poFormOptions() as $value => $label)
+                                            <option value="{{ $value }}" @selected($termOfPaymentType === $value)>{{ $label }}</option>
+                                        @endforeach
                                     </select>
                                     <input type="text" name="term_of_payment" class="form-control" value="{{ $termOfPayment }}" placeholder="Description optional">
                                 </div>

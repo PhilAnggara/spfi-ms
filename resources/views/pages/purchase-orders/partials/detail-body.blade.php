@@ -6,9 +6,11 @@
     $currencyCode = $purchaseOrder->currency?->code ?? $purchaseOrder->currency?->symbol ?? 'Rp';
     $firstItemMeta = $purchaseOrder->items->first()?->meta ?? [];
     $termOfPaymentType = $purchaseOrder->term_of_payment_type ?? ($firstItemMeta['term_of_payment_type'] ?? null);
+    $termOfPaymentTypeEnum = \App\Enums\TermOfPaymentType::fromStored($termOfPaymentType);
     $termOfPayment = $purchaseOrder->term_of_payment ?? ($firstItemMeta['term_of_payment'] ?? null);
     $termOfDelivery = $purchaseOrder->term_of_delivery ?? ($firstItemMeta['term_of_delivery'] ?? null);
-    $termPaymentDisplay = trim(($termOfPayment ? $termOfPayment.' ' : '').($termOfPaymentType ? ucfirst((string) $termOfPaymentType) : ''));
+    $termTypeLabel = $termOfPaymentTypeEnum?->label() ?? ($termOfPaymentType ? ucfirst((string) $termOfPaymentType) : '');
+    $termPaymentDisplay = trim(($termOfPayment ? $termOfPayment.' ' : '').$termTypeLabel);
     $termPaymentDisplay = $termPaymentDisplay !== '' ? $termPaymentDisplay : '-';
     $feeItems = collect($purchaseOrder->fees_breakdown ?? [])
         ->filter(fn ($row) => is_array($row))

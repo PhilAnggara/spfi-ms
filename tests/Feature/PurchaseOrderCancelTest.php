@@ -256,7 +256,7 @@ it('releases the po number so it can be reused on a new po', function () {
             'po_number' => $this->releasedPoNumber,
             'remark_type' => 'Normal',
             'remark_text' => null,
-            'term_of_payment_type' => 'cash',
+            'term_of_payment_type' => 'materials_in_transit',
             'term_of_payment' => 'COD',
             'term_of_delivery' => '7 days',
             'items' => [

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TermOfPaymentType;
 use App\Exports\PoNotYetDeliveredSpreadsheet;
 use App\Exports\PoRegisteredDepartmentSpreadsheet;
 use App\Exports\PoRegisteredItemSpreadsheet;
@@ -701,7 +702,11 @@ class PurchasingReportController extends Controller
             ->whereHas('purchaseOrder', function ($query) use ($validated, $dateFrom) {
                 $query->whereDate('created_at', '>=', $dateFrom)
                     ->whereDate('created_at', '<=', $validated['date_to'])
-                    ->where('term_of_payment_type', $validated['po_type'])
+                    ->when(
+                        $validated['po_type'] === 'cash',
+                        fn ($q) => $q->whereIn('term_of_payment_type', TermOfPaymentType::cashReportValues()),
+                        fn ($q) => $q->where('term_of_payment_type', $validated['po_type'])
+                    )
                     ->where('status', 'APPROVED');
             });
 

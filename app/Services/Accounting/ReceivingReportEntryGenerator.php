@@ -2,6 +2,7 @@
 
 namespace App\Services\Accounting;
 
+use App\Enums\TermOfPaymentType;
 use App\Models\AccountingCode;
 use App\Models\ReceivingReport;
 use App\Services\CurrencyExchangeRateService;
@@ -124,11 +125,7 @@ class ReceivingReportEntryGenerator
             ->map(fn ($rrItem) => strtolower(trim((string) data_get($rrItem, 'purchaseOrderItem.meta.term_of_payment_type', ''))))
             ->first(fn ($value) => $value !== '');
 
-        $creditAccount = match ($termOfPaymentType) {
-            'credit' => '201',
-            'cash' => '148',
-            default => '',
-        };
+        $creditAccount = TermOfPaymentType::fromStored($termOfPaymentType)?->creditAccountCode() ?? '';
 
         $lines = collect($debitRows)
             ->values()
