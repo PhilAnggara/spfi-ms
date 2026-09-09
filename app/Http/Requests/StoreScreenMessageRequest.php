@@ -74,8 +74,11 @@ class StoreScreenMessageRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $duration = $this->input('duration_seconds');
+
         $this->merge([
             'allow_reply' => $this->boolean('allow_reply'),
+            'duration_seconds' => ($duration === '' || $duration === null) ? null : $duration,
         ]);
     }
 }

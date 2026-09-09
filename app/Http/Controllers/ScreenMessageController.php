@@ -10,6 +10,7 @@ use App\Models\ScreenMessage;
 use App\Models\User;
 use App\Services\ScreenMessageService;
 use App\Support\ScreenMessageAccess;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -96,6 +97,16 @@ class ScreenMessageController extends Controller
             'seenCount' => $screenMessage->recipients->whereNotNull('seen_at')->count(),
             'recipientCount' => $screenMessage->recipients->count(),
         ]);
+    }
+
+    public function live(Request $request, ScreenMessage $screenMessage): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless(ScreenMessageAccess::canView($user, $screenMessage), 403);
+
+        return response()->json(
+            $this->screenMessages->livePayload($screenMessage, $user)
+        );
     }
 
     public function deactivate(Request $request, ScreenMessage $screenMessage): RedirectResponse

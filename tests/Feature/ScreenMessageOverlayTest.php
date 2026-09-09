@@ -204,3 +204,136 @@ it('shows read receipts on the sender detail page', function () {
         ->assertSee($unseenUser->name)
         ->assertSee('Not yet');
 });
+
+it('stores null duration for user closable without timer', function () {
+    $sender = createOverlayUser('ov-nodur-sender', [
+        'create-all-screen-messages',
+        'view-own-screen-messages',
+    ]);
+    $recipient = createOverlayUser('ov-nodur-recipient');
+
+    $this->actingAs($sender)
+        ->post(route('screen-messages.store'), [
+            'title' => 'No timer',
+            'body' => 'Close yourself',
+            'display_mode' => ScreenMessageDisplayMode::UserClosable->value,
+            'duration_seconds' => null,
+            'audience_type' => ScreenMessageAudienceType::Users->value,
+            'target_ids' => [$recipient->id],
+        ])
+        ->assertRedirect();
+
+    $message = \App\Models\ScreenMessage::query()->where('title', 'No timer')->first();
+    expect($message)->not->toBeNull()
+        ->and($message->duration_seconds)->toBeNull();
+
+    $this->actingAs($recipient)
+        ->getJson(route('screen-messages.inbox.pending'))
+        ->assertOk()
+        ->assertJsonPath('messages.0.id', $message->id)
+        ->assertJsonPath('messages.0.expires_at', null);
+});
+
+it('sets overlay_expires_at once and resumes the same expiry on pending', function () {
+    $sender = createOverlayUser('ov-exp-sender', [
+        'create-all-screen-messages',
+    ]);
+    $recipient = createOverlayUser('ov-exp-recipient');
+
+    $message = app(ScreenMessageService::class)->create($sender, [
+        'title' => 'Timed',
+        'body' => 'Countdown',
+        'display_mode' => ScreenMessageDisplayMode::AutoOnly->value,
+        'duration_seconds' => 60,
+        'audience_type' => ScreenMessageAudienceType::Users->value,
+        'target_ids' => [$recipient->id],
+    ]);
+
+    $first = $this->actingAs($recipient)
+        ->postJson(route('screen-messages.inbox.seen', $message))
+        ->assertOk()
+        ->json('expires_at');
+
+    expect($first)->not->toBeNull();
+
+    $this->travel(5)->seconds();
+
+    $second = $this->actingAs($recipient)
+        ->postJson(route('screen-messages.inbox.seen', $message))
+        ->assertOk()
+        ->json('expires_at');
+
+    expect($second)->toBe($first);
+
+    $this->actingAs($recipient)
+        ->getJson(route('screen-messages.inbox.pending'))
+        ->assertOk()
+        ->assertJsonPath('messages.0.expires_at', $first);
+});
+
+it('includes my_reply in pending after the recipient replies', function () {
+    $sender = createOverlayUser('ov-myreply-sender', [
+        'create-all-screen-messages',
+        'view-own-screen-messages',
+        'view-own-screen-message-replies',
+    ]);
+    $recipient = createOverlayUser('ov-myreply-recipient');
+
+    $message = app(ScreenMessageService::class)->create($sender, [
+        'title' => 'Reply me',
+        'body' => 'Please answer',
+        'display_mode' => ScreenMessageDisplayMode::UserClosable->value,
+        'audience_type' => ScreenMessageAudienceType::Users->value,
+        'target_ids' => [$recipient->id],
+        'allow_reply' => true,
+    ]);
+
+    $this->actingAs($recipient)
+        ->postJson(route('screen-messages.inbox.reply', $message), ['body' => 'Here is my answer'])
+        ->assertOk();
+
+    $this->actingAs($recipient)
+        ->getJson(route('screen-messages.inbox.pending'))
+        ->assertOk()
+        ->assertJsonPath('messages.0.my_reply.body', 'Here is my answer');
+});
+
+it('returns live recipient and reply data for authorized viewers', function () {
+    $sender = createOverlayUser('ov-live-sender', [
+        'create-all-screen-messages',
+        'view-own-screen-messages',
+        'view-own-screen-message-replies',
+    ]);
+    $outsider = createOverlayUser('ov-live-outsider', [
+        'view-own-screen-messages',
+    ]);
+    $recipient = createOverlayUser('ov-live-recipient');
+
+    $message = app(ScreenMessageService::class)->create($sender, [
+        'title' => 'Live feed',
+        'body' => 'Watch me',
+        'display_mode' => ScreenMessageDisplayMode::UserClosable->value,
+        'audience_type' => ScreenMessageAudienceType::Users->value,
+        'target_ids' => [$recipient->id],
+        'allow_reply' => true,
+    ]);
+
+    $this->actingAs($recipient)
+        ->postJson(route('screen-messages.inbox.seen', $message))
+        ->assertOk();
+    $this->actingAs($recipient)
+        ->postJson(route('screen-messages.inbox.reply', $message), ['body' => 'Live reply'])
+        ->assertOk();
+
+    $this->actingAs($outsider)
+        ->getJson(route('screen-messages.live', $message))
+        ->assertForbidden();
+
+    $this->actingAs($sender)
+        ->getJson(route('screen-messages.live', $message))
+        ->assertOk()
+        ->assertJsonPath('seen_count', 1)
+        ->assertJsonPath('recipient_count', 1)
+        ->assertJsonPath('recipients.0.name', $recipient->name)
+        ->assertJsonPath('replies.0.body', 'Live reply');
+});

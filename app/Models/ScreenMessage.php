@@ -88,9 +88,9 @@ class ScreenMessage extends Model
     /**
      * @return array<string, mixed>
      */
-    public function toOverlayPayload(): array
+    public function toOverlayPayload(?User $viewer = null): array
     {
-        return [
+        $payload = [
             'id' => $this->id,
             'title' => $this->title,
             'body' => $this->body,
@@ -99,6 +99,31 @@ class ScreenMessage extends Model
             'allow_reply' => $this->allow_reply,
             'is_active' => $this->is_active,
             'created_at' => $this->created_at?->toIso8601String(),
+            'expires_at' => null,
+            'my_reply' => null,
         ];
+
+        if ($viewer) {
+            $recipient = $this->relationLoaded('recipients')
+                ? $this->recipients->firstWhere('user_id', $viewer->id)
+                : $this->recipients()->where('user_id', $viewer->id)->first();
+
+            $payload['expires_at'] = $recipient?->overlay_expires_at?->toIso8601String();
+
+            if ($this->allow_reply) {
+                $reply = $this->relationLoaded('replies')
+                    ? $this->replies->firstWhere('user_id', $viewer->id)
+                    : $this->replies()->where('user_id', $viewer->id)->first();
+
+                if ($reply) {
+                    $payload['my_reply'] = [
+                        'id' => $reply->id,
+                        'body' => $reply->body,
+                    ];
+                }
+            }
+        }
+
+        return $payload;
     }
 }

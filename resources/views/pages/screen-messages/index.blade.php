@@ -2,7 +2,7 @@
 @section('title', ' | Screen Messages')
 
 @section('content')
-<div class="page-heading po-page sc-page">
+<div class="page-heading po-page sc-page sm-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
             <div class="col-12 col-lg-7">
@@ -13,7 +13,7 @@
             </div>
             @if ($canCreate)
                 <div class="col-12 col-lg-5">
-                    <div class="po-top-actions text-lg-end">
+                    <div class="po-top-actions sm-page-actions text-lg-end">
                         <a href="{{ route('screen-messages.create') }}" class="btn btn-success icon icon-left">
                             <i class="fa-duotone fa-solid fa-paper-plane"></i>
                             New Message
@@ -36,7 +36,7 @@
                     <span class="badge bg-light-primary">{{ number_format($messages->total()) }} records</span>
                 </div>
 
-                <div class="table-responsive">
+                <div class="table-responsive sm-index-table-wrap d-none d-md-block">
                     <table class="table table-striped align-middle list-table sc-index-table mb-0">
                         <thead>
                             <tr>
@@ -83,6 +83,37 @@
                             @endforelse
                         </tbody>
                     </table>
+                </div>
+
+                <div class="sm-index-cards d-md-none">
+                    @forelse ($messages as $message)
+                        <article class="sm-index-card">
+                            <div class="sm-index-card__top">
+                                <h6 class="sm-index-card__title mb-1">{{ $message->title }}</h6>
+                                <div class="sm-index-card__meta text-muted">
+                                    {{ $message->user?->name ?? '—' }}
+                                    · {{ $message->created_at?->format('d M Y H:i') }}
+                                </div>
+                            </div>
+                            <div class="sm-index-card__badges">
+                                <span class="badge bg-light-secondary text-secondary">{{ $message->display_mode->label() }}</span>
+                                @if ($message->is_active)
+                                    <span class="badge bg-light-success text-success">Active</span>
+                                @else
+                                    <span class="badge bg-light-warning text-warning">Inactive</span>
+                                @endif
+                                <span class="badge bg-light-primary">{{ $message->seen_recipients_count }}/{{ $message->recipients_count }} seen</span>
+                                <span class="badge bg-light-info text-info">{{ $message->replies_count }} replies</span>
+                            </div>
+                            <div class="sm-index-card__actions">
+                                <a href="{{ route('screen-messages.show', $message) }}" class="btn btn-sm btn-outline-primary w-100">
+                                    View
+                                </a>
+                            </div>
+                        </article>
+                    @empty
+                        <div class="text-center text-muted py-4">No screen messages yet.</div>
+                    @endforelse
                 </div>
 
                 <div class="mt-3">

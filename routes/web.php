@@ -685,6 +685,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/create', [ScreenMessageController::class, 'create'])->name('create');
         Route::post('/', [ScreenMessageController::class, 'store'])->name('store');
         Route::get('/{screenMessage}', [ScreenMessageController::class, 'show'])->name('show');
+        Route::get('/{screenMessage}/live', [ScreenMessageController::class, 'live'])->name('live');
         Route::post('/{screenMessage}/deactivate', [ScreenMessageController::class, 'deactivate'])->name('deactivate');
         Route::delete('/{screenMessage}', [ScreenMessageController::class, 'destroy'])->name('destroy');
     });

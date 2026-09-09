@@ -8,13 +8,15 @@
     const authUserId = document.querySelector('meta[name="auth-user-id"]')?.content;
     const titleEl = document.getElementById('sm-overlay-title');
     const bodyEl = document.getElementById('sm-overlay-body');
-    const badgeEl = document.getElementById('sm-overlay-badge');
     const timerWrap = document.getElementById('sm-overlay-timer');
     const timerBar = document.getElementById('sm-overlay-timer-bar');
     const timerText = document.getElementById('sm-overlay-timer-text');
     const replyWrap = document.getElementById('sm-overlay-reply');
+    const replyForm = document.getElementById('sm-overlay-reply-form');
     const replyInput = document.getElementById('sm-overlay-reply-input');
     const replySubmitBtn = document.getElementById('sm-overlay-reply-submit');
+    const replySent = document.getElementById('sm-overlay-reply-sent');
+    const replySentBody = document.getElementById('sm-overlay-reply-sent-body');
     const closeBtn = document.getElementById('sm-overlay-close');
     const permanentNote = document.getElementById('sm-overlay-permanent-note');
 
@@ -67,6 +69,13 @@
         }
 
         if (current?.id === message.id) {
+            if (message.expires_at && !current.expires_at) {
+                current.expires_at = message.expires_at;
+            }
+            if (message.my_reply && !current.my_reply) {
+                current.my_reply = message.my_reply;
+                showSentReply(message.my_reply.body);
+            }
             return;
         }
 
@@ -113,19 +122,59 @@
         }
     }
 
-    function startTimer(seconds) {
+    function startTimerFromExpiresAt(expiresAtIso, fallbackDurationSeconds) {
         clearTimer();
-        if (!seconds || seconds < 1) {
+
+        let endsAt = expiresAtIso ? Date.parse(expiresAtIso) : NaN;
+        if (Number.isNaN(endsAt) && fallbackDurationSeconds && fallbackDurationSeconds > 0) {
+            endsAt = Date.now() + fallbackDurationSeconds * 1000;
+        }
+
+        if (Number.isNaN(endsAt)) {
             timerWrap.hidden = true;
             return;
         }
 
+        const remainingMs = endsAt - Date.now();
+        if (remainingMs <= 0) {
+            timerWrap.hidden = true;
+            dismissCurrent();
+            return;
+        }
+
         timerWrap.hidden = false;
-        timerTotalMs = seconds * 1000;
-        timerEndsAt = Date.now() + timerTotalMs;
-        timerBar.style.width = '100%';
+        timerEndsAt = endsAt;
+        timerTotalMs = fallbackDurationSeconds && fallbackDurationSeconds > 0
+            ? fallbackDurationSeconds * 1000
+            : remainingMs;
+        if (timerTotalMs < remainingMs) {
+            timerTotalMs = remainingMs;
+        }
         updateTimerUi();
         timerId = setInterval(updateTimerUi, 200);
+    }
+
+    function showReplyForm() {
+        replyWrap.hidden = false;
+        replyForm.hidden = false;
+        replySent.hidden = true;
+        replyInput.value = '';
+        replySubmitBtn.hidden = false;
+    }
+
+    function showSentReply(body) {
+        replyWrap.hidden = false;
+        replyForm.hidden = true;
+        replySent.hidden = false;
+        replySentBody.innerHTML = escapeHtml(body || '').replaceAll('\n', '<br>');
+        replyInput.value = '';
+    }
+
+    function hideReply() {
+        replyWrap.hidden = true;
+        replyForm.hidden = true;
+        replySent.hidden = true;
+        replyInput.value = '';
     }
 
     function render(message) {
@@ -135,25 +184,24 @@
         const isPermanent = message.display_mode === 'permanent';
         const canClose = message.display_mode === 'user_closable';
 
-        badgeEl.hidden = !isPermanent;
         permanentNote.hidden = !isPermanent;
         closeBtn.hidden = !canClose;
 
         if (message.allow_reply) {
-            replyWrap.hidden = false;
-            replyInput.value = '';
-            replySubmitBtn.hidden = false;
+            if (message.my_reply?.body) {
+                showSentReply(message.my_reply.body);
+            } else {
+                showReplyForm();
+            }
         } else {
-            replyWrap.hidden = true;
-            replyInput.value = '';
-            replySubmitBtn.hidden = true;
+            hideReply();
         }
 
         if (isPermanent) {
             timerWrap.hidden = true;
             clearTimer();
         } else {
-            startTimer(message.duration_seconds || 0);
+            startTimerFromExpiresAt(message.expires_at, message.duration_seconds || 0);
         }
     }
 
@@ -203,14 +251,20 @@
         showOverlay();
 
         try {
-            await api(`/screen-messages/inbox/${current.id}/seen`, { method: 'POST', body: '{}' });
+            const seen = await api(`/screen-messages/inbox/${current.id}/seen`, { method: 'POST', body: '{}' });
+            if (seen.expires_at) {
+                current.expires_at = seen.expires_at;
+                if (current.display_mode !== 'permanent' && (current.duration_seconds || seen.expires_at)) {
+                    startTimerFromExpiresAt(seen.expires_at, current.duration_seconds || 0);
+                }
+            }
         } catch (e) {
             // Keep showing even if seen tracking fails.
         }
     }
 
     async function submitReplyIfNeeded() {
-        if (!current?.allow_reply) {
+        if (!current?.allow_reply || current.my_reply) {
             return;
         }
 
@@ -219,12 +273,13 @@
             return;
         }
 
-        await api(`/screen-messages/inbox/${current.id}/reply`, {
+        const data = await api(`/screen-messages/inbox/${current.id}/reply`, {
             method: 'POST',
             body: JSON.stringify({ body }),
         });
 
-        replyInput.value = '';
+        current.my_reply = data.reply || { body };
+        showSentReply(current.my_reply.body);
     }
 
     async function dismissCurrent() {
@@ -256,7 +311,7 @@
     });
 
     replySubmitBtn.addEventListener('click', async () => {
-        if (!current?.allow_reply) {
+        if (!current?.allow_reply || current.my_reply) {
             return;
         }
 

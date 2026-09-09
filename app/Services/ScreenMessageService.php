@@ -60,7 +60,13 @@ class ScreenMessageService
 
         $duration = $displayMode->isPermanent()
             ? null
-            : ($data['duration_seconds'] ?? null);
+            : (isset($data['duration_seconds']) && $data['duration_seconds'] !== '' && $data['duration_seconds'] !== null
+                ? (int) $data['duration_seconds']
+                : null);
+
+        if ($duration !== null && $duration < 1) {
+            $duration = null;
+        }
 
         /** @var ScreenMessage $message */
         $message = DB::transaction(function () use ($sender, $data, $displayMode, $audienceType, $duration, $targetIds, $recipients): ScreenMessage {
@@ -146,13 +152,28 @@ class ScreenMessageService
         $message->delete();
     }
 
-    public function markSeen(ScreenMessage $message, User $user): void
+    public function markSeen(ScreenMessage $message, User $user): ?string
     {
         $recipient = $this->recipientFor($message, $user);
+        $updates = [];
 
         if ($recipient->seen_at === null) {
-            $recipient->forceFill(['seen_at' => now()])->save();
+            $updates['seen_at'] = now();
         }
+
+        if (
+            $recipient->overlay_expires_at === null
+            && $message->duration_seconds
+            && ! $message->display_mode->isPermanent()
+        ) {
+            $updates['overlay_expires_at'] = now()->addSeconds((int) $message->duration_seconds);
+        }
+
+        if ($updates !== []) {
+            $recipient->forceFill($updates)->save();
+        }
+
+        return $recipient->fresh()?->overlay_expires_at?->toIso8601String();
     }
 
     public function dismiss(ScreenMessage $message, User $user): void
@@ -199,6 +220,8 @@ class ScreenMessageService
      */
     public function pendingFor(User $user): Collection
     {
+        $this->dismissExpiredFor($user);
+
         return ScreenMessage::query()
             ->where('is_active', true)
             ->where(function (Builder $query) use ($user): void {
@@ -212,9 +235,90 @@ class ScreenMessageService
                         });
                 });
             })
+            ->with([
+                'recipients' => fn ($q) => $q->where('user_id', $user->id),
+                'replies' => fn ($q) => $q->where('user_id', $user->id),
+            ])
             ->orderBy('created_at')
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * @return array{
+     *     seen_count: int,
+     *     recipient_count: int,
+     *     recipients: list<array<string, mixed>>,
+     *     replies: list<array<string, mixed>>|null
+     * }
+     */
+    public function livePayload(ScreenMessage $message, User $actor): array
+    {
+        $message->load([
+            'recipients.user.department',
+            'replies.user',
+        ]);
+
+        $recipients = $message->recipients
+            ->sortBy(fn (ScreenMessageRecipient $recipient) => $recipient->user?->name ?? '')
+            ->values()
+            ->map(fn (ScreenMessageRecipient $recipient): array => [
+                'id' => $recipient->id,
+                'user_id' => $recipient->user_id,
+                'name' => $recipient->user?->name ?? '—',
+                'department' => $recipient->user?->department?->name ?? '—',
+                'seen_at' => $recipient->seen_at?->toIso8601String(),
+                'seen_at_label' => $recipient->seen_at?->format('d M Y H:i'),
+                'dismissed_at' => $recipient->dismissed_at?->toIso8601String(),
+                'dismissed_at_label' => $recipient->dismissed_at?->format('d M Y H:i'),
+                'is_seen' => $recipient->seen_at !== null,
+            ])
+            ->all();
+
+        $replies = null;
+        if (ScreenMessageAccess::canViewReplies($actor, $message)) {
+            $replies = $message->replies
+                ->sortByDesc('created_at')
+                ->values()
+                ->map(fn (ScreenMessageReply $reply): array => [
+                    'id' => $reply->id,
+                    'user_name' => $reply->user?->name ?? '—',
+                    'body' => $reply->body,
+                    'created_at' => $reply->created_at?->toIso8601String(),
+                    'created_at_label' => $reply->created_at?->format('d M Y H:i'),
+                ])
+                ->all();
+        }
+
+        $seenCount = $message->recipients->whereNotNull('seen_at')->count();
+
+        return [
+            'seen_count' => $seenCount,
+            'recipient_count' => $message->recipients->count(),
+            'recipients' => $recipients,
+            'replies' => $replies,
+        ];
+    }
+
+    private function dismissExpiredFor(User $user): void
+    {
+        $expired = ScreenMessageRecipient::query()
+            ->where('user_id', $user->id)
+            ->whereNull('dismissed_at')
+            ->whereNotNull('overlay_expires_at')
+            ->where('overlay_expires_at', '<=', now())
+            ->whereHas('screenMessage', function (Builder $query): void {
+                $query->where('is_active', true)
+                    ->where('display_mode', '!=', ScreenMessageDisplayMode::Permanent->value);
+            })
+            ->get();
+
+        foreach ($expired as $recipient) {
+            $recipient->forceFill([
+                'seen_at' => $recipient->seen_at ?? now(),
+                'dismissed_at' => now(),
+            ])->save();
+        }
     }
 
     /**

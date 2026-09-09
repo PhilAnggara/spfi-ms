@@ -173,6 +173,16 @@
     transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
 
+.sm-overlay__reply-sent {
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    background: #f8fafc;
+    color: #0f172a;
+    white-space: pre-wrap;
+    line-height: 1.5;
+}
+
 .sm-overlay__btn--primary {
     color: #fff;
     background: linear-gradient(135deg, #0f766e, #1d4ed8);
@@ -202,5 +212,345 @@
     .sm-overlay__panel,
     .sm-overlay__btn {
         transition: none !important;
+    }
+}
+
+/* Detail page: message + replies */
+.sm-detail-card .card-body {
+    padding-top: 1rem;
+}
+
+.sm-message-body {
+    margin: 0 0 1.25rem;
+    padding: 0 0 0 1rem;
+    border-left: 3px solid #1f7a8c;
+    color: #0f172a;
+    font-size: 1.05rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.sm-message-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eef2f7;
+}
+
+.sm-message-meta__item--wide {
+    grid-column: 1 / -1;
+}
+
+.sm-message-meta__label {
+    display: block;
+    margin-bottom: 0.15rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.sm-message-meta__value {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.sm-replies-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.sm-reply-item {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+}
+
+.sm-reply-item__avatar {
+    flex: 0 0 auto;
+    width: 2.35rem;
+    height: 2.35rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #0f766e;
+    background: linear-gradient(145deg, #ecfeff, #e0f2fe);
+    border: 1px solid #bae6fd;
+}
+
+.sm-reply-item__content {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.sm-reply-item:last-child .sm-reply-item__content {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.sm-reply-item__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.sm-reply-item__name {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.sm-reply-item__time {
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+
+.sm-reply-item__body {
+    color: #475569;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.sm-replies-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.75rem 1rem;
+    text-align: center;
+    color: #94a3b8;
+}
+
+.sm-replies-empty i {
+    font-size: 1.5rem;
+    color: #cbd5e1;
+}
+
+/* Create form option cards */
+.sm-option-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.sm-option-grid .sws-mode-option {
+    width: 100%;
+    text-align: left;
+}
+
+.sm-option-grid .sws-mode-option.is-disabled,
+.sm-option-grid .sws-mode-option:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+#screen-message-create-page .choices {
+    margin-bottom: 0;
+}
+
+.sm-page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.sm-action-form {
+    display: inline-flex;
+}
+
+.sm-recipients-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.sm-recipients-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sm-index-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.sm-index-card {
+    border: 1px solid #e8eef5;
+    border-radius: 0.9rem;
+    padding: 1rem;
+    background: #fff;
+}
+
+.sm-index-card__title {
+    font-weight: 700;
+    color: #0f172a;
+    overflow-wrap: anywhere;
+}
+
+.sm-index-card__meta {
+    font-size: 0.82rem;
+}
+
+.sm-index-card__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.75rem 0;
+}
+
+.sm-index-card__actions {
+    margin-top: 0.25rem;
+}
+
+/* Responsive */
+@media (max-width: 991.98px) {
+    .sm-page .po-hero h3 {
+        font-size: 1.35rem;
+    }
+
+    .sm-option-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .sm-create-footer {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+
+    .sm-create-footer__hint {
+        text-align: center;
+    }
+
+    .sm-create-footer__actions {
+        width: 100%;
+    }
+
+    .sm-create-footer__actions .btn {
+        flex: 1 1 0;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .sm-page-actions {
+        width: 100%;
+    }
+
+    .sm-page-actions > .btn,
+    .sm-page-actions .sm-action-form,
+    .sm-page-actions .sm-action-form .btn {
+        width: 100%;
+    }
+
+    .sm-page-actions .sm-action-form .btn {
+        justify-content: center;
+    }
+
+    .sm-recipients-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .sm-recipients-toolbar__actions {
+        justify-content: space-between;
+    }
+
+    .sm-recipients-toolbar__actions #sm-refresh-btn {
+        flex: 0 0 auto;
+    }
+
+    .sm-message-body {
+        font-size: 1rem;
+    }
+
+    .sm-overlay {
+        padding: 0.75rem;
+        align-items: flex-end;
+    }
+
+    .sm-overlay__panel {
+        width: 100%;
+        max-height: min(92vh, 760px);
+        border-radius: 16px 16px 12px 12px;
+        padding: 1.35rem 1.1rem 1.1rem;
+    }
+
+    .sm-overlay__title {
+        font-size: 1.2rem;
+    }
+
+    .sm-overlay__body {
+        font-size: 0.95rem;
+    }
+
+    .sm-overlay__actions {
+        justify-content: stretch;
+    }
+
+    .sm-overlay__btn--primary,
+    .sm-overlay__btn--secondary {
+        width: 100%;
+    }
+
+    .sm-overlay__btn--secondary {
+        margin-top: 0.5rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .sm-message-meta {
+        grid-template-columns: 1fr;
+    }
+
+    .sm-reply-item__head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.15rem;
+    }
+
+    .sm-refresh-label {
+        display: none;
+    }
+
+    .sm-page .card-body {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+    }
+
+    .sm-overlay {
+        padding: 0.5rem;
+    }
+
+    .sm-overlay__panel {
+        padding: 1.15rem 0.95rem 0.95rem;
+        max-height: 94vh;
+    }
+
+    .sm-overlay__accent {
+        left: 1rem;
+        right: 1rem;
     }
 }

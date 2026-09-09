@@ -12,6 +12,7 @@ class ScreenMessageRecipient extends Model
         'user_id',
         'seen_at',
         'dismissed_at',
+        'overlay_expires_at',
     ];
 
     /**
@@ -22,6 +23,7 @@ class ScreenMessageRecipient extends Model
         return [
             'seen_at' => 'datetime',
             'dismissed_at' => 'datetime',
+            'overlay_expires_at' => 'datetime',
         ];
     }
 

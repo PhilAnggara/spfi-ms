@@ -14,9 +14,11 @@ class ScreenMessageInboxController extends Controller
 
     public function pending(Request $request): JsonResponse
     {
+        $user = $request->user();
+
         $messages = $this->screenMessages
-            ->pendingFor($request->user())
-            ->map(fn (ScreenMessage $message) => $message->toOverlayPayload())
+            ->pendingFor($user)
+            ->map(fn (ScreenMessage $message) => $message->toOverlayPayload($user))
             ->values();
 
         return response()->json(['messages' => $messages]);
@@ -24,9 +26,12 @@ class ScreenMessageInboxController extends Controller
 
     public function markSeen(Request $request, ScreenMessage $screenMessage): JsonResponse
     {
-        $this->screenMessages->markSeen($screenMessage, $request->user());
+        $expiresAt = $this->screenMessages->markSeen($screenMessage, $request->user());
 
-        return response()->json(['ok' => true]);
+        return response()->json([
+            'ok' => true,
+            'expires_at' => $expiresAt,
+        ]);
     }
 
     public function dismiss(Request $request, ScreenMessage $screenMessage): JsonResponse

@@ -7,7 +7,7 @@
     $oldAudience = old('audience_type', 'users');
     $oldTargets = collect(old('target_ids', []))->map(fn ($id) => (int) $id);
 @endphp
-<div class="page-heading po-page sc-page prs-create-page" id="screen-message-create-page">
+<div class="page-heading po-page sc-page prs-create-page sm-page" id="screen-message-create-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
             <div class="col-12 col-lg-7">
@@ -91,7 +91,7 @@
                             $disabled = $mode->isPermanent() && ! $canCreatePermanent;
                             $desc = match ($mode) {
                                 \App\Enums\ScreenMessageDisplayMode::AutoOnly => 'Timer closes the overlay. Recipients cannot dismiss early.',
-                                \App\Enums\ScreenMessageDisplayMode::UserClosable => 'Recipients can close it. Optional timer still works.',
+                                \App\Enums\ScreenMessageDisplayMode::UserClosable => 'Recipients close it themselves. Turn on a timer only if you want auto-close too.',
                                 \App\Enums\ScreenMessageDisplayMode::Permanent => 'Stays until you deactivate it, even after refresh.',
                             };
                             $icon = match ($mode) {
@@ -122,14 +122,30 @@
                 </div>
                 @error('display_mode') <div class="text-danger small">{{ $message }}</div> @enderror
 
-                <div class="row g-3" id="duration-field">
-                    <div class="col-md-4">
-                        <label for="duration_seconds" class="form-label">Duration (seconds)</label>
-                        <input type="number" name="duration_seconds" id="duration_seconds"
-                               class="form-control @error('duration_seconds') is-invalid @enderror"
-                               value="{{ old('duration_seconds', 30) }}" min="1" max="3600">
-                        @error('duration_seconds') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        <div class="form-text" id="display-mode-help"></div>
+                @php
+                    $oldDuration = old('duration_seconds');
+                    $hasOptionalDuration = filled($oldDuration) && $oldMode === 'user_closable';
+                @endphp
+
+                <div id="duration-panel" class="mt-3">
+                    <div class="form-check form-switch mb-3" id="optional-duration-toggle-wrap" style="display:none;">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="enable_optional_duration" @checked($hasOptionalDuration)>
+                        <label class="form-check-label" for="enable_optional_duration">
+                            Add auto-close duration
+                        </label>
+                        <div class="form-text">Leave off if recipients should only close the message themselves.</div>
+                    </div>
+
+                    <div class="row g-3" id="duration-field">
+                        <div class="col-md-4">
+                            <label for="duration_seconds" class="form-label">Duration (seconds)</label>
+                            <input type="number" name="duration_seconds" id="duration_seconds"
+                                   class="form-control @error('duration_seconds') is-invalid @enderror"
+                                   value="{{ $oldDuration }}" min="1" max="3600">
+                            @error('duration_seconds') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div class="form-text" id="display-mode-help"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -217,9 +233,9 @@
             </div>
         </div>
 
-        <div class="sc-sticky-footer d-flex flex-wrap gap-3 align-items-center justify-content-between">
-            <div class="text-muted small">Review recipients carefully before sending.</div>
-            <div class="d-flex gap-2">
+        <div class="sc-sticky-footer sm-create-footer d-flex flex-wrap gap-3 align-items-center justify-content-between">
+            <div class="text-muted small sm-create-footer__hint">Review recipients carefully before sending.</div>
+            <div class="sm-create-footer__actions d-flex gap-2">
                 <a href="{{ route('screen-messages.index') }}" class="btn btn-light-secondary">Cancel</a>
                 <button type="submit" class="btn btn-primary icon icon-left">
                     <i class="fa-duotone fa-solid fa-paper-plane"></i>
@@ -236,25 +252,6 @@
     <link rel="stylesheet" href="{{ url('assets/css/stock-correction-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
-    <style>
-        .sm-option-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 0.75rem;
-        }
-        .sm-option-grid .sws-mode-option {
-            width: 100%;
-            text-align: left;
-        }
-        .sm-option-grid .sws-mode-option.is-disabled,
-        .sm-option-grid .sws-mode-option:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-        }
-        #screen-message-create-page .choices {
-            margin-bottom: 0;
-        }
-    </style>
 @endpush
 
 @push('addon-script')
@@ -263,14 +260,19 @@
 (function () {
     const modeInput = document.getElementById('display_mode');
     const audienceInput = document.getElementById('audience_type');
+    const durationPanel = document.getElementById('duration-panel');
     const durationField = document.getElementById('duration-field');
     const durationInput = document.getElementById('duration_seconds');
+    const optionalToggleWrap = document.getElementById('optional-duration-toggle-wrap');
+    const optionalToggle = document.getElementById('enable_optional_duration');
     const help = document.getElementById('display-mode-help');
     const usersBlock = document.getElementById('targets-users');
     const deptsBlock = document.getElementById('targets-departments');
     const allBlock = document.getElementById('targets-all');
     const usersSelect = document.getElementById('target_users');
     const deptsSelect = document.getElementById('target_departments');
+    const defaultAutoDuration = '30';
+    let lastOptionalDuration = durationInput.value || defaultAutoDuration;
 
     function initChoices(select) {
         if (!select || typeof Choices === 'undefined') {
@@ -307,15 +309,59 @@
 
     function syncMode() {
         const mode = modeInput.value;
-        const needsDuration = mode === 'auto_only' || mode === 'user_closable';
-        durationField.style.display = needsDuration ? '' : 'none';
-        durationInput.required = mode === 'auto_only';
-        help.textContent = {
-            auto_only: 'Required. Overlay auto-closes when the timer ends.',
-            user_closable: 'Optional. Leave blank if recipients should only close manually.',
-            permanent: 'No timer. Remains until deactivated.',
-        }[mode] || '';
+
+        if (mode === 'permanent') {
+            durationPanel.style.display = 'none';
+            optionalToggleWrap.style.display = 'none';
+            durationField.style.display = 'none';
+            durationInput.required = false;
+            durationInput.disabled = true;
+            durationInput.name = '';
+            durationInput.value = '';
+            help.textContent = '';
+        } else if (mode === 'auto_only') {
+            durationPanel.style.display = '';
+            optionalToggleWrap.style.display = 'none';
+            durationField.style.display = '';
+            durationInput.disabled = false;
+            durationInput.name = 'duration_seconds';
+            durationInput.required = true;
+            if (!durationInput.value) {
+                durationInput.value = defaultAutoDuration;
+            }
+            help.textContent = 'Required. Overlay auto-closes when the timer ends.';
+        } else {
+            durationPanel.style.display = '';
+            optionalToggleWrap.style.display = '';
+            durationInput.required = false;
+            syncOptionalDuration();
+            help.textContent = optionalToggle.checked
+                ? 'Overlay can be closed by the user, and also auto-closes after this timer.'
+                : 'No timer. Recipients close the message with the Close button.';
+        }
+
         setActiveButtons('[data-display-mode]', 'data-display-mode', mode);
+    }
+
+    function syncOptionalDuration() {
+        const enabled = optionalToggle.checked;
+        durationField.style.display = enabled ? '' : 'none';
+        durationInput.disabled = !enabled;
+        durationInput.name = enabled ? 'duration_seconds' : '';
+        durationInput.required = enabled;
+
+        if (enabled) {
+            if (!durationInput.value) {
+                durationInput.value = lastOptionalDuration || defaultAutoDuration;
+            }
+        } else if (durationInput.value) {
+            lastOptionalDuration = durationInput.value;
+            durationInput.value = '';
+        }
+
+        help.textContent = enabled
+            ? 'Overlay can be closed by the user, and also auto-closes after this timer.'
+            : 'No timer. Recipients close the message with the Close button.';
     }
 
     function syncAudience() {
@@ -380,6 +426,12 @@
             audienceInput.value = btn.getAttribute('data-audience-type');
             syncAudience();
         });
+    });
+
+    optionalToggle.addEventListener('change', () => {
+        if (modeInput.value === 'user_closable') {
+            syncOptionalDuration();
+        }
     });
 
     syncMode();
