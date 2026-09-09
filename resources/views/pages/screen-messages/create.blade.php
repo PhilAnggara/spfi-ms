@@ -251,6 +251,7 @@
     <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/stock-correction-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
+    <link rel="stylesheet" href="{{ url('assets/css/screen-messages.css') }}?v=2">
     <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
 @endpush
 

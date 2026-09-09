@@ -344,8 +344,8 @@
     color: #cbd5e1;
 }
 
-/* Create form option cards */
-.sm-option-grid {
+/* Create form option cards — beat .sws-withdrawal-mode-switch (2-col) from prs-modern.css */
+.sws-withdrawal-mode-switch.sm-option-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75rem;
@@ -432,7 +432,7 @@
         font-size: 1.35rem;
     }
 
-    .sm-option-grid {
+    .sws-withdrawal-mode-switch.sm-option-grid {
         grid-template-columns: 1fr;
     }
 
