@@ -6,6 +6,7 @@ use App\Enums\ScreenMessageAudienceType;
 use App\Enums\ScreenMessageDisplayMode;
 use App\Enums\ScreenMessageTheme;
 use App\Support\ScreenMessageAccess;
+use App\Support\ScreenMessageHtml;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -24,7 +25,7 @@ class StoreScreenMessageRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:255'],
-            'body' => ['required', 'string', 'max:5000'],
+            'body' => ['required', 'string', 'max:8000'],
             'display_mode' => ['required', 'string', Rule::in(ScreenMessageDisplayMode::values())],
             'duration_seconds' => ['nullable', 'integer', 'min:1', 'max:3600'],
             'audience_type' => ['required', 'string', Rule::in(ScreenMessageAudienceType::values())],
@@ -56,6 +57,10 @@ class StoreScreenMessageRequest extends FormRequest
             $audience = ScreenMessageAudienceType::tryFrom((string) $this->input('audience_type'));
             $targetIds = $this->input('target_ids', []);
 
+            if (ScreenMessageHtml::isEmpty($this->input('body'))) {
+                $validator->errors()->add('body', 'Please enter the message body.');
+            }
+
             if ($mode?->requiresDuration() && blank($this->input('duration_seconds'))) {
                 $validator->errors()->add('duration_seconds', 'Duration is required for auto-close messages.');
             }
@@ -83,6 +88,7 @@ class StoreScreenMessageRequest extends FormRequest
             'allow_reply' => $this->boolean('allow_reply'),
             'duration_seconds' => ($duration === '' || $duration === null) ? null : $duration,
             'theme' => $this->input('theme') ?: ScreenMessageTheme::Default->value,
+            'body' => ScreenMessageHtml::sanitize($this->input('body')),
         ]);
     }
 }

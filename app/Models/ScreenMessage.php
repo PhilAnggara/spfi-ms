@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ScreenMessageAudienceType;
 use App\Enums\ScreenMessageDisplayMode;
 use App\Enums\ScreenMessageTheme;
+use App\Support\ScreenMessageHtml;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -98,7 +99,7 @@ class ScreenMessage extends Model
         $payload = [
             'id' => $this->id,
             'title' => $this->title,
-            'body' => $this->body,
+            'body' => ScreenMessageHtml::sanitize($this->body),
             'display_mode' => $this->display_mode->value,
             'duration_seconds' => $this->duration_seconds,
             'allow_reply' => $this->allow_reply,

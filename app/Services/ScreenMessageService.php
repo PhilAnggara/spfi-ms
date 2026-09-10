@@ -14,6 +14,7 @@ use App\Models\ScreenMessageReply;
 use App\Models\ScreenMessageTarget;
 use App\Models\User;
 use App\Support\ScreenMessageAccess;
+use App\Support\ScreenMessageHtml;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -77,7 +78,7 @@ class ScreenMessageService
             $message = ScreenMessage::query()->create([
                 'user_id' => $sender->id,
                 'title' => $data['title'],
-                'body' => $data['body'],
+                'body' => ScreenMessageHtml::sanitize((string) $data['body']),
                 'display_mode' => $displayMode,
                 'duration_seconds' => $duration,
                 'audience_type' => $audienceType,

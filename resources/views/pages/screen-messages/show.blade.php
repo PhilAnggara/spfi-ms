@@ -72,7 +72,7 @@
                         <span class="sc-section-title"><i class="fa-regular fa-message-lines"></i> Message</span>
                     </div>
                     <div class="card-body">
-                        <div class="sm-message-body">{{ $message->body }}</div>
+                        <div class="sm-message-body">{!! \App\Support\ScreenMessageHtml::forDisplay($message->body) !!}</div>
                         <div class="sm-message-meta">
                             <div class="sm-message-meta__item">
                                 <span class="sm-message-meta__label">Duration</span>

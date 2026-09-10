@@ -14,7 +14,7 @@
             <div class="col-12 col-lg-7">
                 <div class="po-hero">
                     <h3 class="mb-1">New Screen Message</h3>
-                    <p class="text-muted mb-0">Compose an overlay that appears on recipients’ screens in real time.</p>
+                    <p class="text-muted mb-0">Compose an overlay that appears on recipients' screens in real time.</p>
                 </div>
             </div>
             <div class="col-12 col-lg-5">
@@ -65,9 +65,39 @@
                     </div>
                     <div class="col-12">
                         <label for="body" class="form-label">Message</label>
-                        <textarea name="body" id="body" rows="5" class="form-control @error('body') is-invalid @enderror"
-                                  maxlength="5000" required placeholder="Write the message recipients will see…">{{ old('body') }}</textarea>
-                        @error('body') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        <div class="sm-rich-editor" id="sm-rich-editor">
+                            <div class="sm-rich-editor__toolbar" role="toolbar" aria-label="Text formatting">
+                                <button type="button" class="sm-rich-editor__btn" data-command="bold" title="Bold" aria-label="Bold">
+                                    <i class="fa-solid fa-bold"></i>
+                                </button>
+                                <button type="button" class="sm-rich-editor__btn" data-command="italic" title="Italic" aria-label="Italic">
+                                    <i class="fa-solid fa-italic"></i>
+                                </button>
+                                <button type="button" class="sm-rich-editor__btn" data-command="underline" title="Underline" aria-label="Underline">
+                                    <i class="fa-solid fa-underline"></i>
+                                </button>
+                                <span class="sm-rich-editor__sep" aria-hidden="true"></span>
+                                <button type="button" class="sm-rich-editor__btn" data-command="insertUnorderedList" title="Bullet list" aria-label="Bullet list">
+                                    <i class="fa-solid fa-list-ul"></i>
+                                </button>
+                                <button type="button" class="sm-rich-editor__btn" data-command="insertOrderedList" title="Numbered list" aria-label="Numbered list">
+                                    <i class="fa-solid fa-list-ol"></i>
+                                </button>
+                                <span class="sm-rich-editor__sep" aria-hidden="true"></span>
+                                <button type="button" class="sm-rich-editor__btn" data-command="removeFormat" title="Clear formatting" aria-label="Clear formatting">
+                                    <i class="fa-solid fa-eraser"></i>
+                                </button>
+                            </div>
+                            <div id="sm-rich-editor-surface"
+                                 class="sm-rich-editor__surface"
+                                 contenteditable="true"
+                                 role="textbox"
+                                 aria-multiline="true"
+                                 data-placeholder="Write the message recipients will see..."></div>
+                        </div>
+                        <textarea name="body" id="body" class="d-none" maxlength="8000">{{ old('body') }}</textarea>
+                        <div class="form-text">Bold, italic, underline, and lists are supported.</div>
+                        @error('body') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-12">
                         <div class="form-check form-switch">
@@ -102,17 +132,10 @@
 
                 <div class="sm-theme-preview" aria-live="polite">
                     <div class="sm-theme-preview__label">Preview</div>
-                    <div class="sm-overlay sm-theme-preview__overlay is-visible" id="sm-theme-preview" data-theme="{{ $oldTheme }}">
-                        <div class="sm-overlay__panel sm-theme-preview__panel">
-                            <div class="sm-overlay__accent"></div>
-                            <div class="sm-overlay__header">
-                                <span class="sm-overlay__badge" id="sm-preview-badge">
-                                    {{ \App\Enums\ScreenMessageTheme::tryFrom($oldTheme)?->label() ?? 'Default' }}
-                                </span>
-                                <h2 class="sm-overlay__title" id="sm-preview-title">Message title</h2>
-                            </div>
-                            <div class="sm-overlay__body" id="sm-preview-body">Your message will appear here.</div>
-                        </div>
+                    <div class="sm-theme-preview__card" id="sm-theme-preview" data-theme="{{ $oldTheme }}">
+                        <div class="sm-theme-preview__accent"></div>
+                        <h2 class="sm-theme-preview__title" id="sm-preview-title">Message title</h2>
+                        <div class="sm-theme-preview__body" id="sm-preview-body">Your message will appear here.</div>
                     </div>
                 </div>
             </div>
@@ -241,8 +264,8 @@
                         @foreach ($users as $user)
                             <option value="{{ $user->id }}" @selected($oldTargets->contains($user->id))>
                                 {{ $user->name }}
-                                @if ($user->username) · {{ $user->username }} @endif
-                                @if ($user->department?->name) · {{ $user->department->alias ?: $user->department->name }} @endif
+                                @if ($user->username) - {{ $user->username }} @endif
+                                @if ($user->department?->name) - {{ $user->department->alias ?: $user->department->name }} @endif
                             </option>
                         @endforeach
                     </select>
@@ -259,7 +282,7 @@
                             <option value="{{ $department->id }}" @selected($oldTargets->contains($department->id))>
                                 {{ $department->name }}
                                 ({{ $department->code }})
-                                · {{ $department->users_count }} users
+                                - {{ $department->users_count }} users
                             </option>
                         @endforeach
                     </select>
@@ -296,242 +319,6 @@
 
 @push('addon-script')
 <script src="{{ url('assets/extensions/choices.js/public/assets/scripts/choices.js') }}"></script>
-<script>
-(function () {
-    const modeInput = document.getElementById('display_mode');
-    const audienceInput = document.getElementById('audience_type');
-    const themeInput = document.getElementById('theme');
-    const titleInput = document.getElementById('title');
-    const bodyInput = document.getElementById('body');
-    const previewRoot = document.getElementById('sm-theme-preview');
-    const previewBadge = document.getElementById('sm-preview-badge');
-    const previewTitle = document.getElementById('sm-preview-title');
-    const previewBody = document.getElementById('sm-preview-body');
-    const durationPanel = document.getElementById('duration-panel');
-    const durationField = document.getElementById('duration-field');
-    const durationInput = document.getElementById('duration_seconds');
-    const optionalToggleWrap = document.getElementById('optional-duration-toggle-wrap');
-    const optionalToggle = document.getElementById('enable_optional_duration');
-    const help = document.getElementById('display-mode-help');
-    const usersBlock = document.getElementById('targets-users');
-    const deptsBlock = document.getElementById('targets-departments');
-    const allBlock = document.getElementById('targets-all');
-    const usersSelect = document.getElementById('target_users');
-    const deptsSelect = document.getElementById('target_departments');
-    const defaultAutoDuration = '30';
-    let lastOptionalDuration = durationInput.value || defaultAutoDuration;
-
-    function escapePreview(value) {
-        return String(value ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#039;');
-    }
-
-    function initChoices(select) {
-        if (!select || typeof Choices === 'undefined') {
-            return null;
-        }
-
-        if (select.choicesInstance) {
-            return select.choicesInstance;
-        }
-
-        const instance = new Choices(select, {
-            removeItemButton: true,
-            searchEnabled: true,
-            searchPlaceholderValue: 'Type to search…',
-            placeholder: true,
-            placeholderValue: 'Select…',
-            shouldSort: false,
-            itemSelectText: '',
-        });
-        select.choicesInstance = instance;
-        return instance;
-    }
-
-    const userChoices = initChoices(usersSelect);
-    const deptChoices = initChoices(deptsSelect);
-
-    function setActiveButtons(selector, attr, value) {
-        document.querySelectorAll(selector).forEach((btn) => {
-            const active = btn.getAttribute(attr) === value;
-            btn.classList.toggle('active', active);
-            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-        });
-    }
-
-    function syncMode() {
-        const mode = modeInput.value;
-
-        if (mode === 'permanent') {
-            durationPanel.style.display = 'none';
-            optionalToggleWrap.style.display = 'none';
-            durationField.style.display = 'none';
-            durationInput.required = false;
-            durationInput.disabled = true;
-            durationInput.name = '';
-            durationInput.value = '';
-            help.textContent = '';
-        } else if (mode === 'auto_only') {
-            durationPanel.style.display = '';
-            optionalToggleWrap.style.display = 'none';
-            durationField.style.display = '';
-            durationInput.disabled = false;
-            durationInput.name = 'duration_seconds';
-            durationInput.required = true;
-            if (!durationInput.value) {
-                durationInput.value = defaultAutoDuration;
-            }
-            help.textContent = 'Required. Overlay auto-closes when the timer ends.';
-        } else {
-            durationPanel.style.display = '';
-            optionalToggleWrap.style.display = '';
-            durationInput.required = false;
-            syncOptionalDuration();
-            help.textContent = optionalToggle.checked
-                ? 'Overlay can be closed by the user, and also auto-closes after this timer.'
-                : 'No timer. Recipients close the message with the Close button.';
-        }
-
-        setActiveButtons('[data-display-mode]', 'data-display-mode', mode);
-    }
-
-    function syncOptionalDuration() {
-        const enabled = optionalToggle.checked;
-        durationField.style.display = enabled ? '' : 'none';
-        durationInput.disabled = !enabled;
-        durationInput.name = enabled ? 'duration_seconds' : '';
-        durationInput.required = enabled;
-
-        if (enabled) {
-            if (!durationInput.value) {
-                durationInput.value = lastOptionalDuration || defaultAutoDuration;
-            }
-        } else if (durationInput.value) {
-            lastOptionalDuration = durationInput.value;
-            durationInput.value = '';
-        }
-
-        help.textContent = enabled
-            ? 'Overlay can be closed by the user, and also auto-closes after this timer.'
-            : 'No timer. Recipients close the message with the Close button.';
-    }
-
-    function syncAudience() {
-        const type = audienceInput.value;
-        usersBlock.style.display = type === 'users' ? '' : 'none';
-        deptsBlock.style.display = type === 'departments' ? '' : 'none';
-        allBlock.style.display = type === 'all' ? '' : 'none';
-
-        if (type === 'users') {
-            usersSelect.disabled = false;
-            usersSelect.name = 'target_ids[]';
-            deptsSelect.disabled = true;
-            deptsSelect.name = '';
-            if (deptChoices) {
-                deptChoices.disable();
-            }
-            if (userChoices) {
-                userChoices.enable();
-            }
-        } else if (type === 'departments') {
-            deptsSelect.disabled = false;
-            deptsSelect.name = 'target_ids[]';
-            usersSelect.disabled = true;
-            usersSelect.name = '';
-            if (userChoices) {
-                userChoices.disable();
-            }
-            if (deptChoices) {
-                deptChoices.enable();
-            }
-        } else {
-            usersSelect.disabled = true;
-            deptsSelect.disabled = true;
-            usersSelect.name = '';
-            deptsSelect.name = '';
-            if (userChoices) {
-                userChoices.disable();
-            }
-            if (deptChoices) {
-                deptChoices.disable();
-            }
-        }
-
-        setActiveButtons('[data-audience-type]', 'data-audience-type', type);
-    }
-
-    function syncThemePreview() {
-        const activeChip = document.querySelector(`.sm-theme-chip[data-theme="${themeInput.value}"]`);
-        const label = activeChip?.getAttribute('data-theme-label') || 'Default';
-        const title = (titleInput.value || '').trim() || 'Message title';
-        const body = (bodyInput.value || '').trim() || 'Your message will appear here.';
-
-        if (previewRoot) {
-            previewRoot.setAttribute('data-theme', themeInput.value || 'default');
-        }
-        if (previewBadge) {
-            previewBadge.textContent = label;
-        }
-        if (previewTitle) {
-            previewTitle.textContent = title;
-        }
-        if (previewBody) {
-            previewBody.innerHTML = escapePreview(body).replaceAll('\n', '<br>');
-        }
-    }
-
-    function syncTheme() {
-        document.querySelectorAll('.sm-theme-chip').forEach((btn) => {
-            const active = btn.getAttribute('data-theme') === themeInput.value;
-            btn.classList.toggle('is-active', active);
-            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-        });
-        syncThemePreview();
-    }
-
-    document.querySelectorAll('[data-display-mode]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            if (btn.disabled) {
-                return;
-            }
-            modeInput.value = btn.getAttribute('data-display-mode');
-            syncMode();
-        });
-    });
-
-    document.querySelectorAll('[data-audience-type]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            if (btn.disabled) {
-                return;
-            }
-            audienceInput.value = btn.getAttribute('data-audience-type');
-            syncAudience();
-        });
-    });
-
-    document.querySelectorAll('.sm-theme-chip').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            themeInput.value = btn.getAttribute('data-theme');
-            syncTheme();
-        });
-    });
-
-    titleInput.addEventListener('input', syncThemePreview);
-    bodyInput.addEventListener('input', syncThemePreview);
-
-    optionalToggle.addEventListener('change', () => {
-        if (modeInput.value === 'user_closable') {
-            syncOptionalDuration();
-        }
-    });
-
-    syncMode();
-    syncAudience();
-    syncTheme();
-})();
-</script>
+<script src="{{ url('assets/scripts/modules/screen-message-create.js') }}?v={{ @filemtime(public_path('assets/scripts/modules/screen-message-create.js')) ?: time() }}"></script>
 @endpush
+

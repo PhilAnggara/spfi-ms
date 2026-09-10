@@ -375,3 +375,63 @@ it('rejects invalid themes', function () {
         ])
         ->assertSessionHasErrors('theme');
 });
+
+it('stores sanitized rich text body and strips xss', function () {
+    $sender = createScreenUser('sm-rich-sender', $this->departmentA->id, [
+        'create-all-screen-messages',
+        'view-own-screen-messages',
+    ]);
+    $target = createScreenUser('sm-rich-target', $this->departmentA->id);
+
+    $this->actingAs($sender)
+        ->post(route('screen-messages.store'), [
+            'title' => 'Rich notice',
+            'body' => '<p>Please <strong>read</strong></p><ul><li>Item</li></ul><script>alert(1)</script><p onclick="x">Done</p>',
+            'display_mode' => ScreenMessageDisplayMode::UserClosable->value,
+            'audience_type' => ScreenMessageAudienceType::Users->value,
+            'target_ids' => [$target->id],
+            'theme' => 'info',
+        ])
+        ->assertRedirect();
+
+    $message = ScreenMessage::query()->where('title', 'Rich notice')->first();
+
+    expect($message)->not->toBeNull()
+        ->and($message->body)->toContain('<strong>read</strong>')
+        ->and($message->body)->toContain('<li>Item</li>')
+        ->and($message->body)->not->toContain('script')
+        ->and($message->body)->not->toContain('onclick');
+
+    $payload = $message->toOverlayPayload($target);
+
+    expect($payload['body'])
+        ->toContain('<strong>read</strong>')
+        ->not->toContain('script');
+
+    $this->actingAs($target)
+        ->getJson(route('screen-messages.inbox.pending'))
+        ->assertOk()
+        ->assertJsonPath('messages.0.id', $message->id);
+
+    expect($this->actingAs($target)->getJson(route('screen-messages.inbox.pending'))->json('messages.0.body'))
+        ->toContain('<strong>read</strong>')
+        ->not->toContain('script');
+});
+
+it('rejects empty rich text body after sanitizing', function () {
+    $sender = createScreenUser('sm-empty-html', $this->departmentA->id, [
+        'create-all-screen-messages',
+        'view-own-screen-messages',
+    ]);
+    $target = createScreenUser('sm-empty-html-target', $this->departmentA->id);
+
+    $this->actingAs($sender)
+        ->post(route('screen-messages.store'), [
+            'title' => 'Empty html',
+            'body' => '<p><br></p>',
+            'display_mode' => ScreenMessageDisplayMode::UserClosable->value,
+            'audience_type' => ScreenMessageAudienceType::Users->value,
+            'target_ids' => [$target->id],
+        ])
+        ->assertSessionHasErrors('body');
+});

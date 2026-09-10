@@ -48,6 +48,47 @@
             .replaceAll("'", '&#039;');
     }
 
+    const ALLOWED_BODY_TAGS = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI']);
+
+    function sanitizeBodyHtml(html) {
+        const template = document.createElement('template');
+        template.innerHTML = String(html || '');
+
+        const walk = (node) => {
+            Array.from(node.childNodes).forEach((child) => {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    return;
+                }
+                if (child.nodeType !== Node.ELEMENT_NODE) {
+                    child.remove();
+                    return;
+                }
+                if (!ALLOWED_BODY_TAGS.has(child.tagName)) {
+                    while (child.firstChild) {
+                        node.insertBefore(child.firstChild, child);
+                    }
+                    child.remove();
+                    return;
+                }
+                while (child.attributes.length > 0) {
+                    child.removeAttribute(child.attributes[0].name);
+                }
+                walk(child);
+            });
+        };
+
+        walk(template.content);
+        return template.innerHTML;
+    }
+
+    function formatMessageBody(value) {
+        const raw = String(value ?? '');
+        if (!raw.includes('<')) {
+            return escapeHtml(raw).replaceAll('\n', '<br>');
+        }
+        return sanitizeBodyHtml(raw);
+    }
+
     async function api(url, options = {}) {
         const response = await fetch(url, {
             headers: {
@@ -230,7 +271,7 @@
     function render(message) {
         applyTheme(message);
         titleEl.textContent = message.title || '';
-        bodyEl.innerHTML = escapeHtml(message.body || '').replaceAll('\n', '<br>');
+        bodyEl.innerHTML = formatMessageBody(message.body || '');
 
         const isPermanent = message.display_mode === 'permanent';
         const canClose = message.display_mode === 'user_closable';
