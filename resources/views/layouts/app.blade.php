@@ -28,6 +28,7 @@
         </div>
     </div>
     @include('partials.screen-message-overlay')
+    @include('partials.chat-widget')
     @include('includes.script')
     @livewireScripts
 

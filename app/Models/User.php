@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -89,6 +90,51 @@ class User extends Authenticatable
     public function latestActivityLog(): HasOne
     {
         return $this->hasOne(UserActivityLog::class)->latestOfMany();
+    }
+
+    /**
+     * @return BelongsToMany<Conversation, $this>
+     */
+    public function conversations(): BelongsToMany
+    {
+        return $this->belongsToMany(Conversation::class, 'conversation_participants')
+            ->withPivot(['last_read_at', 'last_delivered_at'])
+            ->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<ConversationParticipant, $this>
+     */
+    public function conversationParticipants(): HasMany
+    {
+        return $this->hasMany(ConversationParticipant::class);
+    }
+
+    /**
+     * @return HasMany<Message, $this>
+     */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    public function isOnline(): bool
+    {
+        $threshold = now()->subSeconds(Session::ONLINE_THRESHOLD_SECONDS);
+
+        if ($this->relationLoaded('sessions')) {
+            return $this->sessions->contains(
+                fn (Session $session): bool => (int) $session->last_activity >= $threshold->timestamp
+            );
+        }
+
+        if ($this->last_seen_at && $this->last_seen_at->gte($threshold)) {
+            return true;
+        }
+
+        return $this->sessions()
+            ->where('last_activity', '>=', $threshold->timestamp)
+            ->exists();
     }
 
     public function deviceLabel(): string

@@ -42,5 +42,6 @@
     <link rel="stylesheet" href="{{ url('assets/styles/spfi-list.css') }}">
     <link rel="stylesheet" href="{{ url('assets/styles/main.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/screen-messages.css') }}?v={{ @filemtime(public_path('assets/css/screen-messages.css')) ?: time() }}">
+    <link rel="stylesheet" href="{{ url('assets/css/chat-widget.css') }}?v={{ @filemtime(public_path('assets/css/chat-widget.css')) ?: time() }}">
 
     @stack('addon-style')

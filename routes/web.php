@@ -12,6 +12,7 @@ use App\Http\Controllers\ActiveSessionController;
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CanvassingController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\EmployeeController;
@@ -671,6 +672,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
         Route::post('/clear-read', [NotificationController::class, 'clearRead'])->name('notifications.clear-read');
+    });
+
+    Route::prefix('chat')->name('chat.')->group(function () {
+        Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations.index');
+        Route::post('/conversations', [ChatController::class, 'storeConversation'])->name('conversations.store');
+        Route::get('/conversations/{conversation}/messages', [ChatController::class, 'messages'])->name('messages.index');
+        Route::post('/conversations/{conversation}/messages', [ChatController::class, 'storeMessage'])->name('messages.store');
+        Route::post('/conversations/{conversation}/delivered', [ChatController::class, 'markDelivered'])->name('delivered');
+        Route::post('/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('read');
+        Route::get('/users/search', [ChatController::class, 'searchUsers'])->name('users.search');
+        Route::get('/unread-count', [ChatController::class, 'unreadCount'])->name('unread-count');
     });
 
     Route::prefix('screen-messages/inbox')->name('screen-messages.inbox.')->group(function () {

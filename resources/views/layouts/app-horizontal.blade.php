@@ -27,6 +27,7 @@
         </div>
     </div>
     @include('partials.screen-message-overlay')
+    @include('partials.chat-widget')
     <script src="{{ url('assets/static/js/pages/horizontal-layout.js') }}"></script>
     @include('includes.script')
     @livewireScripts
