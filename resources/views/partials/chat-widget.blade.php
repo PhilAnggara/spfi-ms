@@ -30,12 +30,19 @@
                     </button>
                 </div>
             </div>
-            <div class="chat-widget__search">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="search" id="chat-list-filter" class="form-control form-control-sm" placeholder="Search or start chat..." autocomplete="off">
+            <div class="chat-widget__search" id="chat-search-bar">
+                <button type="button" class="chat-widget__search-back" id="chat-search-back" title="Back" aria-label="Back to chats" hidden>
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+                <div class="chat-widget__search-field">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="search" id="chat-list-filter" class="form-control form-control-sm" placeholder="Search or start chat..." autocomplete="off">
+                </div>
             </div>
-            <div class="chat-widget__list" id="chat-conversation-list">
-                <div class="chat-widget__empty">No conversations yet. Search a contact to start.</div>
+            <div class="chat-widget__list-shell">
+                <div class="chat-widget__list" id="chat-conversation-list">
+                    <div class="chat-widget__empty">No conversations yet. Search a contact to start.</div>
+                </div>
             </div>
         </div>
 

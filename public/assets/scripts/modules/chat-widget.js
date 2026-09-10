@@ -12,6 +12,10 @@
     const badge = document.getElementById('chat-widget-badge');
     const conversationList = document.getElementById('chat-conversation-list');
     const listFilter = document.getElementById('chat-list-filter');
+    const searchEl = document.getElementById('chat-search-bar') || root.querySelector('.chat-widget__search');
+    const searchBackBtn = document.getElementById('chat-search-back');
+    const listView = document.getElementById('chat-view-list');
+    const listShell = root.querySelector('.chat-widget__list-shell');
     const messagesEl = document.getElementById('chat-messages');
     const input = document.getElementById('chat-input');
     const sendBtn = document.getElementById('chat-send-btn');
@@ -74,6 +78,10 @@
         unreadRefreshTimer: null,
         sending: false,
         stickToBottom: true,
+        searchMode: false,
+        contactsLoading: false,
+        listPageTimer: null,
+        loadedImageIds: new Set(),
     };
 
     const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😅','😢','😭','😡','👍','👎','👏','🙏','🔥','✨','🎉','❤️','💙','💚','💛','🧡','💜','✅','❌','📌','📎','📷','📁','☕','🚀'];
@@ -529,32 +537,130 @@
         profileEl.setAttribute('aria-hidden', 'true');
     }
 
+    function sortedContacts() {
+        return [...state.contactResults].sort((a, b) => {
+            const aOnline = isPeerOnline(a) || !!a.is_online ? 1 : 0;
+            const bOnline = isPeerOnline(b) || !!b.is_online ? 1 : 0;
+            if (aOnline !== bOnline) {
+                return bOnline - aOnline;
+            }
+            return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+        });
+    }
+
+    function shouldShowContacts() {
+        return state.searchMode || state.contactsLoading;
+    }
+
+    function contactsSkeletonHtml() {
+        return `
+            <div class="chat-widget__contacts-block">
+                <div class="chat-widget__section-label">Contacts</div>
+                ${[0, 1, 2].map((index) => `
+                    <div class="chat-widget__skeleton-item" style="--chat-stagger:${index}">
+                        <div class="chat-widget__skeleton-avatar"></div>
+                        <div class="chat-widget__skeleton-lines">
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function animateListPage(direction) {
+        const target = listShell || conversationList;
+        target.classList.remove('is-page-enter', 'is-page-enter-back');
+        void target.offsetWidth;
+        target.classList.add(direction === 'back' ? 'is-page-enter-back' : 'is-page-enter');
+        if (state.listPageTimer) {
+            clearTimeout(state.listPageTimer);
+        }
+        state.listPageTimer = setTimeout(() => {
+            target.classList.remove('is-page-enter', 'is-page-enter-back');
+            state.listPageTimer = null;
+        }, 260);
+    }
+
+    function enterSearchMode() {
+        if (state.searchMode) {
+            listFilter.focus();
+            return;
+        }
+
+        state.searchMode = true;
+        listView?.classList.add('is-search-mode');
+        if (searchBackBtn) {
+            searchBackBtn.hidden = false;
+        }
+        searchEl?.classList.add('is-active', 'is-search-page');
+        state.contactsLoading = true;
+        renderConversationList();
+        animateListPage('forward');
+        searchContacts(listFilter.value);
+        listFilter.focus();
+    }
+
+    function exitSearchMode({ animate = true } = {}) {
+        if (!state.searchMode) {
+            listView?.classList.remove('is-search-mode');
+            searchEl?.classList.remove('is-active', 'is-search-page');
+            if (searchBackBtn) {
+                searchBackBtn.hidden = true;
+            }
+            return;
+        }
+
+        state.searchMode = false;
+        state.contactsLoading = false;
+        state.contactResults = [];
+        listFilter.value = '';
+        listView?.classList.remove('is-search-mode');
+        searchEl?.classList.remove('is-active', 'is-search-page');
+        renderConversationList();
+        if (animate) {
+            animateListPage('back');
+        }
+        if (searchBackBtn) {
+            // Keep in DOM until width transition finishes.
+            window.setTimeout(() => {
+                if (!state.searchMode) {
+                    searchBackBtn.hidden = true;
+                }
+            }, 240);
+        }
+    }
+
     function renderConversationList() {
         const term = (listFilter.value || '').trim().toLowerCase();
-        const items = state.conversations.filter((item) => {
-            if (!term) {
-                return true;
-            }
-            const name = (item.peer?.name || '').toLowerCase();
-            const username = (item.peer?.username || '').toLowerCase();
-            return name.includes(term) || username.includes(term);
-        });
+        const chatItems = state.searchMode
+            ? state.conversations.filter((item) => {
+                if (!term) {
+                    return true;
+                }
+                const name = (item.peer?.name || '').toLowerCase();
+                const username = (item.peer?.username || '').toLowerCase();
+                return name.includes(term) || username.includes(term);
+            })
+            : state.conversations;
 
-        const contacts = term ? state.contactResults : [];
+        const showContacts = shouldShowContacts();
+        const contacts = showContacts ? sortedContacts() : [];
         let html = '';
 
-        if (!items.length && !contacts.length) {
-            conversationList.innerHTML = term
+        if (!chatItems.length && !contacts.length && !state.contactsLoading) {
+            conversationList.innerHTML = state.searchMode
                 ? '<div class="chat-widget__empty">No chats or contacts found.</div>'
                 : '<div class="chat-widget__empty">No conversations yet. Search a contact to start.</div>';
             return;
         }
 
-        if (items.length) {
-            if (term) {
+        if (chatItems.length) {
+            if (state.searchMode) {
                 html += '<div class="chat-widget__section-label">Chats</div>';
             }
-            html += items.map((item) => {
+            html += chatItems.map((item) => {
                 const peer = item.peer || {};
                 const online = isPeerOnline(peer);
                 const unread = Number(item.unread_count || 0);
@@ -585,9 +691,12 @@
             }).join('');
         }
 
-        if (contacts.length) {
+        if (state.searchMode && state.contactsLoading && !contacts.length) {
+            html += contactsSkeletonHtml();
+        } else if (state.searchMode && contacts.length) {
+            html += '<div class="chat-widget__contacts-block">';
             html += '<div class="chat-widget__section-label">Contacts</div>';
-            html += contacts.map((user) => {
+            html += contacts.map((user, index) => {
                 const online = isPeerOnline(user) || !!user.is_online;
                 const typing = isTypingForKey(typingKeyForDraft(user.id));
                 const draftKey = typingKeyForDraft(user.id);
@@ -598,9 +707,12 @@
                     previewHtml = escapeHtml('typing...');
                 } else if (hasDraft) {
                     previewHtml = draftPreviewHtml(draftKey);
+                } else if (online) {
+                    previewHtml = escapeHtml('Online');
                 }
+                const stagger = Math.min(index, 5);
                 return `
-                    <div class="chat-widget__item" data-draft-peer-id="${user.id}">
+                    <div class="chat-widget__item chat-widget__item--contact" data-draft-peer-id="${user.id}" style="--chat-stagger:${stagger}">
                         <button type="button" class="chat-widget__profile-trigger" data-profile-peer="contact" data-peer-id="${user.id}" title="View profile" aria-label="View profile">
                             <div class="chat-widget__avatar ${online ? 'is-online' : ''}">${escapeHtml(initials(user.name))}</div>
                         </button>
@@ -610,7 +722,7 @@
                                     <span class="chat-widget__item-name">${escapeHtml(user.name)}</span>
                                 </div>
                                 <div class="chat-widget__item-bottom">
-                                    <span class="chat-widget__item-preview ${previewClass}">
+                                    <span class="chat-widget__item-preview ${previewClass} ${online && !typing && !hasDraft ? 'is-online-label' : ''}">
                                         ${previewHtml}
                                     </span>
                                 </div>
@@ -619,6 +731,7 @@
                     </div>
                 `;
             }).join('');
+            html += '</div>';
         }
 
         conversationList.innerHTML = html;
@@ -627,14 +740,35 @@
     function messageBodyHtml(message) {
         let html = '';
         if (message.type === 'image' && message.attachment_url) {
-            html += `<a href="${escapeHtml(message.attachment_url)}" target="_blank" rel="noopener"><img class="chat-bubble__image" src="${escapeHtml(message.attachment_url)}" alt="${escapeHtml(message.attachment_original_name || 'Image')}" decoding="async"></a>`;
+            const messageId = Number(message.id);
+            const loaded = state.loadedImageIds.has(messageId);
+            html += `
+                <a class="chat-bubble__image-link" href="${escapeHtml(message.attachment_url)}" target="_blank" rel="noopener">
+                    <span class="chat-bubble__image-frame ${loaded ? 'is-loaded' : 'is-loading'}">
+                        <span class="chat-bubble__image-placeholder" aria-hidden="true">
+                            <i class="fa-regular fa-image"></i>
+                            <span class="chat-bubble__image-spinner"></span>
+                        </span>
+                        <img class="chat-bubble__image" src="${escapeHtml(message.attachment_url)}" alt="${escapeHtml(message.attachment_original_name || 'Image')}" decoding="async" draggable="false">
+                    </span>
+                </a>
+            `;
         } else if (message.type === 'file' && message.attachment_url) {
             html += `<a class="chat-bubble__file" href="${escapeHtml(message.attachment_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file"></i><span>${escapeHtml(message.attachment_original_name || 'File')}</span></a>`;
         }
         if (message.body) {
-            html += `<div>${escapeHtml(message.body)}</div>`;
+            html += `<div class="chat-bubble__text">${escapeHtml(message.body)}</div>`;
         }
         return html || '<div></div>';
+    }
+
+    function clearImageFrameSize(frame) {
+        if (!frame) {
+            return;
+        }
+        frame.style.width = '';
+        frame.style.height = '';
+        frame.style.aspectRatio = '';
     }
 
     function isMessagesNearBottom(threshold = 96) {
@@ -658,62 +792,163 @@
     }
 
     function bindMessageMediaScroll() {
-        if (!messagesEl || !state.stickToBottom) {
+        if (!messagesEl) {
             return;
         }
 
         messagesEl.querySelectorAll('img.chat-bubble__image').forEach((img) => {
-            if (img.dataset.scrollBound === '1') {
-                return;
-            }
-            img.dataset.scrollBound = '1';
+            const frame = img.closest('.chat-bubble__image-frame');
+            const bubble = img.closest('.chat-bubble[data-message-id]');
+            const messageId = bubble ? Number(bubble.dataset.messageId) : null;
 
-            const keepBottom = () => {
+            const markLoaded = () => {
+                if (messageId != null) {
+                    state.loadedImageIds.add(messageId);
+                }
+                clearImageFrameSize(frame);
+                frame?.classList.remove('is-loading', 'is-error');
+                frame?.classList.add('is-loaded');
                 if (state.stickToBottom && state.view === 'thread') {
                     scrollMessagesToBottom();
                 }
             };
 
+            if (img.dataset.mediaBound === '1') {
+                if (img.complete && img.naturalHeight > 0) {
+                    clearImageFrameSize(frame);
+                    frame?.classList.add('is-loaded');
+                    frame?.classList.remove('is-loading', 'is-error');
+                }
+                return;
+            }
+            img.dataset.mediaBound = '1';
+
             if (img.complete && img.naturalHeight > 0) {
-                keepBottom();
+                markLoaded();
                 return;
             }
 
-            img.addEventListener('load', keepBottom, { once: true });
-            img.addEventListener('error', keepBottom, { once: true });
+            img.addEventListener('load', markLoaded, { once: true });
+            img.addEventListener('error', () => {
+                clearImageFrameSize(frame);
+                frame?.classList.remove('is-loading');
+                frame?.classList.add('is-loaded', 'is-error');
+            }, { once: true });
         });
     }
 
-    function renderMessages({ forceScroll = false } = {}) {
+    function bubbleMarkup(message) {
+        const isMine = sameId(message.user_id, authUserId);
+        const hasImage = message.type === 'image' && !!message.attachment_url;
+        const imageOnly = hasImage && !message.body;
+        const classes = [
+            'chat-bubble',
+            isMine ? 'is-mine' : 'is-theirs',
+            hasImage ? 'has-image' : '',
+            imageOnly ? 'is-image-only' : '',
+        ].filter(Boolean).join(' ');
+
+        return `
+            <div class="${classes}" data-message-id="${message.id}">
+                <div class="chat-bubble__content">${messageBodyHtml(message)}</div>
+                <div class="chat-bubble__meta">
+                    <span>${escapeHtml(formatTime(message.created_at))}</span>
+                    ${ticksHtml(message, isMine)}
+                </div>
+            </div>
+        `;
+    }
+
+    function dayMarkup(iso) {
+        return `<div class="chat-widget__day" data-day-key="${escapeHtml(new Date(iso).toDateString())}">${escapeHtml(new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }))}</div>`;
+    }
+
+    function patchMessageMetas(sorted) {
+        sorted.forEach((message) => {
+            const bubble = messagesEl.querySelector(`.chat-bubble[data-message-id="${message.id}"]`);
+            if (!bubble) {
+                return;
+            }
+            const isMine = sameId(message.user_id, authUserId);
+            const meta = bubble.querySelector('.chat-bubble__meta');
+            if (meta) {
+                meta.innerHTML = `
+                    <span>${escapeHtml(formatTime(message.created_at))}</span>
+                    ${ticksHtml(message, isMine)}
+                `;
+            }
+        });
+    }
+
+    function existingBubbleIds() {
+        return [...messagesEl.querySelectorAll('.chat-bubble[data-message-id]')].map((el) => Number(el.dataset.messageId));
+    }
+
+    function renderMessages({ forceScroll = false, rebuild = false } = {}) {
         const sorted = [...state.messages].sort((a, b) => Number(a.id) - Number(b.id));
+        const shouldStick = forceScroll || state.stickToBottom || isMessagesNearBottom();
+        const nextIds = sorted.map((message) => Number(message.id));
+        const currentIds = existingBubbleIds();
+
+        const sameSequence = currentIds.length > 0
+            && currentIds.length === nextIds.length
+            && currentIds.every((id, index) => id === nextIds[index]);
+
+        const canAppend = !rebuild
+            && currentIds.length > 0
+            && nextIds.length > currentIds.length
+            && currentIds.every((id, index) => id === nextIds[index]);
+
+        if (!rebuild && sameSequence) {
+            patchMessageMetas(sorted);
+            if (shouldStick || forceScroll) {
+                state.stickToBottom = true;
+                scrollMessagesToBottom();
+            }
+            return;
+        }
+
+        if (canAppend) {
+            patchMessageMetas(sorted.slice(0, currentIds.length));
+            const lastExisting = sorted[currentIds.length - 1];
+            let lastDay = lastExisting?.created_at
+                ? new Date(lastExisting.created_at).toDateString()
+                : '';
+            const chunks = [];
+            sorted.slice(currentIds.length).forEach((message) => {
+                const day = message.created_at ? new Date(message.created_at).toDateString() : '';
+                if (day && day !== lastDay) {
+                    lastDay = day;
+                    chunks.push(dayMarkup(message.created_at));
+                }
+                chunks.push(bubbleMarkup(message));
+            });
+            messagesEl.insertAdjacentHTML('beforeend', chunks.join(''));
+            bindMessageMediaScroll();
+            if (shouldStick || forceScroll) {
+                state.stickToBottom = true;
+                scrollMessagesToBottom();
+            }
+            return;
+        }
+
         let lastDay = '';
         const chunks = [];
-        const shouldStick = forceScroll || state.stickToBottom || isMessagesNearBottom();
-
         sorted.forEach((message) => {
             const day = message.created_at ? new Date(message.created_at).toDateString() : '';
             if (day && day !== lastDay) {
                 lastDay = day;
-                chunks.push(`<div class="chat-widget__day">${escapeHtml(new Date(message.created_at).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }))}</div>`);
+                chunks.push(dayMarkup(message.created_at));
             }
-            const isMine = sameId(message.user_id, authUserId);
-            chunks.push(`
-                <div class="chat-bubble ${isMine ? 'is-mine' : 'is-theirs'}" data-message-id="${message.id}">
-                    <div class="chat-bubble__content">${messageBodyHtml(message)}</div>
-                    <div class="chat-bubble__meta">
-                        <span>${escapeHtml(formatTime(message.created_at))}</span>
-                        ${ticksHtml(message, isMine)}
-                    </div>
-                </div>
-            `);
+            chunks.push(bubbleMarkup(message));
         });
 
         messagesEl.innerHTML = chunks.join('') || '<div class="chat-widget__empty">Say hello</div>';
+        bindMessageMediaScroll();
 
         if (shouldStick || forceScroll) {
             state.stickToBottom = true;
             scrollMessagesToBottom();
-            bindMessageMediaScroll();
         }
     }
 
@@ -788,22 +1023,35 @@
     }
 
     async function searchContacts(query) {
-        const term = (query || '').trim();
-        if (!term) {
+        if (!state.searchMode) {
             state.contactResults = [];
+            state.contactsLoading = false;
             renderConversationList();
             return;
         }
+
+        const term = (query || '').trim();
+        state.contactsLoading = true;
+        renderConversationList();
 
         try {
             const url = new URL(root.dataset.searchUsersUrl, window.location.origin);
             url.searchParams.set('q', term);
             const payload = await api(url.toString());
+            if (!state.searchMode) {
+                state.contactResults = [];
+                state.contactsLoading = false;
+                return;
+            }
             state.contactResults = payload.data || [];
+            state.contactsLoading = false;
             renderConversationList();
         } catch (e) {
             state.contactResults = [];
-            renderConversationList();
+            state.contactsLoading = false;
+            if (state.searchMode) {
+                renderConversationList();
+            }
         }
     }
 
@@ -983,6 +1231,7 @@
 
     function clearThreadMessagesUi() {
         state.messages = [];
+        state.loadedImageIds.clear();
         messagesEl.innerHTML = '';
     }
 
@@ -997,8 +1246,7 @@
         state.draftPeer = null;
         state.activePeer = normalizePeer(conversation?.peer) || null;
         clearThreadMessagesUi();
-        listFilter.value = '';
-        state.contactResults = [];
+        exitSearchMode({ animate: false });
         state.stickToBottom = true;
         restoreComposerDraft();
         updateThreadHeader();
@@ -1030,6 +1278,7 @@
         state.activePeer = state.draftPeer;
         clearThreadMessagesUi();
         leaveConversationChannel();
+        exitSearchMode({ animate: false });
         state.stickToBottom = true;
         restoreComposerDraft();
         updateThreadHeader();
@@ -1077,7 +1326,10 @@
                 });
             }
             state.messages = Array.from(byId.values());
-            renderMessages({ forceScroll: forceScroll || (!merge && state.stickToBottom) });
+            renderMessages({
+                forceScroll: forceScroll || (!merge && state.stickToBottom),
+                rebuild: !merge,
+            });
         } catch (e) {
             if (loadToken !== null && loadToken !== state.messageLoadToken) {
                 return;
@@ -1671,13 +1923,38 @@
             autoGrow();
             showView('list');
             loadConversations();
-            searchContacts(listFilter.value);
         });
+    });
+
+    searchBackBtn?.addEventListener('click', () => {
+        exitSearchMode({ animate: true });
+    });
+
+    searchEl?.addEventListener('click', (event) => {
+        if (event.target.closest('#chat-search-back')) {
+            return;
+        }
+        enterSearchMode();
+    });
+
+    listFilter.addEventListener('focus', () => {
+        enterSearchMode();
+    });
+
+    listFilter.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && state.searchMode) {
+            event.preventDefault();
+            exitSearchMode({ animate: true });
+            listFilter.blur();
+        }
     });
 
     listFilter.addEventListener('input', () => {
         clearTimeout(state.searchTimer);
         state.searchTimer = setTimeout(() => {
+            if (!state.searchMode) {
+                return;
+            }
             renderConversationList();
             searchContacts(listFilter.value);
         }, 250);
@@ -1795,7 +2072,7 @@
         refreshUnread();
         if (state.open && state.view === 'list') {
             loadConversations();
-            if ((listFilter.value || '').trim()) {
+            if (state.searchMode) {
                 searchContacts(listFilter.value);
             }
         }

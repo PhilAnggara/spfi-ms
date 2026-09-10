@@ -227,13 +227,10 @@ class ChatService
     /**
      * @return Collection<int, User>
      */
-    public function searchUsers(User $authUser, string $query, int $limit = 15): Collection
+    public function searchUsers(User $authUser, string $query, ?int $limit = null): Collection
     {
         $term = trim($query);
-
-        if ($term === '') {
-            return collect();
-        }
+        $resolvedLimit = $limit ?? ($term === '' ? 50 : 30);
 
         $peerIdsWithMessages = Conversation::query()
             ->whereHas('participants', fn ($query) => $query->where('user_id', $authUser->id))
@@ -249,13 +246,15 @@ class ChatService
         return User::query()
             ->whereKeyNot($authUser->id)
             ->when($peerIdsWithMessages !== [], fn ($builder) => $builder->whereKeyNot($peerIdsWithMessages))
-            ->where(function ($inner) use ($term): void {
-                $inner->where('name', 'like', '%'.$term.'%')
-                    ->orWhere('username', 'like', '%'.$term.'%');
+            ->when($term !== '', function ($builder) use ($term): void {
+                $builder->where(function ($inner) use ($term): void {
+                    $inner->where('name', 'like', '%'.$term.'%')
+                        ->orWhere('username', 'like', '%'.$term.'%');
+                });
             })
             ->with('department:id,name')
             ->orderBy('name')
-            ->limit($limit)
+            ->limit($resolvedLimit)
             ->get(['id', 'name', 'username', 'email', 'role', 'department_id', 'last_seen_at']);
     }
 

@@ -243,6 +243,32 @@ it('searches users and excludes self soft-deleted and existing chat peers', func
         ->and($ids)->not->toContain($this->alice->id, $this->bob->id, $deleted->id);
 });
 
+it('browses contacts when search query is empty', function () {
+    $deleted = User::factory()->create([
+        'name' => 'Gone User',
+        'username' => 'goneuser',
+    ]);
+    $deleted->delete();
+
+    $existing = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+    Message::factory()->create([
+        'conversation_id' => $existing->id,
+        'user_id' => $this->alice->id,
+        'body' => 'Already chatting',
+    ]);
+
+    $response = $this->actingAs($this->alice)
+        ->getJson(route('chat.users.search', ['q' => '']))
+        ->assertOk()
+        ->json('data');
+
+    $ids = collect($response)->pluck('id')->all();
+
+    expect($ids)->toContain($this->carol->id)
+        ->and($ids)->not->toContain($this->alice->id, $this->bob->id, $deleted->id)
+        ->and($response[0])->toHaveKeys(['id', 'name', 'username', 'email', 'role', 'department', 'is_online']);
+});
+
 it('broadcasts typing to the peer user channel', function () {
     Event::fake([\App\Events\ChatTyping::class]);
 
