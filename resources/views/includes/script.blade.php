@@ -23,8 +23,15 @@
 
             const broadcaster = '{{ env('BROADCAST_CONNECTION', 'pusher') }}' === 'reverb' ? 'reverb' : 'pusher';
             const key = broadcaster === 'reverb' ? '{{ env('REVERB_APP_KEY') }}' : '{{ env('PUSHER_APP_KEY') }}';
+            // Browser clients must connect to the same host serving the app (LAN/IP),
+            // not server-only loopback values like 127.0.0.1 from REVERB_HOST.
+            const configuredReverbHost = '{{ env('REVERB_HOST', '') }}';
+            const reverbHostIsLoopback = !configuredReverbHost
+                || configuredReverbHost === '127.0.0.1'
+                || configuredReverbHost === 'localhost'
+                || configuredReverbHost === '0.0.0.0';
             const wsHost = broadcaster === 'reverb'
-                ? '{{ env('REVERB_HOST', request()->getHost()) }}'
+                ? (reverbHostIsLoopback ? window.location.hostname : configuredReverbHost)
                 : '{{ env('PUSHER_HOST', 'ws-'.env('PUSHER_APP_CLUSTER', 'mt1').'.pusher.com') }}';
             const wsPort = broadcaster === 'reverb'
                 ? {{ (int) env('REVERB_PORT', 8080) }}

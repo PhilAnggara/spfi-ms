@@ -173,12 +173,64 @@ it('lists conversations for the authenticated user only', function () {
         ->and($response[0]['peer']['id'])->toBe($this->bob->id);
 });
 
-it('searches users and excludes self and soft-deleted users', function () {
+it('hides empty conversations from the list until a message exists', function () {
+    Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+
+    $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+
+    $this->actingAs($this->bob)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+});
+
+it('creates a conversation only when the first direct message is sent', function () {
+    Event::fake([MessageSent::class]);
+
+    expect(Conversation::query()->count())->toBe(0);
+
+    $payload = $this->actingAs($this->alice)
+        ->postJson(route('chat.direct-messages.store'), [
+            'user_id' => $this->bob->id,
+            'body' => 'First hello',
+        ])
+        ->assertCreated()
+        ->json('data');
+
+    expect(Conversation::query()->count())->toBe(1)
+        ->and($payload['conversation']['peer']['id'])->toBe($this->bob->id)
+        ->and($payload['message']['body'])->toBe('First hello');
+
+    $aliceList = $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data');
+
+    $bobList = $this->actingAs($this->bob)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data');
+
+    expect($aliceList)->toHaveCount(1)
+        ->and($bobList)->toHaveCount(1);
+});
+
+it('searches users and excludes self soft-deleted and existing chat peers', function () {
     $deleted = User::factory()->create([
         'name' => 'Deleted User',
         'username' => 'deleteduser',
     ]);
     $deleted->delete();
+
+    $existing = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+    Message::factory()->create([
+        'conversation_id' => $existing->id,
+        'user_id' => $this->alice->id,
+        'body' => 'Already chatting',
+    ]);
 
     $response = $this->actingAs($this->alice)
         ->getJson(route('chat.users.search', ['q' => 'chat']))
@@ -187,8 +239,123 @@ it('searches users and excludes self and soft-deleted users', function () {
 
     $ids = collect($response)->pluck('id')->all();
 
-    expect($ids)->toContain($this->bob->id, $this->carol->id)
-        ->and($ids)->not->toContain($this->alice->id, $deleted->id);
+    expect($ids)->toContain($this->carol->id)
+        ->and($ids)->not->toContain($this->alice->id, $this->bob->id, $deleted->id);
+});
+
+it('broadcasts typing to the peer user channel', function () {
+    Event::fake([\App\Events\ChatTyping::class]);
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.typing'), [
+            'user_id' => $this->bob->id,
+            'typing' => true,
+        ])
+        ->assertOk();
+
+    Event::assertDispatched(\App\Events\ChatTyping::class, function (\App\Events\ChatTyping $event): bool {
+        return $event->from->is($this->alice)
+            && $event->toUserId === $this->bob->id
+            && $event->typing === true;
+    });
+});
+
+it('marks delivered and read statuses on message payloads', function () {
+    Event::fake([MessageSent::class, MessageDelivered::class, ConversationRead::class]);
+
+    $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Status check',
+        ])
+        ->assertCreated();
+
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.delivered', $conversation))
+        ->assertOk();
+
+    $delivered = $this->actingAs($this->alice)
+        ->getJson(route('chat.messages.index', $conversation))
+        ->assertOk()
+        ->json('data.0');
+
+    expect($delivered['status'])->toBe('delivered');
+    expect($delivered['delivered_at'])->not->toBeNull();
+
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.read', $conversation))
+        ->assertOk();
+
+    $read = $this->actingAs($this->alice)
+        ->getJson(route('chat.messages.index', $conversation))
+        ->assertOk()
+        ->json('data.0');
+
+    expect($read['status'])->toBe('read')
+        ->and($read['read_at'])->not->toBeNull()
+        ->and($read['delivered_at'])->not->toBeNull();
+});
+
+it('broadcasts MessageSent on conversation and recipient user channels', function () {
+    Event::fake([MessageSent::class]);
+
+    $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Channel check',
+        ])
+        ->assertCreated();
+
+    Event::assertDispatched(MessageSent::class, function (MessageSent $event) use ($conversation): bool {
+        $channelNames = collect($event->broadcastOn())->map(fn ($channel) => $channel->name)->all();
+
+        return in_array('private-conversation.'.$conversation->id, $channelNames, true)
+            && in_array('private-App.Models.User.'.$this->bob->id, $channelNames, true)
+            && ! in_array('private-App.Models.User.'.$this->alice->id, $channelNames, true);
+    });
+});
+
+it('includes peer profile fields on conversations and search results', function () {
+    $department = \App\Models\Department::query()->create([
+        'name' => 'Finance Dept',
+        'code' => 'FIN-CHAT-TEST',
+        'is_active' => true,
+    ]);
+
+    $this->bob->forceFill([
+        'email' => 'bob.chat@example.com',
+        'role' => 'Analyst',
+        'department_id' => $department->id,
+    ])->save();
+
+    $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+    Message::factory()->create([
+        'conversation_id' => $conversation->id,
+        'user_id' => $this->bob->id,
+        'body' => 'Profile fields',
+    ]);
+
+    $listPeer = $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data.0.peer');
+
+    expect($listPeer)
+        ->toHaveKeys(['id', 'name', 'username', 'email', 'role', 'department', 'is_online', 'last_seen_at'])
+        ->and($listPeer['email'])->toBe('bob.chat@example.com')
+        ->and($listPeer['role'])->toBe('Analyst')
+        ->and($listPeer['department'])->toBe('Finance Dept');
+
+    $searchPeer = $this->actingAs($this->alice)
+        ->getJson(route('chat.users.search', ['q' => 'Carol']))
+        ->assertOk()
+        ->json('data.0');
+
+    expect($searchPeer)
+        ->toHaveKeys(['id', 'name', 'username', 'email', 'role', 'department', 'is_online', 'last_seen_at'])
+        ->and($searchPeer['id'])->toBe($this->carol->id);
 });
 
 it('includes the chat widget on authenticated app pages', function () {
@@ -196,5 +363,11 @@ it('includes the chat widget on authenticated app pages', function () {
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee('id="chat-widget"', false)
-        ->assertSee('chat-widget.js', false);
+        ->assertSee('chat-widget.js', false)
+        ->assertDontSee('id="chat-new-btn"', false)
+        ->assertSee('Search or start chat', false)
+        ->assertSee('id="chat-user-profile"', false)
+        ->assertSee('id="chat-profile-status"', false)
+        ->assertSee('id="chat-dropzone"', false)
+        ->assertSee('id="chat-toast-host"', false);
 });

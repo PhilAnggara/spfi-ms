@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ConversationType;
 use App\Enums\MessageType;
+use App\Events\ChatTyping;
 use App\Events\ConversationRead;
 use App\Events\MessageDelivered;
 use App\Events\MessageSent;
@@ -28,16 +29,47 @@ class ChatService
     {
         $conversations = Conversation::query()
             ->whereHas('participants', fn ($query) => $query->where('user_id', $user->id))
+            ->whereHas('messages')
             ->with([
                 'latestMessage.user',
                 'participants',
-                'users' => fn ($query) => $query->with(['sessions' => fn ($sessions) => $sessions->select('id', 'user_id', 'last_activity')]),
+                'users' => fn ($query) => $query->with([
+                    'department:id,name',
+                    'sessions' => fn ($sessions) => $sessions->select('id', 'user_id', 'last_activity'),
+                ]),
             ])
             ->get()
             ->sortByDesc(fn (Conversation $conversation) => $conversation->latestMessage?->created_at?->timestamp ?? $conversation->updated_at?->timestamp ?? 0)
             ->values();
 
         return $conversations->map(fn (Conversation $conversation): array => $this->conversationPayload($conversation, $user));
+    }
+
+    /**
+     * @return array{conversation: Conversation, message: Message}
+     */
+    public function sendDirectMessage(
+        User $sender,
+        User $peer,
+        ?string $body = null,
+        ?UploadedFile $attachment = null,
+    ): array {
+        $conversation = $this->findOrCreateDirect($sender, $peer);
+        $message = $this->sendMessage($conversation, $sender, $body, $attachment);
+
+        return [
+            'conversation' => $conversation->fresh([
+                'participants',
+                'users.department:id,name',
+                'latestMessage.user',
+            ]),
+            'message' => $message,
+        ];
+    }
+
+    public function broadcastTyping(User $from, User $to, bool $typing, ?int $conversationId = null): void
+    {
+        broadcast(new ChatTyping($from, $to->id, $typing, $conversationId))->toOthers();
     }
 
     public function findOrCreateDirect(User $authUser, User $peer): Conversation
@@ -53,7 +85,7 @@ class ChatService
         $conversation = Conversation::query()->where('direct_key', $directKey)->first();
 
         if ($conversation) {
-            return $conversation->load(['participants', 'users', 'latestMessage.user']);
+            return $conversation->load(['participants', 'users.department:id,name', 'latestMessage.user']);
         }
 
         return DB::transaction(function () use ($authUser, $peer, $directKey): Conversation {
@@ -67,7 +99,7 @@ class ChatService
                 ['user_id' => $peer->id],
             ]);
 
-            return $conversation->load(['participants', 'users', 'latestMessage.user']);
+            return $conversation->load(['participants', 'users.department:id,name', 'latestMessage.user']);
         });
     }
 
@@ -199,17 +231,32 @@ class ChatService
     {
         $term = trim($query);
 
+        if ($term === '') {
+            return collect();
+        }
+
+        $peerIdsWithMessages = Conversation::query()
+            ->whereHas('participants', fn ($query) => $query->where('user_id', $authUser->id))
+            ->whereHas('messages')
+            ->with('participants')
+            ->get()
+            ->flatMap(fn (Conversation $conversation) => $conversation->participants->pluck('user_id'))
+            ->reject(fn ($id): bool => (int) $id === (int) $authUser->id)
+            ->unique()
+            ->values()
+            ->all();
+
         return User::query()
             ->whereKeyNot($authUser->id)
-            ->when($term !== '', function ($builder) use ($term): void {
-                $builder->where(function ($inner) use ($term): void {
-                    $inner->where('name', 'like', '%'.$term.'%')
-                        ->orWhere('username', 'like', '%'.$term.'%');
-                });
+            ->when($peerIdsWithMessages !== [], fn ($builder) => $builder->whereKeyNot($peerIdsWithMessages))
+            ->where(function ($inner) use ($term): void {
+                $inner->where('name', 'like', '%'.$term.'%')
+                    ->orWhere('username', 'like', '%'.$term.'%');
             })
+            ->with('department:id,name')
             ->orderBy('name')
             ->limit($limit)
-            ->get(['id', 'name', 'username', 'last_seen_at']);
+            ->get(['id', 'name', 'username', 'email', 'role', 'department_id', 'last_seen_at']);
     }
 
     /**
@@ -237,13 +284,7 @@ class ChatService
         return [
             'id' => $conversation->id,
             'type' => $conversation->type->value,
-            'peer' => $peer ? [
-                'id' => $peer->id,
-                'name' => $peer->name,
-                'username' => $peer->username,
-                'is_online' => $peer->isOnline(),
-                'last_seen_at' => $peer->last_seen_at?->toIso8601String(),
-            ] : null,
+            'peer' => $peer ? $this->peerPayload($peer) : null,
             'latest_message' => $latest
                 ? $latest->toChatPayload($viewerParticipant, $peerParticipant)
                 : null,
@@ -288,16 +329,33 @@ class ChatService
     }
 
     /**
-     * @return array{id: int, name: string, username: string, is_online: bool, last_seen_at: ?string, online_threshold_seconds: int}
+     * @return array{id: int, name: string, username: string, email: ?string, role: ?string, department: ?string, is_online: bool, last_seen_at: ?string}
      */
-    public function userPresencePayload(User $user): array
+    public function peerPayload(User $user): array
     {
+        if (! $user->relationLoaded('department')) {
+            $user->load('department:id,name');
+        }
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'username' => $user->username,
+            'email' => $user->email,
+            'role' => $user->role,
+            'department' => $user->department?->name,
             'is_online' => $user->isOnline(),
             'last_seen_at' => $user->last_seen_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array{id: int, name: string, username: string, email: ?string, role: ?string, department: ?string, is_online: bool, last_seen_at: ?string, online_threshold_seconds: int}
+     */
+    public function userPresencePayload(User $user): array
+    {
+        return [
+            ...$this->peerPayload($user),
             'online_threshold_seconds' => Session::ONLINE_THRESHOLD_SECONDS,
         ];
     }

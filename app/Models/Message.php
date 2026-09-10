@@ -87,6 +87,12 @@ class Message extends Model
             'attachment_mime' => $this->attachment_mime,
             'attachment_size' => $this->attachment_size,
             'status' => $status,
+            'delivered_at' => in_array($status, ['delivered', 'read'], true)
+                ? $peerParticipant?->last_delivered_at?->toIso8601String()
+                : null,
+            'read_at' => $status === 'read'
+                ? $peerParticipant?->last_read_at?->toIso8601String()
+                : null,
             'created_at' => $this->created_at?->toIso8601String(),
             'user' => $this->relationLoaded('user') && $this->user ? [
                 'id' => $this->user->id,

@@ -17,7 +17,10 @@ class MessageSent implements ShouldBroadcastNow
 
     public function __construct(public Message $message)
     {
-        $this->message->loadMissing('user:id,name,username');
+        $this->message->loadMissing([
+            'user:id,name,username',
+            'conversation.participants',
+        ]);
     }
 
     /**
@@ -25,9 +28,22 @@ class MessageSent implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
-        return [
+        $channels = [
             new PrivateChannel('conversation.'.$this->message->conversation_id),
         ];
+
+        $recipientIds = $this->message->conversation
+            ? $this->message->conversation->participants
+                ->pluck('user_id')
+                ->reject(fn ($userId): bool => (int) $userId === (int) $this->message->user_id)
+                ->values()
+            : collect();
+
+        foreach ($recipientIds as $recipientId) {
+            $channels[] = new PrivateChannel('App.Models.User.'.$recipientId);
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string

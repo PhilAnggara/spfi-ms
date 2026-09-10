@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\SearchChatUsersRequest;
 use App\Http\Requests\StoreChatConversationRequest;
+use App\Http\Requests\StoreChatDirectMessageRequest;
 use App\Http\Requests\StoreChatMessageRequest;
+use App\Http\Requests\StoreChatTypingRequest;
 use App\Models\Conversation;
+use App\Models\User;
 use App\Services\ChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,11 +30,29 @@ class ChatController extends Controller
 
     public function storeConversation(StoreChatConversationRequest $request): JsonResponse
     {
-        $peer = \App\Models\User::query()->findOrFail((int) $request->validated('user_id'));
+        $peer = User::query()->findOrFail((int) $request->validated('user_id'));
         $conversation = $this->chatService->findOrCreateDirect($request->user(), $peer);
 
         return response()->json([
             'data' => $this->chatService->conversationPayload($conversation, $request->user()),
+        ], 201);
+    }
+
+    public function storeDirectMessage(StoreChatDirectMessageRequest $request): JsonResponse
+    {
+        $peer = User::query()->findOrFail((int) $request->validated('user_id'));
+        $result = $this->chatService->sendDirectMessage(
+            $request->user(),
+            $peer,
+            $request->validated('body'),
+            $request->file('attachment'),
+        );
+
+        return response()->json([
+            'data' => [
+                'conversation' => $this->chatService->conversationPayload($result['conversation'], $request->user()),
+                'message' => $this->chatService->messagePayload($result['message'], $request->user()),
+            ],
         ], 201);
     }
 
@@ -104,6 +125,20 @@ class ChatController extends Controller
         return response()->json([
             'data' => $users->map(fn ($user) => $this->chatService->userPresencePayload($user))->values(),
         ]);
+    }
+
+    public function typing(StoreChatTypingRequest $request): JsonResponse
+    {
+        $peer = User::query()->findOrFail((int) $request->validated('user_id'));
+
+        $this->chatService->broadcastTyping(
+            $request->user(),
+            $peer,
+            (bool) $request->validated('typing'),
+            $request->validated('conversation_id'),
+        );
+
+        return response()->json(['ok' => true]);
     }
 
     public function unreadCount(Request $request): JsonResponse

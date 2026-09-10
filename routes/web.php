@@ -677,6 +677,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('chat')->name('chat.')->group(function () {
         Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations.index');
         Route::post('/conversations', [ChatController::class, 'storeConversation'])->name('conversations.store');
+        Route::post('/direct-messages', [ChatController::class, 'storeDirectMessage'])->name('direct-messages.store');
+        Route::post('/typing', [ChatController::class, 'typing'])->name('typing');
         Route::get('/conversations/{conversation}/messages', [ChatController::class, 'messages'])->name('messages.index');
         Route::post('/conversations/{conversation}/messages', [ChatController::class, 'storeMessage'])->name('messages.store');
         Route::post('/conversations/{conversation}/delivered', [ChatController::class, 'markDelivered'])->name('delivered');
