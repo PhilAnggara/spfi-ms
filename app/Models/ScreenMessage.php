@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ScreenMessageAudienceType;
 use App\Enums\ScreenMessageDisplayMode;
+use App\Enums\ScreenMessageTheme;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,6 +26,7 @@ class ScreenMessage extends Model
         'duration_seconds',
         'audience_type',
         'allow_reply',
+        'theme',
         'is_active',
         'deactivated_at',
         'deactivated_by',
@@ -38,6 +40,7 @@ class ScreenMessage extends Model
         return [
             'display_mode' => ScreenMessageDisplayMode::class,
             'audience_type' => ScreenMessageAudienceType::class,
+            'theme' => ScreenMessageTheme::class,
             'duration_seconds' => 'integer',
             'allow_reply' => 'boolean',
             'is_active' => 'boolean',
@@ -90,6 +93,8 @@ class ScreenMessage extends Model
      */
     public function toOverlayPayload(?User $viewer = null): array
     {
+        $theme = $this->theme ?? ScreenMessageTheme::Default;
+
         $payload = [
             'id' => $this->id,
             'title' => $this->title,
@@ -97,6 +102,8 @@ class ScreenMessage extends Model
             'display_mode' => $this->display_mode->value,
             'duration_seconds' => $this->duration_seconds,
             'allow_reply' => $this->allow_reply,
+            'theme' => $theme->value,
+            'theme_label' => $theme->label(),
             'is_active' => $this->is_active,
             'created_at' => $this->created_at?->toIso8601String(),
             'expires_at' => null,

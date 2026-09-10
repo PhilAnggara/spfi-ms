@@ -56,6 +56,7 @@
                                     <td class="fw-semibold">{{ $message->title }}</td>
                                     <td>{{ $message->user?->name ?? '—' }}</td>
                                     <td>
+                                        <span class="badge {{ $message->theme->badgeClass() }}">{{ $message->theme->label() }}</span>
                                         <span class="badge bg-light-secondary text-secondary">
                                             {{ $message->display_mode->label() }}
                                         </span>
@@ -96,6 +97,7 @@
                                 </div>
                             </div>
                             <div class="sm-index-card__badges">
+                                <span class="badge {{ $message->theme->badgeClass() }}">{{ $message->theme->label() }}</span>
                                 <span class="badge bg-light-secondary text-secondary">{{ $message->display_mode->label() }}</span>
                                 @if ($message->is_active)
                                     <span class="badge bg-light-success text-success">Active</span>

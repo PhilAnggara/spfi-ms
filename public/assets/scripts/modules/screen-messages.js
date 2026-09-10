@@ -6,6 +6,7 @@
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const authUserId = document.querySelector('meta[name="auth-user-id"]')?.content;
+    const panelEl = root.querySelector('.sm-overlay__panel');
     const titleEl = document.getElementById('sm-overlay-title');
     const bodyEl = document.getElementById('sm-overlay-body');
     const timerWrap = document.getElementById('sm-overlay-timer');
@@ -20,6 +21,9 @@
     const closeBtn = document.getElementById('sm-overlay-close');
     const permanentNote = document.getElementById('sm-overlay-permanent-note');
 
+    const IDLE_POLL_MS = 10000;
+    const ACTIVE_POLL_MS = 2000;
+
     const queue = [];
     const queuedIds = new Set();
     let current = null;
@@ -27,6 +31,13 @@
     let timerEndsAt = null;
     let timerTotalMs = 0;
     let leaveTimeout = null;
+    let pollTimerId = null;
+    let loadingPending = false;
+
+    function messageId(value) {
+        const id = Number(value);
+        return Number.isFinite(id) && id > 0 ? id : null;
+    }
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -63,12 +74,33 @@
         return response.json().catch(() => ({}));
     }
 
+    function schedulePoll() {
+        if (pollTimerId) {
+            clearTimeout(pollTimerId);
+        }
+        const delay = current ? ACTIVE_POLL_MS : IDLE_POLL_MS;
+        pollTimerId = setTimeout(async () => {
+            await loadPending();
+            schedulePoll();
+        }, delay);
+    }
+
     function enqueue(message) {
-        if (!message?.id || queuedIds.has(message.id)) {
+        const id = messageId(message?.id);
+        if (!id) {
             return;
         }
 
-        if (current?.id === message.id) {
+        message.id = id;
+        if (!message.theme) {
+            message.theme = 'default';
+        }
+
+        if (queuedIds.has(id)) {
+            return;
+        }
+
+        if (current?.id === id) {
             if (message.expires_at && !current.expires_at) {
                 current.expires_at = message.expires_at;
             }
@@ -76,15 +108,24 @@
                 current.my_reply = message.my_reply;
                 showSentReply(message.my_reply.body);
             }
+            if (message.theme) {
+                current.theme = message.theme;
+                applyTheme(current);
+            }
             return;
         }
 
-        queuedIds.add(message.id);
+        queuedIds.add(id);
         queue.push(message);
         maybeShowNext();
     }
 
-    function removeFromQueue(id) {
+    function removeFromQueue(rawId) {
+        const id = messageId(rawId);
+        if (!id) {
+            return;
+        }
+
         for (let i = queue.length - 1; i >= 0; i -= 1) {
             if (queue[i].id === id) {
                 queue.splice(i, 1);
@@ -177,7 +218,17 @@
         replyInput.value = '';
     }
 
+    function applyTheme(message) {
+        const theme = String(message?.theme || 'default').toLowerCase();
+
+        root.setAttribute('data-theme', theme);
+        if (panelEl) {
+            panelEl.setAttribute('data-theme', theme);
+        }
+    }
+
     function render(message) {
+        applyTheme(message);
         titleEl.textContent = message.title || '';
         bodyEl.innerHTML = escapeHtml(message.body || '').replaceAll('\n', '<br>');
 
@@ -207,12 +258,14 @@
 
     function showOverlay() {
         root.hidden = false;
+        root.removeAttribute('hidden');
         root.setAttribute('aria-hidden', 'false');
         requestAnimationFrame(() => {
             root.classList.add('is-visible');
             root.classList.remove('is-leaving');
         });
         document.body.style.overflow = 'hidden';
+        schedulePoll();
     }
 
     function hideOverlay(immediate) {
@@ -222,8 +275,14 @@
         const finish = () => {
             root.classList.remove('is-visible', 'is-leaving');
             root.hidden = true;
+            root.setAttribute('hidden', 'hidden');
             root.setAttribute('aria-hidden', 'true');
+            root.setAttribute('data-theme', 'default');
+            if (panelEl) {
+                panelEl.setAttribute('data-theme', 'default');
+            }
             document.body.style.overflow = '';
+            schedulePoll();
             maybeShowNext();
         };
 
@@ -252,7 +311,7 @@
 
         try {
             const seen = await api(`/screen-messages/inbox/${current.id}/seen`, { method: 'POST', body: '{}' });
-            if (seen.expires_at) {
+            if (seen.expires_at && current) {
                 current.expires_at = seen.expires_at;
                 if (current.display_mode !== 'permanent' && (current.duration_seconds || seen.expires_at)) {
                     startTimerFromExpiresAt(seen.expires_at, current.duration_seconds || 0);
@@ -339,32 +398,80 @@
         }
     });
 
+    function reconcileAgainstPending(messages) {
+        const pendingIds = new Set();
+
+        messages.forEach((message) => {
+            const id = messageId(message?.id);
+            if (id) {
+                pendingIds.add(id);
+                enqueue(message);
+            }
+        });
+
+        [...queuedIds].forEach((id) => {
+            if (!pendingIds.has(id)) {
+                removeFromQueue(id);
+            }
+        });
+
+        if (current?.id && !pendingIds.has(current.id)) {
+            removeFromQueue(current.id);
+        }
+    }
+
     async function loadPending() {
+        if (loadingPending) {
+            return;
+        }
+
+        loadingPending = true;
         try {
             const data = await api('/screen-messages/inbox/pending');
-            (data.messages || []).forEach(enqueue);
+            reconcileAgainstPending(data.messages || []);
         } catch (e) {
             // Ignore bootstrap failures.
+        } finally {
+            loadingPending = false;
+        }
+    }
+
+    function handleDeactivatedPayload(payload) {
+        const id = messageId(payload?.id ?? payload?.screen_message_id ?? payload?.message_id);
+        if (id) {
+            removeFromQueue(id);
         }
     }
 
     function bindEcho() {
-        if (!authUserId || typeof window.Echo === 'undefined') {
+        if (!authUserId || !window.Echo || typeof window.Echo.private !== 'function') {
             return;
         }
 
-        window.Echo.private(`App.Models.User.${authUserId}`)
-            .listen('.screen-message.sent', (payload) => {
+        try {
+            const channel = window.Echo.private(`App.Models.User.${authUserId}`);
+            channel.listen('.screen-message.sent', (payload) => {
                 enqueue(payload);
-            })
-            .listen('.screen-message.deactivated', (payload) => {
-                if (payload?.id) {
-                    removeFromQueue(payload.id);
-                }
             });
+            channel.listen('.screen-message.deactivated', handleDeactivatedPayload);
+            channel.listen('screen-message.deactivated', handleDeactivatedPayload);
+        } catch (e) {
+            // Poll fallback remains active.
+        }
     }
 
-    loadPending();
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            loadPending();
+        }
+    });
+
+    window.addEventListener('focus', () => {
+        loadPending();
+    });
+
+    loadPending().finally(() => {
+        schedulePoll();
+    });
     bindEcho();
-    setInterval(loadPending, 15000);
 })();

@@ -18,6 +18,7 @@
                         · {{ $message->created_at?->format('d M Y H:i') }}
                     </p>
                     <div class="d-flex flex-wrap gap-2 mt-3">
+                        <span class="badge {{ $message->theme->badgeClass() }}">{{ $message->theme->label() }}</span>
                         <span class="badge bg-light-secondary text-secondary">{{ $message->display_mode->label() }}</span>
                         <span class="badge bg-light-info text-info">{{ $message->audience_type->label() }}</span>
                         @if ($message->is_active)

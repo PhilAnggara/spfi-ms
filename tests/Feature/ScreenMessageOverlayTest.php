@@ -337,3 +337,60 @@ it('returns live recipient and reply data for authorized viewers', function () {
         ->assertJsonPath('recipients.0.name', $recipient->name)
         ->assertJsonPath('replies.0.body', 'Live reply');
 });
+
+it('includes theme in pending overlay payload', function () {
+    $sender = createOverlayUser('ov-theme-sender', [
+        'create-all-screen-messages',
+        'view-own-screen-messages',
+    ]);
+    $recipient = createOverlayUser('ov-theme-recipient');
+
+    $message = app(ScreenMessageService::class)->create($sender, [
+        'title' => 'Warning notice',
+        'body' => 'Please check stock',
+        'display_mode' => ScreenMessageDisplayMode::UserClosable->value,
+        'audience_type' => ScreenMessageAudienceType::Users->value,
+        'target_ids' => [$recipient->id],
+        'theme' => \App\Enums\ScreenMessageTheme::Warning->value,
+        'allow_reply' => false,
+    ]);
+
+    expect($message->theme)->toBe(\App\Enums\ScreenMessageTheme::Warning);
+
+    $this->actingAs($recipient)
+        ->getJson(route('screen-messages.inbox.pending'))
+        ->assertOk()
+        ->assertJsonPath('messages.0.id', $message->id)
+        ->assertJsonPath('messages.0.theme', 'warning')
+        ->assertJsonPath('messages.0.theme_label', 'Warning');
+});
+
+it('removes deactivated messages from pending for recipients', function () {
+    $sender = createOverlayUser('ov-deact-sender', [
+        'create-all-screen-messages',
+        'view-own-screen-messages',
+        'deactivate-own-screen-messages',
+    ]);
+    $recipient = createOverlayUser('ov-deact-recipient');
+
+    $message = app(ScreenMessageService::class)->create($sender, [
+        'title' => 'Will deactivate',
+        'body' => 'Close me remotely',
+        'display_mode' => ScreenMessageDisplayMode::UserClosable->value,
+        'audience_type' => ScreenMessageAudienceType::Users->value,
+        'target_ids' => [$recipient->id],
+    ]);
+
+    $this->actingAs($recipient)
+        ->getJson(route('screen-messages.inbox.pending'))
+        ->assertJsonCount(1, 'messages');
+
+    $this->actingAs($sender)
+        ->post(route('screen-messages.deactivate', $message))
+        ->assertRedirect();
+
+    $this->actingAs($recipient)
+        ->getJson(route('screen-messages.inbox.pending'))
+        ->assertOk()
+        ->assertJsonCount(0, 'messages');
+});

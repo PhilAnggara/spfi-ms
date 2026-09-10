@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\ScreenMessageAudienceType;
 use App\Enums\ScreenMessageDisplayMode;
+use App\Enums\ScreenMessageTheme;
 use App\Http\Requests\StoreScreenMessageRequest;
 use App\Models\Department;
 use App\Models\ScreenMessage;
@@ -60,6 +61,7 @@ class ScreenMessageController extends Controller
             'departments' => $departmentsQuery->withCount('users')->get(['id', 'name', 'code', 'alias']),
             'displayModes' => ScreenMessageDisplayMode::cases(),
             'audienceTypes' => ScreenMessageAudienceType::cases(),
+            'themes' => ScreenMessageTheme::cases(),
             'canCreateAll' => $canCreateAll,
             'canCreatePermanent' => ScreenMessageAccess::canCreatePermanent($user),
         ]);

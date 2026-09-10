@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\ScreenMessageAudienceType;
 use App\Enums\ScreenMessageDisplayMode;
+use App\Enums\ScreenMessageTheme;
 use App\Support\ScreenMessageAccess;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -27,6 +28,7 @@ class StoreScreenMessageRequest extends FormRequest
             'display_mode' => ['required', 'string', Rule::in(ScreenMessageDisplayMode::values())],
             'duration_seconds' => ['nullable', 'integer', 'min:1', 'max:3600'],
             'audience_type' => ['required', 'string', Rule::in(ScreenMessageAudienceType::values())],
+            'theme' => ['required', 'string', Rule::in(ScreenMessageTheme::values())],
             'allow_reply' => ['sometimes', 'boolean'],
             'target_ids' => ['nullable', 'array'],
             'target_ids.*' => ['integer', 'min:1'],
@@ -43,6 +45,7 @@ class StoreScreenMessageRequest extends FormRequest
             'body.required' => 'Please enter the message body.',
             'display_mode.required' => 'Please choose how the overlay should behave.',
             'audience_type.required' => 'Please choose who should receive the message.',
+            'theme.required' => 'Please choose a message theme.',
         ];
     }
 
@@ -79,6 +82,7 @@ class StoreScreenMessageRequest extends FormRequest
         $this->merge([
             'allow_reply' => $this->boolean('allow_reply'),
             'duration_seconds' => ($duration === '' || $duration === null) ? null : $duration,
+            'theme' => $this->input('theme') ?: ScreenMessageTheme::Default->value,
         ]);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ScreenMessageAudienceType;
 use App\Enums\ScreenMessageDisplayMode;
 use App\Enums\ScreenMessageTargetType;
+use App\Enums\ScreenMessageTheme;
 use App\Events\ScreenMessageDeactivated;
 use App\Events\ScreenMessageSent;
 use App\Models\ScreenMessage;
@@ -28,6 +29,7 @@ class ScreenMessageService
      *     display_mode: string,
      *     duration_seconds?: int|null,
      *     audience_type: string,
+     *     theme?: string,
      *     allow_reply?: bool,
      *     target_ids?: list<int>
      * }  $data
@@ -36,6 +38,8 @@ class ScreenMessageService
     {
         $displayMode = ScreenMessageDisplayMode::from($data['display_mode']);
         $audienceType = ScreenMessageAudienceType::from($data['audience_type']);
+        $theme = ScreenMessageTheme::tryFrom((string) ($data['theme'] ?? ''))
+            ?? ScreenMessageTheme::Default;
 
         if ($displayMode->isPermanent() && ! ScreenMessageAccess::canCreatePermanent($sender)) {
             throw ValidationException::withMessages([
@@ -69,7 +73,7 @@ class ScreenMessageService
         }
 
         /** @var ScreenMessage $message */
-        $message = DB::transaction(function () use ($sender, $data, $displayMode, $audienceType, $duration, $targetIds, $recipients): ScreenMessage {
+        $message = DB::transaction(function () use ($sender, $data, $displayMode, $audienceType, $theme, $duration, $targetIds, $recipients): ScreenMessage {
             $message = ScreenMessage::query()->create([
                 'user_id' => $sender->id,
                 'title' => $data['title'],
@@ -78,6 +82,7 @@ class ScreenMessageService
                 'duration_seconds' => $duration,
                 'audience_type' => $audienceType,
                 'allow_reply' => (bool) ($data['allow_reply'] ?? false),
+                'theme' => $theme,
                 'is_active' => true,
             ]);
 

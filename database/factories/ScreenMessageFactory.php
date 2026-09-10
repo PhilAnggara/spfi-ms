@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\ScreenMessageAudienceType;
 use App\Enums\ScreenMessageDisplayMode;
+use App\Enums\ScreenMessageTheme;
 use App\Models\ScreenMessage;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -28,6 +29,7 @@ class ScreenMessageFactory extends Factory
             'duration_seconds' => 30,
             'audience_type' => ScreenMessageAudienceType::Users,
             'allow_reply' => false,
+            'theme' => ScreenMessageTheme::Default,
             'is_active' => true,
         ];
     }

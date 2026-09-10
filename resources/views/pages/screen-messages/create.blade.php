@@ -5,6 +5,7 @@
 @php
     $oldMode = old('display_mode', 'user_closable');
     $oldAudience = old('audience_type', 'users');
+    $oldTheme = old('theme', 'default');
     $oldTargets = collect(old('target_ids', []))->map(fn ($id) => (int) $id);
 @endphp
 <div class="page-heading po-page sc-page prs-create-page sm-page" id="screen-message-create-page">
@@ -73,6 +74,44 @@
                             <input class="form-check-input" type="checkbox" value="1" name="allow_reply" id="allow_reply"
                                 @checked(old('allow_reply'))>
                             <label class="form-check-label" for="allow_reply">Allow recipients to reply</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-transparent">
+                <span class="sc-section-title"><i class="fa-regular fa-palette"></i> Theme</span>
+            </div>
+            <div class="card-body">
+                <input type="hidden" name="theme" id="theme" value="{{ $oldTheme }}">
+                <div class="sm-theme-chips mb-3" role="group" aria-label="Message theme">
+                    @foreach ($themes as $themeOption)
+                        <button type="button"
+                            class="sm-theme-chip {{ $oldTheme === $themeOption->value ? 'is-active' : '' }}"
+                            data-theme="{{ $themeOption->value }}"
+                            data-theme-label="{{ $themeOption->label() }}"
+                            aria-pressed="{{ $oldTheme === $themeOption->value ? 'true' : 'false' }}">
+                            <span class="sm-theme-chip__swatch" data-theme="{{ $themeOption->value }}"></span>
+                            <span class="sm-theme-chip__label">{{ $themeOption->label() }}</span>
+                        </button>
+                    @endforeach
+                </div>
+                @error('theme') <div class="text-danger small mb-2">{{ $message }}</div> @enderror
+
+                <div class="sm-theme-preview" aria-live="polite">
+                    <div class="sm-theme-preview__label">Preview</div>
+                    <div class="sm-overlay sm-theme-preview__overlay is-visible" id="sm-theme-preview" data-theme="{{ $oldTheme }}">
+                        <div class="sm-overlay__panel sm-theme-preview__panel">
+                            <div class="sm-overlay__accent"></div>
+                            <div class="sm-overlay__header">
+                                <span class="sm-overlay__badge" id="sm-preview-badge">
+                                    {{ \App\Enums\ScreenMessageTheme::tryFrom($oldTheme)?->label() ?? 'Default' }}
+                                </span>
+                                <h2 class="sm-overlay__title" id="sm-preview-title">Message title</h2>
+                            </div>
+                            <div class="sm-overlay__body" id="sm-preview-body">Your message will appear here.</div>
                         </div>
                     </div>
                 </div>
@@ -251,7 +290,7 @@
     <link rel="stylesheet" href="{{ url('assets/css/purchase-orders-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/stock-correction-modern.css') }}">
     <link rel="stylesheet" href="{{ url('assets/css/prs-modern.css') }}">
-    <link rel="stylesheet" href="{{ url('assets/css/screen-messages.css') }}?v=2">
+    <link rel="stylesheet" href="{{ url('assets/css/screen-messages.css') }}?v={{ @filemtime(public_path('assets/css/screen-messages.css')) ?: time() }}">
     <link rel="stylesheet" href="{{ url('assets/extensions/choices.js/public/assets/styles/choices.css') }}">
 @endpush
 
@@ -261,6 +300,13 @@
 (function () {
     const modeInput = document.getElementById('display_mode');
     const audienceInput = document.getElementById('audience_type');
+    const themeInput = document.getElementById('theme');
+    const titleInput = document.getElementById('title');
+    const bodyInput = document.getElementById('body');
+    const previewRoot = document.getElementById('sm-theme-preview');
+    const previewBadge = document.getElementById('sm-preview-badge');
+    const previewTitle = document.getElementById('sm-preview-title');
+    const previewBody = document.getElementById('sm-preview-body');
     const durationPanel = document.getElementById('duration-panel');
     const durationField = document.getElementById('duration-field');
     const durationInput = document.getElementById('duration_seconds');
@@ -274,6 +320,15 @@
     const deptsSelect = document.getElementById('target_departments');
     const defaultAutoDuration = '30';
     let lastOptionalDuration = durationInput.value || defaultAutoDuration;
+
+    function escapePreview(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
 
     function initChoices(select) {
         if (!select || typeof Choices === 'undefined') {
@@ -409,6 +464,35 @@
         setActiveButtons('[data-audience-type]', 'data-audience-type', type);
     }
 
+    function syncThemePreview() {
+        const activeChip = document.querySelector(`.sm-theme-chip[data-theme="${themeInput.value}"]`);
+        const label = activeChip?.getAttribute('data-theme-label') || 'Default';
+        const title = (titleInput.value || '').trim() || 'Message title';
+        const body = (bodyInput.value || '').trim() || 'Your message will appear here.';
+
+        if (previewRoot) {
+            previewRoot.setAttribute('data-theme', themeInput.value || 'default');
+        }
+        if (previewBadge) {
+            previewBadge.textContent = label;
+        }
+        if (previewTitle) {
+            previewTitle.textContent = title;
+        }
+        if (previewBody) {
+            previewBody.innerHTML = escapePreview(body).replaceAll('\n', '<br>');
+        }
+    }
+
+    function syncTheme() {
+        document.querySelectorAll('.sm-theme-chip').forEach((btn) => {
+            const active = btn.getAttribute('data-theme') === themeInput.value;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        syncThemePreview();
+    }
+
     document.querySelectorAll('[data-display-mode]').forEach((btn) => {
         btn.addEventListener('click', () => {
             if (btn.disabled) {
@@ -429,6 +513,16 @@
         });
     });
 
+    document.querySelectorAll('.sm-theme-chip').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            themeInput.value = btn.getAttribute('data-theme');
+            syncTheme();
+        });
+    });
+
+    titleInput.addEventListener('input', syncThemePreview);
+    bodyInput.addEventListener('input', syncThemePreview);
+
     optionalToggle.addEventListener('change', () => {
         if (modeInput.value === 'user_closable') {
             syncOptionalDuration();
@@ -437,6 +531,7 @@
 
     syncMode();
     syncAudience();
+    syncTheme();
 })();
 </script>
 @endpush

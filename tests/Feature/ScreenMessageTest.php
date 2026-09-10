@@ -327,3 +327,51 @@ it('hides replies without reply view permission', function () {
         ->assertOk()
         ->assertSee('Got it');
 });
+
+it('stores the selected theme when creating a screen message', function () {
+    $sender = createScreenUser('sm-theme-sender', $this->departmentA->id, [
+        'create-all-screen-messages',
+        'view-own-screen-messages',
+    ]);
+    $target = createScreenUser('sm-theme-target', $this->departmentA->id);
+
+    $this->actingAs($sender)
+        ->post(route('screen-messages.store'), [
+            'title' => 'Danger alert',
+            'body' => 'Immediate action needed',
+            'display_mode' => ScreenMessageDisplayMode::UserClosable->value,
+            'audience_type' => ScreenMessageAudienceType::Users->value,
+            'target_ids' => [$target->id],
+            'theme' => \App\Enums\ScreenMessageTheme::Danger->value,
+        ])
+        ->assertRedirect();
+
+    $message = ScreenMessage::query()->where('title', 'Danger alert')->first();
+
+    expect($message)->not->toBeNull()
+        ->and($message->theme)->toBe(\App\Enums\ScreenMessageTheme::Danger);
+
+    $this->actingAs($sender)
+        ->get(route('screen-messages.show', $message))
+        ->assertOk()
+        ->assertSee('Danger');
+});
+
+it('rejects invalid themes', function () {
+    $sender = createScreenUser('sm-bad-theme', $this->departmentA->id, [
+        'create-all-screen-messages',
+        'view-own-screen-messages',
+    ]);
+    $target = createScreenUser('sm-bad-theme-target', $this->departmentA->id);
+
+    $this->actingAs($sender)
+        ->post(route('screen-messages.store'), [
+            'title' => 'Bad theme',
+            'body' => 'Should fail',
+            'display_mode' => ScreenMessageDisplayMode::UserClosable->value,
+            'audience_type' => ScreenMessageAudienceType::Users->value,
+            'target_ids' => [$target->id],
+            'theme' => 'neon',
+        ])
+        ->assertSessionHasErrors('theme');
+});

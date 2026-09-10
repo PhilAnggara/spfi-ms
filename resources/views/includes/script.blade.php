@@ -54,7 +54,7 @@
 
     <script src="{{ url('assets/scripts/main.js') }}"></script>
     <script src="{{ url('assets/scripts/modules/realtime-notifications.js') }}"></script>
-    <script src="{{ url('assets/scripts/modules/screen-messages.js') }}"></script>
+    <script src="{{ url('assets/scripts/modules/screen-messages.js') }}?v={{ @filemtime(public_path('assets/scripts/modules/screen-messages.js')) ?: time() }}"></script>
 
     @stack('addon-script')
 
