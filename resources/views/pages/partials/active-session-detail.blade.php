@@ -8,7 +8,7 @@
     };
 @endphp
 
-<div class="as-detail">
+<div class="as-detail" data-detail-url="{{ $detailUrl }}" data-has-more="{{ $hasMore ? '1' : '0' }}" data-oldest-id="{{ $oldestId ?? '' }}">
     <div class="as-detail-profile">
         <img src="https://ui-avatars.com/api/?background={{ $avatar }}&color=fff&bold=true&size=96&name={{ urlencode($user->name) }}"
              alt="{{ $user->name }}" class="as-detail-avatar">
@@ -53,39 +53,11 @@
 
     <h6 class="as-timeline-title">Activity History</h6>
 
-    @forelse ($logs as $log)
-        <div class="as-timeline-item as-action-{{ $log->action }}">
-            <div class="as-timeline-dot"></div>
-            <div class="as-timeline-content">
-                <div class="as-timeline-head">
-                    <strong>{{ $log->label() }}</strong>
-                    <span class="text-muted small">{{ $log->created_at->diffForHumans() }}</span>
-                </div>
-                <div class="small text-muted">{{ $log->created_at->format('d M Y H:i:s') }}</div>
-                @if ($log->ip_address)
-                    <div class="small"><span class="as-mono">{{ $log->ip_address }}</span></div>
-                @endif
-                @if ($log->action === 'force_logout' && $log->actor)
-                    <div class="small">by {{ $log->actor->name }}</div>
-                @endif
-                @if ($log->pageLabel())
-                    <div class="small text-muted">
-                        <i class="fa-regular fa-file-lines me-1"></i>{{ $log->pageLabel() }}
-                        @if ($log->subjectLabel())
-                            <span class="as-subject-id">{{ $log->subjectLabel() }}</span>
-                        @endif
-                    </div>
-                @elseif ($log->subjectLabel())
-                    <div class="small text-muted">
-                        <span class="as-subject-id">{{ $log->subjectLabel() }}</span>
-                    </div>
-                @endif
-                @if (! empty($log->meta['message']))
-                    <div class="small">{{ $log->meta['message'] }}</div>
-                @endif
-            </div>
-        </div>
-    @empty
-        <div class="text-muted small py-3">No activity recorded yet.</div>
-    @endforelse
+    <div id="as-timeline" class="as-timeline">
+        @include('pages.partials.active-session-detail-logs', [
+            'logs' => $logs,
+            'hasMore' => $hasMore,
+            'oldestId' => $oldestId,
+        ])
+    </div>
 </div>

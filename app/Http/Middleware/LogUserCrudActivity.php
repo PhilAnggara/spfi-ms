@@ -2,6 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Conversation;
+use App\Models\Item;
+use App\Models\User;
 use App\Models\UserActivityLog;
 use App\Services\UserActivityLogger;
 use Closure;
@@ -31,6 +34,8 @@ class LogUserCrudActivity
         'notifications.mark-all-read',
         'notifications.destroy',
         'notifications.clear-read',
+        'chat.delivered',
+        'chat.read',
     ];
 
     /**
@@ -66,6 +71,27 @@ class LogUserCrudActivity
         'reports',
     ];
 
+    /**
+     * Attribute names checked (in order) when building a human-readable subject code.
+     *
+     * @var list<string>
+     */
+    private const SUBJECT_CODE_ATTRIBUTES = [
+        'code',
+        'item_code',
+        'product_code',
+        'ts_number',
+        'po_number',
+        'prs_number',
+        'sws_number',
+        'rr_number',
+        'sa_number',
+        'dr_number',
+        'obc_number',
+        'doc_number',
+        'name',
+    ];
+
     public function __construct(private UserActivityLogger $logger) {}
 
     /**
@@ -93,15 +119,22 @@ class LogUserCrudActivity
             return $response;
         }
 
+        $routeName = (string) $request->route()?->getName();
+
+        if ($routeName === 'chat.typing') {
+            $this->logTypingIfNeeded($user, $request);
+
+            return $response;
+        }
+
         $action = $this->actionForRoute($request);
 
         if ($action === null) {
             return $response;
         }
 
-        $routeName = $request->route()?->getName();
         $path = '/'.$request->path();
-        $subject = $this->resolveSubject($request);
+        $subject = $this->resolveSubject($request, $user);
 
         $this->logger->log(
             $user,
@@ -158,22 +191,144 @@ class LogUserCrudActivity
         };
     }
 
-    /**
-     * @return array{subject?: string, subject_type?: string, subject_id?: int|string}
-     */
-    private function resolveSubject(Request $request): array
+    private function logTypingIfNeeded(User $user, Request $request): void
     {
+        if (! $request->boolean('typing')) {
+            return;
+        }
+
+        $peerId = (int) $request->input('user_id');
+
+        if ($peerId <= 0 || $peerId === $user->id) {
+            return;
+        }
+
+        if (! $this->shouldLogTyping($user->id, $peerId)) {
+            return;
+        }
+
+        $peer = User::query()->find($peerId);
+        $subject = $this->formatPersonSubject($peerId, $peer?->name);
+        $path = '/'.$request->path();
+
+        $this->logger->log(
+            $user,
+            UserActivityLog::ACTION_TYPING,
+            $request,
+            meta: array_filter([
+                'route' => 'chat.typing',
+                'path' => $path,
+                'page' => 'Chat',
+                'method' => $request->method(),
+                'subject' => $subject,
+                'subject_type' => 'user',
+                'subject_id' => $peerId,
+                'subject_code' => $peer?->name,
+            ], static fn ($value) => $value !== null && $value !== ''),
+        );
+    }
+
+    private function shouldLogTyping(int $userId, int $peerId): bool
+    {
+        $recent = UserActivityLog::query()
+            ->where('user_id', $userId)
+            ->whereIn('action', [
+                UserActivityLog::ACTION_TYPING,
+                UserActivityLog::ACTION_CREATED,
+            ])
+            ->latest('id')
+            ->limit(100)
+            ->get(['id', 'action', 'meta']);
+
+        $lastChatSendId = null;
+
+        foreach ($recent as $log) {
+            if ($log->action !== UserActivityLog::ACTION_CREATED) {
+                continue;
+            }
+
+            $route = (string) ($log->meta['route'] ?? '');
+            $subjectId = (int) ($log->meta['subject_id'] ?? 0);
+
+            if ($subjectId === $peerId
+                && in_array($route, ['chat.messages.store', 'chat.direct-messages.store'], true)) {
+                $lastChatSendId = (int) $log->id;
+                break;
+            }
+        }
+
+        foreach ($recent as $log) {
+            if ($log->action !== UserActivityLog::ACTION_TYPING) {
+                continue;
+            }
+
+            if ((int) ($log->meta['subject_id'] ?? 0) !== $peerId) {
+                continue;
+            }
+
+            if ($lastChatSendId === null || (int) $log->id > $lastChatSendId) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array{
+     *     subject?: string,
+     *     subject_type?: string,
+     *     subject_id?: int|string,
+     *     subject_code?: string
+     * }
+     */
+    private function resolveSubject(Request $request, User $actor): array
+    {
+        $routeName = (string) $request->route()?->getName();
+
+        if (in_array($routeName, [
+            'chat.direct-messages.store',
+            'chat.conversations.store',
+            'chat.typing',
+        ], true)) {
+            $peerId = (int) $request->input('user_id');
+
+            if ($peerId > 0) {
+                $peer = User::query()->find($peerId);
+
+                return [
+                    'subject' => $this->formatPersonSubject($peerId, $peer?->name),
+                    'subject_type' => 'user',
+                    'subject_id' => $peerId,
+                    'subject_code' => $peer?->name,
+                ];
+            }
+        }
+
+        if ($routeName === 'chat.messages.store') {
+            $conversation = $request->route('conversation');
+
+            if ($conversation instanceof Conversation) {
+                $peer = $conversation->otherParticipant($actor);
+
+                if ($peer !== null) {
+                    return [
+                        'subject' => $this->formatPersonSubject($peer->id, $peer->name),
+                        'subject_type' => 'user',
+                        'subject_id' => $peer->id,
+                        'subject_code' => $peer->name,
+                    ];
+                }
+
+                return $this->subjectFromModel($conversation, 'conversation');
+            }
+        }
+
         $parameters = $request->route()?->parameters() ?? [];
 
         foreach ($parameters as $name => $value) {
             if ($value instanceof Model) {
-                $key = $value->getKey();
-
-                return [
-                    'subject' => '#'.$key,
-                    'subject_type' => $name,
-                    'subject_id' => $key,
-                ];
+                return $this->subjectFromModel($value, (string) $name);
             }
         }
 
@@ -182,18 +337,129 @@ class LogUserCrudActivity
                 continue;
             }
 
-            if (is_numeric($value) || (is_string($value) && ctype_digit($value))) {
-                $key = is_numeric($value) ? $value + 0 : $value;
-
-                return [
-                    'subject' => '#'.$key,
-                    'subject_type' => $name,
-                    'subject_id' => $key,
-                ];
+            if (! is_numeric($value) && ! (is_string($value) && ctype_digit($value))) {
+                continue;
             }
+
+            $key = is_numeric($value) ? $value + 0 : (int) $value;
+            $model = $this->resolveModelForParameter((string) $name, $key, $routeName);
+
+            if ($model instanceof Model) {
+                return $this->subjectFromModel($model, (string) $name);
+            }
+
+            return [
+                'subject' => '#'.$key,
+                'subject_type' => (string) $name,
+                'subject_id' => $key,
+            ];
         }
 
         return [];
+    }
+
+    private function resolveModelForParameter(string $name, int|string $key, string $routeName): ?Model
+    {
+        $normalized = str_replace('-', '_', strtolower($name));
+
+        $map = [
+            'product' => Item::class,
+            'item' => Item::class,
+            'currency' => \App\Models\Currency::class,
+            'purchase_order' => \App\Models\PurchaseOrder::class,
+            'purchaseorder' => \App\Models\PurchaseOrder::class,
+            'transfer_slip' => \App\Models\TransferSlip::class,
+            'transferslip' => \App\Models\TransferSlip::class,
+            'prs' => \App\Models\Prs::class,
+            'supplier' => \App\Models\Supplier::class,
+            'buyer' => \App\Models\Buyer::class,
+            'receiving_report' => \App\Models\ReceivingReport::class,
+            'delivery' => \App\Models\Delivery::class,
+            'screen_message' => \App\Models\ScreenMessage::class,
+            'screenmessage' => \App\Models\ScreenMessage::class,
+        ];
+
+        if (str_starts_with($routeName, 'product.')) {
+            return Item::query()->find($key);
+        }
+
+        if (isset($map[$normalized])) {
+            return $map[$normalized]::query()->find($key);
+        }
+
+        $compact = str_replace('_', '', $normalized);
+        if (isset($map[$compact])) {
+            return $map[$compact]::query()->find($key);
+        }
+
+        $guesses = [
+            'App\\Models\\'.\Illuminate\Support\Str::studly($normalized),
+            'App\\Models\\'.\Illuminate\Support\Str::studly(\Illuminate\Support\Str::singular($normalized)),
+        ];
+
+        foreach ($guesses as $class) {
+            if (class_exists($class) && is_subclass_of($class, Model::class)) {
+                return $class::query()->find($key);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{
+     *     subject: string,
+     *     subject_type: string,
+     *     subject_id: int|string,
+     *     subject_code?: string
+     * }
+     */
+    private function subjectFromModel(Model $model, string $type): array
+    {
+        $key = $model->getKey();
+        $code = $this->extractSubjectCode($model);
+
+        if ($model instanceof User) {
+            return [
+                'subject' => $this->formatPersonSubject((int) $key, $model->name),
+                'subject_type' => $type,
+                'subject_id' => $key,
+                'subject_code' => $model->name,
+            ];
+        }
+
+        return array_filter([
+            'subject' => $code !== null && $code !== ''
+                ? '#'.$key.' ('.$code.')'
+                : '#'.$key,
+            'subject_type' => $type,
+            'subject_id' => $key,
+            'subject_code' => $code,
+        ], static fn ($value) => $value !== null && $value !== '');
+    }
+
+    private function extractSubjectCode(Model $model): ?string
+    {
+        foreach (self::SUBJECT_CODE_ATTRIBUTES as $attribute) {
+            if ($attribute === 'name' && ! $model instanceof User) {
+                continue;
+            }
+
+            $value = $model->getAttribute($attribute);
+
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    private function formatPersonSubject(int $id, ?string $name): string
+    {
+        $name = trim((string) $name);
+
+        return $name !== '' ? '#'.$id.' '.$name : '#'.$id;
     }
 
     private function shouldSkipActivityLog(Request $request): bool

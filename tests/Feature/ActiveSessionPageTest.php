@@ -193,9 +193,8 @@ it('shows a friendly page name instead of a raw path in activity detail', functi
     $this->actingAs($this->admin)
         ->get(route('active-sessions.show', $this->monitoredUser))
         ->assertSuccessful()
-        ->assertSee('Visited page')
-        ->assertSee('Purchase Requisitions')
-        ->assertSee('Notifications refresh')
+        ->assertSee('Visited Purchase Requisitions')
+        ->assertSee('Visited Notifications refresh')
         ->assertDontSee('/notifications/recent');
 });
 
@@ -423,8 +422,10 @@ it('logs successful update activity with subject id from the route', function ()
 
     expect($log)->not->toBeNull()
         ->and($log->meta['subject_id'] ?? null)->toBe($currency->id)
-        ->and($log->meta['subject'] ?? null)->toBe('#'.$currency->id)
-        ->and($log->subjectLabel())->toBe('#'.$currency->id);
+        ->and($log->meta['subject'] ?? null)->toBe('#'.$currency->id.' (UPD)')
+        ->and($log->meta['subject_code'] ?? null)->toBe('UPD')
+        ->and($log->subjectLabel())->toBe('#'.$currency->id.' (UPD)')
+        ->and($log->summary())->toBe('Edited currency #'.$currency->id.' (UPD)');
 });
 
 it('logs successful delete activity with subject id from the model', function () {
@@ -447,7 +448,8 @@ it('logs successful delete activity with subject id from the model', function ()
 
     expect($log)->not->toBeNull()
         ->and($log->meta['subject_id'] ?? null)->toBe($currency->id)
-        ->and($log->meta['subject'] ?? null)->toBe('#'.$currency->id);
+        ->and($log->meta['subject'] ?? null)->toBe('#'.$currency->id.' (DEL)')
+        ->and($log->meta['subject_code'] ?? null)->toBe('DEL');
 });
 
 it('does not log crud activity when validation fails', function () {
@@ -518,18 +520,19 @@ it('shows subject id in the activity detail timeline', function () {
             'path' => '/prs/12',
             'page' => 'Purchase Requisitions',
             'method' => 'PUT',
-            'subject' => '#12',
+            'subject' => '#12 (PRS-12)',
             'subject_type' => 'prs',
             'subject_id' => 12,
+            'subject_code' => 'PRS-12',
         ],
     ]);
 
     $this->actingAs($this->admin)
         ->get(route('active-sessions.show', $this->monitoredUser))
         ->assertSuccessful()
-        ->assertSee('Updated')
-        ->assertSee('Purchase Requisitions')
-        ->assertSee('#12');
+        ->assertSee('Edited PRS #12 (PRS-12)')
+        ->assertSee('203.0.113.50')
+        ->assertSee('Purchase Requisitions · PUT · /prs/12');
 });
 
 it('logs purchase order approval activity with subject id', function () {
@@ -584,7 +587,9 @@ it('logs purchase order approval activity with subject id', function () {
         ->and($log->meta['route'] ?? null)->toBe('purchase-orders.approve')
         ->and($log->meta['page'] ?? null)->toBe('PO Approval')
         ->and($log->meta['subject_id'] ?? null)->toBe($purchaseOrder->id)
-        ->and($log->meta['subject'] ?? null)->toBe('#'.$purchaseOrder->id)
+        ->and($log->meta['subject'] ?? null)->toBe('#'.$purchaseOrder->id.' (PO-ACT-001)')
+        ->and($log->meta['subject_code'] ?? null)->toBe('PO-ACT-001')
+        ->and($log->summary())->toBe('Approved purchase order #'.$purchaseOrder->id.' (PO-ACT-001)')
         ->and($log->label())->toBe('Approved');
 });
 
@@ -722,4 +727,238 @@ it('shows the reset activity logs control only with reset-activity-logs permissi
         ->get(route('active-sessions.index'))
         ->assertSuccessful()
         ->assertDontSee('Reset activity logs');
+});
+
+it('does not log screen message pending inbox polls as page visits', function () {
+    $this->actingAs($this->monitoredUser)
+        ->getJson(route('screen-messages.inbox.pending'))
+        ->assertSuccessful();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where(function ($query) {
+            $query->where('meta->route', 'screen-messages.inbox.pending')
+                ->orWhere('meta->path', '/screen-messages/inbox/pending');
+        })
+        ->exists())->toBeFalse();
+});
+
+it('logs typing once per peer until a chat is sent', function () {
+    \Illuminate\Support\Facades\Event::fake();
+
+    $this->actingAs($this->monitoredUser)
+        ->postJson(route('chat.typing'), [
+            'user_id' => $this->admin->id,
+            'typing' => true,
+        ])
+        ->assertOk();
+
+    $this->actingAs($this->monitoredUser)
+        ->postJson(route('chat.typing'), [
+            'user_id' => $this->admin->id,
+            'typing' => true,
+        ])
+        ->assertOk();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_TYPING)
+        ->count())->toBe(1);
+
+    $typingLog = UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_TYPING)
+        ->first();
+
+    expect($typingLog->summary())->toBe('Typing to #'.$this->admin->id.' '.$this->admin->name)
+        ->and($typingLog->meta['subject_id'] ?? null)->toBe($this->admin->id);
+
+    $this->actingAs($this->monitoredUser)
+        ->postJson(route('chat.direct-messages.store'), [
+            'user_id' => $this->admin->id,
+            'body' => 'Hello from activity test',
+        ])
+        ->assertCreated();
+
+    $sendLog = UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_CREATED)
+        ->where('meta->route', 'chat.direct-messages.store')
+        ->latest('id')
+        ->first();
+
+    expect($sendLog)->not->toBeNull()
+        ->and($sendLog->summary())->toBe('Sent chat to #'.$this->admin->id.' '.$this->admin->name);
+
+    $this->actingAs($this->monitoredUser)
+        ->postJson(route('chat.typing'), [
+            'user_id' => $this->admin->id,
+            'typing' => true,
+        ])
+        ->assertOk();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_TYPING)
+        ->count())->toBe(2);
+});
+
+it('does not log chat delivered or read as activity', function () {
+    \Illuminate\Support\Facades\Event::fake();
+
+    $conversation = \App\Models\Conversation::factory()
+        ->directBetween($this->monitoredUser, $this->admin)
+        ->create();
+
+    $this->actingAs($this->monitoredUser)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Noise check',
+        ])
+        ->assertCreated();
+
+    $before = UserActivityLog::query()->where('user_id', $this->admin->id)->count();
+
+    $this->actingAs($this->admin)
+        ->postJson(route('chat.delivered', $conversation))
+        ->assertOk();
+
+    $this->actingAs($this->admin)
+        ->postJson(route('chat.read', $conversation))
+        ->assertOk();
+
+    expect(UserActivityLog::query()->where('user_id', $this->admin->id)->count())->toBe($before);
+});
+
+it('logs opening a chat conversation with peer id and name', function () {
+    \Illuminate\Support\Facades\Event::fake();
+
+    $conversation = \App\Models\Conversation::factory()
+        ->directBetween($this->monitoredUser, $this->admin)
+        ->create();
+
+    $this->actingAs($this->monitoredUser)
+        ->getJson(route('chat.messages.index', $conversation))
+        ->assertOk();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where('meta->route', 'chat.messages.index')
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['subject_id'] ?? null)->toBe($this->admin->id)
+        ->and($log->summary())->toBe('Opened chat with #'.$this->admin->id.' '.$this->admin->name);
+
+    $this->actingAs($this->monitoredUser)
+        ->getJson(route('chat.messages.index', $conversation))
+        ->assertOk();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where('meta->route', 'chat.messages.index')
+        ->count())->toBe(1);
+});
+
+it('logs starting a chat with peer id and name', function () {
+    \Illuminate\Support\Facades\Event::fake();
+
+    $this->actingAs($this->monitoredUser)
+        ->postJson(route('chat.conversations.store'), [
+            'user_id' => $this->admin->id,
+        ])
+        ->assertCreated();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_CREATED)
+        ->where('meta->route', 'chat.conversations.store')
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['subject_id'] ?? null)->toBe($this->admin->id)
+        ->and($log->summary())->toBe('Started chat with #'.$this->admin->id.' '.$this->admin->name);
+});
+
+it('loads older activity history with before_id', function () {
+    $logs = collect(range(1, 55))->map(function (int $i) {
+        return UserActivityLog::query()->create([
+            'user_id' => $this->monitoredUser->id,
+            'action' => UserActivityLog::ACTION_LOGIN,
+            'ip_address' => '203.0.113.'.$i,
+            'user_agent' => 'Chrome',
+            'meta' => null,
+            'created_at' => now()->subMinutes(55 - $i),
+            'updated_at' => now()->subMinutes(55 - $i),
+        ]);
+    });
+
+    $initial = $this->actingAs($this->admin)
+        ->get(route('active-sessions.show', $this->monitoredUser))
+        ->assertSuccessful();
+
+    $initial->assertSee('Logged in')
+        ->assertSee('data-has-more="1"', false);
+
+    $oldestOnPage = UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->latest('id')
+        ->skip(49)
+        ->first();
+
+    $older = $this->actingAs($this->admin)
+        ->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])
+        ->get(route('active-sessions.show', [
+            'user' => $this->monitoredUser,
+            'before_id' => $oldestOnPage->id,
+        ]))
+        ->assertSuccessful();
+
+    $older->assertSee('data-log-id="'.$logs->first()->id.'"', false)
+        ->assertDontSee('as-detail-profile', false);
+});
+
+it('cleans noisy historical activity rows in migration', function () {
+    $pending = UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_ACTIVE,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => [
+            'route' => 'screen-messages.inbox.pending',
+            'path' => '/screen-messages/inbox/pending',
+            'page' => 'Screen Messages · Pending',
+        ],
+    ]);
+
+    $typing = UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_TYPING,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => [
+            'route' => 'chat.typing',
+            'subject' => '#1 Admin',
+            'subject_id' => 1,
+        ],
+    ]);
+
+    $keep = UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_LOGIN,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => null,
+    ]);
+
+    $migration = require database_path('migrations/2026_09_10_170333_cleanup_user_activity_log_noise.php');
+    $migration->up();
+
+    expect(UserActivityLog::query()->find($pending->id))->toBeNull()
+        ->and(UserActivityLog::query()->find($typing->id))->toBeNull()
+        ->and(UserActivityLog::query()->find($keep->id))->not->toBeNull();
 });

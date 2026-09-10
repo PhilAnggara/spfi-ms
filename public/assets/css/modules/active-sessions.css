@@ -320,7 +320,7 @@
     border-left: 2px solid #e2e8f0;
 }
 
-.as-timeline-item:last-child {
+.as-timeline-item:last-of-type {
     border-left-color: transparent;
     padding-bottom: 0;
 }
@@ -357,6 +357,19 @@
 .as-action-reassigned .as-timeline-dot,
 .as-action-requested_changes .as-timeline-dot {
     background: #3b82f6;
+}
+
+.as-action-typing .as-timeline-dot {
+    background: #a855f7;
+}
+
+.as-timeline-sentinel {
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    visibility: hidden;
 }
 
 .as-subject-id {

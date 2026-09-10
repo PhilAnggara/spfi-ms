@@ -69,3 +69,72 @@ it('allows activity logs without an actor', function () {
 
     expect($log->actor_id)->toBeNull();
 });
+
+it('builds short english activity summaries', function () {
+    $typing = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_TYPING,
+        'meta' => [
+            'subject' => '#9 Jane Doe',
+            'subject_id' => 9,
+        ],
+    ]);
+
+    $visit = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_ACTIVE,
+        'meta' => [
+            'page' => 'Purchase Requisitions',
+        ],
+    ]);
+
+    $openedChat = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_ACTIVE,
+        'meta' => [
+            'route' => 'chat.messages.index',
+            'page' => 'Chat',
+            'subject' => '#9 Jane Doe',
+        ],
+    ]);
+
+    $chat = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_CREATED,
+        'meta' => [
+            'route' => 'chat.direct-messages.store',
+            'subject' => '#9 Jane Doe',
+        ],
+    ]);
+
+    $startedChat = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_CREATED,
+        'meta' => [
+            'route' => 'chat.conversations.store',
+            'subject' => '#9 Jane Doe',
+        ],
+    ]);
+
+    $edit = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_UPDATED,
+        'meta' => [
+            'page' => 'Products',
+            'subject' => '#45 (SKU-001)',
+        ],
+    ]);
+
+    expect($typing->summary())->toBe('Typing to #9 Jane Doe')
+        ->and($visit->summary())->toBe('Visited Purchase Requisitions')
+        ->and($openedChat->summary())->toBe('Opened chat with #9 Jane Doe')
+        ->and($chat->summary())->toBe('Sent chat to #9 Jane Doe')
+        ->and($startedChat->summary())->toBe('Started chat with #9 Jane Doe')
+        ->and($edit->summary())->toBe('Edited product #45 (SKU-001)');
+
+    $edit->forceFill([
+        'meta' => [
+            'route' => 'product.update',
+            'page' => 'Products',
+            'method' => 'PUT',
+            'path' => '/master/product/45',
+            'subject' => '#45 (SKU-001)',
+        ],
+    ]);
+
+    expect($edit->detailLabel())->toBe('Products · PUT · /master/product/45');
+});

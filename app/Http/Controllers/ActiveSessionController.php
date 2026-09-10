@@ -8,10 +8,13 @@ use App\Models\UserActivityLog;
 use App\Services\UserActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class ActiveSessionController extends Controller
 {
+    private const ACTIVITY_PAGE_SIZE = 50;
+
     public function __construct(private UserActivityLogger $activityLogger) {}
 
     public function index(Request $request): View
@@ -58,8 +61,22 @@ class ActiveSessionController extends Controller
         return view('pages.active-sessions', $data);
     }
 
-    public function show(User $user): View
+    public function show(Request $request, User $user): View
     {
+        $beforeId = $request->integer('before_id') ?: null;
+
+        if ($request->ajax() && $beforeId !== null) {
+            $logs = $this->activityLogsPage($user, $beforeId);
+            $hasMore = $this->hasOlderActivityLogs($user, $logs);
+
+            return view('pages.partials.active-session-detail-logs', [
+                'logs' => $logs,
+                'hasMore' => $hasMore,
+                'oldestId' => $logs->last()?->id,
+                'appendOnly' => true,
+            ]);
+        }
+
         $user->load('department');
 
         $onlineThreshold = now()->timestamp - Session::ONLINE_THRESHOLD_SECONDS;
@@ -68,16 +85,16 @@ class ActiveSessionController extends Controller
             ->where('last_activity', '>=', $onlineThreshold)
             ->exists();
 
-        $logs = $user->activityLogs()
-            ->with('actor')
-            ->latest()
-            ->limit(50)
-            ->get();
+        $logs = $this->activityLogsPage($user);
+        $hasMore = $this->hasOlderActivityLogs($user, $logs);
 
         return view('pages.partials.active-session-detail', [
             'user' => $user,
             'isOnline' => $isOnline,
             'logs' => $logs,
+            'hasMore' => $hasMore,
+            'oldestId' => $logs->last()?->id,
+            'detailUrl' => route('active-sessions.show', $user),
         ]);
     }
 
@@ -130,5 +147,37 @@ class ActiveSessionController extends Controller
         toast('Activity logs cleared. All users have been logged out.');
 
         return redirect()->route('login');
+    }
+
+    /**
+     * @return Collection<int, UserActivityLog>
+     */
+    private function activityLogsPage(User $user, ?int $beforeId = null): Collection
+    {
+        $query = $user->activityLogs()
+            ->with('actor')
+            ->latest('id');
+
+        if ($beforeId !== null) {
+            $query->where('id', '<', $beforeId);
+        }
+
+        return $query->limit(self::ACTIVITY_PAGE_SIZE)->get();
+    }
+
+    /**
+     * @param  Collection<int, UserActivityLog>  $logs
+     */
+    private function hasOlderActivityLogs(User $user, Collection $logs): bool
+    {
+        $oldestId = $logs->last()?->id;
+
+        if ($oldestId === null) {
+            return false;
+        }
+
+        return $user->activityLogs()
+            ->where('id', '<', $oldestId)
+            ->exists();
     }
 }

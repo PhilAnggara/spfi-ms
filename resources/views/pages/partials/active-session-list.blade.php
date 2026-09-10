@@ -104,12 +104,7 @@
 
                 <div class="as-col as-col-history" data-label="Activity History">
                     @if ($latestLog)
-                        <span class="as-info-value">{{ $latestLog->label() }}</span>
-                        @if ($latestLog->pageLabel() || $latestLog->subjectLabel())
-                            <small class="text-muted d-block text-truncate" title="{{ trim(($latestLog->pageLabel() ?? '').' '.($latestLog->subjectLabel() ?? '')) }}">
-                                {{ \Illuminate\Support\Str::limit(trim(($latestLog->pageLabel() ?? '').($latestLog->subjectLabel() ? ' · '.$latestLog->subjectLabel() : '')), 48) }}
-                            </small>
-                        @endif
+                        <span class="as-info-value text-truncate d-block" title="{{ $latestLog->summary() }}">{{ \Illuminate\Support\Str::limit($latestLog->summary(), 52) }}</span>
                         <small class="text-muted d-block">{{ $latestLog->created_at->diffForHumans() }}</small>
                     @else
                         <span class="as-info-value text-muted">No activity yet</span>

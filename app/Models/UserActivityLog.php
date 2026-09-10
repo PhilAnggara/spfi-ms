@@ -38,6 +38,8 @@ class UserActivityLog extends Model
 
     public const ACTION_REQUESTED_CHANGES = 'requested_changes';
 
+    public const ACTION_TYPING = 'typing';
+
     /**
      * @var array<string, string>
      */
@@ -96,6 +98,12 @@ class UserActivityLog extends Model
         'accounting.group-codes.index' => 'Accounting Group Codes',
         'accounting.codes.index' => 'Accounting Codes',
         'accounting.balance-sheet.index' => 'Balance Sheet Mapping',
+        'chat.typing' => 'Chat',
+        'chat.messages.index' => 'Chat',
+        'chat.messages.store' => 'Chat',
+        'chat.direct-messages.store' => 'Chat',
+        'chat.conversations.store' => 'Chat',
+        'chat.conversations.index' => 'Chat',
     ];
 
     /**
@@ -163,7 +171,38 @@ class UserActivityLog extends Model
             self::ACTION_WITHDRAWN => 'Withdrawn',
             self::ACTION_CANCELLED => 'Cancelled',
             self::ACTION_REQUESTED_CHANGES => 'Requested changes',
+            self::ACTION_TYPING => 'Typing',
             default => ucfirst(str_replace('_', ' ', $this->action)),
+        };
+    }
+
+    /**
+     * Short English one-liner for Active Sessions UI.
+     */
+    public function summary(): string
+    {
+        $subject = $this->subjectLabel();
+        $page = $this->pageLabel();
+        $route = (string) ($this->meta['route'] ?? '');
+
+        return match ($this->action) {
+            self::ACTION_LOGIN => 'Logged in',
+            self::ACTION_LOGOUT => 'Logged out',
+            self::ACTION_FORCE_LOGOUT => 'Force logged out',
+            self::ACTION_TYPING => $subject !== null ? 'Typing to '.$subject : 'Typing',
+            self::ACTION_ACTIVE => $this->activeSummary($route, $page, $subject),
+            self::ACTION_CREATED => $this->createdSummary($route, $page, $subject),
+            self::ACTION_UPDATED => $this->resourceSummary('Edited', $page, $subject),
+            self::ACTION_DELETED => $this->resourceSummary('Deleted', $page, $subject),
+            self::ACTION_APPROVED => $this->resourceSummary('Approved', $page, $subject),
+            self::ACTION_REJECTED => $this->resourceSummary('Rejected', $page, $subject),
+            self::ACTION_HELD => $this->resourceSummary('Held', $page, $subject),
+            self::ACTION_REASSIGNED => $this->resourceSummary('Reassigned', $page, $subject),
+            self::ACTION_SUBMITTED => $this->resourceSummary('Submitted', $page, $subject),
+            self::ACTION_WITHDRAWN => $this->resourceSummary('Withdrawn', $page, $subject),
+            self::ACTION_CANCELLED => $this->resourceSummary('Cancelled', $page, $subject),
+            self::ACTION_REQUESTED_CHANGES => $this->resourceSummary('Requested changes on', $page, $subject),
+            default => $this->resourceSummary($this->label(), $page, $subject),
         };
     }
 
@@ -186,10 +225,51 @@ class UserActivityLog extends Model
         }
 
         if (isset($this->meta['subject_id']) && $this->meta['subject_id'] !== '') {
-            return '#'.$this->meta['subject_id'];
+            $id = '#'.$this->meta['subject_id'];
+            $code = trim((string) ($this->meta['subject_code'] ?? ''));
+
+            return $code !== '' ? $id.' ('.$code.')' : $id;
         }
 
         return null;
+    }
+
+    /**
+     * Secondary detail line for the activity timeline (page / method / path / notes).
+     */
+    public function detailLabel(): ?string
+    {
+        $parts = [];
+
+        $page = $this->pageLabel();
+        if ($page !== null && $page !== '') {
+            $parts[] = $page;
+        }
+
+        $method = strtoupper(trim((string) ($this->meta['method'] ?? '')));
+        if ($method !== '') {
+            $parts[] = $method;
+        }
+
+        $path = trim((string) ($this->meta['path'] ?? ''));
+        if ($path !== '') {
+            $parts[] = $path;
+        }
+
+        if ($this->action === self::ACTION_FORCE_LOGOUT && $this->actor) {
+            $parts[] = 'by '.$this->actor->name;
+        }
+
+        $message = trim((string) ($this->meta['message'] ?? ''));
+        if ($message !== '') {
+            $parts[] = $message;
+        }
+
+        if ($parts === []) {
+            return null;
+        }
+
+        return implode(' · ', $parts);
     }
 
     public static function labelForRoute(?string $route, ?string $path = null): ?string
@@ -254,5 +334,74 @@ class UserActivityLog extends Model
         }
 
         return null;
+    }
+
+    private function activeSummary(string $route, ?string $page, ?string $subject): string
+    {
+        if ($route === 'chat.messages.index') {
+            return $subject !== null ? 'Opened chat with '.$subject : 'Opened chat';
+        }
+
+        return $page !== null ? 'Visited '.$page : 'Visited page';
+    }
+
+    private function createdSummary(string $route, ?string $page, ?string $subject): string
+    {
+        if (in_array($route, ['chat.messages.store', 'chat.direct-messages.store'], true)) {
+            return $subject !== null ? 'Sent chat to '.$subject : 'Sent chat';
+        }
+
+        if ($route === 'chat.conversations.store') {
+            return $subject !== null ? 'Started chat with '.$subject : 'Started chat';
+        }
+
+        return $this->resourceSummary('Created', $page, $subject);
+    }
+
+    private function resourceSummary(string $verb, ?string $page, ?string $subject): string
+    {
+        $resource = $this->singularResourceLabel($page);
+
+        if ($resource !== null && $subject !== null) {
+            return $verb.' '.$resource.' '.$subject;
+        }
+
+        if ($resource !== null) {
+            return $verb.' '.$resource;
+        }
+
+        if ($subject !== null) {
+            return $verb.' '.$subject;
+        }
+
+        return $verb;
+    }
+
+    private function singularResourceLabel(?string $page): ?string
+    {
+        if ($page === null || $page === '') {
+            return null;
+        }
+
+        $normalized = strtolower(trim($page));
+
+        return match ($normalized) {
+            'products', 'product' => 'product',
+            'product categories', 'product category' => 'product category',
+            'purchase requisitions', 'prs' => 'PRS',
+            'purchase orders', 'purchase order detail', 'po draft', 'po approval' => 'purchase order',
+            'transfer slips' => 'transfer slip',
+            'stores withdrawals', 'create stores withdrawal' => 'stores withdrawal',
+            'receiving reports' => 'receiving report',
+            'deliveries' => 'delivery',
+            'suppliers' => 'supplier',
+            'buyers' => 'buyer',
+            'currencies' => 'currency',
+            'employees' => 'employee',
+            'manage users' => 'user',
+            'chat' => 'chat',
+            'screen messages' => 'screen message',
+            default => Str::lower(Str::singular($page)),
+        };
     }
 }

@@ -24,11 +24,21 @@ document.addEventListener('DOMContentLoaded', function () {
     let refreshing = false;
     let detailRefreshing = false;
     let currentDetailUrl = null;
+    let loadingOlder = false;
+    let hasMoreHistory = false;
+    let oldestLogId = null;
 
     const loadingHtml = `
         <div class="as-detail-loading text-center text-muted py-5">
             <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
             <div>Loading activity...</div>
+        </div>
+    `;
+
+    const olderLoadingHtml = `
+        <div id="as-timeline-loading" class="text-center text-muted py-3 small">
+            <div class="spinner-border spinner-border-sm text-primary mb-1" role="status"></div>
+            <div>Loading earlier activity...</div>
         </div>
     `;
 
@@ -136,6 +146,21 @@ document.addEventListener('DOMContentLoaded', function () {
         detailRefreshButton.disabled = !enabled;
     }
 
+    function syncHistoryStateFromDom() {
+        const detail = detailBody ? detailBody.querySelector('.as-detail') : null;
+        const sentinel = detailBody ? detailBody.querySelector('#as-timeline-sentinel') : null;
+        const source = sentinel || detail;
+
+        if (!source) {
+            hasMoreHistory = false;
+            oldestLogId = null;
+            return;
+        }
+
+        hasMoreHistory = source.dataset.hasMore === '1';
+        oldestLogId = source.dataset.oldestId || null;
+    }
+
     async function loadDetail(url, options) {
         const showLoading = !options || options.showLoading !== false;
 
@@ -145,6 +170,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         currentDetailUrl = url;
         setDetailRefreshEnabled(true);
+        loadingOlder = false;
+        hasMoreHistory = false;
+        oldestLogId = null;
 
         if (showLoading) {
             detailBody.innerHTML = loadingHtml;
@@ -163,12 +191,99 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             detailBody.innerHTML = await response.text();
+            syncHistoryStateFromDom();
         } catch (error) {
             detailBody.innerHTML = `
                 <div class="text-danger text-center py-5">
                     Unable to load activity history.
                 </div>
             `;
+            hasMoreHistory = false;
+            oldestLogId = null;
+        }
+    }
+
+    async function loadOlderActivity() {
+        if (!currentDetailUrl || !detailBody || loadingOlder || !hasMoreHistory || !oldestLogId) {
+            return;
+        }
+
+        const timeline = detailBody.querySelector('#as-timeline');
+        if (!timeline) {
+            return;
+        }
+
+        loadingOlder = true;
+
+        const existingSentinel = timeline.querySelector('#as-timeline-sentinel');
+        if (existingSentinel) {
+            existingSentinel.insertAdjacentHTML('beforebegin', olderLoadingHtml);
+            existingSentinel.remove();
+        } else {
+            timeline.insertAdjacentHTML('beforeend', olderLoadingHtml);
+        }
+
+        try {
+            const url = new URL(currentDetailUrl, window.location.origin);
+            url.searchParams.set('before_id', String(oldestLogId));
+
+            const response = await fetch(url.toString(), {
+                headers: {
+                    Accept: 'text/html',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load older activity');
+            }
+
+            const html = await response.text();
+            const loadingEl = timeline.querySelector('#as-timeline-loading');
+            if (loadingEl) {
+                loadingEl.remove();
+            }
+
+            timeline.insertAdjacentHTML('beforeend', html);
+            syncHistoryStateFromDom();
+
+            if (!hasMoreHistory) {
+                const sentinel = timeline.querySelector('#as-timeline-sentinel');
+                if (sentinel) {
+                    sentinel.remove();
+                }
+            }
+        } catch (error) {
+            const loadingEl = timeline.querySelector('#as-timeline-loading');
+            if (loadingEl) {
+                loadingEl.remove();
+            }
+
+            if (window.console) {
+                console.error(error);
+            }
+
+            timeline.insertAdjacentHTML('beforeend', `
+                <div id="as-timeline-sentinel"
+                     class="as-timeline-sentinel"
+                     data-has-more="1"
+                     data-oldest-id="${oldestLogId || ''}"
+                     aria-hidden="true"></div>
+            `);
+            hasMoreHistory = true;
+        } finally {
+            loadingOlder = false;
+        }
+    }
+
+    function maybeLoadOlderActivity() {
+        if (!detailBody || !hasMoreHistory || loadingOlder) {
+            return;
+        }
+
+        const remaining = detailBody.scrollHeight - detailBody.scrollTop - detailBody.clientHeight;
+        if (remaining <= 120) {
+            loadOlderActivity();
         }
     }
 
@@ -349,9 +464,18 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    if (detailBody) {
+        detailBody.addEventListener('scroll', function () {
+            maybeLoadOlderActivity();
+        });
+    }
+
     if (offcanvasEl) {
         offcanvasEl.addEventListener('hidden.bs.offcanvas', function () {
             currentDetailUrl = null;
+            hasMoreHistory = false;
+            oldestLogId = null;
+            loadingOlder = false;
             setDetailRefreshEnabled(false);
         });
     }

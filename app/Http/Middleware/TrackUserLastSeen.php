@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Conversation;
+use App\Models\User;
 use App\Models\UserActivityLog;
 use App\Services\UserActivityLogger;
 use Closure;
@@ -25,6 +27,10 @@ class TrackUserLastSeen
         'notifications.clear-read',
         'active-sessions.index',
         'active-sessions.show',
+        'screen-messages.inbox.pending',
+        'chat.conversations.index',
+        'chat.users.search',
+        'chat.unread-count',
     ];
 
     /**
@@ -75,15 +81,56 @@ class TrackUserLastSeen
                 $user,
                 UserActivityLog::ACTION_ACTIVE,
                 $request,
-                meta: [
+                meta: array_filter([
                     'route' => $routeName,
                     'path' => $path,
                     'page' => UserActivityLog::labelForRoute($routeName, $path),
-                ],
+                    ...$this->resolveVisitSubject($request, $user),
+                ], static fn ($value) => $value !== null && $value !== ''),
             );
         }
 
         return $response;
+    }
+
+    /**
+     * @return array{
+     *     subject?: string,
+     *     subject_type?: string,
+     *     subject_id?: int|string,
+     *     subject_code?: string
+     * }
+     */
+    private function resolveVisitSubject(Request $request, User $viewer): array
+    {
+        if (! $request->routeIs('chat.messages.index')) {
+            return [];
+        }
+
+        $conversation = $request->route('conversation');
+
+        if (! $conversation instanceof Conversation) {
+            return [];
+        }
+
+        $peer = $conversation->otherParticipant($viewer);
+
+        if ($peer === null) {
+            return [
+                'subject' => '#'.$conversation->id,
+                'subject_type' => 'conversation',
+                'subject_id' => $conversation->id,
+            ];
+        }
+
+        $name = trim((string) $peer->name);
+
+        return [
+            'subject' => $name !== '' ? '#'.$peer->id.' '.$name : '#'.$peer->id,
+            'subject_type' => 'user',
+            'subject_id' => $peer->id,
+            'subject_code' => $peer->name,
+        ];
     }
 
     private function shouldLogPageVisit(int $userId, ?string $routeName, string $path): bool
@@ -102,6 +149,16 @@ class TrackUserLastSeen
                 && $routeName !== ''
                 && ($meta['route'] ?? null) === $routeName;
             $samePath = ($meta['path'] ?? null) === $path;
+
+            // Opening different chat conversations shares one route name; only
+            // treat the same conversation path as a duplicate visit.
+            if ($routeName === 'chat.messages.index') {
+                if ($samePath) {
+                    return false;
+                }
+
+                continue;
+            }
 
             if ($sameRoute || $samePath) {
                 return false;
@@ -136,6 +193,7 @@ class TrackUserLastSeen
             || str_contains($routeName, 'livewire')
             || str_ends_with($routeName, '.unread-count')
             || str_ends_with($routeName, '.recent')
+            || str_ends_with($routeName, '.pending')
         )) {
             return true;
         }
