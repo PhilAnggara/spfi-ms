@@ -40,7 +40,7 @@
     const profileRole = document.getElementById('chat-profile-role');
     const toastHost = document.getElementById('chat-toast-host');
 
-    const STATUS_RANK = { sent: 1, delivered: 2, read: 3 };
+    const STATUS_RANK = { failed: -1, pending: 0, sent: 1, delivered: 2, read: 3 };
     const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
     const ALLOWED_EXTENSIONS = new Set([
         'jpg', 'jpeg', 'png', 'gif', 'webp',
@@ -76,12 +76,15 @@
         dragDepth: 0,
         processedMessageIds: new Set(),
         unreadRefreshTimer: null,
-        sending: false,
         stickToBottom: true,
         searchMode: false,
         contactsLoading: false,
         listPageTimer: null,
         loadedImageIds: new Set(),
+        pendingPayloads: new Map(),
+        draftSendLock: Promise.resolve(),
+        enterBubbleTimers: new Map(),
+        messageSeq: 0,
     };
 
     const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😅','😢','😭','😡','👍','👎','👏','🙏','🔥','✨','🎉','❤️','💙','💚','💛','🧡','💜','✅','❌','📌','📎','📷','📁','☕','🚀'];
@@ -139,12 +142,90 @@
     }
 
     function sameId(a, b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        if (typeof a === 'string' || typeof b === 'string') {
+            return String(a) === String(b);
+        }
         const left = Number(a);
         const right = Number(b);
         return Number.isFinite(left) && Number.isFinite(right) && left === right;
     }
 
+    function messageDomId(message) {
+        return String(message?.id ?? '');
+    }
+
+    function isTempMessageId(id) {
+        return typeof id === 'string' && id.startsWith('temp-');
+    }
+
+    function findMessageIndexById(id) {
+        return state.messages.findIndex((item) => (
+            sameId(item.id, id)
+            || sameId(item.temp_id, id)
+            || sameId(item.reconciled_from, id)
+        ));
+    }
+
+    function nextClientSeq() {
+        state.messageSeq += 1;
+        return state.messageSeq;
+    }
+
+    function isOptimisticMessage(message) {
+        if (!message) {
+            return false;
+        }
+        return isTempMessageId(message.id)
+            || message.status === 'pending'
+            || message.status === 'failed'
+            || state.pendingPayloads.has(String(message.id))
+            || state.pendingPayloads.has(String(message.temp_id || ''));
+    }
+
+    function hasOpenOptimisticMessages() {
+        if (state.pendingPayloads.size > 0) {
+            return true;
+        }
+        return state.messages.some((message) => isOptimisticMessage(message));
+    }
+
+    function dedupeMessagesByRealId(messages) {
+        const seen = new Set();
+        const result = [];
+        messages.forEach((message) => {
+            if (isTempMessageId(message.id)) {
+                result.push(message);
+                return;
+            }
+            const key = messageDomId(message);
+            if (seen.has(key)) {
+                return;
+            }
+            seen.add(key);
+            result.push(message);
+        });
+        return result;
+    }
+
+    function orderedMessages() {
+        // Insertion/replace-in-place order is canonical for the sender UI.
+        return state.messages;
+    }
+
     function preferStatus(current, next) {
+        if (!next) {
+            return current;
+        }
+        // Never let live status events/poll rewrite local optimistic states.
+        if (current === 'pending' || current === 'failed') {
+            return current;
+        }
+        if (next === 'pending' || next === 'failed') {
+            return current || next;
+        }
         const currentRank = STATUS_RANK[current] || 0;
         const nextRank = STATUS_RANK[next] || 0;
         return nextRank >= currentRank ? next : current;
@@ -491,6 +572,12 @@
             return '';
         }
         const status = message?.status || 'sent';
+        if (status === 'pending') {
+            return `<span class="chat-bubble__ticks is-pending" aria-label="Sending"><i class="fa-regular fa-clock" aria-hidden="true"></i></span>`;
+        }
+        if (status === 'failed') {
+            return `<button type="button" class="chat-bubble__ticks is-failed" data-retry-message="${escapeHtml(messageDomId(message))}" aria-label="Failed, tap to retry" title="Tap to retry"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i></button>`;
+        }
         const tip = ticksTooltipHtml(message);
         if (status === 'read') {
             return `<span class="chat-bubble__ticks is-read" tabindex="0" aria-label="Read">${tip}✓✓</span>`;
@@ -499,6 +586,81 @@
             return `<span class="chat-bubble__ticks" tabindex="0" aria-label="Delivered">${tip}✓✓</span>`;
         }
         return `<span class="chat-bubble__ticks" tabindex="0" aria-label="Sent">${tip}✓</span>`;
+    }
+
+    function applyStatusToBubble(bubble, message) {
+        if (!bubble || !message) {
+            return;
+        }
+        bubble.dataset.messageId = messageDomId(message);
+        if (message.client_seq != null) {
+            bubble.dataset.clientSeq = String(message.client_seq);
+        }
+        if (isTempMessageId(message.id)) {
+            bubble.dataset.tempId = messageDomId(message);
+        } else {
+            delete bubble.dataset.tempId;
+        }
+        bubble.classList.toggle('is-failed', message.status === 'failed');
+
+        const isMine = sameId(message.user_id, authUserId);
+        const meta = bubble.querySelector('.chat-bubble__meta');
+        if (!meta) {
+            return;
+        }
+
+        // Keep the time node intact; only update ticks in place (no bubble remount).
+        let timeEl = meta.querySelector('.chat-bubble__time');
+        if (!timeEl) {
+            const firstSpan = meta.querySelector(':scope > span:not(.chat-bubble__ticks)');
+            if (firstSpan && !firstSpan.classList.contains('chat-bubble__ticks')) {
+                firstSpan.classList.add('chat-bubble__time');
+                timeEl = firstSpan;
+            }
+        }
+
+        const nextTicks = ticksHtml(message, isMine);
+        const currentTicks = meta.querySelector('.chat-bubble__ticks');
+        if (!nextTicks) {
+            currentTicks?.remove();
+            return;
+        }
+
+        const holder = document.createElement('div');
+        holder.innerHTML = nextTicks.trim();
+        const nextNode = holder.firstElementChild;
+        if (!nextNode) {
+            return;
+        }
+
+        if (currentTicks) {
+            if (
+                currentTicks.className === nextNode.className
+                && currentTicks.getAttribute('aria-label') === nextNode.getAttribute('aria-label')
+                && currentTicks.innerHTML === nextNode.innerHTML
+            ) {
+                return;
+            }
+            // Span ↔ button (failed) needs a real node swap; otherwise mutate in place.
+            if (currentTicks.tagName !== nextNode.tagName) {
+                currentTicks.replaceWith(nextNode);
+                return;
+            }
+            currentTicks.className = nextNode.className;
+            ['aria-label', 'title', 'tabindex', 'type', 'data-retry-message'].forEach((attr) => {
+                if (nextNode.hasAttribute(attr)) {
+                    currentTicks.setAttribute(attr, nextNode.getAttribute(attr));
+                } else {
+                    currentTicks.removeAttribute(attr);
+                }
+            });
+            if (currentTicks.innerHTML !== nextNode.innerHTML) {
+                currentTicks.innerHTML = nextNode.innerHTML;
+            }
+            return;
+        }
+
+        meta.appendChild(nextNode);
     }
 
     function listTicksHtml(message, conversationId = null) {
@@ -768,7 +930,7 @@
     function messageBodyHtml(message) {
         let html = '';
         if (message.type === 'image' && message.attachment_url) {
-            const messageId = Number(message.id);
+            const messageId = messageDomId(message);
             const loaded = state.loadedImageIds.has(messageId);
             html += `
                 <a class="chat-bubble__image-link" href="${escapeHtml(message.attachment_url)}" target="_blank" rel="noopener">
@@ -827,11 +989,11 @@
         messagesEl.querySelectorAll('img.chat-bubble__image').forEach((img) => {
             const frame = img.closest('.chat-bubble__image-frame');
             const bubble = img.closest('.chat-bubble[data-message-id]');
-            const messageId = bubble ? Number(bubble.dataset.messageId) : null;
+            const messageId = bubble ? String(bubble.dataset.messageId || '') : '';
 
             const markLoaded = () => {
-                if (messageId != null) {
-                    state.loadedImageIds.add(messageId);
+                if (messageId != null && messageId !== '') {
+                    state.loadedImageIds.add(String(messageId));
                 }
                 clearImageFrameSize(frame);
                 frame?.classList.remove('is-loading', 'is-error');
@@ -865,7 +1027,80 @@
         });
     }
 
-    function bubbleMarkup(message) {
+    function scheduleBubbleEnter(bubble) {
+        if (!bubble) {
+            return;
+        }
+        // Key by client_seq so reconcile (temp → real id) does not lose the timer.
+        const id = String(bubble.dataset.clientSeq || bubble.dataset.messageId || '');
+        if (!id) {
+            return;
+        }
+        // Never restart enter animation — that looks like a brand-new bubble on status change.
+        if (bubble.dataset.enterPlayed === '1') {
+            return;
+        }
+        bubble.dataset.enterPlayed = '1';
+        if (!bubble.classList.contains('is-entering')) {
+            bubble.classList.add('is-entering');
+        }
+        const existing = state.enterBubbleTimers.get(id);
+        if (existing) {
+            clearTimeout(existing);
+        }
+        const timer = window.setTimeout(() => {
+            bubble.classList.remove('is-entering');
+            state.enterBubbleTimers.delete(id);
+        }, 320);
+        state.enterBubbleTimers.set(id, timer);
+    }
+
+    function captureBubblePositions() {
+        const map = new Map();
+        if (!messagesEl) {
+            return map;
+        }
+        messagesEl.querySelectorAll('.chat-bubble[data-message-id]').forEach((el) => {
+            map.set(String(el.dataset.messageId), el.getBoundingClientRect());
+        });
+        return map;
+    }
+
+    function playBubbleShiftAnimation(previousRects, newBubbleIds = []) {
+        if (!messagesEl || !previousRects?.size) {
+            return;
+        }
+        const newIds = new Set((newBubbleIds || []).map(String));
+        messagesEl.querySelectorAll('.chat-bubble[data-message-id]').forEach((el) => {
+            const id = String(el.dataset.messageId);
+            if (newIds.has(id)) {
+                return;
+            }
+            const first = previousRects.get(id);
+            if (!first) {
+                return;
+            }
+            const last = el.getBoundingClientRect();
+            const dy = first.top - last.top;
+            if (Math.abs(dy) < 0.5) {
+                return;
+            }
+            if (typeof el.animate === 'function') {
+                el.animate(
+                    [
+                        { transform: `translateY(${dy}px)` },
+                        { transform: 'translateY(0)' },
+                    ],
+                    {
+                        duration: 300,
+                        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                    },
+                );
+            }
+        });
+    }
+
+    function bubbleMarkup(message, { animate = false } = {}) {
         const isMine = sameId(message.user_id, authUserId);
         const hasImage = message.type === 'image' && !!message.attachment_url;
         const imageOnly = hasImage && !message.body;
@@ -874,13 +1109,21 @@
             isMine ? 'is-mine' : 'is-theirs',
             hasImage ? 'has-image' : '',
             imageOnly ? 'is-image-only' : '',
+            message.status === 'failed' ? 'is-failed' : '',
+            animate ? 'is-entering' : '',
         ].filter(Boolean).join(' ');
+        const tempAttr = isTempMessageId(message.id)
+            ? ` data-temp-id="${escapeHtml(messageDomId(message))}"`
+            : '';
+        const seqAttr = message.client_seq != null
+            ? ` data-client-seq="${escapeHtml(String(message.client_seq))}"`
+            : '';
 
         return `
-            <div class="${classes}" data-message-id="${message.id}">
+            <div class="${classes}" data-message-id="${escapeHtml(messageDomId(message))}"${tempAttr}${seqAttr}>
                 <div class="chat-bubble__content">${messageBodyHtml(message)}</div>
                 <div class="chat-bubble__meta">
-                    <span>${escapeHtml(formatTime(message.created_at))}</span>
+                    <span class="chat-bubble__time">${escapeHtml(formatTime(message.created_at))}</span>
                     ${ticksHtml(message, isMine)}
                 </div>
             </div>
@@ -892,92 +1135,200 @@
     }
 
     function patchMessageMetas(sorted) {
-        sorted.forEach((message) => {
-            const bubble = messagesEl.querySelector(`.chat-bubble[data-message-id="${message.id}"]`);
+        const bubbles = [...(messagesEl?.querySelectorAll('.chat-bubble[data-message-id]') || [])];
+        sorted.forEach((message, index) => {
+            const bubble = (message.client_seq != null
+                ? messagesEl?.querySelector(`.chat-bubble[data-client-seq="${CSS.escape(String(message.client_seq))}"]`)
+                : null)
+                || bubbles[index]
+                || messagesEl?.querySelector(`.chat-bubble[data-message-id="${CSS.escape(messageDomId(message))}"]`);
             if (!bubble) {
                 return;
             }
-            const isMine = sameId(message.user_id, authUserId);
-            const meta = bubble.querySelector('.chat-bubble__meta');
-            if (meta) {
-                meta.innerHTML = `
-                    <span>${escapeHtml(formatTime(message.created_at))}</span>
-                    ${ticksHtml(message, isMine)}
-                `;
+            applyStatusToBubble(bubble, message);
+        });
+    }
+
+    function existingBubbleNodes() {
+        return [...(messagesEl?.querySelectorAll('.chat-bubble[data-message-id]') || [])];
+    }
+
+    function existingBubbleIds() {
+        return existingBubbleNodes().map((el) => String(el.dataset.messageId));
+    }
+
+    function syncBubblesByPosition(messages, { updateContent = false } = {}) {
+        const bubbles = existingBubbleNodes();
+        if (!bubbles.length || bubbles.length !== messages.length) {
+            return false;
+        }
+
+        messages.forEach((message, index) => {
+            const bubble = bubbles[index];
+            bubble.dataset.messageId = messageDomId(message);
+            if (updateContent) {
+                const hasImage = message.type === 'image' && !!message.attachment_url;
+                const imageOnly = hasImage && !message.body;
+                bubble.classList.toggle('has-image', hasImage);
+                bubble.classList.toggle('is-image-only', imageOnly);
+
+                const content = bubble.querySelector('.chat-bubble__content');
+                if (content) {
+                    const currentImg = content.querySelector('img.chat-bubble__image');
+                    const nextUrl = message.type === 'image' ? message.attachment_url : null;
+                    const currentUrl = currentImg?.getAttribute('src');
+                    if (nextUrl && currentUrl && currentUrl !== nextUrl && String(currentUrl).startsWith('blob:')) {
+                        currentImg.src = nextUrl;
+                    } else if (!(nextUrl && currentUrl && currentUrl === nextUrl && !message.body)) {
+                        const nextContent = messageBodyHtml(message);
+                        if (content.innerHTML !== nextContent) {
+                            content.innerHTML = nextContent;
+                        }
+                    }
+                }
+            }
+
+            applyStatusToBubble(bubble, message);
+        });
+
+        if (updateContent) {
+            bindMessageMediaScroll();
+        }
+        return true;
+    }
+
+    function trimOrphanBubbles(expectedCount) {
+        const bubbles = existingBubbleNodes();
+        if (bubbles.length <= expectedCount) {
+            return;
+        }
+        bubbles.slice(expectedCount).forEach((bubble) => {
+            const day = bubble.previousElementSibling;
+            bubble.remove();
+            if (day?.classList?.contains('chat-widget__day') && !day.nextElementSibling?.classList?.contains('chat-bubble')) {
+                // Keep day markers that still precede remaining bubbles; remove trailing empty day.
+                if (!day.nextElementSibling) {
+                    day.remove();
+                }
             }
         });
     }
 
-    function existingBubbleIds() {
-        return [...messagesEl.querySelectorAll('.chat-bubble[data-message-id]')].map((el) => Number(el.dataset.messageId));
-    }
-
     function renderMessages({ forceScroll = false, rebuild = false } = {}) {
-        const sorted = [...state.messages].sort((a, b) => Number(a.id) - Number(b.id));
+        const sorted = orderedMessages();
         const shouldStick = forceScroll || state.stickToBottom || isMessagesNearBottom();
-        const nextIds = sorted.map((message) => Number(message.id));
-        const currentIds = existingBubbleIds();
+        const bubbles = existingBubbleNodes();
 
-        const sameSequence = currentIds.length > 0
-            && currentIds.length === nextIds.length
-            && currentIds.every((id, index) => id === nextIds[index]);
+        if (!rebuild && bubbles.length > sorted.length && sorted.length > 0) {
+            trimOrphanBubbles(sorted.length);
+        }
 
-        const canAppend = !rebuild
-            && currentIds.length > 0
-            && nextIds.length > currentIds.length
-            && currentIds.every((id, index) => id === nextIds[index]);
+        const currentCount = existingBubbleNodes().length;
 
-        if (!rebuild && sameSequence) {
-            patchMessageMetas(sorted);
-            if (shouldStick || forceScroll) {
+        // Same count ⇒ same slots. Never full-rebuild for status / id reconcile.
+        if (!rebuild && currentCount > 0 && currentCount === sorted.length) {
+            syncBubblesByPosition(sorted, { updateContent: false });
+            // Do not scroll on status-only sync — it causes visible bubble jitter.
+            if (forceScroll) {
                 state.stickToBottom = true;
                 scrollMessagesToBottom();
             }
             return;
         }
 
+        const currentIds = existingBubbleIds();
+        const nextIds = sorted.map((message) => messageDomId(message));
+        const canAppend = !rebuild
+            && currentIds.length > 0
+            && nextIds.length > currentIds.length
+            && currentIds.every((id, index) => {
+                const message = sorted[index];
+                if (!message) {
+                    return false;
+                }
+                if (id === nextIds[index]) {
+                    return true;
+                }
+                return isTempMessageId(id)
+                    && (sameId(message.temp_id, id) || sameId(message.reconciled_from, id) || sameId(message.id, nextIds[index]));
+            });
+
         if (canAppend) {
-            patchMessageMetas(sorted.slice(0, currentIds.length));
+            syncBubblesByPosition(sorted.slice(0, currentIds.length), { updateContent: false });
             const lastExisting = sorted[currentIds.length - 1];
             let lastDay = lastExisting?.created_at
                 ? new Date(lastExisting.created_at).toDateString()
                 : '';
             const chunks = [];
-            sorted.slice(currentIds.length).forEach((message) => {
+            const appended = sorted.slice(currentIds.length);
+            const previousRects = captureBubblePositions();
+            appended.forEach((message) => {
                 const day = message.created_at ? new Date(message.created_at).toDateString() : '';
                 if (day && day !== lastDay) {
                     lastDay = day;
                     chunks.push(dayMarkup(message.created_at));
                 }
-                chunks.push(bubbleMarkup(message));
+                chunks.push(bubbleMarkup(message, { animate: !!message._animate }));
+                message._animate = false;
             });
             messagesEl.insertAdjacentHTML('beforeend', chunks.join(''));
-            bindMessageMediaScroll();
             if (shouldStick || forceScroll) {
                 state.stickToBottom = true;
-                scrollMessagesToBottom();
+                messagesEl.scrollTop = messagesEl.scrollHeight;
             }
+            const newIds = appended.map((message) => messageDomId(message));
+            playBubbleShiftAnimation(previousRects, newIds);
+            window.requestAnimationFrame(() => {
+                appended.forEach((message) => {
+                    const bubble = messagesEl.querySelector(`.chat-bubble[data-client-seq="${CSS.escape(String(message.client_seq))}"]`)
+                        || messagesEl.querySelector(`.chat-bubble[data-message-id="${CSS.escape(messageDomId(message))}"]`);
+                    if (bubble) {
+                        scheduleBubbleEnter(bubble);
+                    }
+                });
+                if (shouldStick || forceScroll) {
+                    scrollMessagesToBottom();
+                }
+            });
+            bindMessageMediaScroll();
             return;
         }
 
+        // Full rebuild only for initial load / hard mismatch.
         let lastDay = '';
         const chunks = [];
+        const animatedIds = [];
         sorted.forEach((message) => {
             const day = message.created_at ? new Date(message.created_at).toDateString() : '';
             if (day && day !== lastDay) {
                 lastDay = day;
                 chunks.push(dayMarkup(message.created_at));
             }
-            chunks.push(bubbleMarkup(message));
+            if (message._animate) {
+                animatedIds.push(String(message.client_seq ?? messageDomId(message)));
+            }
+            chunks.push(bubbleMarkup(message, { animate: !!message._animate }));
+            message._animate = false;
         });
 
         messagesEl.innerHTML = chunks.join('') || '<div class="chat-widget__empty">Say hello</div>';
-        bindMessageMediaScroll();
-
         if (shouldStick || forceScroll) {
             state.stickToBottom = true;
-            scrollMessagesToBottom();
+            messagesEl.scrollTop = messagesEl.scrollHeight;
         }
+        window.requestAnimationFrame(() => {
+            animatedIds.forEach((key) => {
+                const bubble = messagesEl.querySelector(`.chat-bubble[data-client-seq="${CSS.escape(key)}"]`)
+                    || messagesEl.querySelector(`.chat-bubble[data-message-id="${CSS.escape(key)}"]`);
+                if (bubble) {
+                    scheduleBubbleEnter(bubble);
+                }
+            });
+            if (shouldStick || forceScroll) {
+                scrollMessagesToBottom();
+            }
+        });
+        bindMessageMediaScroll();
     }
 
     function updateThreadHeader() {
@@ -1147,6 +1498,9 @@
     function updateOutgoingStatus(conversationId, status, at) {
         let changed = false;
         state.messages = state.messages.map((message) => {
+            if (isOptimisticMessage(message) || isTempMessageId(message.id)) {
+                return message;
+            }
             if (!sameId(message.conversation_id || state.activeConversationId, conversationId)) {
                 return message;
             }
@@ -1189,7 +1543,7 @@
         }
 
         if (changed && isActiveThread(conversationId)) {
-            renderMessages();
+            patchMessageMetas(orderedMessages());
         }
     }
 
@@ -1225,27 +1579,14 @@
     }
 
     function focusComposer() {
-        if (!input || state.sending || !(state.open && state.view === 'thread')) {
+        if (!input || !(state.open && state.view === 'thread')) {
             return;
         }
         window.requestAnimationFrame(() => {
-            if (!state.sending && state.open && state.view === 'thread') {
+            if (state.open && state.view === 'thread') {
                 input.focus({ preventScroll: true });
             }
         });
-    }
-
-    function setComposerSending(sending) {
-        state.sending = !!sending;
-        input.disabled = state.sending;
-        sendBtn.disabled = state.sending;
-        if (emojiBtn) {
-            emojiBtn.disabled = state.sending;
-        }
-        if (attachInput) {
-            attachInput.disabled = state.sending;
-        }
-        input.setAttribute('aria-busy', state.sending ? 'true' : 'false');
     }
 
     function showMessagesLoading() {
@@ -1258,8 +1599,11 @@
     }
 
     function clearThreadMessagesUi() {
+        state.messages.forEach((message) => revokeOptimisticBlob(message));
         state.messages = [];
         state.loadedImageIds.clear();
+        state.pendingPayloads.clear();
+        state.messageSeq = 0;
         messagesEl.innerHTML = '';
     }
 
@@ -1330,30 +1674,82 @@
                 return;
             }
             const fetched = (payload.data || []).slice().reverse();
-            const byId = merge
-                ? new Map(state.messages.map((message) => [Number(message.id), message]))
-                : new Map();
-            fetched.forEach((message) => {
-                const existing = byId.get(Number(message.id));
-                if (existing) {
-                    byId.set(Number(message.id), {
-                        ...existing,
+
+            if (!merge) {
+                state.messageSeq = 0;
+                state.messages = fetched.map((message) => {
+                    const normalized = {
                         ...message,
-                        status: preferStatus(existing.status, message.status),
-                    });
-                } else {
-                    byId.set(Number(message.id), message);
-                }
-            });
-            if (merge) {
-                const fetchedIds = new Set(fetched.map((m) => Number(m.id)));
-                state.messages.forEach((message) => {
-                    if (!fetchedIds.has(Number(message.id))) {
-                        byId.set(Number(message.id), message);
-                    }
+                        id: Number(message.id),
+                        conversation_id: Number(message.conversation_id || conversationId),
+                        user_id: Number(message.user_id),
+                        client_seq: nextClientSeq(),
+                    };
+                    rememberProcessedMessage(normalized.id);
+                    return normalized;
                 });
+            } else {
+                // Poll must NEVER absorb optimistic slots. Parallel HTTP responses finish
+                // out of order; only reconcileOptimistic(tempId, response) may pair them.
+                const fetchedById = new Map(fetched.map((message) => [messageDomId(message), message]));
+                const nextMessages = [];
+                const seenRealIds = new Set();
+                const blockingOptimistic = hasOpenOptimisticMessages();
+
+                state.messages.forEach((existing) => {
+                    if (isOptimisticMessage(existing)) {
+                        nextMessages.push(existing);
+                        return;
+                    }
+
+                    const key = messageDomId(existing);
+                    const incoming = fetchedById.get(key);
+                    if (incoming) {
+                        nextMessages.push({
+                            ...existing,
+                            ...incoming,
+                            id: Number(incoming.id),
+                            conversation_id: Number(incoming.conversation_id || conversationId),
+                            user_id: Number(incoming.user_id),
+                            client_seq: existing.client_seq,
+                            temp_id: existing.temp_id,
+                            reconciled_from: existing.reconciled_from,
+                            status: preferStatus(existing.status, incoming.status),
+                        });
+                        seenRealIds.add(key);
+                        return;
+                    }
+
+                    nextMessages.push(existing);
+                    seenRealIds.add(key);
+                });
+
+                fetched.forEach((message) => {
+                    const key = messageDomId(message);
+                    if (seenRealIds.has(key)) {
+                        return;
+                    }
+                    if (nextMessages.some((item) => sameId(item.id, message.id) && !isTempMessageId(item.id))) {
+                        return;
+                    }
+                    // Skip own messages while optimistic bubbles are open — HTTP reconcile owns them.
+                    if (sameId(message.user_id, authUserId) && blockingOptimistic) {
+                        return;
+                    }
+                    nextMessages.push({
+                        ...message,
+                        id: Number(message.id),
+                        conversation_id: Number(message.conversation_id || conversationId),
+                        user_id: Number(message.user_id),
+                        client_seq: nextClientSeq(),
+                    });
+                    seenRealIds.add(key);
+                    rememberProcessedMessage(message.id);
+                });
+
+                state.messages = dedupeMessagesByRealId(nextMessages);
             }
-            state.messages = Array.from(byId.values());
+
             renderMessages({
                 forceScroll: forceScroll || (!merge && state.stickToBottom),
                 rebuild: !merge,
@@ -1408,16 +1804,329 @@
         loadConversations();
     }
 
-    function appendMessage(message) {
-        if (!message || !message.id) {
+    function appendMessage(message, { animate = true } = {}) {
+        if (!message || message.id == null || message.id === '') {
             return false;
         }
         if (state.messages.some((item) => sameId(item.id, message.id))) {
             return false;
         }
+        if (message.temp_id && state.messages.some((item) => sameId(item.temp_id, message.temp_id))) {
+            return false;
+        }
+        // Own realtime echo while optimistic slots are open must not create a second bubble
+        // (that re-plays the enter animation when pending → sent). HTTP reconcile owns pairing.
+        if (
+            sameId(message.user_id, authUserId)
+            && !isTempMessageId(message.id)
+            && hasOpenOptimisticMessages()
+        ) {
+            return false;
+        }
+        if (message.client_seq == null || !Number.isFinite(Number(message.client_seq))) {
+            message.client_seq = nextClientSeq();
+        } else {
+            state.messageSeq = Math.max(state.messageSeq, Number(message.client_seq));
+        }
+        if (animate) {
+            message._animate = true;
+        }
         state.messages.push(message);
-        renderMessages();
+        renderMessages({ forceScroll: true });
         return true;
+    }
+
+    function buildOptimisticMessage({ tempId, body, file, conversationId }) {
+        const isImage = !!(file && String(file.type || '').startsWith('image/'));
+        const blobUrl = file && isImage ? URL.createObjectURL(file) : null;
+        let type = 'text';
+        if (file && isImage) {
+            type = 'image';
+        } else if (file) {
+            type = 'file';
+        }
+
+        return {
+            id: tempId,
+            temp_id: tempId,
+            conversation_id: conversationId ? Number(conversationId) : null,
+            user_id: authUserId,
+            body: body || null,
+            type,
+            attachment_url: blobUrl || (file && !isImage ? '#' : null),
+            attachment_original_name: file?.name || null,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            local_blob_url: blobUrl,
+            client_seq: nextClientSeq(),
+        };
+    }
+
+    function revokeOptimisticBlob(message) {
+        if (message?.local_blob_url) {
+            URL.revokeObjectURL(message.local_blob_url);
+            message.local_blob_url = null;
+        }
+    }
+
+    function patchSingleBubble(message) {
+        const bubble = messagesEl?.querySelector(`.chat-bubble[data-message-id="${CSS.escape(messageDomId(message))}"]`)
+            || (message.temp_id
+                ? messagesEl?.querySelector(`.chat-bubble[data-temp-id="${CSS.escape(String(message.temp_id))}"]`)
+                : null)
+            || (message.client_seq != null
+                ? messagesEl?.querySelector(`.chat-bubble[data-client-seq="${CSS.escape(String(message.client_seq))}"]`)
+                : null);
+        if (!bubble) {
+            syncBubblesByPosition(orderedMessages(), { updateContent: false });
+            return;
+        }
+        applyStatusToBubble(bubble, message);
+    }
+
+    function reconcileOptimistic(tempId, realMessage) {
+        const realId = Number(realMessage.id);
+
+        // Remove any duplicate real-id copies, but keep the optimistic slot for tempId.
+        state.messages = state.messages.filter((item) => {
+            if (sameId(item.id, tempId) || sameId(item.temp_id, tempId) || sameId(item.reconciled_from, tempId)) {
+                return true;
+            }
+            return !sameId(item.id, realId);
+        });
+
+        let index = findMessageIndexById(tempId);
+        if (index < 0) {
+            // Already reconciled earlier; just ensure no duplicate and patch ticks.
+            index = state.messages.findIndex((item) => sameId(item.id, realId));
+            if (index < 0) {
+                // Should be rare: keep thread stable rather than appending out of order.
+                return;
+            }
+        }
+
+        const previous = state.messages[index];
+        if (state.loadedImageIds.has(String(tempId))) {
+            state.loadedImageIds.add(String(realId));
+            state.loadedImageIds.delete(String(tempId));
+        }
+        revokeOptimisticBlob(previous);
+
+        let status = realMessage.status || 'sent';
+        if (isPeerOnline(state.activePeer)) {
+            status = preferStatus(status === 'pending' ? 'sent' : status, 'delivered');
+            if (status === 'pending' || status === 'failed') {
+                status = 'delivered';
+            }
+        }
+        if (status === 'pending' || status === 'failed') {
+            status = 'sent';
+        }
+
+        const message = {
+            ...previous,
+            ...realMessage,
+            id: realId,
+            conversation_id: Number(realMessage.conversation_id || previous.conversation_id || state.activeConversationId),
+            user_id: Number(realMessage.user_id || previous.user_id || authUserId),
+            status,
+            // Keep local timestamp so the visible time label does not jump/reflow.
+            created_at: previous.created_at || realMessage.created_at,
+            client_seq: previous.client_seq != null ? previous.client_seq : nextClientSeq(),
+            temp_id: previous.temp_id || tempId,
+            reconciled_from: tempId,
+            local_blob_url: null,
+            delivered_at: realMessage.delivered_at
+                || previous.delivered_at
+                || (status === 'delivered' || status === 'read' ? new Date().toISOString() : null),
+        };
+
+        state.messages[index] = message;
+        state.messages = dedupeMessagesByRealId(state.messages);
+        rememberProcessedMessage(realId);
+        state.messageSeq = Math.max(state.messageSeq, Number(message.client_seq) || 0);
+
+        // Prefer stable lookup by client_seq (never moves in the list).
+        const bubble = (message.client_seq != null
+            ? messagesEl?.querySelector(`.chat-bubble[data-client-seq="${CSS.escape(String(message.client_seq))}"]`)
+            : null)
+            || messagesEl?.querySelector(`.chat-bubble[data-temp-id="${CSS.escape(String(tempId))}"]`)
+            || messagesEl?.querySelector(`.chat-bubble[data-message-id="${CSS.escape(String(tempId))}"]`);
+
+        if (bubble) {
+            const content = bubble.querySelector('.chat-bubble__content');
+            if (content && message.type === 'image' && previous.local_blob_url && message.attachment_url) {
+                const img = content.querySelector('img.chat-bubble__image');
+                if (img) {
+                    img.src = message.attachment_url;
+                }
+            } else if (content && previous.type === 'file' && message.attachment_url && message.attachment_url !== '#') {
+                content.innerHTML = messageBodyHtml(message);
+            }
+            // Only swap ticks — do not rewrite meta or kill enter animation mid-flight.
+            applyStatusToBubble(bubble, message);
+            trimOrphanBubbles(state.messages.length);
+            return;
+        }
+
+        syncBubblesByPosition(orderedMessages(), { updateContent: false });
+        trimOrphanBubbles(state.messages.length);
+    }
+
+    function markOptimisticFailed(tempId, errorMessage = '') {
+        const index = findMessageIndexById(tempId);
+        if (index < 0) {
+            return;
+        }
+        state.messages[index] = {
+            ...state.messages[index],
+            status: 'failed',
+            error_message: errorMessage || 'Failed to send',
+        };
+        patchSingleBubble(state.messages[index]);
+    }
+
+    async function withDraftSendLock(fn) {
+        const previous = state.draftSendLock;
+        let release = () => {};
+        state.draftSendLock = new Promise((resolve) => {
+            release = resolve;
+        });
+        try {
+            await previous;
+            return await fn();
+        } finally {
+            release();
+        }
+    }
+
+    async function dispatchOutgoing(tempId) {
+        const payload = state.pendingPayloads.get(tempId);
+        if (!payload) {
+            return;
+        }
+
+        const index = findMessageIndexById(tempId);
+        if (index >= 0) {
+            state.messages[index].status = 'pending';
+            patchSingleBubble(state.messages[index]);
+        }
+
+        const formData = new FormData();
+        if (payload.body) {
+            formData.append('body', payload.body);
+        }
+        if (payload.file) {
+            formData.append('attachment', payload.file);
+        }
+
+        const sendRequest = async () => {
+            let message;
+            let conversationPayload = null;
+            const conversationId = state.activeConversationId || payload.conversationId;
+
+            if (conversationId) {
+                payload.conversationId = Number(conversationId);
+                const response = await api(urlTemplate(root.dataset.storeMessageUrlTemplate, conversationId), {
+                    method: 'POST',
+                    body: formData,
+                });
+                message = response.data;
+            } else if (payload.draftPeer?.id || state.draftPeer?.id) {
+                const peerId = payload.draftPeer?.id || state.draftPeer.id;
+                formData.set('user_id', String(peerId));
+                const response = await api(root.dataset.directMessageUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+                conversationPayload = response.data.conversation;
+                message = response.data.message;
+                state.activeConversationId = Number(conversationPayload.id);
+                state.draftPeer = null;
+                state.activePeer = normalizePeer(conversationPayload.peer);
+                joinActiveConversationChannel(state.activeConversationId);
+
+                const existingIndex = state.conversations.findIndex((item) => sameId(item.id, conversationPayload.id));
+                if (existingIndex >= 0) {
+                    state.conversations[existingIndex] = conversationPayload;
+                } else {
+                    state.conversations.unshift(conversationPayload);
+                }
+                payload.conversationId = state.activeConversationId;
+            } else {
+                throw new Error('No active chat');
+            }
+
+            return { message, conversationPayload };
+        };
+
+        try {
+            const needsDraftLock = !(state.activeConversationId || payload.conversationId)
+                && !!(payload.draftPeer?.id || state.draftPeer?.id);
+            const result = needsDraftLock
+                ? await withDraftSendLock(sendRequest)
+                : await sendRequest();
+
+            reconcileOptimistic(tempId, result.message);
+            state.pendingPayloads.delete(tempId);
+            upsertConversationPreview(result.message);
+            updateThreadHeader();
+            renderConversationList();
+        } catch (e) {
+            markOptimisticFailed(tempId, e.message);
+            toastError(e.message);
+        }
+    }
+
+    async function retryOptimisticSend(tempId) {
+        const payload = state.pendingPayloads.get(tempId);
+        if (!payload) {
+            return;
+        }
+        const index = findMessageIndexById(tempId);
+        if (index >= 0 && state.messages[index].status === 'pending') {
+            return;
+        }
+        await dispatchOutgoing(tempId);
+    }
+
+    function sendMessage() {
+        const body = (input.value || '').trim();
+        const file = state.pendingAttachment;
+        if (!body && !file) {
+            return;
+        }
+
+        const draftKey = composerDraftKey();
+        const conversationId = state.activeConversationId;
+        const draftPeer = state.draftPeer ? { ...state.draftPeer } : null;
+        const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        input.value = '';
+        clearAttachment();
+        clearComposerDraftForKey(draftKey);
+        if (conversationId) {
+            clearComposerDraftForKey(typingKeyForConversation(conversationId));
+        }
+        autoGrow();
+        stopOutgoingTyping();
+        focusComposer();
+
+        const optimistic = buildOptimisticMessage({ tempId, body, file, conversationId });
+        state.pendingPayloads.set(tempId, {
+            body,
+            file,
+            conversationId,
+            draftPeer,
+        });
+
+        appendMessage(optimistic, { animate: true });
+        if (optimistic.conversation_id) {
+            upsertConversationPreview(optimistic);
+            renderConversationList();
+        }
+
+        dispatchOutgoing(tempId);
     }
 
     function handleIncomingMessage(message) {
@@ -1447,7 +2156,11 @@
                 state.draftPeer = null;
                 joinActiveConversationChannel(message.conversation_id);
             }
-            appendMessage(message);
+            // Own echoes: never animate; skip append entirely while optimistic send is in flight.
+            if (sameId(message.user_id, authUserId) && hasOpenOptimisticMessages()) {
+                return;
+            }
+            appendMessage(message, { animate: !sameId(message.user_id, authUserId) });
             if (!sameId(message.user_id, authUserId)) {
                 markDelivered(message.conversation_id);
                 markRead(message.conversation_id);
@@ -1510,14 +2223,12 @@
             return;
         }
 
-        const toastDurationMs = 8000;
         const sender = resolveIncomingSender(message);
         const toast = document.createElement('button');
         toast.type = 'button';
         toast.className = 'chat-widget__toast';
         toast.setAttribute('data-message-id', String(message.id));
         toast.setAttribute('data-conversation-id', String(message.conversation_id));
-        toast.style.setProperty('--chat-toast-duration', `${toastDurationMs}ms`);
         toast.innerHTML = `
             <div class="chat-widget__avatar">${escapeHtml(initials(sender.name))}</div>
             <div class="chat-widget__toast-body">
@@ -1530,7 +2241,6 @@
             <span class="chat-widget__toast-close" data-toast-close aria-label="Dismiss" role="button">
                 <i class="fa-solid fa-xmark"></i>
             </span>
-            <span class="chat-widget__toast-progress" aria-hidden="true"></span>
         `;
 
         toast.addEventListener('click', (event) => {
@@ -1549,7 +2259,6 @@
         }
 
         toastHost.appendChild(toast);
-        window.setTimeout(() => dismissToast(toast), toastDurationMs);
     }
 
     async function openChatFromToast(conversationId, message = null) {
@@ -1648,87 +2357,6 @@
                 }
                 postTyping(true);
             }, 1500);
-        }
-    }
-
-    async function sendMessage() {
-        if (state.sending) {
-            return;
-        }
-
-        const body = (input.value || '').trim();
-        const file = state.pendingAttachment;
-        if (!body && !file) {
-            return;
-        }
-
-        const draftKey = composerDraftKey();
-        const formData = new FormData();
-        if (body) {
-            formData.append('body', body);
-        }
-        if (file) {
-            formData.append('attachment', file);
-        }
-
-        setComposerSending(true);
-        stopOutgoingTyping();
-
-        try {
-            let message;
-            let conversationPayload = null;
-
-            if (state.activeConversationId) {
-                const payload = await api(urlTemplate(root.dataset.storeMessageUrlTemplate, state.activeConversationId), {
-                    method: 'POST',
-                    body: formData,
-                });
-                message = payload.data;
-            } else if (state.draftPeer?.id) {
-                formData.append('user_id', String(state.draftPeer.id));
-                const payload = await api(root.dataset.directMessageUrl, {
-                    method: 'POST',
-                    body: formData,
-                });
-                conversationPayload = payload.data.conversation;
-                message = payload.data.message;
-                state.activeConversationId = Number(conversationPayload.id);
-                state.draftPeer = null;
-                state.activePeer = normalizePeer(conversationPayload.peer);
-                joinActiveConversationChannel(state.activeConversationId);
-
-                const existingIndex = state.conversations.findIndex((item) => sameId(item.id, conversationPayload.id));
-                if (existingIndex >= 0) {
-                    state.conversations[existingIndex] = conversationPayload;
-                } else {
-                    state.conversations.unshift(conversationPayload);
-                }
-            } else {
-                throw new Error('No active chat');
-            }
-
-            if (isPeerOnline(state.activePeer)) {
-                message.status = preferStatus(message.status || 'sent', 'delivered');
-                message.delivered_at = message.delivered_at || new Date().toISOString();
-            }
-            appendMessage(message);
-            upsertConversationPreview(message);
-            input.value = '';
-            clearComposerDraftForKey(draftKey);
-            if (state.activeConversationId) {
-                clearComposerDraftForKey(typingKeyForConversation(state.activeConversationId));
-            }
-            clearAttachment();
-            autoGrow();
-            state.stickToBottom = true;
-            scrollMessagesToBottom();
-            updateThreadHeader();
-            renderConversationList();
-        } catch (e) {
-            toastError(e.message);
-        } finally {
-            setComposerSending(false);
-            focusComposer();
         }
     }
 
@@ -1925,6 +2553,18 @@
     messagesEl.addEventListener('scroll', () => {
         state.stickToBottom = isMessagesNearBottom();
     }, { passive: true });
+    messagesEl.addEventListener('click', (event) => {
+        const retryBtn = event.target.closest('[data-retry-message]');
+        if (!retryBtn || !messagesEl.contains(retryBtn)) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        const tempId = retryBtn.getAttribute('data-retry-message');
+        if (tempId) {
+            retryOptimisticSend(tempId);
+        }
+    });
     document.getElementById('chat-close-btn')?.addEventListener('click', closePanel);
     document.getElementById('chat-close-thread-btn')?.addEventListener('click', closePanel);
     document.getElementById('chat-thread-profile-trigger')?.addEventListener('click', () => {

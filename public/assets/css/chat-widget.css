@@ -673,6 +673,21 @@ html[data-bs-theme="dark"] .chat-widget__day {
     align-items: flex-end;
 }
 
+.chat-bubble.is-entering {
+    animation: chat-bubble-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes chat-bubble-enter {
+    from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 .chat-bubble.is-theirs {
     align-self: flex-start;
     align-items: flex-start;
@@ -732,12 +747,50 @@ html[data-bs-theme="dark"] .chat-widget__day {
     padding: 0 0.2rem;
 }
 
+.chat-bubble__time {
+    flex: 0 0 auto;
+}
+
 .chat-bubble__ticks {
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    min-width: 1.35rem;
+    height: 0.95rem;
     letter-spacing: -0.08em;
     color: var(--chat-tick);
     font-weight: 700;
     cursor: default;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+}
+
+.chat-bubble__ticks.is-pending {
+    letter-spacing: 0;
+    color: var(--chat-muted);
+    font-weight: 500;
+    font-size: 0.72rem;
+}
+
+.chat-bubble__ticks.is-failed {
+    letter-spacing: 0;
+    color: #dc2626;
+    font-size: 0.78rem;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.chat-bubble__ticks.is-failed:hover {
+    color: #b91c1c;
+}
+
+.chat-bubble.is-failed .chat-bubble__content {
+    box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.28);
 }
 
 .chat-bubble__ticks.is-read {
@@ -1442,18 +1495,6 @@ html[data-bs-theme="dark"] .chat-bubble__ticks-tip {
     color: var(--chat-accent);
 }
 
-.chat-widget__toast-progress {
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    height: 2px;
-    width: 100%;
-    background: var(--chat-accent);
-    transform-origin: left center;
-    animation: chat-toast-progress var(--chat-toast-duration, 8s) linear forwards;
-    pointer-events: none;
-}
-
 @keyframes chat-toast-in {
     from {
         opacity: 0;
@@ -1469,15 +1510,6 @@ html[data-bs-theme="dark"] .chat-bubble__ticks-tip {
     to {
         opacity: 0;
         transform: translateY(8px) scale(0.98);
-    }
-}
-
-@keyframes chat-toast-progress {
-    from {
-        transform: scaleX(1);
-    }
-    to {
-        transform: scaleX(0);
     }
 }
 
