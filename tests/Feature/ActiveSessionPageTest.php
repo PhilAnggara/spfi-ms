@@ -195,7 +195,8 @@ it('shows a friendly page name instead of a raw path in activity detail', functi
         ->assertSuccessful()
         ->assertSee('Visited Purchase Requisitions')
         ->assertSee('Visited Notifications refresh')
-        ->assertDontSee('/notifications/recent');
+        ->assertSee('Purchase Requisitions · /prs')
+        ->assertSee('Notifications refresh · /notifications/recent');
 });
 
 it('does not create activity logs for notification polling endpoints', function () {
@@ -882,6 +883,191 @@ it('logs starting a chat with peer id and name', function () {
     expect($log)->not->toBeNull()
         ->and($log->meta['subject_id'] ?? null)->toBe($this->admin->id)
         ->and($log->summary())->toBe('Started chat with #'.$this->admin->id.' '.$this->admin->name);
+});
+
+it('logs printing a prs with id and number', function () {
+    $unit = \App\Models\UnitOfMeasure::query()->create([
+        'name' => 'Pieces',
+        'code' => 'PCS-ACT',
+    ]);
+    $category = \App\Models\ItemCategory::query()->create([
+        'name' => 'Office Supplies',
+        'code' => 'OFF-ACT',
+    ]);
+    $item = \App\Models\Item::query()->create([
+        'name' => 'Activity Print Item',
+        'code' => 'ITM-ACT-001',
+        'unit_of_measure_id' => $unit->id,
+        'category_id' => $category->id,
+        'type' => 'Consumable',
+        'stock_on_hand' => 1,
+        'is_active' => true,
+    ]);
+
+    $prs = \App\Models\Prs::query()->create([
+        'prs_number' => 'PRS-ACT-2026-0001',
+        'user_id' => $this->admin->id,
+        'department_id' => $this->admin->department_id,
+        'prs_date' => now()->toDateString(),
+        'date_needed' => now()->addDays(3)->toDateString(),
+        'is_capex' => false,
+        'remarks' => 'Print activity test',
+        'status' => 'REQUESTED',
+    ]);
+
+    \App\Models\PrsItem::query()->create([
+        'prs_id' => $prs->id,
+        'item_id' => $item->id,
+        'quantity' => 1,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get(route('prs.print', $prs))
+        ->assertSuccessful();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_PRINTED)
+        ->where('meta->route', 'prs.print')
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['subject_id'] ?? null)->toBe($prs->id)
+        ->and($log->meta['subject_code'] ?? null)->toBe('PRS-ACT-2026-0001')
+        ->and($log->summary())->toBe('Printed PRS #'.$prs->id.' (PRS-ACT-2026-0001)');
+
+    $this->actingAs($this->admin)
+        ->get(route('prs.print', $prs))
+        ->assertSuccessful();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_PRINTED)
+        ->where('meta->route', 'prs.print')
+        ->count())->toBe(1);
+});
+
+it('logs generating an im stock inventory report', function () {
+    $this->admin->assignRole('im-staff');
+
+    $unit = \App\Models\UnitOfMeasure::query()->create([
+        'name' => 'Pieces',
+        'code' => 'PCS-RPT',
+    ]);
+    $category = \App\Models\ItemCategory::query()->create([
+        'name' => 'SPARE PARTS',
+        'code' => 'SP-RPT',
+    ]);
+    $item = \App\Models\Item::query()->create([
+        'name' => 'Report Bearing',
+        'code' => 'SP-RPT-001',
+        'unit_of_measure_id' => $unit->id,
+        'category_id' => $category->id,
+        'type' => 'Spare Parts',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    \App\Models\StockInventory::query()->create([
+        'item_id' => $item->id,
+        'product_code' => $item->code,
+        'wh_code' => 'MAIN',
+        'balance' => 10,
+        'start_balance' => 0,
+        'average_price' => 0,
+        'is_active' => true,
+        'is_delete' => false,
+    ]);
+
+    \App\Models\StockBalance::query()->create([
+        'date' => '2026-05-31',
+        'item_id' => $item->id,
+        'product_code' => $item->code,
+        'wh_code' => 'MAIN',
+        'begin' => 10,
+        'qty_in1' => 0,
+        'qty_in2' => 0,
+        'qty_in3' => 0,
+        'qty_out1' => 0,
+        'qty_out2' => 0,
+        'qty_out3' => 0,
+        'end' => 10,
+        'acc_qty_in1' => 0,
+        'acc_average_price_in1' => 0,
+        'acc_qty_total' => 10,
+        'acc_average_price_total' => 0,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post(route('im.reports.stock-inventory'), [
+            'as_of' => '2026-06-30',
+            'category' => 'SPARE PARTS',
+            'format' => 'excel',
+        ])
+        ->assertSuccessful();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_EXPORTED)
+        ->where('meta->route', 'im.reports.stock-inventory')
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->summary())->toBe('Generated report: Stock Inventory');
+});
+
+it('uses a wider activity detail offcanvas', function () {
+    $this->actingAs($this->admin)
+        ->get(route('active-sessions.index'))
+        ->assertSuccessful()
+        ->assertSee('as-offcanvas', false)
+        ->assertSee('id="as-detail-offcanvas"', false);
+});
+
+it('filters activity detail by action type', function () {
+    UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_LOGIN,
+        'ip_address' => '203.0.113.50',
+        'user_agent' => 'Chrome',
+        'meta' => null,
+    ]);
+
+    UserActivityLog::query()->create([
+        'user_id' => $this->monitoredUser->id,
+        'action' => UserActivityLog::ACTION_PRINTED,
+        'ip_address' => '203.0.113.51',
+        'user_agent' => 'Chrome',
+        'meta' => [
+            'route' => 'prs.print',
+            'page' => 'Purchase Requisitions',
+            'subject' => '#9 (PRS-ACT-1)',
+            'subject_id' => 9,
+            'subject_code' => 'PRS-ACT-1',
+        ],
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get(route('active-sessions.show', $this->monitoredUser))
+        ->assertSuccessful()
+        ->assertSee('as-activity-filter', false)
+        ->assertSee('All types')
+        ->assertSee('Printed')
+        ->assertSee('Logged in')
+        ->assertSee('Printed PRS #9 (PRS-ACT-1)');
+
+    $filtered = $this->actingAs($this->admin)
+        ->get(route('active-sessions.show', [
+            'user' => $this->monitoredUser,
+            'action' => UserActivityLog::ACTION_PRINTED,
+        ]))
+        ->assertSuccessful();
+
+    $filtered->assertSee('Printed PRS #9 (PRS-ACT-1)')
+        ->assertSee('value="printed" selected', false)
+        ->assertDontSee('as-action-login', false);
 });
 
 it('loads older activity history with before_id', function () {

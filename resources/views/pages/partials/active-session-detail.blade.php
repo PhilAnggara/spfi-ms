@@ -51,7 +51,23 @@
         </div>
     </div>
 
-    <h6 class="as-timeline-title">Activity History</h6>
+    <div class="as-timeline-toolbar">
+        <h6 class="as-timeline-title mb-0">Activity History</h6>
+        <div class="as-timeline-filter">
+            <label for="as-activity-filter" class="form-label mb-0 small text-muted">Type</label>
+            <select id="as-activity-filter"
+                    class="form-select form-select-sm"
+                    data-base-url="{{ route('active-sessions.show', $user) }}"
+                    aria-label="Filter activity type">
+                <option value="all" @selected($actionFilter === null)>All types</option>
+                @foreach ($availableActions as $action)
+                    <option value="{{ $action }}" @selected($actionFilter === $action)>
+                        {{ \App\Models\UserActivityLog::actionLabel($action) }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+    </div>
 
     <div id="as-timeline" class="as-timeline">
         @include('pages.partials.active-session-detail-logs', [

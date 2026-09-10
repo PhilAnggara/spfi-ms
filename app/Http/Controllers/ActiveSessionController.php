@@ -64,10 +64,11 @@ class ActiveSessionController extends Controller
     public function show(Request $request, User $user): View
     {
         $beforeId = $request->integer('before_id') ?: null;
+        $actionFilter = $this->normalizeActionFilter($request->string('action')->toString());
 
         if ($request->ajax() && $beforeId !== null) {
-            $logs = $this->activityLogsPage($user, $beforeId);
-            $hasMore = $this->hasOlderActivityLogs($user, $logs);
+            $logs = $this->activityLogsPage($user, $beforeId, $actionFilter);
+            $hasMore = $this->hasOlderActivityLogs($user, $logs, $actionFilter);
 
             return view('pages.partials.active-session-detail-logs', [
                 'logs' => $logs,
@@ -85,8 +86,14 @@ class ActiveSessionController extends Controller
             ->where('last_activity', '>=', $onlineThreshold)
             ->exists();
 
-        $logs = $this->activityLogsPage($user);
-        $hasMore = $this->hasOlderActivityLogs($user, $logs);
+        $logs = $this->activityLogsPage($user, null, $actionFilter);
+        $hasMore = $this->hasOlderActivityLogs($user, $logs, $actionFilter);
+        $availableActions = $this->availableActionsFor($user);
+
+        $detailUrl = route('active-sessions.show', $user);
+        if ($actionFilter !== null) {
+            $detailUrl .= '?action='.urlencode($actionFilter);
+        }
 
         return view('pages.partials.active-session-detail', [
             'user' => $user,
@@ -94,7 +101,9 @@ class ActiveSessionController extends Controller
             'logs' => $logs,
             'hasMore' => $hasMore,
             'oldestId' => $logs->last()?->id,
-            'detailUrl' => route('active-sessions.show', $user),
+            'detailUrl' => $detailUrl,
+            'actionFilter' => $actionFilter,
+            'availableActions' => $availableActions,
         ]);
     }
 
@@ -152,11 +161,15 @@ class ActiveSessionController extends Controller
     /**
      * @return Collection<int, UserActivityLog>
      */
-    private function activityLogsPage(User $user, ?int $beforeId = null): Collection
+    private function activityLogsPage(User $user, ?int $beforeId = null, ?string $actionFilter = null): Collection
     {
         $query = $user->activityLogs()
             ->with('actor')
             ->latest('id');
+
+        if ($actionFilter !== null) {
+            $query->where('action', $actionFilter);
+        }
 
         if ($beforeId !== null) {
             $query->where('id', '<', $beforeId);
@@ -168,7 +181,7 @@ class ActiveSessionController extends Controller
     /**
      * @param  Collection<int, UserActivityLog>  $logs
      */
-    private function hasOlderActivityLogs(User $user, Collection $logs): bool
+    private function hasOlderActivityLogs(User $user, Collection $logs, ?string $actionFilter = null): bool
     {
         $oldestId = $logs->last()?->id;
 
@@ -176,8 +189,36 @@ class ActiveSessionController extends Controller
             return false;
         }
 
+        $query = $user->activityLogs()->where('id', '<', $oldestId);
+
+        if ($actionFilter !== null) {
+            $query->where('action', $actionFilter);
+        }
+
+        return $query->exists();
+    }
+
+    private function normalizeActionFilter(string $action): ?string
+    {
+        $action = trim($action);
+
+        if ($action === '' || $action === 'all') {
+            return null;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    private function availableActionsFor(User $user): Collection
+    {
         return $user->activityLogs()
-            ->where('id', '<', $oldestId)
-            ->exists();
+            ->select('action')
+            ->distinct()
+            ->orderBy('action')
+            ->pluck('action')
+            ->values();
     }
 }

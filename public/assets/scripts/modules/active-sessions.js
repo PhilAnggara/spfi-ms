@@ -192,6 +192,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             detailBody.innerHTML = await response.text();
             syncHistoryStateFromDom();
+            bindActivityFilter();
         } catch (error) {
             detailBody.innerHTML = `
                 <div class="text-danger text-center py-5">
@@ -201,6 +202,36 @@ document.addEventListener('DOMContentLoaded', function () {
             hasMoreHistory = false;
             oldestLogId = null;
         }
+    }
+
+    function bindActivityFilter() {
+        if (!detailBody) {
+            return;
+        }
+
+        const filter = detailBody.querySelector('#as-activity-filter');
+        if (!filter || filter.dataset.bound === '1') {
+            return;
+        }
+
+        filter.dataset.bound = '1';
+        filter.addEventListener('change', async function () {
+            const baseUrl = filter.dataset.baseUrl || currentDetailUrl;
+            if (!baseUrl) {
+                return;
+            }
+
+            const url = new URL(baseUrl, window.location.origin);
+            url.searchParams.delete('before_id');
+
+            if (filter.value && filter.value !== 'all') {
+                url.searchParams.set('action', filter.value);
+            } else {
+                url.searchParams.delete('action');
+            }
+
+            await loadDetail(url.toString(), { showLoading: true });
+        });
     }
 
     async function loadOlderActivity() {
@@ -477,6 +508,22 @@ document.addEventListener('DOMContentLoaded', function () {
             oldestLogId = null;
             loadingOlder = false;
             setDetailRefreshEnabled(false);
+        });
+
+        // If chat opens while this offcanvas is shown, Bootstrap's focus trap
+        // would steal keyboard focus from the chat composer. Chat widget
+        // deactivates traps on open; re-assert after shown for safety.
+        offcanvasEl.addEventListener('shown.bs.offcanvas', function () {
+            const chatOpen = document.getElementById('chat-widget-panel')
+                && !document.getElementById('chat-widget-panel').classList.contains('d-none');
+            if (!chatOpen || !window.bootstrap?.Offcanvas) {
+                return;
+            }
+
+            const instance = window.bootstrap.Offcanvas.getInstance(offcanvasEl);
+            if (instance?._focustrap) {
+                instance._focustrap.deactivate();
+            }
         });
     }
 

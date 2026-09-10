@@ -126,6 +126,25 @@ it('builds short english activity summaries', function () {
         ->and($startedChat->summary())->toBe('Started chat with #9 Jane Doe')
         ->and($edit->summary())->toBe('Edited product #45 (SKU-001)');
 
+    $printed = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_PRINTED,
+        'meta' => [
+            'page' => 'Purchase Requisitions',
+            'subject' => '#12 (PRS-IT-2026-0001)',
+        ],
+    ]);
+
+    $exported = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_EXPORTED,
+        'meta' => [
+            'page' => 'Stock Inventory',
+            'route' => 'im.reports.stock-inventory',
+        ],
+    ]);
+
+    expect($printed->summary())->toBe('Printed PRS #12 (PRS-IT-2026-0001)')
+        ->and($exported->summary())->toBe('Generated report: Stock Inventory');
+
     $edit->forceFill([
         'meta' => [
             'route' => 'product.update',

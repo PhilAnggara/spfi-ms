@@ -40,6 +40,10 @@ class UserActivityLog extends Model
 
     public const ACTION_TYPING = 'typing';
 
+    public const ACTION_PRINTED = 'printed';
+
+    public const ACTION_EXPORTED = 'exported';
+
     /**
      * @var array<string, string>
      */
@@ -53,6 +57,7 @@ class UserActivityLog extends Model
         'active-sessions.index' => 'Active Users / Sessions',
         'active-sessions.show' => 'Active Users / Sessions',
         'employees.index' => 'Employees',
+        'employees.id-cards.print' => 'Employee ID Cards',
         'product.index' => 'Products',
         'product-category.index' => 'Product Categories',
         'unit-of-measurement.index' => 'Units of Measure',
@@ -66,10 +71,13 @@ class UserActivityLog extends Model
         'prs.index' => 'Purchase Requisitions',
         'prs.create' => 'Create PRS',
         'prs.edit' => 'Edit PRS',
+        'prs.print' => 'Purchase Requisitions',
         'prs.approval.index' => 'PRS Approval',
         'prs.approval.show' => 'PRS Approval Detail',
         'canvassing.index' => 'Canvassing',
         'canvassing.show' => 'Canvassing Detail',
+        'canvassing.report' => 'Canvassing',
+        'canvassing.reports.print' => 'Canvassing Reports',
         'purchase-orders.index' => 'Purchase Orders',
         'purchase-orders.draft' => 'PO Draft',
         'purchase-orders.approval' => 'PO Approval',
@@ -79,19 +87,44 @@ class UserActivityLog extends Model
         'purchase-orders.withdraw' => 'Purchase Orders',
         'purchase-orders.cancel' => 'Purchase Orders',
         'purchase-orders.show' => 'Purchase Order Detail',
+        'purchase-orders.print' => 'Purchase Orders',
         'prs.approve' => 'PRS Approval',
         'prs.reject' => 'PRS Approval',
         'prs.hold' => 'PRS Approval',
         'prs.reassign' => 'PRS Approval',
         'procurement.supplier-comparison.index' => 'Supplier Comparison',
+        'procurement.supplier-comparison.report' => 'Supplier Comparison',
         'procurement.reports.index' => 'Purchasing Reports',
+        'procurement.reports.prs-not-yet-po' => 'PRS Not Yet PO',
+        'procurement.reports.po-not-yet-delivered' => 'PO Not Yet Delivered',
+        'procurement.reports.po-registered-period' => 'PO Registered Per Period',
+        'procurement.reports.po-registered-department' => 'PO Registered Per Department',
+        'procurement.reports.po-registered-item' => 'PO Registered Per Item',
+        'procurement.reports.po-registered-supplier' => 'PO Registered Per Supplier',
+        'procurement.reports.purchasing-lead-time' => 'Purchasing Lead Time',
         'receiving-reports.index' => 'Receiving Reports',
+        'receiving-reports.print' => 'Receiving Reports',
         'stores-withdrawals.index' => 'Stores Withdrawals',
         'stores-withdrawals.create' => 'Create Stores Withdrawal',
+        'stores-withdrawals.print' => 'Stores Withdrawals',
         'transfer-slips.index' => 'Transfer Slips',
+        'transfer-slips.print' => 'Transfer Slips',
         'deliveries.index' => 'Deliveries',
+        'deliveries.print' => 'Deliveries',
         'im.reports.index' => 'IM Reports',
+        'im.reports.stock-inventory' => 'Stock Inventory',
+        'im.reports.transaction' => 'IM Transaction',
+        'im.reports.receiving-register' => 'Receiving Register',
+        'im.reports.sws-register' => 'SWS Register',
+        'im.reports.transfer-register' => 'Transfer Register',
+        'im.reports.delivery-register' => 'Delivery Register',
         'accounting.reports.index' => 'Accounting Reports',
+        'accounting.reports.stock-card' => 'Stock Card',
+        'accounting.reports.transaction' => 'Accounting Transaction',
+        'accounting.reports.restatement' => 'Restatement',
+        'accounting.reports.stock-card-count' => 'Stock Card Count',
+        'accounting.reports.document-summary' => 'Document Summary',
+        'accounting.reports.purchase' => 'Accounting Purchase',
         'accounting.exchange-rates.index' => 'Exchange Rates',
         'accounting.doc-entries.index' => 'Document Entries',
         'accounting.groupings.index' => 'Accounting Groupings',
@@ -155,7 +188,12 @@ class UserActivityLog extends Model
 
     public function label(): string
     {
-        return match ($this->action) {
+        return self::actionLabel($this->action);
+    }
+
+    public static function actionLabel(string $action): string
+    {
+        return match ($action) {
             self::ACTION_LOGIN => 'Logged in',
             self::ACTION_LOGOUT => 'Logged out',
             self::ACTION_FORCE_LOGOUT => 'Force logged out',
@@ -172,7 +210,9 @@ class UserActivityLog extends Model
             self::ACTION_CANCELLED => 'Cancelled',
             self::ACTION_REQUESTED_CHANGES => 'Requested changes',
             self::ACTION_TYPING => 'Typing',
-            default => ucfirst(str_replace('_', ' ', $this->action)),
+            self::ACTION_PRINTED => 'Printed',
+            self::ACTION_EXPORTED => 'Generated report',
+            default => ucfirst(str_replace('_', ' ', $action)),
         };
     }
 
@@ -202,6 +242,8 @@ class UserActivityLog extends Model
             self::ACTION_WITHDRAWN => $this->resourceSummary('Withdrawn', $page, $subject),
             self::ACTION_CANCELLED => $this->resourceSummary('Cancelled', $page, $subject),
             self::ACTION_REQUESTED_CHANGES => $this->resourceSummary('Requested changes on', $page, $subject),
+            self::ACTION_PRINTED => $this->printedSummary($page, $subject),
+            self::ACTION_EXPORTED => $page !== null ? 'Generated report: '.$page : 'Generated report',
             default => $this->resourceSummary($this->label(), $page, $subject),
         };
     }
@@ -297,7 +339,7 @@ class UserActivityLog extends Model
                 }
 
                 $indexRoute = implode('.', $resourceSegments).'.index';
-                if (in_array($action, ['store', 'update', 'destroy', 'submit', 'withdraw', 'cancel'], true)
+                if (in_array($action, ['store', 'update', 'destroy', 'submit', 'withdraw', 'cancel', 'print', 'report'], true)
                     && isset(self::ROUTE_PAGE_LABELS[$indexRoute])) {
                     return self::ROUTE_PAGE_LABELS[$indexRoute];
                 }
@@ -358,6 +400,11 @@ class UserActivityLog extends Model
         return $this->resourceSummary('Created', $page, $subject);
     }
 
+    private function printedSummary(?string $page, ?string $subject): string
+    {
+        return $this->resourceSummary('Printed', $page, $subject);
+    }
+
     private function resourceSummary(string $verb, ?string $page, ?string $subject): string
     {
         $resource = $this->singularResourceLabel($page);
@@ -394,6 +441,9 @@ class UserActivityLog extends Model
             'stores withdrawals', 'create stores withdrawal' => 'stores withdrawal',
             'receiving reports' => 'receiving report',
             'deliveries' => 'delivery',
+            'employee id cards' => 'employee ID cards',
+            'canvassing reports' => 'canvassing report',
+            'supplier comparison' => 'supplier comparison',
             'suppliers' => 'supplier',
             'buyers' => 'buyer',
             'currencies' => 'currency',

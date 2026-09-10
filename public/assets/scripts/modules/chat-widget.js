@@ -323,11 +323,38 @@
         }
     }
 
+    function releaseBootstrapFocusTraps() {
+        if (!window.bootstrap?.Offcanvas) {
+            return;
+        }
+
+        document.querySelectorAll('.offcanvas.show').forEach((el) => {
+            const instance = window.bootstrap.Offcanvas.getInstance(el);
+            if (instance?._focustrap) {
+                instance._focustrap.deactivate();
+            }
+        });
+    }
+
+    function restoreBootstrapFocusTraps() {
+        if (!window.bootstrap?.Offcanvas || state.open) {
+            return;
+        }
+
+        document.querySelectorAll('.offcanvas.show').forEach((el) => {
+            const instance = window.bootstrap.Offcanvas.getInstance(el);
+            if (instance?._focustrap) {
+                instance._focustrap.activate();
+            }
+        });
+    }
+
     function openPanel() {
         state.open = true;
         panel.classList.remove('d-none');
         fab.classList.add('is-open');
         fab.setAttribute('aria-expanded', 'true');
+        releaseBootstrapFocusTraps();
         clearIncomingToasts();
         showView('list');
         loadConversations();
@@ -353,6 +380,7 @@
         stopOutgoingTyping();
         leaveConversationChannel();
         stopThreadPolling();
+        restoreBootstrapFocusTraps();
     }
 
     function togglePanel() {
@@ -1532,6 +1560,7 @@
             panel.classList.remove('d-none');
             fab.classList.add('is-open');
             fab.setAttribute('aria-expanded', 'true');
+            releaseBootstrapFocusTraps();
         }
 
         await loadConversations();

@@ -2,10 +2,10 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Conversation;
 use App\Models\User;
 use App\Models\UserActivityLog;
 use App\Services\UserActivityLogger;
+use App\Support\UserActivitySubject;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -73,8 +73,18 @@ class TrackUserLastSeen
             return $response;
         }
 
+        if ($response->getStatusCode() >= 400) {
+            return $response;
+        }
+
         $routeName = $request->route()?->getName();
         $path = '/'.$request->path();
+
+        if (UserActivitySubject::isPrintOrDocumentReportRoute($routeName)) {
+            $this->logPrintIfNeeded($user, $request, $path);
+
+            return $response;
+        }
 
         if ($this->shouldLogPageVisit($user->id, $routeName, $path)) {
             $this->logger->log(
@@ -85,7 +95,7 @@ class TrackUserLastSeen
                     'route' => $routeName,
                     'path' => $path,
                     'page' => UserActivityLog::labelForRoute($routeName, $path),
-                    ...$this->resolveVisitSubject($request, $user),
+                    ...UserActivitySubject::resolve($request, $user),
                 ], static fn ($value) => $value !== null && $value !== ''),
             );
         }
@@ -93,44 +103,45 @@ class TrackUserLastSeen
         return $response;
     }
 
-    /**
-     * @return array{
-     *     subject?: string,
-     *     subject_type?: string,
-     *     subject_id?: int|string,
-     *     subject_code?: string
-     * }
-     */
-    private function resolveVisitSubject(Request $request, User $viewer): array
+    private function logPrintIfNeeded(User $user, Request $request, string $path): void
     {
-        if (! $request->routeIs('chat.messages.index')) {
-            return [];
+        if (! $this->shouldLogPrint($user->id, $path)) {
+            return;
         }
 
-        $conversation = $request->route('conversation');
+        $routeName = $request->route()?->getName();
 
-        if (! $conversation instanceof Conversation) {
-            return [];
+        $this->logger->log(
+            $user,
+            UserActivityLog::ACTION_PRINTED,
+            $request,
+            meta: array_filter([
+                'route' => $routeName,
+                'path' => $path,
+                'page' => UserActivityLog::labelForRoute($routeName, $path),
+                'method' => $request->method(),
+                ...UserActivitySubject::resolve($request, $user),
+            ], static fn ($value) => $value !== null && $value !== ''),
+        );
+    }
+
+    private function shouldLogPrint(int $userId, string $path): bool
+    {
+        $recentLogs = UserActivityLog::query()
+            ->where('user_id', $userId)
+            ->where('action', UserActivityLog::ACTION_PRINTED)
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->latest('id')
+            ->limit(20)
+            ->get(['meta']);
+
+        foreach ($recentLogs as $log) {
+            if (($log->meta['path'] ?? null) === $path) {
+                return false;
+            }
         }
 
-        $peer = $conversation->otherParticipant($viewer);
-
-        if ($peer === null) {
-            return [
-                'subject' => '#'.$conversation->id,
-                'subject_type' => 'conversation',
-                'subject_id' => $conversation->id,
-            ];
-        }
-
-        $name = trim((string) $peer->name);
-
-        return [
-            'subject' => $name !== '' ? '#'.$peer->id.' '.$name : '#'.$peer->id,
-            'subject_type' => 'user',
-            'subject_id' => $peer->id,
-            'subject_code' => $peer->name,
-        ];
+        return true;
     }
 
     private function shouldLogPageVisit(int $userId, ?string $routeName, string $path): bool
