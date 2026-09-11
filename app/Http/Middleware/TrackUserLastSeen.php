@@ -31,6 +31,7 @@ class TrackUserLastSeen
         'chat.conversations.index',
         'chat.users.search',
         'chat.unread-count',
+        'chat.unread-messages',
     ];
 
     /**
@@ -203,6 +204,7 @@ class TrackUserLastSeen
             str_ends_with($routeName, '.datatables')
             || str_contains($routeName, 'livewire')
             || str_ends_with($routeName, '.unread-count')
+            || str_ends_with($routeName, '.unread-messages')
             || str_ends_with($routeName, '.recent')
             || str_ends_with($routeName, '.pending')
         )) {

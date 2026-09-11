@@ -745,6 +745,21 @@ it('does not log screen message pending inbox polls as page visits', function ()
         ->exists())->toBeFalse();
 });
 
+it('does not log chat unread messages polls as page visits', function () {
+    $this->actingAs($this->monitoredUser)
+        ->getJson(route('chat.unread-messages'))
+        ->assertSuccessful();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->monitoredUser->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where(function ($query) {
+            $query->where('meta->route', 'chat.unread-messages')
+                ->orWhere('meta->path', '/chat/unread-messages');
+        })
+        ->exists())->toBeFalse();
+});
+
 it('logs typing once per peer until a chat is sent', function () {
     \Illuminate\Support\Facades\Event::fake();
 
