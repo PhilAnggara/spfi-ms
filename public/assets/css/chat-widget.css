@@ -312,7 +312,7 @@ body:has(.prs-mobile-cart-btn.show) .chat-widget {
     opacity: 1;
 }
 
-.chat-widget__item--contact {
+.chat-widget__item--contact.is-row-enter {
     animation: chat-contact-row-in 0.22s ease both;
     animation-delay: calc(var(--chat-stagger, 0) * 35ms);
 }

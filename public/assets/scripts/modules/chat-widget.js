@@ -79,6 +79,10 @@
         stickToBottom: true,
         searchMode: false,
         contactsLoading: false,
+        searchRequestId: 0,
+        lastContactQuery: null,
+        animateContactRows: false,
+        listRenderKey: '',
         listPageTimer: null,
         loadedImageIds: new Set(),
         pendingPayloads: new Map(),
@@ -786,6 +790,8 @@
         }
         searchEl?.classList.add('is-active', 'is-search-page');
         state.contactsLoading = true;
+        state.animateContactRows = true;
+        state.listRenderKey = '';
         renderConversationList();
         animateListPage('forward');
         searchContacts(listFilter.value);
@@ -805,6 +811,10 @@
         state.searchMode = false;
         state.contactsLoading = false;
         state.contactResults = [];
+        state.lastContactQuery = null;
+        state.animateContactRows = false;
+        state.searchRequestId += 1;
+        state.listRenderKey = '';
         listFilter.value = '';
         listView?.classList.remove('is-search-mode');
         searchEl?.classList.remove('is-active', 'is-search-page');
@@ -822,6 +832,45 @@
         }
     }
 
+    function buildListRenderKey(chatItems, contacts) {
+        const chatKey = chatItems.map((item) => {
+            const peer = item.peer || {};
+            const draftKey = typingKeyForConversation(item.id);
+            return [
+                item.id,
+                Number(item.unread_count || 0),
+                item.latest_message?.id || '',
+                item.latest_message?.status || '',
+                item.latest_message?.body || '',
+                item.latest_message?.type || '',
+                item.latest_message?.created_at || item.updated_at || '',
+                isPeerOnline(peer) ? 1 : 0,
+                isTypingForKey(draftKey) ? 1 : 0,
+                draftPreviewForKey(draftKey) || '',
+                sameId(item.id, state.activeConversationId) ? 1 : 0,
+            ].join(':');
+        }).join('|');
+
+        const contactKey = contacts.map((user) => {
+            const draftKey = typingKeyForDraft(user.id);
+            const online = isPeerOnline(user) || !!user.is_online ? 1 : 0;
+            return [
+                user.id,
+                online,
+                isTypingForKey(draftKey) ? 1 : 0,
+                draftPreviewForKey(draftKey) || '',
+            ].join(':');
+        }).join('|');
+
+        return [
+            state.searchMode ? 1 : 0,
+            state.contactsLoading ? 1 : 0,
+            (listFilter.value || '').trim().toLowerCase(),
+            chatKey,
+            contactKey,
+        ].join('::');
+    }
+
     function renderConversationList() {
         const term = (listFilter.value || '').trim().toLowerCase();
         const chatItems = state.searchMode
@@ -837,12 +886,20 @@
 
         const showContacts = shouldShowContacts();
         const contacts = showContacts ? sortedContacts() : [];
+        const renderKey = buildListRenderKey(chatItems, contacts);
+        if (renderKey === state.listRenderKey) {
+            return;
+        }
+
+        const scrollTop = conversationList.scrollTop;
         let html = '';
 
         if (!chatItems.length && !contacts.length && !state.contactsLoading) {
+            state.listRenderKey = renderKey;
             conversationList.innerHTML = state.searchMode
                 ? '<div class="chat-widget__empty">No chats or contacts found.</div>'
                 : '<div class="chat-widget__empty">No conversations yet. Search a contact to start.</div>';
+            state.animateContactRows = false;
             return;
         }
 
@@ -884,6 +941,7 @@
         if (state.searchMode && state.contactsLoading && !contacts.length) {
             html += contactsSkeletonHtml();
         } else if (state.searchMode && contacts.length) {
+            const animateRows = state.animateContactRows;
             html += '<div class="chat-widget__contacts-block">';
             html += '<div class="chat-widget__section-label">Contacts</div>';
             html += contacts.map((user, index) => {
@@ -901,8 +959,9 @@
                     previewHtml = escapeHtml('Online');
                 }
                 const stagger = Math.min(index, 5);
+                const enterClass = animateRows ? ' is-row-enter' : '';
                 return `
-                    <div class="chat-widget__item chat-widget__item--contact" data-draft-peer-id="${user.id}" style="--chat-stagger:${stagger}">
+                    <div class="chat-widget__item chat-widget__item--contact${enterClass}" data-draft-peer-id="${user.id}" style="--chat-stagger:${stagger}">
                         <button type="button" class="chat-widget__profile-trigger" data-profile-peer="contact" data-peer-id="${user.id}" title="View profile" aria-label="View profile">
                             <div class="chat-widget__avatar ${online ? 'is-online' : ''}">${escapeHtml(initials(user.name))}</div>
                         </button>
@@ -924,7 +983,10 @@
             html += '</div>';
         }
 
+        state.listRenderKey = renderKey;
+        state.animateContactRows = false;
         conversationList.innerHTML = html;
+        conversationList.scrollTop = scrollTop;
     }
 
     function messageBodyHtml(message) {
@@ -1405,32 +1467,45 @@
         if (!state.searchMode) {
             state.contactResults = [];
             state.contactsLoading = false;
+            state.lastContactQuery = null;
             renderConversationList();
             return;
         }
 
         const term = (query || '').trim();
-        state.contactsLoading = true;
-        renderConversationList();
+        const requestId = ++state.searchRequestId;
+        const queryChanged = term !== state.lastContactQuery;
+        const needsLoadingUi = state.contactResults.length === 0 || queryChanged;
+
+        if (queryChanged && state.contactResults.length) {
+            state.contactResults = [];
+        }
+        if (needsLoadingUi) {
+            state.contactsLoading = true;
+            state.animateContactRows = true;
+            renderConversationList();
+        }
 
         try {
             const url = new URL(root.dataset.searchUsersUrl, window.location.origin);
             url.searchParams.set('q', term);
             const payload = await api(url.toString());
-            if (!state.searchMode) {
-                state.contactResults = [];
-                state.contactsLoading = false;
+            if (requestId !== state.searchRequestId || !state.searchMode) {
                 return;
             }
             state.contactResults = payload.data || [];
             state.contactsLoading = false;
+            state.lastContactQuery = term;
+            state.animateContactRows = true;
             renderConversationList();
         } catch (e) {
+            if (requestId !== state.searchRequestId || !state.searchMode) {
+                return;
+            }
             state.contactResults = [];
             state.contactsLoading = false;
-            if (state.searchMode) {
-                renderConversationList();
-            }
+            state.lastContactQuery = term;
+            renderConversationList();
         }
     }
 
@@ -2624,7 +2699,6 @@
             if (!state.searchMode) {
                 return;
             }
-            renderConversationList();
             searchContacts(listFilter.value);
         }, 250);
     });
@@ -2741,9 +2815,6 @@
         refreshUnread();
         if (state.open && state.view === 'list') {
             loadConversations();
-            if (state.searchMode) {
-                searchContacts(listFilter.value);
-            }
         }
     }, 15000);
 })();
