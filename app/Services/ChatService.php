@@ -333,6 +333,7 @@ class ChatService
                 ? $latest->toChatPayload($viewerParticipant, $peerParticipant)
                 : null,
             'unread_count' => $unreadQuery->count(),
+            'viewer_last_read_at' => $viewerParticipant?->last_read_at?->toIso8601String(),
             'updated_at' => $conversation->updated_at?->toIso8601String(),
         ];
     }

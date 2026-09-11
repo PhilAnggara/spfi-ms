@@ -91,6 +91,8 @@
         messageSeq: 0,
         toastedMessageIds: new Set(),
         catchUpToastAt: 0,
+        unreadSeparatorBeforeId: null,
+        unreadSeparatorCount: 0,
     };
 
     const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😅','😢','😭','😡','👍','👎','👏','🙏','🔥','✨','🎉','❤️','💙','💚','💛','🧡','💜','✅','❌','📌','📎','📷','📁','☕','🚀'];
@@ -102,6 +104,20 @@
             .replaceAll('>', '&gt;')
             .replaceAll('"', '&quot;')
             .replaceAll("'", '&#039;');
+    }
+
+    function stripWhatsAppMarkup(value) {
+        return String(value ?? '')
+            .replace(/\*(?!\s)([^*]+?)(?<!\s)\*/g, '$1')
+            .replace(/_(?!\s)([^_]+?)(?<!\s)_/g, '$1')
+            .replace(/~(?!\s)([^~]+?)(?<!\s)~/g, '$1');
+    }
+
+    function formatWhatsAppMarkup(escapedText) {
+        return String(escapedText ?? '')
+            .replace(/\*(?!\s)([^*]+?)(?<!\s)\*/g, '<strong>$1</strong>')
+            .replace(/_(?!\s)([^_]+?)(?<!\s)_/g, '<em>$1</em>')
+            .replace(/~(?!\s)([^~]+?)(?<!\s)~/g, '<del>$1</del>');
     }
 
     function initials(name) {
@@ -372,6 +388,9 @@
     }
 
     function showView(view) {
+        if (view !== 'thread') {
+            clearUnreadSeparator();
+        }
         state.view = view;
         root.querySelectorAll('.chat-widget__view').forEach((el) => {
             el.classList.toggle('is-active', el.dataset.view === view);
@@ -539,7 +558,7 @@
         if (message.type === 'file') {
             return message.attachment_original_name || 'File';
         }
-        return message.body || '';
+        return stripWhatsAppMarkup(message.body || '');
     }
 
     function listPreviewHtml(message, conversationId = null, draftPeerId = null) {
@@ -1011,7 +1030,7 @@
             html += `<a class="chat-bubble__file" href="${escapeHtml(message.attachment_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file"></i><span>${escapeHtml(message.attachment_original_name || 'File')}</span></a>`;
         }
         if (message.body) {
-            html += `<div class="chat-bubble__text">${escapeHtml(message.body)}</div>`;
+            html += `<div class="chat-bubble__text">${formatWhatsAppMarkup(escapeHtml(message.body))}</div>`;
         }
         return html || '<div></div>';
     }
@@ -1198,6 +1217,41 @@
         return `<div class="chat-widget__day" data-day-key="${escapeHtml(new Date(iso).toDateString())}">${escapeHtml(new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }))}</div>`;
     }
 
+    function unreadSeparatorMarkup(count) {
+        const safeCount = Math.max(1, Number(count) || 1);
+        const label = safeCount === 1 ? '1 unread message' : `${safeCount} unread messages`;
+        return `<div class="chat-widget__unread-sep" role="separator">${escapeHtml(label)}</div>`;
+    }
+
+    function clearUnreadSeparator() {
+        state.unreadSeparatorBeforeId = null;
+        state.unreadSeparatorCount = 0;
+        messagesEl?.querySelectorAll('.chat-widget__unread-sep').forEach((el) => el.remove());
+    }
+
+    function snapshotUnreadSeparator(messages, lastReadAt = null) {
+        const unread = (messages || []).filter((message) => {
+            if (!message || sameId(message.user_id, authUserId) || isTempMessageId(message.id)) {
+                return false;
+            }
+            if (!message.created_at) {
+                return false;
+            }
+            if (lastReadAt) {
+                return new Date(message.created_at) > new Date(lastReadAt);
+            }
+            return true;
+        });
+
+        if (!unread.length) {
+            clearUnreadSeparator();
+            return;
+        }
+
+        state.unreadSeparatorBeforeId = messageDomId(unread[0]);
+        state.unreadSeparatorCount = unread.length;
+    }
+
     function patchMessageMetas(sorted) {
         const bubbles = [...(messagesEl?.querySelectorAll('.chat-bubble[data-message-id]') || [])];
         sorted.forEach((message, index) => {
@@ -1367,6 +1421,12 @@
             if (day && day !== lastDay) {
                 lastDay = day;
                 chunks.push(dayMarkup(message.created_at));
+            }
+            if (
+                state.unreadSeparatorBeforeId
+                && String(messageDomId(message)) === String(state.unreadSeparatorBeforeId)
+            ) {
+                chunks.push(unreadSeparatorMarkup(state.unreadSeparatorCount));
             }
             if (message._animate) {
                 animatedIds.push(String(message.client_seq ?? messageDomId(message)));
@@ -1681,6 +1741,7 @@
         state.loadedImageIds.clear();
         state.pendingPayloads.clear();
         state.messageSeq = 0;
+        clearUnreadSeparator();
         messagesEl.innerHTML = '';
     }
 
@@ -1707,8 +1768,16 @@
         if (loadToken !== state.messageLoadToken || !sameId(state.activeConversationId, conversationId)) {
             return;
         }
+        snapshotUnreadSeparator(state.messages, conversation?.viewer_last_read_at || null);
+        if (state.unreadSeparatorBeforeId) {
+            renderMessages({ rebuild: true, forceScroll: true });
+        }
         await markDelivered(conversationId);
         await markRead(conversationId);
+        if (conversation) {
+            conversation.viewer_last_read_at = new Date().toISOString();
+            conversation.unread_count = 0;
+        }
         state.stickToBottom = true;
         scrollMessagesToBottom();
         bindMessageMediaScroll();
@@ -2188,6 +2257,7 @@
         autoGrow();
         stopOutgoingTyping();
         focusComposer();
+        clearUnreadSeparator();
 
         const optimistic = buildOptimisticMessage({ tempId, body, file, conversationId });
         state.pendingPayloads.set(tempId, {
@@ -2265,7 +2335,7 @@
         if (message.type === 'file') {
             return message.attachment_original_name || 'Sent a file';
         }
-        return message.body || 'New message';
+        return stripWhatsAppMarkup(message.body || '') || 'New message';
     }
 
     function resolveIncomingSender(message) {
@@ -2562,9 +2632,55 @@
             return false;
         }
         state.pendingAttachment = file;
-        attachName.textContent = file.name;
+        attachName.textContent = file.name || 'Pasted image';
         attachPreview.classList.remove('d-none');
         return true;
+    }
+
+    function wrapComposerSelection(marker) {
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? input.value.length;
+        const value = input.value || '';
+        const selected = value.slice(start, end);
+        if (selected.length) {
+            const wrapped = `${marker}${selected}${marker}`;
+            input.value = value.slice(0, start) + wrapped + value.slice(end);
+            input.focus();
+            input.selectionStart = start;
+            input.selectionEnd = start + wrapped.length;
+        } else {
+            const insert = `${marker}${marker}`;
+            input.value = value.slice(0, start) + insert + value.slice(end);
+            input.focus();
+            input.selectionStart = input.selectionEnd = start + marker.length;
+        }
+        autoGrow();
+        syncOutgoingTyping();
+    }
+
+    function handleComposerPaste(event) {
+        const items = event.clipboardData?.items;
+        if (!items?.length) {
+            return;
+        }
+        for (const item of items) {
+            if (!String(item.type || '').startsWith('image/')) {
+                continue;
+            }
+            const blob = item.getAsFile();
+            if (!blob) {
+                continue;
+            }
+            event.preventDefault();
+            const ext = (blob.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+            const file = blob.name
+                ? blob
+                : new File([blob], `pasted-image-${Date.now()}.${ext}`, { type: blob.type || 'image/png' });
+            setPendingAttachment(file);
+            focusComposer();
+            syncOutgoingTyping();
+            return;
+        }
     }
 
     function autoGrow() {
@@ -2846,11 +2962,28 @@
         }, 0);
     });
     input.addEventListener('keydown', (event) => {
+        const mod = event.ctrlKey || event.metaKey;
+        if (mod && !event.altKey && event.key.toLowerCase() === 'b') {
+            event.preventDefault();
+            wrapComposerSelection('*');
+            return;
+        }
+        if (mod && !event.altKey && event.key.toLowerCase() === 'i') {
+            event.preventDefault();
+            wrapComposerSelection('_');
+            return;
+        }
+        if (mod && event.shiftKey && event.key.toLowerCase() === 'x') {
+            event.preventDefault();
+            wrapComposerSelection('~');
+            return;
+        }
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             sendMessage();
         }
     });
+    input.addEventListener('paste', handleComposerPaste);
 
     attachInput.addEventListener('change', () => {
         const file = attachInput.files?.[0] || null;

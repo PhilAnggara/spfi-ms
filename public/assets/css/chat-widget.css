@@ -661,6 +661,40 @@ html[data-bs-theme="dark"] .chat-widget__day {
     background: rgba(255, 255, 255, 0.1);
 }
 
+.chat-widget__unread-sep {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0.45rem 0.15rem;
+    color: var(--chat-accent, #0ea5e9);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.chat-widget__unread-sep::before,
+.chat-widget__unread-sep::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: color-mix(in srgb, var(--chat-accent, #0ea5e9) 45%, transparent);
+}
+
+.chat-bubble__text strong {
+    font-weight: 700;
+}
+
+.chat-bubble__text em {
+    font-style: italic;
+}
+
+.chat-bubble__text del {
+    text-decoration: line-through;
+    opacity: 0.9;
+}
+
 .chat-bubble {
     max-width: 82%;
     display: flex;

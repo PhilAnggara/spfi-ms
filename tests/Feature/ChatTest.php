@@ -174,6 +174,39 @@ it('lists recent unread messages for catch-up toasts', function () {
         ->assertJsonCount(0, 'data');
 });
 
+it('exposes viewer_last_read_at and updates it after read', function () {
+    Event::fake([MessageSent::class, ConversationRead::class, MessageDelivered::class]);
+
+    $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => '*hello* _world_',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.body', '*hello* _world_');
+
+    $before = $this->actingAs($this->bob)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data.0');
+
+    expect($before['viewer_last_read_at'])->toBeNull()
+        ->and($before['unread_count'])->toBe(1);
+
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.read', $conversation))
+        ->assertOk();
+
+    $after = $this->actingAs($this->bob)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data.0');
+
+    expect($after['viewer_last_read_at'])->not->toBeNull()
+        ->and($after['unread_count'])->toBe(0);
+});
+
 it('marks delivered and broadcasts MessageDelivered', function () {
     Event::fake([MessageDelivered::class]);
 
@@ -204,7 +237,8 @@ it('lists conversations for the authenticated user only', function () {
 
     expect($response)->toHaveCount(1)
         ->and($response[0]['id'])->toBe($mine->id)
-        ->and($response[0]['peer']['id'])->toBe($this->bob->id);
+        ->and($response[0]['peer']['id'])->toBe($this->bob->id)
+        ->and($response[0])->toHaveKey('viewer_last_read_at');
 });
 
 it('hides empty conversations from the list until a message exists', function () {
