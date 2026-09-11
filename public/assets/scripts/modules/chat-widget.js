@@ -89,6 +89,8 @@
         draftSendLock: Promise.resolve(),
         enterBubbleTimers: new Map(),
         messageSeq: 0,
+        toastedMessageIds: new Set(),
+        catchUpToastAt: 0,
     };
 
     const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😅','😢','😭','😡','👍','👎','👏','🙏','🔥','✨','🎉','❤️','💙','💚','💛','🧡','💜','✅','❌','📌','📎','📷','📁','☕','🚀'];
@@ -2289,20 +2291,71 @@
         window.setTimeout(() => toastEl.remove(), 220);
     }
 
+    function toastedStorageKey() {
+        return `chat.toastedMessageIds.${authUserId}`;
+    }
+
+    function loadToastedMessageIds() {
+        try {
+            const raw = window.localStorage.getItem(toastedStorageKey());
+            const ids = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(ids)) {
+                state.toastedMessageIds = new Set(ids.map(String).slice(-200));
+            }
+        } catch (e) {
+            state.toastedMessageIds = new Set();
+        }
+    }
+
+    function persistToastedMessageIds() {
+        try {
+            window.localStorage.setItem(
+                toastedStorageKey(),
+                JSON.stringify([...state.toastedMessageIds].slice(-200)),
+            );
+        } catch (e) {
+            // ignore quota / private mode
+        }
+    }
+
+    function rememberToastedMessage(messageId) {
+        const id = String(messageId ?? '');
+        if (!id) {
+            return false;
+        }
+        if (state.toastedMessageIds.has(id)) {
+            return false;
+        }
+        state.toastedMessageIds.add(id);
+        while (state.toastedMessageIds.size > 200) {
+            const oldest = state.toastedMessageIds.values().next().value;
+            state.toastedMessageIds.delete(oldest);
+        }
+        persistToastedMessageIds();
+        return true;
+    }
+
     function showIncomingToast(message) {
-        if (!toastHost || state.open) {
+        if (!toastHost || state.open || !message?.id) {
             return;
         }
 
-        if (toastHost.querySelector(`[data-message-id="${message.id}"]`)) {
+        const messageId = String(message.id);
+        if (state.toastedMessageIds.has(messageId)) {
             return;
         }
+        if (toastHost.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`)) {
+            rememberToastedMessage(messageId);
+            return;
+        }
+
+        rememberToastedMessage(messageId);
 
         const sender = resolveIncomingSender(message);
         const toast = document.createElement('button');
         toast.type = 'button';
         toast.className = 'chat-widget__toast';
-        toast.setAttribute('data-message-id', String(message.id));
+        toast.setAttribute('data-message-id', messageId);
         toast.setAttribute('data-conversation-id', String(message.conversation_id));
         toast.innerHTML = `
             <div class="chat-widget__avatar">${escapeHtml(initials(sender.name))}</div>
@@ -2334,6 +2387,37 @@
         }
 
         toastHost.appendChild(toast);
+    }
+
+    async function catchUpMissedToasts() {
+        if (state.open || !toastHost || !root.dataset.unreadMessagesUrl) {
+            state.catchUpToastAt = Date.now();
+            return;
+        }
+
+        try {
+            const payload = await api(root.dataset.unreadMessagesUrl);
+            if (state.open) {
+                state.catchUpToastAt = Date.now();
+                return;
+            }
+
+            // API returns newest-first; keep up to 3 never-toasted, show oldest→newest.
+            const missed = (payload.data || [])
+                .filter((message) => message?.id
+                    && !sameId(message.user_id, authUserId)
+                    && !state.toastedMessageIds.has(String(message.id)))
+                .slice(0, 3)
+                .reverse();
+
+            missed.forEach((message) => {
+                showIncomingToast(message);
+            });
+        } catch (e) {
+            // ignore catch-up transport errors
+        }
+
+        state.catchUpToastAt = Date.now();
     }
 
     async function openChatFromToast(conversationId, message = null) {
@@ -2809,8 +2893,19 @@
     setupPresence();
     setupUserChannelFallback();
     setupDragAndDrop();
+    loadToastedMessageIds();
     refreshUnread();
-    loadConversations();
+    loadConversations().then(() => catchUpMissedToasts());
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') {
+            return;
+        }
+        if (Date.now() - state.catchUpToastAt < 2500) {
+            return;
+        }
+        state.catchUpToastAt = Date.now();
+        loadConversations().then(() => catchUpMissedToasts());
+    });
     state.pollTimer = setInterval(() => {
         refreshUnread();
         if (state.open && state.view === 'list') {

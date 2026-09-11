@@ -685,6 +685,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('read');
         Route::get('/users/search', [ChatController::class, 'searchUsers'])->name('users.search');
         Route::get('/unread-count', [ChatController::class, 'unreadCount'])->name('unread-count');
+        Route::get('/unread-messages', [ChatController::class, 'unreadMessages'])->name('unread-messages');
     });
 
     Route::prefix('screen-messages/inbox')->name('screen-messages.inbox.')->group(function () {

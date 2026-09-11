@@ -147,4 +147,11 @@ class ChatController extends Controller
             'count' => $this->chatService->unreadCount($request->user()),
         ]);
     }
+
+    public function unreadMessages(Request $request): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->chatService->recentUnreadMessages($request->user()),
+        ]);
+    }
 }

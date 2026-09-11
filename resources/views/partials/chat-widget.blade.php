@@ -3,6 +3,7 @@
      class="chat-widget"
      data-auth-user-id="{{ auth()->id() }}"
      data-unread-url="{{ route('chat.unread-count') }}"
+     data-unread-messages-url="{{ route('chat.unread-messages') }}"
      data-conversations-url="{{ route('chat.conversations.index') }}"
      data-direct-message-url="{{ route('chat.direct-messages.store') }}"
      data-typing-url="{{ route('chat.typing') }}"

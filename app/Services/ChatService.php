@@ -225,6 +225,51 @@ class ChatService
     }
 
     /**
+     * Recent unread messages from other participants (newest first).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function recentUnreadMessages(User $user, int $limit = 20): Collection
+    {
+        $participantRows = ConversationParticipant::query()
+            ->where('user_id', $user->id)
+            ->get(['conversation_id', 'last_read_at']);
+
+        if ($participantRows->isEmpty()) {
+            return collect();
+        }
+
+        $messages = Message::query()
+            ->with([
+                'user:id,name,username',
+                'conversation.participants',
+            ])
+            ->where('user_id', '!=', $user->id)
+            ->where(function ($query) use ($participantRows): void {
+                foreach ($participantRows as $index => $row) {
+                    $method = $index === 0 ? 'where' : 'orWhere';
+                    $query->{$method}(function ($inner) use ($row): void {
+                        $inner->where('conversation_id', $row->conversation_id);
+                        if ($row->last_read_at) {
+                            $inner->where('created_at', '>', $row->last_read_at);
+                        }
+                    });
+                }
+            })
+            ->orderByDesc('created_at')
+            ->limit(max(1, min($limit, 50)))
+            ->get();
+
+        return $messages->map(function (Message $message) use ($user) {
+            $conversation = $message->conversation;
+            $viewerParticipant = $conversation?->participants->firstWhere('user_id', $user->id);
+            $peerParticipant = $conversation?->participants->firstWhere('user_id', '!=', $user->id);
+
+            return $message->toChatPayload($viewerParticipant, $peerParticipant);
+        })->values();
+    }
+
+    /**
      * @return Collection<int, User>
      */
     public function searchUsers(User $authUser, string $query, ?int $limit = null): Collection

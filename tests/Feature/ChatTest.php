@@ -140,6 +140,40 @@ it('increments unread count and clears it after read', function () {
     Event::assertDispatched(ConversationRead::class);
 });
 
+it('lists recent unread messages for catch-up toasts', function () {
+    Event::fake([MessageSent::class, ConversationRead::class, MessageDelivered::class]);
+
+    $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), ['body' => 'One'])
+        ->assertCreated();
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), ['body' => 'Two'])
+        ->assertCreated();
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.messages.store', $conversation), ['body' => 'Own reply'])
+        ->assertCreated();
+
+    $unread = $this->actingAs($this->bob)
+        ->getJson(route('chat.unread-messages'))
+        ->assertOk()
+        ->json('data');
+
+    expect($unread)->toHaveCount(2)
+        ->and(collect($unread)->pluck('body')->all())->toEqual(['Two', 'One'])
+        ->and(collect($unread)->every(fn ($message) => (int) $message['user_id'] === (int) $this->alice->id))->toBeTrue();
+
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.read', $conversation))
+        ->assertOk();
+
+    $this->actingAs($this->bob)
+        ->getJson(route('chat.unread-messages'))
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+});
+
 it('marks delivered and broadcasts MessageDelivered', function () {
     Event::fake([MessageDelivered::class]);
 
