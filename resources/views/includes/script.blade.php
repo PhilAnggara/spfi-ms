@@ -21,24 +21,27 @@
             window.__spfiEchoBooted = true;
             window.Pusher = window.Pusher || window.pusher;
 
-            const broadcaster = '{{ env('BROADCAST_CONNECTION', 'pusher') }}' === 'reverb' ? 'reverb' : 'pusher';
-            const key = broadcaster === 'reverb' ? '{{ env('REVERB_APP_KEY') }}' : '{{ env('PUSHER_APP_KEY') }}';
+            // Use config() (not env()) so Echo still boots correctly after config:cache.
+            const broadcaster = @json(config('broadcasting.default') === 'reverb' ? 'reverb' : 'pusher');
+            const key = broadcaster === 'reverb'
+                ? @json(config('broadcasting.connections.reverb.key'))
+                : @json(config('broadcasting.connections.pusher.key'));
             // Browser clients must connect to the same host serving the app (LAN/IP),
             // not server-only loopback values like 127.0.0.1 from REVERB_HOST.
-            const configuredReverbHost = '{{ env('REVERB_HOST', '') }}';
+            const configuredReverbHost = @json((string) config('broadcasting.connections.reverb.options.host'));
             const reverbHostIsLoopback = !configuredReverbHost
                 || configuredReverbHost === '127.0.0.1'
                 || configuredReverbHost === 'localhost'
                 || configuredReverbHost === '0.0.0.0';
             const wsHost = broadcaster === 'reverb'
                 ? (reverbHostIsLoopback ? window.location.hostname : configuredReverbHost)
-                : '{{ env('PUSHER_HOST', 'ws-'.env('PUSHER_APP_CLUSTER', 'mt1').'.pusher.com') }}';
+                : @json((string) config('broadcasting.connections.pusher.options.host'));
             const wsPort = broadcaster === 'reverb'
-                ? {{ (int) env('REVERB_PORT', 8080) }}
-                : {{ (int) env('PUSHER_PORT', 443) }};
+                ? {{ (int) config('broadcasting.connections.reverb.options.port', 8080) }}
+                : {{ (int) config('broadcasting.connections.pusher.options.port', 443) }};
             const forceTLS = broadcaster === 'reverb'
-                ? ('{{ env('REVERB_SCHEME', 'http') }}' === 'https')
-                : ('{{ env('PUSHER_SCHEME', 'https') }}' === 'https');
+                ? @json(config('broadcasting.connections.reverb.options.scheme') === 'https')
+                : @json(config('broadcasting.connections.pusher.options.scheme') === 'https');
 
             window.Echo = new EchoConstructor({
                 broadcaster: broadcaster,
@@ -48,7 +51,7 @@
                 wssPort: wsPort,
                 forceTLS: forceTLS,
                 enabledTransports: ['ws', 'wss'],
-                cluster: '{{ env('PUSHER_APP_CLUSTER', 'mt1') }}',
+                cluster: @json(config('broadcasting.connections.pusher.options.cluster', 'mt1')),
                 authEndpoint: '/broadcasting/auth',
                 auth: {
                     headers: {

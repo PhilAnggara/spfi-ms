@@ -431,3 +431,28 @@ it('includes the chat widget on authenticated app pages', function () {
         ->assertSee('id="chat-dropzone"', false)
         ->assertSee('id="chat-toast-host"', false);
 });
+
+it('boots laravel echo from config values on authenticated pages', function () {
+    config([
+        'broadcasting.default' => 'reverb',
+        'broadcasting.connections.reverb.key' => 'test-echo-reverb-key',
+        'broadcasting.connections.reverb.options.host' => '127.0.0.1',
+        'broadcasting.connections.reverb.options.port' => 8081,
+        'broadcasting.connections.reverb.options.scheme' => 'http',
+    ]);
+
+    $html = $this->actingAs($this->alice)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('__spfiEchoBooted', false)
+        ->assertSee('"reverb"', false)
+        ->assertSee('test-echo-reverb-key', false)
+        ->assertDontSee("env('BROADCAST_CONNECTION'", false)
+        ->assertDontSee("env('REVERB_APP_KEY'", false)
+        ->getContent();
+
+    expect($html)
+        ->toContain('const wsPort = broadcaster === \'reverb\'')
+        ->toMatch('/\?\s*8081/')
+        ->toMatch('/forceTLS = broadcaster === \'reverb\'[\s\S]*?\?\s*false/');
+});
