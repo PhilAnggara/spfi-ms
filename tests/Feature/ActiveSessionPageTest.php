@@ -760,6 +760,80 @@ it('does not log chat unread messages polls as page visits', function () {
         ->exists())->toBeFalse();
 });
 
+it('does not log form helper and chart ajax endpoints as page visits', function (string $route, array $query = []) {
+    $this->actingAs($this->admin)
+        ->get(route($route, $query))
+        ->assertSuccessful();
+
+    expect(UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where('meta->route', $route)
+        ->exists())->toBeFalse();
+})->with([
+    'po by number' => function () {
+        $supplier = Supplier::query()->create([
+            'name' => 'Noise Cleanup Supplier',
+            'code' => 'SUP-NOISE-01',
+            'created_by' => $this->admin->id,
+        ]);
+
+        PurchaseOrder::query()->create([
+            'supplier_id' => $supplier->id,
+            'created_by' => $this->admin->id,
+            'status' => 'APPROVED',
+            'po_number' => 'PO-NOISE-001',
+            'subtotal' => 100,
+            'total' => 100,
+        ]);
+
+        return ['receiving-reports.po-by-number', ['po_number' => 'PO-NOISE-001']];
+    },
+    'sws by number' => function () {
+        $swsNumber = 'SWS-NOISE-001';
+        $now = now();
+
+        DB::table('store_withdrawals')->insert([
+            'sws_number' => $swsNumber,
+            'sws_date' => $now->toDateString(),
+            'department_id' => $this->admin->department_id,
+            'department_code' => '7056',
+            'type' => 'normal',
+            'info' => 'Noise cleanup fixture',
+            'created_by' => $this->admin->id,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        return ['transfer-slips.sws-by-number', ['sws_number' => $swsNumber]];
+    },
+    'capex lines' => ['stores-withdrawals.capex-lines', []],
+    'stock adjustment item search' => ['stock-adjustments.items.search', ['q' => 'ab']],
+    'opening balance item search' => ['opening-balance-corrections.items.search', ['q' => 'ab']],
+    'inventory transaction item search' => ['accounting.inventory-transactions.items.search', ['q' => 'ab']],
+    'account lookup' => ['accounting.doc-entries.account-lookup', ['q' => '1']],
+    'product check code' => ['product.check-code', ['code' => 'NOISE001']],
+    'supplier check code' => ['supplier.check-code', ['code' => 'SUP-NOISE']],
+    'open prs heatmap' => ['dashboard.charts.open-prs-heatmap', []],
+    'print preview sample' => function () {
+        $anchor = app(\App\Services\Print\PrintCalibrationService::class)
+            ->getDesignAnchor(\App\Models\PrintCalibrationProfile::DOCUMENT_TYPE_RR);
+
+        return ['print-calibration-profiles.preview-sample', [
+            'document_type' => \App\Models\PrintCalibrationProfile::DOCUMENT_TYPE_RR,
+            'measured_anchor_x_mm' => $anchor['x'],
+            'measured_anchor_y_mm' => $anchor['y'],
+        ]];
+    },
+    'screen message live' => function () {
+        $message = \App\Models\ScreenMessage::factory()->create([
+            'user_id' => $this->admin->id,
+        ]);
+
+        return ['screen-messages.live', ['screenMessage' => $message]];
+    },
+]);
+
 it('logs typing once per peer until a chat is sent', function () {
     \Illuminate\Support\Facades\Event::fake();
 

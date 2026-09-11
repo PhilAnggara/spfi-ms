@@ -32,6 +32,18 @@ class TrackUserLastSeen
         'chat.users.search',
         'chat.unread-count',
         'chat.unread-messages',
+        'transfer-slips.sws-by-number',
+        'receiving-reports.po-by-number',
+        'stores-withdrawals.capex-lines',
+        'stock-adjustments.items.search',
+        'opening-balance-corrections.items.search',
+        'accounting.inventory-transactions.items.search',
+        'accounting.doc-entries.account-lookup',
+        'product.check-code',
+        'supplier.check-code',
+        'dashboard.charts.open-prs-heatmap',
+        'screen-messages.live',
+        'print-calibration-profiles.preview-sample',
     ];
 
     /**
@@ -207,6 +219,14 @@ class TrackUserLastSeen
             || str_ends_with($routeName, '.unread-messages')
             || str_ends_with($routeName, '.recent')
             || str_ends_with($routeName, '.pending')
+            || str_ends_with($routeName, '.by-number')
+            || str_ends_with($routeName, '.check-code')
+            || str_ends_with($routeName, '.capex-lines')
+            || str_ends_with($routeName, '.items.search')
+            || str_ends_with($routeName, '.account-lookup')
+            || str_ends_with($routeName, '.preview-sample')
+            || str_ends_with($routeName, '.open-prs-heatmap')
+            || str_ends_with($routeName, '.live')
         )) {
             return true;
         }
