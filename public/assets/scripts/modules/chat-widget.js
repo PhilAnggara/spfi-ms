@@ -22,7 +22,9 @@
     const attachInput = document.getElementById('chat-attachment');
     const attachPreview = document.getElementById('chat-attach-preview');
     const attachName = document.getElementById('chat-attach-name');
+    const attachThumb = document.getElementById('chat-attach-thumb');
     const attachClear = document.getElementById('chat-attach-clear');
+    let attachPreviewObjectUrl = null;
     const emojiBtn = document.getElementById('chat-emoji-btn');
     const emojiPicker = document.getElementById('chat-emoji-picker');
     const threadName = document.getElementById('chat-thread-name');
@@ -2589,9 +2591,22 @@
         }
     }
 
+    function revokeAttachPreviewUrl() {
+        if (attachPreviewObjectUrl) {
+            URL.revokeObjectURL(attachPreviewObjectUrl);
+            attachPreviewObjectUrl = null;
+        }
+    }
+
     function clearAttachment() {
         state.pendingAttachment = null;
         attachInput.value = '';
+        revokeAttachPreviewUrl();
+        if (attachThumb) {
+            attachThumb.removeAttribute('src');
+            attachThumb.classList.add('d-none');
+        }
+        attachPreview?.classList.remove('has-image');
         attachPreview.classList.add('d-none');
         attachName.textContent = '';
     }
@@ -2633,6 +2648,19 @@
         }
         state.pendingAttachment = file;
         attachName.textContent = file.name || 'Pasted image';
+        revokeAttachPreviewUrl();
+        const isImage = String(file.type || '').startsWith('image/');
+        if (isImage && attachThumb) {
+            attachPreviewObjectUrl = URL.createObjectURL(file);
+            attachThumb.src = attachPreviewObjectUrl;
+            attachThumb.alt = file.name || 'Image preview';
+            attachThumb.classList.remove('d-none');
+            attachPreview.classList.add('has-image');
+        } else if (attachThumb) {
+            attachThumb.removeAttribute('src');
+            attachThumb.classList.add('d-none');
+            attachPreview.classList.remove('has-image');
+        }
         attachPreview.classList.remove('d-none');
         return true;
     }
@@ -2685,7 +2713,7 @@
 
     function autoGrow() {
         input.style.height = 'auto';
-        input.style.height = Math.min(input.scrollHeight, 110) + 'px';
+        input.style.height = `${Math.min(input.scrollHeight, 110)}px`;
     }
 
     function showDropzone() {

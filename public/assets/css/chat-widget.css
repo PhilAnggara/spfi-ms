@@ -1072,6 +1072,31 @@ html[data-bs-theme="dark"] .chat-bubble__ticks-tip {
     font-size: 0.8rem;
 }
 
+.chat-widget__attach-preview-main {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.chat-widget__attach-thumb {
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 0.45rem;
+    object-fit: cover;
+    flex: 0 0 auto;
+    background: var(--chat-surface-muted);
+    border: 1px solid var(--chat-border);
+}
+
+.chat-widget__attach-preview #chat-attach-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .chat-widget__composer-row {
     display: flex;
     align-items: flex-end;
@@ -1089,6 +1114,7 @@ html[data-bs-theme="dark"] .chat-bubble__ticks-tip {
     padding-bottom: 0.55rem;
     flex: 1 1 auto;
     min-width: 0;
+    line-height: 1.4;
 }
 
 .chat-widget__composer-row textarea::placeholder {

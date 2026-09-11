@@ -68,7 +68,10 @@
             <div class="chat-widget__messages" id="chat-messages"></div>
             <div class="chat-widget__composer">
                 <div class="chat-widget__attach-preview d-none" id="chat-attach-preview">
-                    <span id="chat-attach-name"></span>
+                    <div class="chat-widget__attach-preview-main">
+                        <img id="chat-attach-thumb" class="chat-widget__attach-thumb d-none" alt="" decoding="async">
+                        <span id="chat-attach-name"></span>
+                    </div>
                     <button type="button" class="chat-widget__icon-btn" id="chat-attach-clear" aria-label="Remove attachment">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
