@@ -186,10 +186,10 @@ it('exposes viewer_last_read_at and updates it after read', function () {
         ->assertCreated()
         ->assertJsonPath('data.body', '*hello* _world_');
 
-    $before = $this->actingAs($this->bob)
+    $before = collect($this->actingAs($this->bob)
         ->getJson(route('chat.conversations.index'))
         ->assertOk()
-        ->json('data.0');
+        ->json('data'))->firstWhere('type', 'direct');
 
     expect($before['viewer_last_read_at'])->toBeNull()
         ->and($before['unread_count'])->toBe(1);
@@ -198,10 +198,10 @@ it('exposes viewer_last_read_at and updates it after read', function () {
         ->postJson(route('chat.read', $conversation))
         ->assertOk();
 
-    $after = $this->actingAs($this->bob)
+    $after = collect($this->actingAs($this->bob)
         ->getJson(route('chat.conversations.index'))
         ->assertOk()
-        ->json('data.0');
+        ->json('data'))->firstWhere('type', 'direct');
 
     expect($after['viewer_last_read_at'])->not->toBeNull()
         ->and($after['unread_count'])->toBe(0);
@@ -235,24 +235,55 @@ it('lists conversations for the authenticated user only', function () {
         ->assertOk()
         ->json('data');
 
-    expect($response)->toHaveCount(1)
-        ->and($response[0]['id'])->toBe($mine->id)
-        ->and($response[0]['peer']['id'])->toBe($this->bob->id)
-        ->and($response[0])->toHaveKey('viewer_last_read_at');
+    $direct = collect($response)->firstWhere('type', 'direct');
+    $support = collect($response)->firstWhere('type', 'support');
+
+    expect($response)->toHaveCount(2)
+        ->and($direct['id'])->toBe($mine->id)
+        ->and($direct['peer']['id'])->toBe($this->bob->id)
+        ->and($direct)->toHaveKey('viewer_last_read_at')
+        ->and($support['peer']['name'])->toBe('SPFI-MS')
+        ->and($support['peer']['is_official'])->toBeTrue();
 });
 
 it('hides empty conversations from the list until a message exists', function () {
     Conversation::factory()->directBetween($this->alice, $this->bob)->create();
 
-    $this->actingAs($this->alice)
+    $aliceList = $this->actingAs($this->alice)
         ->getJson(route('chat.conversations.index'))
         ->assertOk()
-        ->assertJsonCount(0, 'data');
+        ->json('data');
 
-    $this->actingAs($this->bob)
+    $bobList = $this->actingAs($this->bob)
         ->getJson(route('chat.conversations.index'))
         ->assertOk()
-        ->assertJsonCount(0, 'data');
+        ->json('data');
+
+    expect($aliceList)->toHaveCount(1)
+        ->and($aliceList[0]['type'])->toBe('support')
+        ->and($bobList)->toHaveCount(1)
+        ->and($bobList[0]['type'])->toBe('support');
+});
+
+it('orders personal chat list by latest message activity not by support pin', function () {
+    $direct = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+
+    Message::factory()->create([
+        'conversation_id' => $direct->id,
+        'user_id' => $this->bob->id,
+        'body' => 'Recent personal chat',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $list = $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data');
+
+    expect($list[0]['type'])->toBe('direct')
+        ->and($list[0]['id'])->toBe($direct->id)
+        ->and(collect($list)->firstWhere('type', 'support'))->not->toBeNull();
 });
 
 it('creates a conversation only when the first direct message is sent', function () {
@@ -282,8 +313,10 @@ it('creates a conversation only when the first direct message is sent', function
         ->assertOk()
         ->json('data');
 
-    expect($aliceList)->toHaveCount(1)
-        ->and($bobList)->toHaveCount(1);
+    expect(collect($aliceList)->where('type', 'direct'))->toHaveCount(1)
+        ->and(collect($bobList)->where('type', 'direct'))->toHaveCount(1)
+        ->and(collect($aliceList)->where('type', 'support'))->toHaveCount(1)
+        ->and(collect($bobList)->where('type', 'support'))->toHaveCount(1);
 });
 
 it('searches users and excludes self soft-deleted and existing chat peers', function () {
@@ -431,10 +464,11 @@ it('includes peer profile fields on conversations and search results', function 
         'body' => 'Profile fields',
     ]);
 
-    $listPeer = $this->actingAs($this->alice)
+    $listPeer = collect($this->actingAs($this->alice)
         ->getJson(route('chat.conversations.index'))
         ->assertOk()
-        ->json('data.0.peer');
+        ->json('data'))
+        ->firstWhere('type', 'direct')['peer'] ?? null;
 
     expect($listPeer)
         ->toHaveKeys(['id', 'name', 'username', 'email', 'role', 'department', 'is_online', 'last_seen_at'])
@@ -489,4 +523,221 @@ it('boots laravel echo from config values on authenticated pages', function () {
         ->toContain('const wsPort = broadcaster === \'reverb\'')
         ->toMatch('/\?\s*8081/')
         ->toMatch('/forceTLS = broadcaster === \'reverb\'[\s\S]*?\?\s*false/');
+});
+
+it('creates distinct SPFI-MS threads for multiple users without colliding on direct_key', function () {
+    $first = $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data');
+
+    $second = $this->actingAs($this->bob)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data');
+
+    $aliceSupport = collect($first)->firstWhere('type', 'support');
+    $bobSupport = collect($second)->firstWhere('type', 'support');
+
+    expect($aliceSupport)->not->toBeNull()
+        ->and($bobSupport)->not->toBeNull()
+        ->and($aliceSupport['id'])->not->toBe($bobSupport['id'])
+        ->and(Conversation::query()->where('type', 'support')->count())->toBe(2)
+        ->and(Conversation::query()->where('type', 'support')->whereNotNull('direct_key')->count())->toBe(2);
+});
+
+it('ensures a unique SPFI-MS support thread per user', function () {
+    $first = $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data');
+
+    $second = $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data');
+
+    $support = collect($first)->firstWhere('type', 'support');
+
+    expect($first)->toHaveCount(1)
+        ->and($second)->toHaveCount(1)
+        ->and($support['peer']['name'])->toBe('SPFI-MS')
+        ->and($support['peer']['is_official'])->toBeTrue()
+        ->and($support['peer']['avatar_url'])->toContain('system_profile.png')
+        ->and(\App\Models\Conversation::query()->where('type', 'support')->count())->toBe(1);
+});
+
+it('lets end users message SPFI-MS and operators reply as system persona', function () {
+    Event::fake([MessageSent::class, ConversationRead::class]);
+
+    \Spatie\Permission\Models\Permission::findOrCreate('chat-support-operate', 'web');
+    $this->carol->givePermissionTo('chat-support-operate');
+
+    $thread = collect($this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data'))->firstWhere('type', 'support');
+
+    $conversation = Conversation::query()->findOrFail($thread['id']);
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Need help please',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.persona', 'user')
+        ->assertJsonPath('data.body', 'Need help please')
+        ->assertJsonPath('data.status', 'delivered');
+
+    $listAfterSend = collect($this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data'))->firstWhere('type', 'support');
+
+    expect($listAfterSend['latest_message']['status'])->toBe('delivered');
+
+    // Older operator read timestamp must not downgrade a newer user message to "sent".
+    $conversation->forceFill([
+        'support_last_read_at' => now()->subMinute(),
+    ])->save();
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Follow up after older read marker',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.status', 'delivered');
+
+    $listAfterFollowUp = collect($this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data'))->firstWhere('type', 'support');
+
+    expect($listAfterFollowUp['latest_message']['body'])->toBe('Follow up after older read marker')
+        ->and($listAfterFollowUp['latest_message']['status'])->toBe('delivered');
+
+    $this->actingAs($this->carol)
+        ->getJson(route('chat.support.conversations.index'))
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $conversation->id)
+        ->assertJsonPath('data.0.peer.id', $this->alice->id);
+
+    $this->actingAs($this->carol)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'We are on it',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.persona', 'system')
+        ->assertJsonPath('data.user_id', $this->carol->id);
+
+    $this->actingAs($this->bob)
+        ->getJson(route('chat.support.conversations.index'))
+        ->assertForbidden();
+
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Intruder',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($this->carol)
+        ->postJson(route('chat.read', $conversation))
+        ->assertOk();
+
+    expect($conversation->fresh()->support_last_read_at)->not->toBeNull()
+        ->and($conversation->fresh()->assigned_to)->toBe($this->carol->id);
+
+    $listAfterRead = collect($this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data'))->firstWhere('type', 'support');
+
+    // Latest is still the system reply from Carol for Alice; Alice's own earlier message
+    // should be readable as "read" when fetched from messages.
+    $aliceMessages = $this->actingAs($this->alice)
+        ->getJson(route('chat.messages.index', $conversation))
+        ->assertOk()
+        ->json('data');
+
+    $aliceOwn = collect($aliceMessages)->firstWhere('body', 'Need help please');
+    expect($aliceOwn['status'])->toBe('read');
+});
+
+it('lets operators reply as SPFI-MS on their own support thread', function () {
+    Event::fake([MessageSent::class, ConversationRead::class]);
+
+    \Spatie\Permission\Models\Permission::findOrCreate('chat-support-operate', 'web');
+    $this->carol->givePermissionTo('chat-support-operate');
+
+    $thread = collect($this->actingAs($this->carol)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json('data'))->firstWhere('type', 'support');
+
+    $conversation = Conversation::query()->findOrFail($thread['id']);
+
+    $this->actingAs($this->carol)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'I need help myself',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.persona', 'user');
+
+    $this->actingAs($this->carol)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Replying as the system',
+            'as_system' => true,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.persona', 'system')
+        ->assertJsonPath('data.user_id', $this->carol->id);
+
+    $messages = $this->actingAs($this->carol)
+        ->getJson(route('chat.messages.index', $conversation).'?as_operator=1')
+        ->assertOk()
+        ->json('data');
+
+    expect(collect($messages)->pluck('persona')->all())->toContain('user', 'system')
+        ->and(collect($messages)->firstWhere('persona', 'system')['body'])->toBe('Replying as the system');
+});
+
+it('lets operators open a support chat from a contact', function () {
+    \Spatie\Permission\Models\Permission::findOrCreate('chat-support-operate', 'web');
+    $this->carol->givePermissionTo('chat-support-operate');
+
+    $this->actingAs($this->carol)
+        ->postJson(route('chat.support.conversations.store'), [
+            'user_id' => $this->alice->id,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.type', 'support')
+        ->assertJsonPath('data.peer.id', $this->alice->id)
+        ->assertJsonPath('data.support_user_id', $this->alice->id);
+
+    expect(\App\Models\Conversation::query()
+        ->where('type', 'support')
+        ->where('support_user_id', $this->alice->id)
+        ->count())->toBe(1);
+});
+
+it('updates support status for operators', function () {
+    \Spatie\Permission\Models\Permission::findOrCreate('chat-support-operate', 'web');
+    $this->carol->givePermissionTo('chat-support-operate');
+
+    $conversation = Conversation::factory()->supportFor($this->alice)->create();
+    Message::factory()->create([
+        'conversation_id' => $conversation->id,
+        'user_id' => $this->alice->id,
+        'persona' => \App\Enums\MessagePersona::User,
+        'body' => 'Hello system',
+    ]);
+
+    $this->actingAs($this->carol)
+        ->patchJson(route('chat.support.status', $conversation), [
+            'status' => 'resolved',
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.support_status', 'resolved');
+
+    expect($conversation->fresh()->support_status->value)->toBe('resolved');
 });

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\MessagePersona;
 use App\Enums\MessageType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,7 @@ class Message extends Model
     protected $fillable = [
         'conversation_id',
         'user_id',
+        'persona',
         'body',
         'type',
         'attachment_path',
@@ -34,6 +36,7 @@ class Message extends Model
     {
         return [
             'type' => MessageType::class,
+            'persona' => MessagePersona::class,
             'attachment_size' => 'integer',
         ];
     }
@@ -80,6 +83,7 @@ class Message extends Model
             'id' => $this->id,
             'conversation_id' => $this->conversation_id,
             'user_id' => $this->user_id,
+            'persona' => ($this->persona ?? MessagePersona::User)->value,
             'body' => $this->body,
             'type' => $this->type->value,
             'attachment_url' => $this->attachmentUrl(),

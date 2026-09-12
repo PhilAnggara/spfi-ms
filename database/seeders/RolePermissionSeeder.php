@@ -175,6 +175,10 @@ class RolePermissionSeeder extends Seeder
             'delete-all-screen-messages',
         ];
 
+        $permissionsChat = [
+            'chat-support-operate',
+        ];
+
         $allPermissions = array_values(array_unique(array_merge(
             $permissionsUsers,
             $permissionsPrs,
@@ -190,6 +194,7 @@ class RolePermissionSeeder extends Seeder
             $permissionsReportsOps,
             $permissionsRbac,
             $permissionsScreenMessages,
+            $permissionsChat,
         )));
 
         foreach ($allPermissions as $permission) {

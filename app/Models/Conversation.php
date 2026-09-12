@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Enums\ConversationType;
+use App\Enums\SupportConversationStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -17,6 +19,10 @@ class Conversation extends Model
     protected $fillable = [
         'type',
         'direct_key',
+        'support_user_id',
+        'assigned_to',
+        'support_status',
+        'support_last_read_at',
     ];
 
     /**
@@ -26,6 +32,8 @@ class Conversation extends Model
     {
         return [
             'type' => ConversationType::class,
+            'support_status' => SupportConversationStatus::class,
+            'support_last_read_at' => 'datetime',
         ];
     }
 
@@ -35,6 +43,16 @@ class Conversation extends Model
         sort($ids);
 
         return hash('sha256', $ids[0].':'.$ids[1]);
+    }
+
+    public static function supportKeyFor(int $supportUserId): string
+    {
+        return hash('sha256', 'support:'.$supportUserId);
+    }
+
+    public function isSupport(): bool
+    {
+        return $this->type === ConversationType::Support;
     }
 
     /**
@@ -69,6 +87,22 @@ class Conversation extends Model
     public function latestMessage(): HasOne
     {
         return $this->hasOne(Message::class)->latestOfMany();
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function supportUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'support_user_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
     }
 
     public function hasParticipant(int $userId): bool

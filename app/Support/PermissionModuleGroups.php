@@ -30,6 +30,7 @@ class PermissionModuleGroups
         'accounting' => 'Accounting',
         'reports' => 'Reports',
         'screen_messages' => 'Screen Messages',
+        'chat' => 'Chat',
         'general' => 'General',
         'other' => 'Other',
     ];
@@ -63,6 +64,8 @@ class PermissionModuleGroups
         'purchase-history' => 'po',
         'screen-message-replies' => 'screen_messages',
         'screen-messages' => 'screen_messages',
+        'chat-support' => 'chat',
+        'chat-support-operate' => 'chat',
         'products' => 'products',
         'suppliers' => 'suppliers',
         'employees' => 'employees',
@@ -127,6 +130,7 @@ class PermissionModuleGroups
         'delete-own-screen-messages' => 'screen-messages',
         'delete-department-screen-messages' => 'screen-messages',
         'delete-all-screen-messages' => 'screen-messages',
+        'chat-support-operate' => 'chat-support',
     ];
 
     /**
@@ -153,6 +157,7 @@ class PermissionModuleGroups
         'im-reports' => 'IM reports',
         'screen-messages' => 'Screen messages',
         'screen-message-replies' => 'Screen message replies',
+        'chat-support' => 'Chat support',
     ];
 
     /**

@@ -2,11 +2,10 @@
 
 namespace App\Enums;
 
-enum ConversationType: string
+enum MessagePersona: string
 {
-    case Direct = 'direct';
-    case Group = 'group';
-    case Support = 'support';
+    case User = 'user';
+    case System = 'system';
 
     /**
      * @return list<string>

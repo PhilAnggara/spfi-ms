@@ -32,8 +32,21 @@ class MessageSent implements ShouldBroadcastNow
             new PrivateChannel('conversation.'.$this->message->conversation_id),
         ];
 
-        $recipientIds = $this->message->conversation
-            ? $this->message->conversation->participants
+        $conversation = $this->message->conversation;
+
+        if ($conversation?->isSupport()) {
+            $channels[] = new PrivateChannel('chat.support');
+
+            $supportUserId = (int) $conversation->support_user_id;
+            if ($supportUserId > 0 && $supportUserId !== (int) $this->message->user_id) {
+                $channels[] = new PrivateChannel('App.Models.User.'.$supportUserId);
+            }
+
+            return $channels;
+        }
+
+        $recipientIds = $conversation
+            ? $conversation->participants
                 ->pluck('user_id')
                 ->reject(fn ($userId): bool => (int) $userId === (int) $this->message->user_id)
                 ->values()

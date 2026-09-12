@@ -677,12 +677,18 @@ Route::middleware('auth')->group(function () {
     Route::prefix('chat')->name('chat.')->group(function () {
         Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations.index');
         Route::post('/conversations', [ChatController::class, 'storeConversation'])->name('conversations.store');
+        Route::get('/support/conversations', [ChatController::class, 'supportConversations'])->name('support.conversations.index');
+        Route::post('/support/conversations', [ChatController::class, 'storeSupportConversation'])->name('support.conversations.store');
+        Route::get('/support/departments', [ChatController::class, 'supportDepartments'])->name('support.departments.index');
+        Route::post('/support/broadcast', [ChatController::class, 'broadcastSystemMessage'])->name('support.broadcast');
         Route::post('/direct-messages', [ChatController::class, 'storeDirectMessage'])->name('direct-messages.store');
         Route::post('/typing', [ChatController::class, 'typing'])->name('typing');
         Route::get('/conversations/{conversation}/messages', [ChatController::class, 'messages'])->name('messages.index');
         Route::post('/conversations/{conversation}/messages', [ChatController::class, 'storeMessage'])->name('messages.store');
         Route::post('/conversations/{conversation}/delivered', [ChatController::class, 'markDelivered'])->name('delivered');
         Route::post('/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('read');
+        Route::post('/conversations/{conversation}/support/assign', [ChatController::class, 'assignSupport'])->name('support.assign');
+        Route::patch('/conversations/{conversation}/support/status', [ChatController::class, 'updateSupportStatus'])->name('support.status');
         Route::get('/users/search', [ChatController::class, 'searchUsers'])->name('users.search');
         Route::get('/unread-count', [ChatController::class, 'unreadCount'])->name('unread-count');
         Route::get('/unread-messages', [ChatController::class, 'unreadMessages'])->name('unread-messages');

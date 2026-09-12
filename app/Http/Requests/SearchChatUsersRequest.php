@@ -18,6 +18,8 @@ class SearchChatUsersRequest extends FormRequest
     {
         return [
             'q' => ['nullable', 'string', 'max:100'],
+            'for_broadcast' => ['sometimes', 'boolean'],
+            'for_support_search' => ['sometimes', 'boolean'],
         ];
     }
 }

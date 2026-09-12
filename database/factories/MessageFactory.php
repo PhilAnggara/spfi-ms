@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\MessagePersona;
 use App\Enums\MessageType;
 use App\Models\Conversation;
 use App\Models\Message;
@@ -23,6 +24,7 @@ class MessageFactory extends Factory
         return [
             'conversation_id' => Conversation::factory(),
             'user_id' => User::factory(),
+            'persona' => MessagePersona::User,
             'body' => fake()->sentence(),
             'type' => MessageType::Text,
             'attachment_path' => null,

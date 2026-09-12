@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\ConversationType;
+use App\Enums\SupportConversationStatus;
 use App\Models\Conversation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -34,6 +35,20 @@ class ConversationFactory extends Factory
             $conversation->participants()->createMany([
                 ['user_id' => $userA->id],
                 ['user_id' => $userB->id],
+            ]);
+        });
+    }
+
+    public function supportFor(User $endUser): static
+    {
+        return $this->state(fn (): array => [
+            'type' => ConversationType::Support,
+            'direct_key' => Conversation::supportKeyFor($endUser->id),
+            'support_user_id' => $endUser->id,
+            'support_status' => SupportConversationStatus::Open,
+        ])->afterCreating(function (Conversation $conversation) use ($endUser): void {
+            $conversation->participants()->create([
+                'user_id' => $endUser->id,
             ]);
         });
     }

@@ -2,11 +2,11 @@
 
 namespace App\Enums;
 
-enum ConversationType: string
+enum SupportConversationStatus: string
 {
-    case Direct = 'direct';
-    case Group = 'group';
-    case Support = 'support';
+    case Open = 'open';
+    case Pending = 'pending';
+    case Resolved = 'resolved';
 
     /**
      * @return list<string>
