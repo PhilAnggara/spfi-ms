@@ -30,6 +30,8 @@ class StoreChatSystemBroadcastRequest extends FormRequest
                 'max:102400',
                 'mimes:jpg,jpeg,png,gif,webp,mp4,mov,webm,m4v,avi,3gp,mkv,pdf,doc,docx,xls,xlsx,csv,txt,zip,rar,ppt,pptx',
             ],
+            'attachment_width' => ['nullable', 'integer', 'min:1', 'max:10000'],
+            'attachment_height' => ['nullable', 'integer', 'min:1', 'max:10000'],
         ];
     }
 

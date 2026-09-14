@@ -31,6 +31,8 @@ class MessageFactory extends Factory
             'attachment_original_name' => null,
             'attachment_mime' => null,
             'attachment_size' => null,
+            'attachment_width' => null,
+            'attachment_height' => null,
         ];
     }
 
@@ -43,6 +45,8 @@ class MessageFactory extends Factory
             'attachment_original_name' => 'image.jpg',
             'attachment_mime' => 'image/jpeg',
             'attachment_size' => 1024,
+            'attachment_width' => 200,
+            'attachment_height' => 200,
         ]);
     }
 

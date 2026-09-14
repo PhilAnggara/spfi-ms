@@ -77,6 +77,8 @@
 
     const STATUS_RANK = { failed: -1, pending: 0, sent: 1, delivered: 2, read: 3 };
     const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
+    const IMAGE_DISPLAY_MAX = { width: 220, height: 280 };
+    const VIDEO_DISPLAY_MAX = { width: 280, height: 340 };
     const ALLOWED_EXTENSIONS = new Set([
         'jpg', 'jpeg', 'png', 'gif', 'webp',
         'mp4', 'mov', 'webm', 'm4v', 'avi', '3gp', 'mkv',
@@ -131,6 +133,9 @@
         listRenderKey: '',
         listPageTimer: null,
         loadedImageIds: new Set(),
+        mediaDimensions: new Map(),
+        pendingAttachmentMeta: null,
+        broadcastAttachmentMeta: null,
         pendingPayloads: new Map(),
         draftSendLock: Promise.resolve(),
         enterBubbleTimers: new Map(),
@@ -1277,14 +1282,148 @@
         conversationList.scrollTop = scrollTop;
     }
 
+    function fittedMediaBox(naturalWidth, naturalHeight, maxWidth, maxHeight) {
+        const width = Number(naturalWidth);
+        const height = Number(naturalHeight);
+        if (!(width > 0 && height > 0)) {
+            return null;
+        }
+        const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+        return {
+            width: Math.max(1, Math.round(width * scale)),
+            height: Math.max(1, Math.round(height * scale)),
+        };
+    }
+
+    function cacheMediaDimensions(messageId, width, height) {
+        const id = String(messageId ?? '');
+        const w = Number(width);
+        const h = Number(height);
+        if (!id || !(w > 0 && h > 0)) {
+            return;
+        }
+        state.mediaDimensions.set(id, { width: w, height: h });
+    }
+
+    function resolveMessageMediaDims(message) {
+        const messageId = messageDomId(message);
+        const cached = state.mediaDimensions.get(String(messageId));
+        if (cached?.width > 0 && cached?.height > 0) {
+            return cached;
+        }
+        const width = Number(message?.attachment_width);
+        const height = Number(message?.attachment_height);
+        if (width > 0 && height > 0) {
+            cacheMediaDimensions(messageId, width, height);
+            return { width, height };
+        }
+        return null;
+    }
+
+    function mediaFrameSizeAttrs(message, kind) {
+        const dims = resolveMessageMediaDims(message);
+        if (!dims) {
+            return { className: '', style: '' };
+        }
+        const max = kind === 'video' ? VIDEO_DISPLAY_MAX : IMAGE_DISPLAY_MAX;
+        const box = fittedMediaBox(dims.width, dims.height, max.width, max.height);
+        if (!box) {
+            return { className: '', style: '' };
+        }
+        return {
+            className: ' has-known-size',
+            style: ` style="width:${box.width}px;height:${box.height}px"`,
+        };
+    }
+
+    function applyFittedSizeToFrame(frame, naturalWidth, naturalHeight, kind) {
+        if (!frame) {
+            return;
+        }
+        const max = kind === 'video' ? VIDEO_DISPLAY_MAX : IMAGE_DISPLAY_MAX;
+        const box = fittedMediaBox(naturalWidth, naturalHeight, max.width, max.height);
+        if (!box) {
+            clearImageFrameSize(frame);
+            frame.classList.remove('has-known-size');
+            return;
+        }
+        frame.style.width = `${box.width}px`;
+        frame.style.height = `${box.height}px`;
+        frame.style.aspectRatio = 'auto';
+        frame.classList.add('has-known-size');
+    }
+
+    function measureAttachmentDimensions(file) {
+        if (!file) {
+            return Promise.resolve(null);
+        }
+        const mime = String(file.type || '');
+        if (mime.startsWith('image/')) {
+            return new Promise((resolve) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(img.naturalWidth > 0 && img.naturalHeight > 0
+                        ? { width: img.naturalWidth, height: img.naturalHeight }
+                        : null);
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(null);
+                };
+                img.src = url;
+            });
+        }
+        if (mime.startsWith('video/')) {
+            return new Promise((resolve) => {
+                const url = URL.createObjectURL(file);
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.muted = true;
+                video.playsInline = true;
+                const cleanup = () => {
+                    URL.revokeObjectURL(url);
+                    video.removeAttribute('src');
+                    video.load();
+                };
+                video.onloadedmetadata = () => {
+                    const width = Number(video.videoWidth);
+                    const height = Number(video.videoHeight);
+                    cleanup();
+                    resolve(width > 0 && height > 0 ? { width, height } : null);
+                };
+                video.onerror = () => {
+                    cleanup();
+                    resolve(null);
+                };
+                video.src = url;
+            });
+        }
+        return Promise.resolve(null);
+    }
+
+    function appendAttachmentDimensions(formData, width, height) {
+        if (!(formData instanceof FormData)) {
+            return;
+        }
+        if (Number(width) > 0) {
+            formData.append('attachment_width', String(Math.round(Number(width))));
+        }
+        if (Number(height) > 0) {
+            formData.append('attachment_height', String(Math.round(Number(height))));
+        }
+    }
+
     function messageBodyHtml(message) {
         let html = '';
         if (message.type === 'image' && message.attachment_url) {
             const messageId = messageDomId(message);
             const loaded = state.loadedImageIds.has(messageId);
+            const sizeAttrs = mediaFrameSizeAttrs(message, 'image');
             html += `
                 <a class="chat-bubble__image-link" href="${escapeHtml(message.attachment_url)}" target="_blank" rel="noopener">
-                    <span class="chat-bubble__image-frame ${loaded ? 'is-loaded' : 'is-loading'}">
+                    <span class="chat-bubble__image-frame ${loaded ? 'is-loaded' : 'is-loading'}${sizeAttrs.className}"${sizeAttrs.style}>
                         <span class="chat-bubble__image-placeholder" aria-hidden="true">
                             <i class="fa-regular fa-image"></i>
                             <span class="chat-bubble__image-spinner"></span>
@@ -1296,8 +1435,9 @@
         } else if (message.type === 'video' && message.attachment_url) {
             const messageId = messageDomId(message);
             const loaded = state.loadedImageIds.has(messageId);
+            const sizeAttrs = mediaFrameSizeAttrs(message, 'video');
             html += `
-                <div class="chat-bubble__video-frame ${loaded ? 'is-loaded' : 'is-loading'}">
+                <div class="chat-bubble__video-frame ${loaded ? 'is-loaded' : 'is-loading'}${sizeAttrs.className}"${sizeAttrs.style}>
                     <span class="chat-bubble__video-placeholder" aria-hidden="true">
                         <i class="fa-solid fa-film"></i>
                         <span class="chat-bubble__image-spinner"></span>
@@ -1360,7 +1500,12 @@
                 if (messageId != null && messageId !== '') {
                     state.loadedImageIds.add(String(messageId));
                 }
-                clearImageFrameSize(frame);
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                    cacheMediaDimensions(messageId, img.naturalWidth, img.naturalHeight);
+                    applyFittedSizeToFrame(frame, img.naturalWidth, img.naturalHeight, 'image');
+                } else {
+                    clearImageFrameSize(frame);
+                }
                 frame?.classList.remove('is-loading', 'is-error');
                 frame?.classList.add('is-loaded');
                 if (state.stickToBottom && state.view === 'thread') {
@@ -1370,7 +1515,8 @@
 
             if (img.dataset.mediaBound === '1') {
                 if (img.complete && img.naturalHeight > 0) {
-                    clearImageFrameSize(frame);
+                    cacheMediaDimensions(messageId, img.naturalWidth, img.naturalHeight);
+                    applyFittedSizeToFrame(frame, img.naturalWidth, img.naturalHeight, 'image');
                     frame?.classList.add('is-loaded');
                     frame?.classList.remove('is-loading', 'is-error');
                 }
@@ -1386,7 +1532,7 @@
             img.addEventListener('load', markLoaded, { once: true });
             img.addEventListener('error', () => {
                 clearImageFrameSize(frame);
-                frame?.classList.remove('is-loading');
+                frame?.classList.remove('is-loading', 'has-known-size');
                 frame?.classList.add('is-loaded', 'is-error');
             }, { once: true });
         });
@@ -1400,6 +1546,10 @@
                 if (messageId != null && messageId !== '') {
                     state.loadedImageIds.add(String(messageId));
                 }
+                if (video.videoWidth > 0 && video.videoHeight > 0) {
+                    cacheMediaDimensions(messageId, video.videoWidth, video.videoHeight);
+                    applyFittedSizeToFrame(frame, video.videoWidth, video.videoHeight, 'video');
+                }
                 frame?.classList.remove('is-loading', 'is-error');
                 frame?.classList.add('is-loaded');
                 if (state.stickToBottom && state.view === 'thread') {
@@ -1409,6 +1559,10 @@
 
             if (video.dataset.mediaBound === '1') {
                 if (video.readyState >= 1) {
+                    if (video.videoWidth > 0 && video.videoHeight > 0) {
+                        cacheMediaDimensions(messageId, video.videoWidth, video.videoHeight);
+                        applyFittedSizeToFrame(frame, video.videoWidth, video.videoHeight, 'video');
+                    }
                     frame?.classList.add('is-loaded');
                     frame?.classList.remove('is-loading', 'is-error');
                 }
@@ -1423,7 +1577,7 @@
 
             video.addEventListener('loadedmetadata', markLoaded, { once: true });
             video.addEventListener('error', () => {
-                frame?.classList.remove('is-loading');
+                frame?.classList.remove('is-loading', 'has-known-size');
                 frame?.classList.add('is-loaded', 'is-error');
             }, { once: true });
         });
@@ -2506,7 +2660,7 @@
         return true;
     }
 
-    function buildOptimisticMessage({ tempId, body, file, conversationId }) {
+    function buildOptimisticMessage({ tempId, body, file, conversationId, attachmentWidth = null, attachmentHeight = null }) {
         const isImage = !!(file && String(file.type || '').startsWith('image/'));
         const isVideo = !!(file && String(file.type || '').startsWith('video/'));
         const blobUrl = file && (isImage || isVideo) ? URL.createObjectURL(file) : null;
@@ -2519,6 +2673,12 @@
             type = 'file';
         }
 
+        const width = Number(attachmentWidth);
+        const height = Number(attachmentHeight);
+        if (width > 0 && height > 0) {
+            cacheMediaDimensions(tempId, width, height);
+        }
+
         return {
             id: tempId,
             temp_id: tempId,
@@ -2529,6 +2689,8 @@
             type,
             attachment_url: blobUrl || (file && !isImage && !isVideo ? '#' : null),
             attachment_original_name: file?.name || null,
+            attachment_width: width > 0 ? width : null,
+            attachment_height: height > 0 ? height : null,
             status: 'pending',
             created_at: new Date().toISOString(),
             local_blob_url: blobUrl,
@@ -2583,6 +2745,14 @@
         if (state.loadedImageIds.has(String(tempId))) {
             state.loadedImageIds.add(String(realId));
             state.loadedImageIds.delete(String(tempId));
+        }
+        const cachedDims = state.mediaDimensions.get(String(tempId));
+        if (cachedDims) {
+            state.mediaDimensions.set(String(realId), cachedDims);
+            state.mediaDimensions.delete(String(tempId));
+        }
+        if (realMessage.attachment_width && realMessage.attachment_height) {
+            cacheMediaDimensions(realId, realMessage.attachment_width, realMessage.attachment_height);
         }
         revokeOptimisticBlob(previous);
 
@@ -2701,6 +2871,7 @@
         }
         if (payload.file) {
             formData.append('attachment', payload.file);
+            appendAttachmentDimensions(formData, payload.attachmentWidth, payload.attachmentHeight);
         }
         if (isActingAsSystemInThread()) {
             formData.append('as_system', '1');
@@ -2796,6 +2967,8 @@
         const draftKey = composerDraftKey();
         const conversationId = state.activeConversationId;
         const draftPeer = state.draftPeer ? { ...state.draftPeer } : null;
+        const attachmentWidth = Number(state.pendingAttachmentMeta?.width) || null;
+        const attachmentHeight = Number(state.pendingAttachmentMeta?.height) || null;
         const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
         input.value = '';
@@ -2809,12 +2982,21 @@
         focusComposer();
         clearUnreadSeparator();
 
-        const optimistic = buildOptimisticMessage({ tempId, body, file, conversationId });
+        const optimistic = buildOptimisticMessage({
+            tempId,
+            body,
+            file,
+            conversationId,
+            attachmentWidth,
+            attachmentHeight,
+        });
         state.pendingPayloads.set(tempId, {
             body,
             file,
             conversationId,
             draftPeer,
+            attachmentWidth,
+            attachmentHeight,
         });
 
         appendMessage(optimistic, { animate: true });
@@ -3210,6 +3392,7 @@
 
     function clearBroadcastAttachment() {
         state.broadcastAttachment = null;
+        state.broadcastAttachmentMeta = null;
         if (broadcastAttachInput) {
             broadcastAttachInput.value = '';
         }
@@ -3228,7 +3411,7 @@
         }
     }
 
-    function setBroadcastAttachment(file) {
+    async function setBroadcastAttachment(file) {
         if (!isAllowedAttachment(file)) {
             if (file?.size > MAX_ATTACHMENT_BYTES) {
                 toastError('Attachments may not be greater than 100MB.');
@@ -3239,6 +3422,7 @@
         }
         clearBroadcastAttachment();
         state.broadcastAttachment = file;
+        state.broadcastAttachmentMeta = await measureAttachmentDimensions(file);
         if (broadcastAttachName) {
             broadcastAttachName.textContent = file.name;
         }
@@ -3501,6 +3685,11 @@
         }
         if (file) {
             form.append('attachment', file);
+            appendAttachmentDimensions(
+                form,
+                state.broadcastAttachmentMeta?.width,
+                state.broadcastAttachmentMeta?.height,
+            );
         }
 
         state.broadcastSending = true;
@@ -3546,6 +3735,7 @@
 
     function clearAttachment() {
         state.pendingAttachment = null;
+        state.pendingAttachmentMeta = null;
         attachInput.value = '';
         revokeAttachPreviewUrl();
         if (attachThumb) {
@@ -3582,7 +3772,7 @@
         return ALLOWED_EXTENSIONS.has(fileExtension(file));
     }
 
-    function setPendingAttachment(file) {
+    async function setPendingAttachment(file) {
         if (!file) {
             clearAttachment();
             return false;
@@ -3596,6 +3786,7 @@
             return false;
         }
         state.pendingAttachment = file;
+        state.pendingAttachmentMeta = await measureAttachmentDimensions(file);
         attachName.textContent = file.name || 'Pasted image';
         revokeAttachPreviewUrl();
         const isImage = String(file.type || '').startsWith('image/');
@@ -3684,9 +3875,10 @@
             const file = blob.name
                 ? blob
                 : new File([blob], `pasted-image-${Date.now()}.${ext}`, { type: blob.type || 'image/png' });
-            setPendingAttachment(file);
-            focusComposer();
-            syncOutgoingTyping();
+            setPendingAttachment(file).then(() => {
+                focusComposer();
+                syncOutgoingTyping();
+            });
             return;
         }
     }
@@ -3771,10 +3963,12 @@
             if (!file) {
                 return;
             }
-            if (setPendingAttachment(file)) {
-                input.focus();
-                syncOutgoingTyping();
-            }
+            setPendingAttachment(file).then((ok) => {
+                if (ok) {
+                    input.focus();
+                    syncOutgoingTyping();
+                }
+            });
         });
     }
 

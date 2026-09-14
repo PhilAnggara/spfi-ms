@@ -74,6 +74,8 @@ class ChatController extends Controller
             $request->validated('target_ids', []),
             $request->validated('body'),
             $request->file('attachment'),
+            $request->integer('attachment_width') ?: null,
+            $request->integer('attachment_height') ?: null,
         );
 
         return response()->json([
@@ -99,6 +101,8 @@ class ChatController extends Controller
             $peer,
             $request->validated('body'),
             $request->file('attachment'),
+            $request->integer('attachment_width') ?: null,
+            $request->integer('attachment_height') ?: null,
         );
 
         return response()->json([
@@ -168,6 +172,8 @@ class ChatController extends Controller
                 $request->validated('body'),
                 $request->file('attachment'),
                 $persona,
+                $request->integer('attachment_width') ?: null,
+                $request->integer('attachment_height') ?: null,
             );
 
             return response()->json([
@@ -184,6 +190,8 @@ class ChatController extends Controller
             $user,
             $request->validated('body'),
             $request->file('attachment'),
+            attachmentWidth: $request->integer('attachment_width') ?: null,
+            attachmentHeight: $request->integer('attachment_height') ?: null,
         );
 
         return response()->json([

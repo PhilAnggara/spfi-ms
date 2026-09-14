@@ -27,6 +27,8 @@ class Message extends Model
         'attachment_original_name',
         'attachment_mime',
         'attachment_size',
+        'attachment_width',
+        'attachment_height',
     ];
 
     /**
@@ -38,6 +40,8 @@ class Message extends Model
             'type' => MessageType::class,
             'persona' => MessagePersona::class,
             'attachment_size' => 'integer',
+            'attachment_width' => 'integer',
+            'attachment_height' => 'integer',
         ];
     }
 
@@ -90,6 +94,8 @@ class Message extends Model
             'attachment_original_name' => $this->attachment_original_name,
             'attachment_mime' => $this->attachment_mime,
             'attachment_size' => $this->attachment_size,
+            'attachment_width' => $this->attachment_width,
+            'attachment_height' => $this->attachment_height,
             'status' => $status,
             'delivered_at' => in_array($status, ['delivered', 'read'], true)
                 ? $peerParticipant?->last_delivered_at?->toIso8601String()

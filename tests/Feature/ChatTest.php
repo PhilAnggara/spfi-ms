@@ -78,13 +78,39 @@ it('sends an image attachment', function () {
             'attachment' => $file,
         ], ['Accept' => 'application/json'])
         ->assertCreated()
-        ->assertJsonPath('data.type', 'image');
+        ->assertJsonPath('data.type', 'image')
+        ->assertJsonPath('data.attachment_width', 200)
+        ->assertJsonPath('data.attachment_height', 200);
 
     $message = Message::query()->first();
     expect($message)->not->toBeNull()
-        ->and($message->attachment_path)->not->toBeNull();
+        ->and($message->attachment_path)->not->toBeNull()
+        ->and($message->attachment_width)->toBe(200)
+        ->and($message->attachment_height)->toBe(200);
 
     Storage::disk('public')->assertExists($message->attachment_path);
+});
+
+it('stores client-provided video attachment dimensions', function () {
+    Storage::fake('public');
+
+    $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+    $file = UploadedFile::fake()->create('clip.mp4', 512, 'video/mp4');
+
+    $this->actingAs($this->alice)
+        ->post(route('chat.messages.store', $conversation), [
+            'attachment' => $file,
+            'attachment_width' => 1280,
+            'attachment_height' => 720,
+        ], ['Accept' => 'application/json'])
+        ->assertCreated()
+        ->assertJsonPath('data.type', 'video')
+        ->assertJsonPath('data.attachment_width', 1280)
+        ->assertJsonPath('data.attachment_height', 720);
+
+    $message = Message::query()->first();
+    expect($message->attachment_width)->toBe(1280)
+        ->and($message->attachment_height)->toBe(720);
 });
 
 it('sends a video attachment', function () {

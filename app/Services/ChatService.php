@@ -95,9 +95,18 @@ class ChatService
         User $peer,
         ?string $body = null,
         ?UploadedFile $attachment = null,
+        ?int $attachmentWidth = null,
+        ?int $attachmentHeight = null,
     ): array {
         $conversation = $this->findOrCreateDirect($sender, $peer);
-        $message = $this->sendMessage($conversation, $sender, $body, $attachment);
+        $message = $this->sendMessage(
+            $conversation,
+            $sender,
+            $body,
+            $attachment,
+            attachmentWidth: $attachmentWidth,
+            attachmentHeight: $attachmentHeight,
+        );
 
         return [
             'conversation' => $conversation->fresh([
@@ -231,6 +240,8 @@ class ChatService
         ?string $body = null,
         ?UploadedFile $attachment = null,
         MessagePersona $persona = MessagePersona::User,
+        ?int $attachmentWidth = null,
+        ?int $attachmentHeight = null,
     ): array {
         abort_unless($conversation->isSupport(), 422);
 
@@ -240,7 +251,16 @@ class ChatService
             abort_unless((int) $conversation->support_user_id === (int) $actor->id, 403);
         }
 
-        $message = $this->sendMessage($conversation, $actor, $body, $attachment, $persona, skipParticipantCheck: true);
+        $message = $this->sendMessage(
+            $conversation,
+            $actor,
+            $body,
+            $attachment,
+            $persona,
+            skipParticipantCheck: true,
+            attachmentWidth: $attachmentWidth,
+            attachmentHeight: $attachmentHeight,
+        );
 
         if ($persona === MessagePersona::System && ! $conversation->assigned_to) {
             $conversation->forceFill([
@@ -330,6 +350,8 @@ class ChatService
         array $targetIds = [],
         ?string $body = null,
         ?UploadedFile $attachment = null,
+        ?int $attachmentWidth = null,
+        ?int $attachmentHeight = null,
     ): array {
         abort_unless($operator->can('chat-support-operate'), 403);
 
@@ -342,7 +364,7 @@ class ChatService
         }
 
         $trimmedBody = filled($body) ? trim($body) : null;
-        $sharedAttachment = $this->storeBroadcastAttachment($attachment);
+        $sharedAttachment = $this->storeBroadcastAttachment($attachment, $attachmentWidth, $attachmentHeight);
 
         if ($trimmedBody === null && $sharedAttachment === null) {
             throw ValidationException::withMessages([
@@ -422,10 +444,13 @@ class ChatService
     }
 
     /**
-     * @return array{path: string, original_name: string, mime: string, size: int, type: MessageType}|null
+     * @return array{path: string, original_name: string, mime: string, size: int, type: MessageType, width: ?int, height: ?int}|null
      */
-    protected function storeBroadcastAttachment(?UploadedFile $attachment): ?array
-    {
+    protected function storeBroadcastAttachment(
+        ?UploadedFile $attachment,
+        ?int $attachmentWidth = null,
+        ?int $attachmentHeight = null,
+    ): ?array {
         if (! $attachment) {
             return null;
         }
@@ -435,6 +460,7 @@ class ChatService
         $extension = $attachment->getClientOriginalExtension() ?: $attachment->extension() ?: 'bin';
         $filename = Str::uuid()->toString().'.'.$extension;
         $path = $attachment->storeAs('chat/broadcast', $filename, 'public');
+        $dimensions = $this->resolveAttachmentDimensions($attachment, $attachmentWidth, $attachmentHeight);
 
         return [
             'path' => $path,
@@ -442,11 +468,13 @@ class ChatService
             'mime' => $mime,
             'size' => (int) $attachment->getSize(),
             'type' => $type,
+            'width' => $dimensions['width'],
+            'height' => $dimensions['height'],
         ];
     }
 
     /**
-     * @param  array{path: string, original_name: string, mime: string, size: int, type: MessageType}|null  $storedAttachment
+     * @param  array{path: string, original_name: string, mime: string, size: int, type: MessageType, width?: ?int, height?: ?int}|null  $storedAttachment
      */
     protected function sendStoredSupportMessage(
         Conversation $conversation,
@@ -465,6 +493,8 @@ class ChatService
             'attachment_original_name' => $storedAttachment['original_name'] ?? null,
             'attachment_mime' => $storedAttachment['mime'] ?? null,
             'attachment_size' => $storedAttachment['size'] ?? null,
+            'attachment_width' => $storedAttachment['width'] ?? null,
+            'attachment_height' => $storedAttachment['height'] ?? null,
         ]);
 
         $conversation->touch();
@@ -481,6 +511,8 @@ class ChatService
         ?UploadedFile $attachment = null,
         MessagePersona $persona = MessagePersona::User,
         bool $skipParticipantCheck = false,
+        ?int $attachmentWidth = null,
+        ?int $attachmentHeight = null,
     ): Message {
         if (! $skipParticipantCheck) {
             $this->ensureCanAccess($conversation, $sender);
@@ -499,6 +531,8 @@ class ChatService
         $attachmentOriginalName = null;
         $attachmentMime = null;
         $attachmentSize = null;
+        $resolvedWidth = null;
+        $resolvedHeight = null;
 
         if ($attachment) {
             $mime = (string) $attachment->getMimeType();
@@ -509,6 +543,9 @@ class ChatService
             $attachmentOriginalName = $attachment->getClientOriginalName();
             $attachmentMime = $mime;
             $attachmentSize = $attachment->getSize();
+            $dimensions = $this->resolveAttachmentDimensions($attachment, $attachmentWidth, $attachmentHeight);
+            $resolvedWidth = $dimensions['width'];
+            $resolvedHeight = $dimensions['height'];
         }
 
         if ($trimmedBody === null && $attachmentPath === null) {
@@ -527,6 +564,8 @@ class ChatService
             'attachment_original_name' => $attachmentOriginalName,
             'attachment_mime' => $attachmentMime,
             'attachment_size' => $attachmentSize,
+            'attachment_width' => $resolvedWidth,
+            'attachment_height' => $resolvedHeight,
         ]);
 
         $conversation->touch();
@@ -891,6 +930,35 @@ class ChatService
         }
 
         return MessageType::File;
+    }
+
+    /**
+     * @return array{width: ?int, height: ?int}
+     */
+    protected function resolveAttachmentDimensions(
+        ?UploadedFile $attachment,
+        ?int $width = null,
+        ?int $height = null,
+    ): array {
+        $resolvedWidth = ($width !== null && $width > 0) ? $width : null;
+        $resolvedHeight = ($height !== null && $height > 0) ? $height : null;
+
+        if ($attachment && ($resolvedWidth === null || $resolvedHeight === null)) {
+            $mime = (string) $attachment->getMimeType();
+            if (str_starts_with($mime, 'image/')) {
+                $path = $attachment->getRealPath();
+                $size = is_string($path) && $path !== '' ? @getimagesize($path) : false;
+                if (is_array($size) && ($size[0] ?? 0) > 0 && ($size[1] ?? 0) > 0) {
+                    $resolvedWidth ??= (int) $size[0];
+                    $resolvedHeight ??= (int) $size[1];
+                }
+            }
+        }
+
+        return [
+            'width' => $resolvedWidth,
+            'height' => $resolvedHeight,
+        ];
     }
 
     public function participantOrFail(Conversation $conversation, User $user): ConversationParticipant
