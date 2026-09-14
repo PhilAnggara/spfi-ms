@@ -87,6 +87,29 @@ it('sends an image attachment', function () {
     Storage::disk('public')->assertExists($message->attachment_path);
 });
 
+it('sends a video attachment', function () {
+    Storage::fake('public');
+
+    $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+    $file = UploadedFile::fake()->create('clip.mp4', 512, 'video/mp4');
+
+    $this->actingAs($this->alice)
+        ->post(route('chat.messages.store', $conversation), [
+            'body' => 'Watch this',
+            'attachment' => $file,
+        ], ['Accept' => 'application/json'])
+        ->assertCreated()
+        ->assertJsonPath('data.type', 'video')
+        ->assertJsonPath('data.attachment_original_name', 'clip.mp4');
+
+    $message = Message::query()->first();
+    expect($message)->not->toBeNull()
+        ->and($message->type->value)->toBe('video')
+        ->and($message->attachment_path)->not->toBeNull();
+
+    Storage::disk('public')->assertExists($message->attachment_path);
+});
+
 it('validates empty messages without attachments', function () {
     $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
 

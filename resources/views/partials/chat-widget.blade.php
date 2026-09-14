@@ -117,7 +117,7 @@
                     </button>
                     <label class="chat-widget__icon-btn mb-0" title="Attach file" aria-label="Attach file">
                         <i class="fa-solid fa-paperclip"></i>
-                        <input type="file" id="chat-attachment" class="d-none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.ppt,.pptx">
+                        <input type="file" id="chat-attachment" class="d-none" accept="image/*,video/*,.mp4,.mov,.webm,.m4v,.avi,.3gp,.mkv,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.ppt,.pptx">
                     </label>
                     <textarea id="chat-input" class="form-control" rows="1" placeholder="Type a message..."></textarea>
                     <button type="button" class="chat-widget__send-btn" id="chat-send-btn" aria-label="Send">
@@ -221,7 +221,7 @@
                     <div class="chat-widget__broadcast-actions">
                         <label class="chat-widget__icon-btn mb-0" title="Attach file" aria-label="Attach file">
                             <i class="fa-solid fa-paperclip"></i>
-                            <input type="file" id="chat-broadcast-attachment" class="d-none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.ppt,.pptx">
+                            <input type="file" id="chat-broadcast-attachment" class="d-none" accept="image/*,video/*,.mp4,.mov,.webm,.m4v,.avi,.3gp,.mkv,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.ppt,.pptx">
                         </label>
                         <button type="button" class="chat-widget__broadcast-send" id="chat-broadcast-send">
                             Send broadcast

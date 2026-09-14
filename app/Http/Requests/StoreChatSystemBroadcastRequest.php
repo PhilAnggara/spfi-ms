@@ -27,8 +27,8 @@ class StoreChatSystemBroadcastRequest extends FormRequest
             'attachment' => [
                 'nullable',
                 'file',
-                'max:10240',
-                'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,csv,txt,zip,rar,ppt,pptx',
+                'max:102400',
+                'mimes:jpg,jpeg,png,gif,webp,mp4,mov,webm,m4v,avi,3gp,mkv,pdf,doc,docx,xls,xlsx,csv,txt,zip,rar,ppt,pptx',
             ],
         ];
     }
@@ -41,7 +41,7 @@ class StoreChatSystemBroadcastRequest extends FormRequest
         return [
             'audience.required' => 'Please choose who should receive this broadcast.',
             'body.max' => 'Message text may not be greater than 5000 characters.',
-            'attachment.max' => 'Attachments may not be greater than 10MB.',
+            'attachment.max' => 'Attachments may not be greater than 100MB.',
             'attachment.mimes' => 'This file type is not allowed.',
         ];
     }

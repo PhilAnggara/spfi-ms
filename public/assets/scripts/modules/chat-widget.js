@@ -76,9 +76,10 @@
     const toastHost = document.getElementById('chat-toast-host');
 
     const STATUS_RANK = { failed: -1, pending: 0, sent: 1, delivered: 2, read: 3 };
-    const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+    const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
     const ALLOWED_EXTENSIONS = new Set([
         'jpg', 'jpeg', 'png', 'gif', 'webp',
+        'mp4', 'mov', 'webm', 'm4v', 'avi', '3gp', 'mkv',
         'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt',
         'zip', 'rar', 'ppt', 'pptx',
     ]);
@@ -741,6 +742,9 @@
         if (message.type === 'image') {
             return 'Photo';
         }
+        if (message.type === 'video') {
+            return 'Video';
+        }
         if (message.type === 'file') {
             return message.attachment_original_name || 'File';
         }
@@ -1289,6 +1293,21 @@
                     </span>
                 </a>
             `;
+        } else if (message.type === 'video' && message.attachment_url) {
+            const messageId = messageDomId(message);
+            const loaded = state.loadedImageIds.has(messageId);
+            html += `
+                <div class="chat-bubble__video-frame ${loaded ? 'is-loaded' : 'is-loading'}">
+                    <span class="chat-bubble__video-placeholder" aria-hidden="true">
+                        <i class="fa-solid fa-film"></i>
+                        <span class="chat-bubble__image-spinner"></span>
+                    </span>
+                    <video class="chat-bubble__video" src="${escapeHtml(message.attachment_url)}" controls playsinline preload="metadata"></video>
+                    <a class="chat-bubble__video-open" href="${escapeHtml(message.attachment_url)}" target="_blank" rel="noopener" title="Open video" aria-label="Open video">
+                        <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                    </a>
+                </div>
+            `;
         } else if (message.type === 'file' && message.attachment_url) {
             html += `<a class="chat-bubble__file" href="${escapeHtml(message.attachment_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file"></i><span>${escapeHtml(message.attachment_original_name || 'File')}</span></a>`;
         }
@@ -1371,6 +1390,43 @@
                 frame?.classList.add('is-loaded', 'is-error');
             }, { once: true });
         });
+
+        messagesEl.querySelectorAll('video.chat-bubble__video').forEach((video) => {
+            const frame = video.closest('.chat-bubble__video-frame');
+            const bubble = video.closest('.chat-bubble[data-message-id]');
+            const messageId = bubble ? String(bubble.dataset.messageId || '') : '';
+
+            const markLoaded = () => {
+                if (messageId != null && messageId !== '') {
+                    state.loadedImageIds.add(String(messageId));
+                }
+                frame?.classList.remove('is-loading', 'is-error');
+                frame?.classList.add('is-loaded');
+                if (state.stickToBottom && state.view === 'thread') {
+                    scrollMessagesToBottom();
+                }
+            };
+
+            if (video.dataset.mediaBound === '1') {
+                if (video.readyState >= 1) {
+                    frame?.classList.add('is-loaded');
+                    frame?.classList.remove('is-loading', 'is-error');
+                }
+                return;
+            }
+            video.dataset.mediaBound = '1';
+
+            if (video.readyState >= 1) {
+                markLoaded();
+                return;
+            }
+
+            video.addEventListener('loadedmetadata', markLoaded, { once: true });
+            video.addEventListener('error', () => {
+                frame?.classList.remove('is-loading');
+                frame?.classList.add('is-loaded', 'is-error');
+            }, { once: true });
+        });
     }
 
     function scheduleBubbleEnter(bubble) {
@@ -1449,12 +1505,16 @@
     function bubbleMarkup(message, { animate = false } = {}) {
         const isMine = isMineMessage(message);
         const hasImage = message.type === 'image' && !!message.attachment_url;
+        const hasVideo = message.type === 'video' && !!message.attachment_url;
         const imageOnly = hasImage && !message.body;
+        const videoOnly = hasVideo && !message.body;
         const classes = [
             'chat-bubble',
             isMine ? 'is-mine' : 'is-theirs',
             hasImage ? 'has-image' : '',
+            hasVideo ? 'has-video' : '',
             imageOnly ? 'is-image-only' : '',
+            videoOnly ? 'is-video-only' : '',
             message.status === 'failed' ? 'is-failed' : '',
             animate ? 'is-entering' : '',
         ].filter(Boolean).join(' ');
@@ -1549,18 +1609,32 @@
             bubble.dataset.messageId = messageDomId(message);
             if (updateContent) {
                 const hasImage = message.type === 'image' && !!message.attachment_url;
+                const hasVideo = message.type === 'video' && !!message.attachment_url;
                 const imageOnly = hasImage && !message.body;
+                const videoOnly = hasVideo && !message.body;
                 bubble.classList.toggle('has-image', hasImage);
+                bubble.classList.toggle('has-video', hasVideo);
                 bubble.classList.toggle('is-image-only', imageOnly);
+                bubble.classList.toggle('is-video-only', videoOnly);
 
                 const content = bubble.querySelector('.chat-bubble__content');
                 if (content) {
                     const currentImg = content.querySelector('img.chat-bubble__image');
-                    const nextUrl = message.type === 'image' ? message.attachment_url : null;
-                    const currentUrl = currentImg?.getAttribute('src');
-                    if (nextUrl && currentUrl && currentUrl !== nextUrl && String(currentUrl).startsWith('blob:')) {
-                        currentImg.src = nextUrl;
-                    } else if (!(nextUrl && currentUrl && currentUrl === nextUrl && !message.body)) {
+                    const currentVideo = content.querySelector('video.chat-bubble__video');
+                    const nextImageUrl = message.type === 'image' ? message.attachment_url : null;
+                    const nextVideoUrl = message.type === 'video' ? message.attachment_url : null;
+                    const currentImageUrl = currentImg?.getAttribute('src');
+                    const currentVideoUrl = currentVideo?.getAttribute('src');
+                    if (nextImageUrl && currentImageUrl && currentImageUrl !== nextImageUrl && String(currentImageUrl).startsWith('blob:')) {
+                        currentImg.src = nextImageUrl;
+                    } else if (nextVideoUrl && currentVideoUrl && currentVideoUrl !== nextVideoUrl && String(currentVideoUrl).startsWith('blob:')) {
+                        currentVideo.src = nextVideoUrl;
+                        const openLink = content.querySelector('.chat-bubble__video-open');
+                        if (openLink) {
+                            openLink.href = nextVideoUrl;
+                        }
+                    } else if (!(nextImageUrl && currentImageUrl && currentImageUrl === nextImageUrl && !message.body)
+                        && !(nextVideoUrl && currentVideoUrl && currentVideoUrl === nextVideoUrl && !message.body)) {
                         const nextContent = messageBodyHtml(message);
                         if (content.innerHTML !== nextContent) {
                             content.innerHTML = nextContent;
@@ -2434,10 +2508,13 @@
 
     function buildOptimisticMessage({ tempId, body, file, conversationId }) {
         const isImage = !!(file && String(file.type || '').startsWith('image/'));
-        const blobUrl = file && isImage ? URL.createObjectURL(file) : null;
+        const isVideo = !!(file && String(file.type || '').startsWith('video/'));
+        const blobUrl = file && (isImage || isVideo) ? URL.createObjectURL(file) : null;
         let type = 'text';
         if (file && isImage) {
             type = 'image';
+        } else if (file && isVideo) {
+            type = 'video';
         } else if (file) {
             type = 'file';
         }
@@ -2450,7 +2527,7 @@
             persona: isActingAsSystemInThread() ? 'system' : 'user',
             body: body || null,
             type,
-            attachment_url: blobUrl || (file && !isImage ? '#' : null),
+            attachment_url: blobUrl || (file && !isImage && !isVideo ? '#' : null),
             attachment_original_name: file?.name || null,
             status: 'pending',
             created_at: new Date().toISOString(),
@@ -2556,6 +2633,15 @@
                 const img = content.querySelector('img.chat-bubble__image');
                 if (img) {
                     img.src = message.attachment_url;
+                }
+            } else if (content && message.type === 'video' && previous.local_blob_url && message.attachment_url) {
+                const video = content.querySelector('video.chat-bubble__video');
+                if (video) {
+                    video.src = message.attachment_url;
+                }
+                const openLink = content.querySelector('.chat-bubble__video-open');
+                if (openLink) {
+                    openLink.href = message.attachment_url;
                 }
             } else if (content && previous.type === 'file' && message.attachment_url && message.attachment_url !== '#') {
                 content.innerHTML = messageBodyHtml(message);
@@ -2795,6 +2881,9 @@
         }
         if (message.type === 'image') {
             return 'Sent a photo';
+        }
+        if (message.type === 'video') {
+            return 'Sent a video';
         }
         if (message.type === 'file') {
             return message.attachment_original_name || 'Sent a file';
@@ -3142,7 +3231,7 @@
     function setBroadcastAttachment(file) {
         if (!isAllowedAttachment(file)) {
             if (file?.size > MAX_ATTACHMENT_BYTES) {
-                toastError('Attachments may not be greater than 10MB.');
+                toastError('Attachments may not be greater than 100MB.');
             } else {
                 toastError('This file type is not allowed.');
             }
@@ -3487,6 +3576,9 @@
         if (String(file.type || '').startsWith('image/')) {
             return true;
         }
+        if (String(file.type || '').startsWith('video/')) {
+            return true;
+        }
         return ALLOWED_EXTENSIONS.has(fileExtension(file));
     }
 
@@ -3496,7 +3588,7 @@
             return false;
         }
         if (file.size > MAX_ATTACHMENT_BYTES) {
-            toastError('Attachments may not be greater than 10MB.');
+            toastError('Attachments may not be greater than 100MB.');
             return false;
         }
         if (!isAllowedAttachment(file)) {

@@ -431,7 +431,7 @@ class ChatService
         }
 
         $mime = (string) $attachment->getMimeType();
-        $type = str_starts_with($mime, 'image/') ? MessageType::Image : MessageType::File;
+        $type = $this->messageTypeFromMime($mime);
         $extension = $attachment->getClientOriginalExtension() ?: $attachment->extension() ?: 'bin';
         $filename = Str::uuid()->toString().'.'.$extension;
         $path = $attachment->storeAs('chat/broadcast', $filename, 'public');
@@ -502,7 +502,7 @@ class ChatService
 
         if ($attachment) {
             $mime = (string) $attachment->getMimeType();
-            $type = str_starts_with($mime, 'image/') ? MessageType::Image : MessageType::File;
+            $type = $this->messageTypeFromMime($mime);
             $extension = $attachment->getClientOriginalExtension() ?: $attachment->extension() ?: 'bin';
             $filename = Str::uuid()->toString().'.'.$extension;
             $attachmentPath = $attachment->storeAs('chat/'.$conversation->id, $filename, 'public');
@@ -878,6 +878,19 @@ class ChatService
     public function ensureParticipant(Conversation $conversation, User $user): void
     {
         abort_unless($conversation->hasParticipant($user->id), 403);
+    }
+
+    protected function messageTypeFromMime(string $mime): MessageType
+    {
+        if (str_starts_with($mime, 'image/')) {
+            return MessageType::Image;
+        }
+
+        if (str_starts_with($mime, 'video/')) {
+            return MessageType::Video;
+        }
+
+        return MessageType::File;
     }
 
     public function participantOrFail(Conversation $conversation, User $user): ConversationParticipant
