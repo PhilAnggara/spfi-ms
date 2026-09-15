@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\PrsCanvassingItem;
 use App\Models\PurchaseOrderItem;
 use App\Models\UnitOfMeasure;
 use App\Support\Concerns\PaginatesLegacySqlServer;
@@ -37,6 +38,7 @@ class ProductController extends Controller
     {
         $user = auth()->user();
         $canViewPurchaseHistory = $user?->can('view-purchase-history') ?? false;
+        $canViewCanvassingHistory = $user?->can('view-canvassing-history') ?? false;
         $itemCategories = ItemCategory::query()->orderBy('name')->get();
         $itemUnits = UnitOfMeasure::query()->orderBy('name')->get();
         $types = ['Raw Material', 'Capital Goods', 'Finished Goods', 'Wastes'];
@@ -72,6 +74,8 @@ class ProductController extends Controller
             'canManageProducts' => ($user?->can('update-products') || $user?->can('delete-products')) ?? false,
             'canViewPurchaseOrders' => $user?->can('view-po') ?? false,
             'canViewPurchaseHistory' => $canViewPurchaseHistory,
+            'canViewCanvassingHistory' => $canViewCanvassingHistory,
+            'canViewPrs' => $user?->can('view-all-prs') ?? false,
         ]);
     }
 
@@ -302,16 +306,26 @@ class ProductController extends Controller
         $length = (int) $request->input('length', 10);
         $length = $length > 0 ? $length : 10;
 
-        if ($orderColumn === 'canvasser') {
-            $baseQuery->orderByRaw('COALESCE(prs_canvasser.name, po_creator.name) '.$orderDirection);
-        } else {
-            $baseQuery->orderBy($orderColumn, $orderDirection);
+        $orderColumnSql = $orderColumn === 'canvasser'
+            ? 'COALESCE(prs_canvasser.name, po_creator.name)'
+            : $orderColumn;
+        $orderBySql = $this->buildDataTableOrderBySql($orderColumnSql, $orderDirection, 'purchase_order_items.id');
+
+        if (! $this->isSqlServerConnection()) {
+            if ($orderColumn === 'canvasser') {
+                $baseQuery->orderByRaw('COALESCE(prs_canvasser.name, po_creator.name) '.$orderDirection);
+            } else {
+                $baseQuery->orderBy($orderColumn, $orderDirection);
+            }
         }
 
-        $data = $baseQuery
-            ->skip($start)
-            ->take($length)
-            ->get()
+        $data = $this->sliceEloquentQueryForDataTables(
+            $baseQuery,
+            'purchase_order_items.id',
+            $orderBySql,
+            $start,
+            $length
+        )
             ->map(fn ($row) => [
                 'id' => $row->id,
                 'purchase_order_id' => $row->purchase_order_id,
@@ -330,6 +344,171 @@ class ProductController extends Controller
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
             'avgUnitPrices' => $avgUnitPrices,
+            'data' => $data,
+        ]);
+    }
+
+    public function canvassingHistory(Request $request, Item $item)
+    {
+        $columns = [
+            'prs_canvassing_items.created_at',
+            'prs.prs_number',
+            'suppliers.code',
+            'suppliers.name',
+            'prs_canvassing_items.unit_price',
+            'is_selected_quote',
+            'prs_canvassing_items.lead_time_days',
+            'term_of_payment',
+            'prs_canvassing_items.term_of_delivery',
+            'canvasser',
+            'prs_canvassing_items.notes',
+        ];
+
+        $baseQuery = PrsCanvassingItem::query()
+            ->join('prs_items', 'prs_items.id', '=', 'prs_canvassing_items.prs_item_id')
+            ->where('prs_items.item_id', $item->id)
+            ->whereNull('prs_canvassing_items.deleted_at')
+            ->whereNull('prs_items.deleted_at')
+            ->join('prs', 'prs.id', '=', 'prs_canvassing_items.prs_id')
+            ->whereNull('prs.deleted_at')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'prs_canvassing_items.supplier_id')
+            ->leftJoin('users as canvased_by_user', 'canvased_by_user.id', '=', 'prs_canvassing_items.canvased_by')
+            ->leftJoin('users as prs_canvasser', 'prs_canvasser.id', '=', 'prs_items.canvasser_id')
+            ->select([
+                'prs_canvassing_items.id',
+                'prs_canvassing_items.created_at as canvass_date',
+                'prs.id as prs_id',
+                'prs.prs_number',
+                'suppliers.code as supplier_code',
+                'suppliers.name as supplier_name',
+                'prs_canvassing_items.unit_price',
+                'prs_canvassing_items.lead_time_days',
+                'prs_canvassing_items.term_of_payment_type',
+                'prs_canvassing_items.term_of_payment',
+                'prs_canvassing_items.term_of_delivery',
+                'prs_canvassing_items.notes',
+                DB::raw('CASE WHEN prs_items.selected_canvassing_item_id = prs_canvassing_items.id THEN 1 ELSE 0 END as is_selected_quote'),
+                DB::raw('COALESCE(canvased_by_user.name, prs_canvasser.name) as canvasser'),
+            ]);
+
+        $recordsTotal = PrsCanvassingItem::query()
+            ->join('prs_items', 'prs_items.id', '=', 'prs_canvassing_items.prs_item_id')
+            ->where('prs_items.item_id', $item->id)
+            ->whereNull('prs_canvassing_items.deleted_at')
+            ->whereNull('prs_items.deleted_at')
+            ->whereHas('prs', fn ($query) => $query->whereNull('deleted_at'))
+            ->count();
+
+        $searchValue = $request->input('search.value');
+        if ($searchValue) {
+            $likeValue = '%'.$searchValue.'%';
+            $baseQuery->where(function ($query) use ($likeValue) {
+                $query->where('prs.prs_number', 'like', $likeValue)
+                    ->orWhere('suppliers.code', 'like', $likeValue)
+                    ->orWhere('suppliers.name', 'like', $likeValue)
+                    ->orWhere('canvased_by_user.name', 'like', $likeValue)
+                    ->orWhere('prs_canvasser.name', 'like', $likeValue)
+                    ->orWhere('prs_canvassing_items.notes', 'like', $likeValue)
+                    ->orWhere('prs_canvassing_items.term_of_payment', 'like', $likeValue)
+                    ->orWhere('prs_canvassing_items.term_of_delivery', 'like', $likeValue);
+            });
+        }
+
+        $recordsFiltered = (clone $baseQuery)->count();
+
+        $summaryRow = (clone $baseQuery)
+            ->reorder()
+            ->select([
+                DB::raw('ROUND(AVG(prs_canvassing_items.unit_price), 2) as avg_unit_price'),
+                DB::raw('MIN(prs_canvassing_items.unit_price) as min_unit_price'),
+                DB::raw('COUNT(*) as quote_count'),
+                DB::raw('COUNT(DISTINCT prs_canvassing_items.supplier_id) as supplier_count'),
+            ])
+            ->first();
+
+        $summary = [
+            'avg_unit_price' => $summaryRow?->avg_unit_price !== null ? (float) $summaryRow->avg_unit_price : null,
+            'min_unit_price' => $summaryRow?->min_unit_price !== null ? (float) $summaryRow->min_unit_price : null,
+            'quote_count' => (int) ($summaryRow?->quote_count ?? 0),
+            'supplier_count' => (int) ($summaryRow?->supplier_count ?? 0),
+        ];
+
+        $orderColumnIndex = (int) $request->input('order.0.column', 0);
+        $orderDirection = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
+        $orderColumn = $columns[$orderColumnIndex] ?? 'prs_canvassing_items.created_at';
+
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 10);
+        $length = $length > 0 ? $length : 10;
+
+        $direction = $orderDirection === 'asc' ? 'ASC' : 'DESC';
+
+        if ($orderColumn === 'canvasser') {
+            $orderBySql = $this->buildDataTableOrderBySql(
+                'COALESCE(canvased_by_user.name, prs_canvasser.name)',
+                $orderDirection,
+                'prs_canvassing_items.id'
+            );
+        } elseif ($orderColumn === 'is_selected_quote') {
+            $orderBySql = $this->buildDataTableOrderBySql(
+                'CASE WHEN prs_items.selected_canvassing_item_id = prs_canvassing_items.id THEN 1 ELSE 0 END',
+                $orderDirection,
+                'prs_canvassing_items.id'
+            );
+        } elseif ($orderColumn === 'term_of_payment') {
+            $orderBySql = "prs_canvassing_items.term_of_payment_type {$direction}, prs_canvassing_items.term_of_payment {$direction}, prs_canvassing_items.id DESC";
+        } else {
+            $orderBySql = $this->buildDataTableOrderBySql($orderColumn, $orderDirection, 'prs_canvassing_items.id');
+        }
+
+        if (! $this->isSqlServerConnection()) {
+            if ($orderColumn === 'canvasser') {
+                $baseQuery->orderByRaw('COALESCE(canvased_by_user.name, prs_canvasser.name) '.$orderDirection);
+            } elseif ($orderColumn === 'is_selected_quote') {
+                $baseQuery->orderByRaw('CASE WHEN prs_items.selected_canvassing_item_id = prs_canvassing_items.id THEN 1 ELSE 0 END '.$orderDirection);
+            } elseif ($orderColumn === 'term_of_payment') {
+                $baseQuery->orderBy('prs_canvassing_items.term_of_payment_type', $orderDirection)
+                    ->orderBy('prs_canvassing_items.term_of_payment', $orderDirection);
+            } else {
+                $baseQuery->orderBy($orderColumn, $orderDirection);
+            }
+        }
+
+        $data = $this->sliceEloquentQueryForDataTables(
+            $baseQuery,
+            'prs_canvassing_items.id',
+            $orderBySql,
+            $start,
+            $length
+        )
+            ->map(function ($row) {
+                $topParts = array_filter([
+                    $row->term_of_payment_type,
+                    $row->term_of_payment,
+                ]);
+
+                return [
+                    'id' => $row->id,
+                    'canvass_date' => $row->canvass_date,
+                    'prs_id' => $row->prs_id,
+                    'prs_number' => $row->prs_number,
+                    'supplier_code' => $row->supplier_code,
+                    'supplier_name' => $row->supplier_name,
+                    'unit_price' => $row->unit_price,
+                    'is_selected' => (bool) $row->is_selected_quote,
+                    'lead_time_days' => $row->lead_time_days,
+                    'term_of_payment' => $topParts !== [] ? implode(' / ', $topParts) : null,
+                    'term_of_delivery' => $row->term_of_delivery,
+                    'canvasser' => $row->canvasser,
+                    'notes' => $row->notes,
+                ];
+            });
+
+        return response()->json([
+            'draw' => (int) $request->input('draw', 1),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'summary' => $summary,
             'data' => $data,
         ]);
     }

@@ -115,11 +115,15 @@
                             data-update-route-template="{{ route('product.update', '__ID__') }}"
                             data-destroy-route-template="{{ route('product.destroy', '__ID__') }}"
                             data-history-route-template="{{ $canViewPurchaseHistory ? route('product.purchase-history', '__ID__') : '' }}"
+                            data-canvassing-history-route-template="{{ $canViewCanvassingHistory ? route('product.canvassing-history', '__ID__') : '' }}"
                             data-po-show-route-template="{{ route('purchase-orders.show', '__ID__') }}"
+                            data-prs-show-route-template="{{ route('prs.show', '__ID__') }}"
                             data-can-manage="{{ $canManageProducts ? '1' : '0' }}"
                             data-can-create="{{ $canCreateProducts ? '1' : '0' }}"
                             data-can-view-po="{{ $canViewPurchaseOrders ? '1' : '0' }}"
                             data-can-view-purchase-history="{{ $canViewPurchaseHistory ? '1' : '0' }}"
+                            data-can-view-canvassing-history="{{ $canViewCanvassingHistory ? '1' : '0' }}"
+                            data-can-view-prs="{{ $canViewPrs ? '1' : '0' }}"
                             data-open-create-modal="{{ $errors->any() ? '1' : '0' }}"
                             data-editing-product-id="{{ (string) session('editing_product_id', '') }}">
                             <thead>
@@ -152,6 +156,9 @@
 @endif
 @if ($canViewPurchaseHistory)
     @include('includes.modals.product-purchase-history-modal')
+@endif
+@if ($canViewCanvassingHistory)
+    @include('includes.modals.product-canvassing-history-modal')
 @endif
 @endsection
 

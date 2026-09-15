@@ -22,8 +22,11 @@ class RolePermissionSeeder extends Seeder
     /**
      * Run the database seeds.
      *
-     * Assignments are additive (givePermissionTo) so re-seeding does not revoke
-     * permissions granted through the Role & Permission management UI.
+     * Safe to re-run against a customized production/dev database:
+     * - Creates missing permissions and roles.
+     * - Applies full defaults only to newly created roles.
+     * - For existing roles, only grants permissions that were newly created in this run.
+     * - Never revokes role or direct user assignments made through the UI.
      */
     public function run(): void
     {
@@ -54,6 +57,7 @@ class RolePermissionSeeder extends Seeder
             'assign-canvasser',
             'view-canvassing',
             'update-canvassing',
+            'view-canvassing-history',
         ];
 
         $permissionsPo = [
@@ -197,8 +201,15 @@ class RolePermissionSeeder extends Seeder
             $permissionsChat,
         )));
 
-        foreach ($allPermissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        /** @var list<string> */
+        $newlyCreatedPermissions = [];
+
+        foreach ($allPermissions as $permissionName) {
+            $permission = Permission::firstOrCreate(['name' => $permissionName, 'guard_name' => 'web']);
+
+            if ($permission->wasRecentlyCreated) {
+                $newlyCreatedPermissions[] = $permissionName;
+            }
         }
 
         $this->deleteObsoletePermissions([
@@ -241,8 +252,15 @@ class RolePermissionSeeder extends Seeder
             'hrd-staff',
         ];
 
-        foreach ($roles as $role) {
-            Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+        /** @var list<string> */
+        $newlyCreatedRoles = [];
+
+        foreach ($roles as $roleName) {
+            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+
+            if ($role->wasRecentlyCreated) {
+                $newlyCreatedRoles[] = $roleName;
+            }
         }
 
         $itMasterReadWrite = array_merge(
@@ -256,6 +274,7 @@ class RolePermissionSeeder extends Seeder
                 'update-suppliers',
                 'delete-suppliers',
                 'view-purchase-history',
+                'view-canvassing-history',
                 'view-users',
                 'create-users',
                 'update-users',
@@ -333,6 +352,7 @@ class RolePermissionSeeder extends Seeder
                 'view-all-prs',
                 'assign-canvasser',
                 'view-canvassing',
+                'view-canvassing-history',
                 'approve-po',
                 'view-po',
                 'view-po-progress',
@@ -349,6 +369,7 @@ class RolePermissionSeeder extends Seeder
             'purchasing-staff' => [
                 'view-canvassing',
                 'update-canvassing',
+                'view-canvassing-history',
                 'create-po',
                 'view-po',
                 'submit-po',
@@ -407,12 +428,52 @@ class RolePermissionSeeder extends Seeder
             'hrd-staff' => $this->crud('employees'),
         ];
 
-        foreach ($rolePermissions as $roleName => $permissions) {
-            $role = Role::findByName($roleName);
-            $role->givePermissionTo(array_values(array_unique($permissions)));
-        }
+        $this->assignRolePermissionsPreserveCustomizations(
+            $rolePermissions,
+            $newlyCreatedRoles,
+            $newlyCreatedPermissions,
+        );
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * Apply default role permissions without undoing UI customizations.
+     *
+     * - Newly created roles receive their full default permission set.
+     * - Existing roles only receive permissions that were newly created in this run.
+     * - Existing role/user assignments are never revoked.
+     *
+     * @param  array<string, list<string>>  $rolePermissions
+     * @param  list<string>  $newlyCreatedRoles
+     * @param  list<string>  $newlyCreatedPermissions
+     */
+    private function assignRolePermissionsPreserveCustomizations(
+        array $rolePermissions,
+        array $newlyCreatedRoles,
+        array $newlyCreatedPermissions,
+    ): void {
+        $newlyCreatedPermissionLookup = array_fill_keys($newlyCreatedPermissions, true);
+
+        foreach ($rolePermissions as $roleName => $permissions) {
+            $role = Role::findByName($roleName);
+            $defaultPermissions = array_values(array_unique($permissions));
+
+            if (in_array($roleName, $newlyCreatedRoles, true)) {
+                $role->givePermissionTo($defaultPermissions);
+
+                continue;
+            }
+
+            $permissionsToGrant = array_values(array_filter(
+                $defaultPermissions,
+                fn (string $permission): bool => isset($newlyCreatedPermissionLookup[$permission])
+            ));
+
+            if ($permissionsToGrant !== []) {
+                $role->givePermissionTo($permissionsToGrant);
+            }
+        }
     }
 
     /**

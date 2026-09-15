@@ -68,6 +68,10 @@ Route::middleware('auth')->group(function () {
         Route::get('supplier/{supplier}/purchase-history', [SupplierController::class, 'purchaseHistory'])->name('supplier.purchase-history');
     });
 
+    Route::middleware('permission:view-canvassing-history')->prefix('master')->group(function () {
+        Route::get('product/{item}/canvassing-history', [ProductController::class, 'canvassingHistory'])->name('product.canvassing-history');
+    });
+
     Route::middleware('permission:create-products')->prefix('master')->group(function () {
         Route::get('product/check-code', [ProductController::class, 'checkCode'])->name('product.check-code');
         Route::post('product', [ProductController::class, 'store'])->name('product.store');

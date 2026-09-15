@@ -344,16 +344,26 @@ class SupplierController extends Controller
         $length = (int) $request->input('length', 10);
         $length = $length > 0 ? $length : 10;
 
-        if ($orderColumn === 'canvasser') {
-            $baseQuery->orderByRaw('COALESCE(prs_canvasser.name, po_creator.name) '.$orderDirection);
-        } else {
-            $baseQuery->orderBy($orderColumn, $orderDirection);
+        $orderColumnSql = $orderColumn === 'canvasser'
+            ? 'COALESCE(prs_canvasser.name, po_creator.name)'
+            : $orderColumn;
+        $orderBySql = $this->buildDataTableOrderBySql($orderColumnSql, $orderDirection, 'purchase_order_items.id');
+
+        if (! $this->isSqlServerConnection()) {
+            if ($orderColumn === 'canvasser') {
+                $baseQuery->orderByRaw('COALESCE(prs_canvasser.name, po_creator.name) '.$orderDirection);
+            } else {
+                $baseQuery->orderBy($orderColumn, $orderDirection);
+            }
         }
 
-        $data = $baseQuery
-            ->skip($start)
-            ->take($length)
-            ->get()
+        $data = $this->sliceEloquentQueryForDataTables(
+            $baseQuery,
+            'purchase_order_items.id',
+            $orderBySql,
+            $start,
+            $length
+        )
             ->map(fn ($row) => [
                 'id' => $row->id,
                 'purchase_order_id' => $row->purchase_order_id,

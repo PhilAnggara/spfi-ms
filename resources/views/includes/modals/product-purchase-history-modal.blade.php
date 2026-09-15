@@ -23,7 +23,7 @@
                             <th>PO Date</th>
                             <th>Currency</th>
                             <th>Supplier Code</th>
-                            <th>Supplier Name</th>
+                            <th class="text-start">Supplier Name</th>
                             <th class="text-end">Qty</th>
                             <th class="text-end">Unit Price</th>
                             <th>Canvasser</th>

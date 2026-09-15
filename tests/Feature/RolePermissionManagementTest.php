@@ -378,3 +378,55 @@ it('prevents it-manager from granting reset-activity-logs via role or user acces
 
     expect($target->fresh()->hasRole('administrator'))->toBeFalse();
 });
+
+it('preserves role unassign and custom grants when reseeding', function () {
+    $purchasingStaff = Role::findByName('purchasing-staff');
+    $imStaff = Role::findByName('im-staff');
+
+    $purchasingStaff->revokePermissionTo('view-purchase-history');
+    $imStaff->givePermissionTo('view-purchase-history');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    expect($purchasingStaff->fresh()->hasPermissionTo('view-purchase-history'))->toBeFalse();
+    expect($imStaff->fresh()->hasPermissionTo('view-purchase-history'))->toBeTrue();
+
+    $this->seed(RolePermissionSeeder::class);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    expect(Role::findByName('purchasing-staff')->hasPermissionTo('view-purchase-history'))->toBeFalse();
+    expect(Role::findByName('im-staff')->hasPermissionTo('view-purchase-history'))->toBeTrue();
+});
+
+it('preserves direct user permission customizations when reseeding', function () {
+    $user = createRbacUser('rbac-direct-preserve', 'im-staff');
+    $user->givePermissionTo('view-purchase-history');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    expect($user->fresh()->hasDirectPermission('view-purchase-history'))->toBeTrue();
+
+    $this->seed(RolePermissionSeeder::class);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    expect($user->fresh()->hasDirectPermission('view-purchase-history'))->toBeTrue();
+});
+
+it('assigns newly created permissions to intended existing roles on reseed', function () {
+    $permission = Permission::findByName('view-canvassing-history');
+    if ($permission !== null) {
+        $permission->roles()->detach();
+        $permission->users()->detach();
+        $permission->delete();
+    }
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    expect(Permission::query()->where('name', 'view-canvassing-history')->exists())->toBeFalse();
+
+    $this->seed(RolePermissionSeeder::class);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    expect(Permission::findByName('view-canvassing-history'))->not->toBeNull();
+    expect(Role::findByName('purchasing-staff')->hasPermissionTo('view-canvassing-history'))->toBeTrue();
+    expect(Role::findByName('purchasing-manager')->hasPermissionTo('view-canvassing-history'))->toBeTrue();
+    expect(Role::findByName('it-staff')->hasPermissionTo('view-canvassing-history'))->toBeTrue();
+    expect(Role::findByName('im-staff')->hasPermissionTo('view-canvassing-history'))->toBeFalse();
+});

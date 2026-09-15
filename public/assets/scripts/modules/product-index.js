@@ -9,11 +9,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const updateRouteTemplate = table.data('updateRouteTemplate');
     const destroyRouteTemplate = table.data('destroyRouteTemplate');
     const historyRouteTemplate = table.data('historyRouteTemplate');
+    const canvassingHistoryRouteTemplate = table.data('canvassingHistoryRouteTemplate');
     const poShowRouteTemplate = table.data('poShowRouteTemplate');
+    const prsShowRouteTemplate = table.data('prsShowRouteTemplate');
     const canManage = table.data('canManage') === 1 || table.data('canManage') === '1';
     const canCreate = table.data('canCreate') === 1 || table.data('canCreate') === '1';
     const canViewPo = table.data('canViewPo') === 1 || table.data('canViewPo') === '1';
     const canViewPurchaseHistory = table.data('canViewPurchaseHistory') === 1 || table.data('canViewPurchaseHistory') === '1';
+    const canViewCanvassingHistory = table.data('canViewCanvassingHistory') === 1 || table.data('canViewCanvassingHistory') === '1';
+    const canViewPrs = table.data('canViewPrs') === 1 || table.data('canViewPrs') === '1';
     const openCreateModal = table.data('openCreateModal') === 1 || table.data('openCreateModal') === '1';
     const editingProductId = String(table.data('editingProductId') || '');
 
@@ -69,7 +73,13 @@ document.addEventListener('DOMContentLoaded', function () {
         ? new window.bootstrap.Modal(historyModalElement)
         : null;
 
+    const canvassingHistoryModalElement = document.getElementById('product-canvassing-history-modal');
+    const canvassingHistoryModal = canvassingHistoryModalElement && window.bootstrap && window.bootstrap.Modal
+        ? new window.bootstrap.Modal(canvassingHistoryModalElement)
+        : null;
+
     let historyDataTable = null;
+    let canvassingHistoryDataTable = null;
     let productDataTable = null;
     let filterDebounceTimer = null;
 
@@ -305,9 +315,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 {
                     data: 'supplier_name',
+                    className: 'text-start',
                     render: function (data) {
                         const safeName = escapeHtml(data ?? '-');
-                        return `<span class="text-start d-inline-block text-truncate" style="max-width: 220px;" title="${safeName}">${safeName}</span>`;
+                        return `<span class="d-inline-block text-truncate" style="max-width: 220px;" title="${safeName}">${safeName}</span>`;
                     },
                 },
                 {
@@ -329,6 +340,162 @@ document.addEventListener('DOMContentLoaded', function () {
                     data: 'canvasser',
                     render: function (data) {
                         return escapeHtml(data ?? '-');
+                    },
+                },
+            ],
+        });
+    };
+
+    const destroyCanvassingHistoryTable = () => {
+        if (canvassingHistoryDataTable) {
+            canvassingHistoryDataTable.destroy();
+            canvassingHistoryDataTable = null;
+        }
+        $('#product-canvassing-history-table tbody').empty();
+        updateCanvassingSummary(null);
+    };
+
+    const updateCanvassingSummary = (summary) => {
+        const summaryEl = document.getElementById('product-canvassing-history-summary');
+        const summaryBodyEl = document.getElementById('product-canvassing-history-summary-body');
+        if (!summaryEl || !summaryBodyEl) {
+            return;
+        }
+
+        if (!summary || !summary.quote_count) {
+            summaryEl.classList.add('d-none');
+            summaryBodyEl.innerHTML = '';
+            return;
+        }
+
+        const badges = [];
+        if (summary.avg_unit_price !== null && summary.avg_unit_price !== undefined) {
+            badges.push(`<span class="badge bg-light-primary fs-6">Avg ${formatNumber(summary.avg_unit_price)}</span>`);
+        }
+        if (summary.min_unit_price !== null && summary.min_unit_price !== undefined) {
+            badges.push(`<span class="badge bg-light-success fs-6">Min ${formatNumber(summary.min_unit_price)}</span>`);
+        }
+        badges.push(`<span class="badge bg-light-secondary fs-6">${summary.quote_count} quote${summary.quote_count === 1 ? '' : 's'}</span>`);
+        badges.push(`<span class="badge bg-light-secondary fs-6">${summary.supplier_count} supplier${summary.supplier_count === 1 ? '' : 's'}</span>`);
+
+        summaryBodyEl.innerHTML = badges.join('');
+        summaryEl.classList.remove('d-none');
+    };
+
+    const truncateText = (value, maxLength = 60) => {
+        const text = value ?? '';
+        if (!text) {
+            return '-';
+        }
+        const safe = escapeHtml(text);
+        if (text.length <= maxLength) {
+            return `<span title="${safe}">${safe}</span>`;
+        }
+        return `<span title="${safe}">${escapeHtml(text.slice(0, maxLength))}...</span>`;
+    };
+
+    const initCanvassingHistoryTable = (itemId) => {
+        destroyCanvassingHistoryTable();
+
+        const historyUrl = String(canvassingHistoryRouteTemplate || '').replace('__ID__', itemId);
+
+        canvassingHistoryDataTable = $('#product-canvassing-history-table').DataTable({
+            processing: true,
+            serverSide: true,
+            searching: true,
+            ajax: {
+                url: historyUrl,
+                type: 'GET',
+                dataSrc: function (json) {
+                    updateCanvassingSummary(json.summary);
+                    return json.data;
+                },
+            },
+            order: [[0, 'desc']],
+            pageLength: 10,
+            language: {
+                emptyTable: 'No canvassing history found for this item.',
+                zeroRecords: 'No canvassing history found for this item.',
+            },
+            columns: [
+                {
+                    data: 'canvass_date',
+                    render: function (data) {
+                        return formatDate(data);
+                    },
+                },
+                {
+                    data: 'prs_number',
+                    render: function (data, type, row) {
+                        const safeNumber = escapeHtml(data ?? '-');
+                        if (!canViewPrs || !row.prs_id) {
+                            return safeNumber;
+                        }
+                        const prsUrl = String(prsShowRouteTemplate || '').replace('__ID__', row.prs_id);
+                        return `<a href="${prsUrl}" class="text-primary fw-semibold">${safeNumber}</a>`;
+                    },
+                },
+                {
+                    data: 'supplier_code',
+                    render: function (data) {
+                        return escapeHtml(data ?? '-');
+                    },
+                },
+                {
+                    data: 'supplier_name',
+                    className: 'text-start',
+                    render: function (data) {
+                        const safeName = escapeHtml(data ?? '-');
+                        return `<span class="d-inline-block text-truncate" style="max-width: 180px;" title="${safeName}">${safeName}</span>`;
+                    },
+                },
+                {
+                    data: 'unit_price',
+                    className: 'text-end',
+                    render: function (data) {
+                        return formatNumber(data);
+                    },
+                },
+                {
+                    data: 'is_selected',
+                    render: function (data) {
+                        if (data) {
+                            return '<span class="badge bg-light-success">Selected</span>';
+                        }
+                        return '<span class="badge bg-light-secondary">Not selected</span>';
+                    },
+                },
+                {
+                    data: 'lead_time_days',
+                    render: function (data) {
+                        if (data === null || data === undefined || data === '') {
+                            return '-';
+                        }
+                        return `${escapeHtml(data)} day${Number(data) === 1 ? '' : 's'}`;
+                    },
+                },
+                {
+                    data: 'term_of_payment',
+                    render: function (data) {
+                        return escapeHtml(data ?? '-');
+                    },
+                },
+                {
+                    data: 'term_of_delivery',
+                    render: function (data) {
+                        return escapeHtml(data ?? '-');
+                    },
+                },
+                {
+                    data: 'canvasser',
+                    render: function (data) {
+                        return escapeHtml(data ?? '-');
+                    },
+                },
+                {
+                    data: 'notes',
+                    render: function (data) {
+                        return truncateText(data, 50);
                     },
                 },
             ],
@@ -458,9 +625,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 `
                 : '';
 
+            const canvassingHistoryButton = canViewCanvassingHistory
+                ? `
+                    <button type="button" class="btn icon view-canvassing-history" ${historyAttrs} data-bstooltip-toggle="tooltip" data-bs-placement="top" title="Canvassing History">
+                        <i class="fa-light fa-scale-balanced text-warning"></i>
+                    </button>
+                `
+                : '';
+
             return `
                 <div class="btn-group btn-group-sm">
                     ${historyButton}
+                    ${canvassingHistoryButton}
                     ${manageButtons}
                 </div>
             `;
@@ -591,6 +767,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (historyModalElement) {
         historyModalElement.addEventListener('hidden.bs.modal', destroyHistoryTable);
+    }
+
+    $('#product-table tbody').on('click', '.view-canvassing-history', function () {
+        const button = $(this);
+        const itemId = button.data('id');
+        const code = button.data('code') || '-';
+        const name = button.data('name') || '-';
+        const unit = button.data('unit') || '-';
+        const category = button.data('category') || '-';
+
+        const title = document.getElementById('productCanvassingHistoryLabel');
+        const meta = document.getElementById('product-canvassing-history-meta');
+        if (title) {
+            title.textContent = `Canvassing History — ${code}`;
+        }
+        if (meta) {
+            meta.textContent = `${name} · ${unit} · ${category}`;
+        }
+
+        initCanvassingHistoryTable(itemId);
+
+        if (canvassingHistoryModal) {
+            canvassingHistoryModal.show();
+        }
+    });
+
+    if (canvassingHistoryModalElement) {
+        canvassingHistoryModalElement.addEventListener('hidden.bs.modal', destroyCanvassingHistoryTable);
     }
 
     let createCodeValidation = null;
