@@ -116,6 +116,7 @@
                             data-destroy-route-template="{{ route('product.destroy', '__ID__') }}"
                             data-history-route-template="{{ $canViewPurchaseHistory ? route('product.purchase-history', '__ID__') : '' }}"
                             data-canvassing-history-route-template="{{ $canViewCanvassingHistory ? route('product.canvassing-history', '__ID__') : '' }}"
+                            data-canvassing-history-export-route-template="{{ $canViewCanvassingHistory ? route('product.canvassing-history.export', '__ID__') : '' }}"
                             data-po-show-route-template="{{ route('purchase-orders.show', '__ID__') }}"
                             data-prs-show-route-template="{{ route('prs.show', '__ID__') }}"
                             data-can-manage="{{ $canManageProducts ? '1' : '0' }}"

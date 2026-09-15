@@ -2,16 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\CanvassingHistorySpreadsheet;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\PrsCanvassingItem;
 use App\Models\PurchaseOrderItem;
 use App\Models\UnitOfMeasure;
 use App\Support\Concerns\PaginatesLegacySqlServer;
+use App\Support\PdfReport;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductController extends Controller
 {
@@ -357,39 +362,13 @@ class ProductController extends Controller
             'suppliers.name',
             'prs_canvassing_items.unit_price',
             'is_selected_quote',
-            'prs_canvassing_items.lead_time_days',
             'term_of_payment',
             'prs_canvassing_items.term_of_delivery',
             'canvasser',
             'prs_canvassing_items.notes',
         ];
 
-        $baseQuery = PrsCanvassingItem::query()
-            ->join('prs_items', 'prs_items.id', '=', 'prs_canvassing_items.prs_item_id')
-            ->where('prs_items.item_id', $item->id)
-            ->whereNull('prs_canvassing_items.deleted_at')
-            ->whereNull('prs_items.deleted_at')
-            ->join('prs', 'prs.id', '=', 'prs_canvassing_items.prs_id')
-            ->whereNull('prs.deleted_at')
-            ->leftJoin('suppliers', 'suppliers.id', '=', 'prs_canvassing_items.supplier_id')
-            ->leftJoin('users as canvased_by_user', 'canvased_by_user.id', '=', 'prs_canvassing_items.canvased_by')
-            ->leftJoin('users as prs_canvasser', 'prs_canvasser.id', '=', 'prs_items.canvasser_id')
-            ->select([
-                'prs_canvassing_items.id',
-                'prs_canvassing_items.created_at as canvass_date',
-                'prs.id as prs_id',
-                'prs.prs_number',
-                'suppliers.code as supplier_code',
-                'suppliers.name as supplier_name',
-                'prs_canvassing_items.unit_price',
-                'prs_canvassing_items.lead_time_days',
-                'prs_canvassing_items.term_of_payment_type',
-                'prs_canvassing_items.term_of_payment',
-                'prs_canvassing_items.term_of_delivery',
-                'prs_canvassing_items.notes',
-                DB::raw('CASE WHEN prs_items.selected_canvassing_item_id = prs_canvassing_items.id THEN 1 ELSE 0 END as is_selected_quote'),
-                DB::raw('COALESCE(canvased_by_user.name, prs_canvasser.name) as canvasser'),
-            ]);
+        $baseQuery = $this->canvassingHistoryBaseQuery($item);
 
         $recordsTotal = PrsCanvassingItem::query()
             ->join('prs_items', 'prs_items.id', '=', 'prs_canvassing_items.prs_item_id')
@@ -416,22 +395,7 @@ class ProductController extends Controller
 
         $recordsFiltered = (clone $baseQuery)->count();
 
-        $summaryRow = (clone $baseQuery)
-            ->reorder()
-            ->select([
-                DB::raw('ROUND(AVG(prs_canvassing_items.unit_price), 2) as avg_unit_price'),
-                DB::raw('MIN(prs_canvassing_items.unit_price) as min_unit_price'),
-                DB::raw('COUNT(*) as quote_count'),
-                DB::raw('COUNT(DISTINCT prs_canvassing_items.supplier_id) as supplier_count'),
-            ])
-            ->first();
-
-        $summary = [
-            'avg_unit_price' => $summaryRow?->avg_unit_price !== null ? (float) $summaryRow->avg_unit_price : null,
-            'min_unit_price' => $summaryRow?->min_unit_price !== null ? (float) $summaryRow->min_unit_price : null,
-            'quote_count' => (int) ($summaryRow?->quote_count ?? 0),
-            'supplier_count' => (int) ($summaryRow?->supplier_count ?? 0),
-        ];
+        $summary = $this->canvassingHistorySummary((clone $baseQuery));
 
         $orderColumnIndex = (int) $request->input('order.0.column', 0);
         $orderDirection = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
@@ -480,29 +444,7 @@ class ProductController extends Controller
             $orderBySql,
             $start,
             $length
-        )
-            ->map(function ($row) {
-                $topParts = array_filter([
-                    $row->term_of_payment_type,
-                    $row->term_of_payment,
-                ]);
-
-                return [
-                    'id' => $row->id,
-                    'canvass_date' => $row->canvass_date,
-                    'prs_id' => $row->prs_id,
-                    'prs_number' => $row->prs_number,
-                    'supplier_code' => $row->supplier_code,
-                    'supplier_name' => $row->supplier_name,
-                    'unit_price' => $row->unit_price,
-                    'is_selected' => (bool) $row->is_selected_quote,
-                    'lead_time_days' => $row->lead_time_days,
-                    'term_of_payment' => $topParts !== [] ? implode(' / ', $topParts) : null,
-                    'term_of_delivery' => $row->term_of_delivery,
-                    'canvasser' => $row->canvasser,
-                    'notes' => $row->notes,
-                ];
-            });
+        )->map(fn ($row) => $this->mapCanvassingHistoryRow($row));
 
         return response()->json([
             'draw' => (int) $request->input('draw', 1),
@@ -511,6 +453,145 @@ class ProductController extends Controller
             'summary' => $summary,
             'data' => $data,
         ]);
+    }
+
+    public function exportCanvassingHistory(Request $request, Item $item): Response|StreamedResponse
+    {
+        $validated = $request->validate([
+            'format' => ['required', 'in:pdf,excel'],
+        ]);
+
+        $item->loadMissing(['unit', 'category']);
+
+        $baseQuery = $this->canvassingHistoryBaseQuery($item);
+        $summary = $this->canvassingHistorySummary((clone $baseQuery));
+        $quoteCount = max(0, $summary['quote_count']);
+
+        $orderBySql = $this->buildDataTableOrderBySql(
+            'prs_canvassing_items.created_at',
+            'desc',
+            'prs_canvassing_items.id'
+        );
+
+        if (! $this->isSqlServerConnection()) {
+            $baseQuery->orderBy('prs_canvassing_items.created_at', 'desc')
+                ->orderBy('prs_canvassing_items.id', 'desc');
+        }
+
+        $rows = $quoteCount === 0
+            ? collect()
+            : $this->sliceEloquentQueryForDataTables(
+                $baseQuery,
+                'prs_canvassing_items.id',
+                $orderBySql,
+                0,
+                $quoteCount
+            );
+
+        $mappedRows = $rows
+            ->map(fn ($row) => $this->mapCanvassingHistoryRow($row))
+            ->values()
+            ->all();
+
+        $data = [
+            'company' => PdfReport::DEFAULT_COMPANY,
+            'title' => 'Item Canvassing History',
+            'item_code' => $item->code,
+            'item_name' => $item->name,
+            'unit' => $item->unit?->name,
+            'category' => $item->category?->name,
+            'printed_at' => now()->format('d-m-Y H:i'),
+            'summary' => $summary,
+            'rows' => $mappedRows,
+        ];
+
+        if ($validated['format'] === 'excel') {
+            $filename = sprintf('canvassing-history-%s-%s.xlsx', $item->code, now()->format('Ymd-His'));
+
+            return (new CanvassingHistorySpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('canvassing-history-%s-%s.pdf', $item->code, now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.canvassing-history', $data, $filename);
+    }
+
+    private function canvassingHistoryBaseQuery(Item $item): EloquentBuilder
+    {
+        return PrsCanvassingItem::query()
+            ->join('prs_items', 'prs_items.id', '=', 'prs_canvassing_items.prs_item_id')
+            ->where('prs_items.item_id', $item->id)
+            ->whereNull('prs_canvassing_items.deleted_at')
+            ->whereNull('prs_items.deleted_at')
+            ->join('prs', 'prs.id', '=', 'prs_canvassing_items.prs_id')
+            ->whereNull('prs.deleted_at')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'prs_canvassing_items.supplier_id')
+            ->leftJoin('users as canvased_by_user', 'canvased_by_user.id', '=', 'prs_canvassing_items.canvased_by')
+            ->leftJoin('users as prs_canvasser', 'prs_canvasser.id', '=', 'prs_items.canvasser_id')
+            ->select([
+                'prs_canvassing_items.id',
+                'prs_canvassing_items.created_at as canvass_date',
+                'prs.id as prs_id',
+                'prs.prs_number',
+                'suppliers.code as supplier_code',
+                'suppliers.name as supplier_name',
+                'prs_canvassing_items.unit_price',
+                'prs_canvassing_items.term_of_payment_type',
+                'prs_canvassing_items.term_of_payment',
+                'prs_canvassing_items.term_of_delivery',
+                'prs_canvassing_items.notes',
+                DB::raw('CASE WHEN prs_items.selected_canvassing_item_id = prs_canvassing_items.id THEN 1 ELSE 0 END as is_selected_quote'),
+                DB::raw('COALESCE(canvased_by_user.name, prs_canvasser.name) as canvasser'),
+            ]);
+    }
+
+    /**
+     * @return array{avg_unit_price: float|null, min_unit_price: float|null, quote_count: int, supplier_count: int}
+     */
+    private function canvassingHistorySummary(EloquentBuilder $baseQuery): array
+    {
+        $summaryRow = $baseQuery
+            ->reorder()
+            ->select([
+                DB::raw('ROUND(AVG(prs_canvassing_items.unit_price), 2) as avg_unit_price'),
+                DB::raw('MIN(prs_canvassing_items.unit_price) as min_unit_price'),
+                DB::raw('COUNT(*) as quote_count'),
+                DB::raw('COUNT(DISTINCT prs_canvassing_items.supplier_id) as supplier_count'),
+            ])
+            ->first();
+
+        return [
+            'avg_unit_price' => $summaryRow?->avg_unit_price !== null ? (float) $summaryRow->avg_unit_price : null,
+            'min_unit_price' => $summaryRow?->min_unit_price !== null ? (float) $summaryRow->min_unit_price : null,
+            'quote_count' => (int) ($summaryRow?->quote_count ?? 0),
+            'supplier_count' => (int) ($summaryRow?->supplier_count ?? 0),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapCanvassingHistoryRow(object $row): array
+    {
+        $topParts = array_filter([
+            $row->term_of_payment_type,
+            $row->term_of_payment,
+        ]);
+
+        return [
+            'id' => $row->id,
+            'canvass_date' => $row->canvass_date,
+            'prs_id' => $row->prs_id,
+            'prs_number' => $row->prs_number,
+            'supplier_code' => $row->supplier_code,
+            'supplier_name' => $row->supplier_name,
+            'unit_price' => $row->unit_price,
+            'is_selected' => (bool) $row->is_selected_quote,
+            'term_of_payment' => $topParts !== [] ? implode(' / ', $topParts) : null,
+            'term_of_delivery' => $row->term_of_delivery,
+            'canvasser' => $row->canvasser,
+            'notes' => $row->notes,
+        ];
     }
 
     /**

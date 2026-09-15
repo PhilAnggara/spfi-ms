@@ -285,3 +285,50 @@ it('paginates canvassing history beyond the first page', function () {
         ->and($response->json('recordsFiltered'))->toBe(14)
         ->and($response->json('data'))->toHaveCount(4);
 });
+
+it('forbids users without permission from exporting canvassing history', function () {
+    $user = createCanvassingHistoryUser('im-export-canvass-hist', 'im-manager');
+
+    $this->actingAs($user)
+        ->post(route('product.canvassing-history.export', $this->item), [
+            'format' => 'pdf',
+        ])
+        ->assertForbidden();
+});
+
+it('exports canvassing history as pdf', function () {
+    $user = createCanvassingHistoryUser('pdf-export-canvass-hist', 'purchasing-staff');
+
+    $response = $this->actingAs($user)
+        ->post(route('product.canvassing-history.export', $this->item), [
+            'format' => 'pdf',
+        ]);
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+});
+
+it('exports canvassing history as excel', function () {
+    $user = createCanvassingHistoryUser('xlsx-export-canvass-hist', 'purchasing-staff');
+
+    $response = $this->actingAs($user)
+        ->post(route('product.canvassing-history.export', $this->item), [
+            'format' => 'excel',
+        ]);
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    expect($response->headers->get('content-disposition'))->toContain('.xlsx');
+});
+
+it('rejects invalid canvassing history export format', function () {
+    $user = createCanvassingHistoryUser('bad-export-canvass-hist', 'purchasing-staff');
+
+    $this->actingAs($user)
+        ->post(route('product.canvassing-history.export', $this->item), [
+            'format' => 'csv',
+        ])
+        ->assertSessionHasErrors('format');
+});

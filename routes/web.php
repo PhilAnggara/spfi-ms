@@ -70,6 +70,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view-canvassing-history')->prefix('master')->group(function () {
         Route::get('product/{item}/canvassing-history', [ProductController::class, 'canvassingHistory'])->name('product.canvassing-history');
+        Route::post('product/{item}/canvassing-history/export', [ProductController::class, 'exportCanvassingHistory'])->name('product.canvassing-history.export');
     });
 
     Route::middleware('permission:create-products')->prefix('master')->group(function () {

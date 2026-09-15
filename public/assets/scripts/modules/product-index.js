@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const destroyRouteTemplate = table.data('destroyRouteTemplate');
     const historyRouteTemplate = table.data('historyRouteTemplate');
     const canvassingHistoryRouteTemplate = table.data('canvassingHistoryRouteTemplate');
+    const canvassingHistoryExportRouteTemplate = table.data('canvassingHistoryExportRouteTemplate');
     const poShowRouteTemplate = table.data('poShowRouteTemplate');
     const prsShowRouteTemplate = table.data('prsShowRouteTemplate');
     const canManage = table.data('canManage') === 1 || table.data('canManage') === '1';
@@ -466,15 +467,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     },
                 },
                 {
-                    data: 'lead_time_days',
-                    render: function (data) {
-                        if (data === null || data === undefined || data === '') {
-                            return '-';
-                        }
-                        return `${escapeHtml(data)} day${Number(data) === 1 ? '' : 's'}`;
-                    },
-                },
-                {
                     data: 'term_of_payment',
                     render: function (data) {
                         return escapeHtml(data ?? '-');
@@ -786,6 +778,15 @@ document.addEventListener('DOMContentLoaded', function () {
             meta.textContent = `${name} · ${unit} · ${category}`;
         }
 
+        const exportForm = document.getElementById('canvassing-history-export-form');
+        if (exportForm) {
+            const exportUrl = String(canvassingHistoryExportRouteTemplate || '').replace('__ID__', itemId);
+            exportForm.setAttribute('action', exportUrl);
+            exportForm.querySelectorAll('button[type="submit"]').forEach((buttonEl) => {
+                buttonEl.disabled = !exportUrl;
+            });
+        }
+
         initCanvassingHistoryTable(itemId);
 
         if (canvassingHistoryModal) {
@@ -794,7 +795,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (canvassingHistoryModalElement) {
-        canvassingHistoryModalElement.addEventListener('hidden.bs.modal', destroyCanvassingHistoryTable);
+        canvassingHistoryModalElement.addEventListener('hidden.bs.modal', function () {
+            destroyCanvassingHistoryTable();
+            const exportForm = document.getElementById('canvassing-history-export-form');
+            if (exportForm) {
+                exportForm.setAttribute('action', '');
+                exportForm.querySelectorAll('button[type="submit"]').forEach((buttonEl) => {
+                    buttonEl.disabled = true;
+                });
+            }
+        });
     }
 
     let createCodeValidation = null;

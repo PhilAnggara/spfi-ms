@@ -25,7 +25,6 @@
                             <th class="text-start">Supplier Name</th>
                             <th class="text-end">Unit Price</th>
                             <th>Status</th>
-                            <th>Lead Time</th>
                             <th>TOP</th>
                             <th>TOD</th>
                             <th>Canvasser</th>
@@ -35,7 +34,18 @@
                     <tbody></tbody>
                 </table>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer d-flex flex-wrap gap-2 justify-content-between">
+                <form id="canvassing-history-export-form" method="post" action="" class="d-flex flex-wrap gap-2 mb-0">
+                    @csrf
+                    <button type="submit" name="format" value="pdf" formtarget="_blank" class="btn btn-sm icon icon-left btn-outline-secondary" disabled>
+                        <i class="fa-thin fa-file-pdf"></i>
+                        Export PDF
+                    </button>
+                    <button type="submit" name="format" value="excel" class="btn btn-sm icon icon-left btn-success" disabled>
+                        <i class="fa-thin fa-file-spreadsheet"></i>
+                        Export Excel
+                    </button>
+                </form>
                 <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
