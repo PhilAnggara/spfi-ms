@@ -754,6 +754,26 @@ html[data-bs-theme="dark"] .chat-widget__day {
     opacity: 0.9;
 }
 
+.chat-bubble__link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.chat-bubble.is-mine .chat-bubble__link {
+    color: #eff6ff;
+}
+
+.chat-bubble.is-theirs .chat-bubble__link {
+    color: var(--chat-accent-strong, #1d4ed8);
+}
+
+.chat-bubble__link:hover {
+    text-decoration-thickness: 2px;
+}
+
 .chat-bubble {
     max-width: 82%;
     display: flex;

@@ -164,11 +164,44 @@
             .replace(/~(?!\s)([^~]+?)(?<!\s)~/g, '$1');
     }
 
-    function formatWhatsAppMarkup(escapedText) {
-        return String(escapedText ?? '')
+    function applyWhatsAppMarkupSegment(segment) {
+        return String(segment ?? '')
             .replace(/\*(?!\s)([^*]+?)(?<!\s)\*/g, '<strong>$1</strong>')
             .replace(/_(?!\s)([^_]+?)(?<!\s)_/g, '<em>$1</em>')
             .replace(/~(?!\s)([^~]+?)(?<!\s)~/g, '<del>$1</del>');
+    }
+
+    function formatWhatsAppMarkup(escapedText) {
+        // Keep existing anchors intact so URL underscores are not turned into <em>.
+        return String(escapedText ?? '').replace(/(<a\b[^>]*>[\s\S]*?<\/a>)|([^<]+)/gi, (full, anchor, text) => {
+            if (anchor) {
+                return anchor;
+            }
+            return applyWhatsAppMarkupSegment(text);
+        });
+    }
+
+    function linkifyEscapedText(escapedText) {
+        return String(escapedText ?? '').replace(
+            /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi,
+            (rawMatch) => {
+                let matched = rawMatch;
+                let trailing = '';
+                while (/[.,;:!?)]$/.test(matched) && matched.length > 1) {
+                    trailing = matched.slice(-1) + trailing;
+                    matched = matched.slice(0, -1);
+                }
+                if (!matched) {
+                    return rawMatch;
+                }
+                const href = /^www\./i.test(matched) ? `https://${matched}` : matched;
+                return `<a class="chat-bubble__link" href="${href}" target="_blank" rel="noopener noreferrer">${matched}</a>${trailing}`;
+            },
+        );
+    }
+
+    function formatMessageBodyHtml(body) {
+        return formatWhatsAppMarkup(linkifyEscapedText(escapeHtml(body)));
     }
 
     function initials(name) {
@@ -1452,7 +1485,7 @@
             html += `<a class="chat-bubble__file" href="${escapeHtml(message.attachment_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file"></i><span>${escapeHtml(message.attachment_original_name || 'File')}</span></a>`;
         }
         if (message.body) {
-            html += `<div class="chat-bubble__text">${formatWhatsAppMarkup(escapeHtml(message.body))}</div>`;
+            html += `<div class="chat-bubble__text">${formatMessageBodyHtml(message.body)}</div>`;
         }
         return html || '<div></div>';
     }
