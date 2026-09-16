@@ -191,6 +191,35 @@ it('calculates lead time days from assigned canvasser date to receiving report d
     expect($rows->first()['lead_time_days'])->toBe(7);
 });
 
+it('uses received date instead of created at for rr date in lead time report', function () {
+    $receivedDate = now()->subDays(2)->toDateString();
+    $createdAt = now()->subDay()->startOfDay();
+
+    \Illuminate\Support\Facades\DB::table('receiving_reports')
+        ->where('rr_number', 'RR-LT-001')
+        ->update([
+            'received_date' => $receivedDate,
+            'created_at' => $createdAt,
+        ]);
+
+    $controller = app(PurchasingReportController::class);
+    $method = new ReflectionMethod($controller, 'buildPurchasingLeadTimeRows');
+    $method->setAccessible(true);
+
+    $rows = $method->invoke(
+        $controller,
+        now()->subMonth()->startOfDay(),
+        now()->endOfDay(),
+        null
+    );
+
+    $firstRow = $rows->first();
+
+    expect($firstRow['rr_date'])->toBe($receivedDate)
+        ->and($firstRow['rr_date'])->not->toBe($createdAt->toDateString())
+        ->and($firstRow['lead_time_days'])->toBe(8);
+});
+
 it('formats table dates with dashed month abbreviation', function () {
     expect(PdfFormatters::tableDate('2026-01-15'))->toBe('15-Jan-2026');
     expect(PdfFormatters::tableDate(null))->toBe('');

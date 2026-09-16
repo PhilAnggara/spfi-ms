@@ -228,3 +228,74 @@ it('adjusts stock when receiving report qty good is edited', function () {
 
     expect($netInAfterReduce)->toBe(4.0);
 });
+
+it('moves stock ledger date when only received date is edited', function () {
+    $originalDate = now()->subDays(10)->toDateString();
+    $newDate = now()->subDays(3)->toDateString();
+
+    $response = $this->actingAs($this->user)
+        ->from(route('receiving-reports.index'))
+        ->post(route('receiving-reports.store'), [
+            'rr_number' => 'RR-DATE-'.uniqid(),
+            'purchase_order_id' => $this->purchaseOrder->id,
+            'received_date' => $originalDate,
+            'requires_customs_document' => '0',
+            'notes' => 'Initial RR',
+            'items' => [
+                [
+                    'purchase_order_item_id' => $this->purchaseOrderItem->id,
+                    'selected' => '1',
+                    'qty_good' => 10,
+                    'qty_bad' => 0,
+                ],
+            ],
+        ]);
+
+    $response->assertRedirect(route('receiving-reports.index'));
+    $response->assertSessionHasNoErrors();
+
+    $receivingReport = ReceivingReport::query()
+        ->where('purchase_order_id', $this->purchaseOrder->id)
+        ->whereNull('deleted_at')
+        ->latest('id')
+        ->firstOrFail();
+
+    expect(StockBalance::query()
+        ->where('reference_type', StockService::REF_RECEIVING_REPORT)
+        ->where('reference_id', $receivingReport->id)
+        ->pluck('date')
+        ->map(fn ($date) => $date instanceof \Carbon\CarbonInterface ? $date->toDateString() : (string) $date)
+        ->unique()
+        ->all())->toBe([$originalDate]);
+
+    $response = $this->actingAs($this->user)
+        ->from(route('receiving-reports.index'))
+        ->put(route('receiving-reports.update', $receivingReport), [
+            'received_date' => $newDate,
+            'requires_customs_document' => '0',
+            'notes' => 'Date only update',
+            'items' => [
+                [
+                    'purchase_order_item_id' => $this->purchaseOrderItem->id,
+                    'selected' => '1',
+                    'qty_good' => 10,
+                    'qty_bad' => 0,
+                ],
+            ],
+        ]);
+
+    $response->assertRedirect(route('receiving-reports.index'));
+    $response->assertSessionHasNoErrors();
+
+    $ledgerDates = StockBalance::query()
+        ->where('reference_type', StockService::REF_RECEIVING_REPORT)
+        ->where('reference_id', $receivingReport->id)
+        ->pluck('date')
+        ->map(fn ($date) => $date instanceof \Carbon\CarbonInterface ? $date->toDateString() : (string) $date)
+        ->unique()
+        ->values()
+        ->all();
+
+    expect($ledgerDates)->toBe([$newDate])
+        ->and((float) StockInventory::query()->where('item_id', $this->item->id)->value('balance'))->toBe(60.0);
+});

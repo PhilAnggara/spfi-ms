@@ -235,6 +235,80 @@ it('updates header and quantities and adjusts stock', function () {
         ->and((float) Item::query()->where('id', $this->itemB->id)->value('stock_on_hand'))->toBe(98.0);
 });
 
+it('moves stock ledger date when only ts date is edited', function () {
+    [$storeWithdrawalId, $swsItemA, $swsItemB, $now] = createNormalSwsWithTwoItems($this);
+    $originalDate = $now->copy()->subDays(5)->toDateString();
+    $newDate = $now->copy()->addDays(2)->toDateString();
+
+    $transferSlipId = createTransferSlip($this, $storeWithdrawalId, [
+        [
+            'store_withdrawal_item_id' => $swsItemA,
+            'item_id' => $this->itemA->id,
+            'quantity' => 4,
+        ],
+        [
+            'store_withdrawal_item_id' => $swsItemB,
+            'item_id' => $this->itemB->id,
+            'quantity' => 3,
+        ],
+    ], $originalDate);
+
+    $ledgerDatesBefore = StockBalance::query()
+        ->where('reference_type', StockService::REF_TRANSFER_SLIP)
+        ->where('reference_id', $transferSlipId)
+        ->pluck('date')
+        ->map(fn ($date) => $date instanceof \Carbon\CarbonInterface ? $date->toDateString() : (string) $date)
+        ->unique()
+        ->values()
+        ->all();
+
+    expect($ledgerDatesBefore)->toBe([$originalDate]);
+
+    $swsNumber = DB::table('store_withdrawals')->where('id', $storeWithdrawalId)->value('sws_number');
+    $currentTsNumber = (string) DB::table('transfer_slips')->where('id', $transferSlipId)->value('ts_number');
+
+    $response = $this->actingAs($this->user)
+        ->from(route('transfer-slips.index'))
+        ->put(route('transfer-slips.update', $transferSlipId), [
+            '_edit_transfer_slip_id' => $transferSlipId,
+            'ts_number' => $currentTsNumber,
+            'ts_date' => $newDate,
+            'for_production' => '0',
+            'remarks' => 'Date only update',
+            'sws_number' => $swsNumber,
+            'store_withdrawal_id' => $storeWithdrawalId,
+            'items' => [
+                [
+                    'store_withdrawal_item_id' => $swsItemA,
+                    'item_id' => $this->itemA->id,
+                    'quantity' => 4,
+                ],
+                [
+                    'store_withdrawal_item_id' => $swsItemB,
+                    'item_id' => $this->itemB->id,
+                    'quantity' => 3,
+                ],
+            ],
+        ]);
+
+    $response->assertRedirect(route('transfer-slips.index'));
+    $response->assertSessionHasNoErrors();
+
+    $ledgerDatesAfter = StockBalance::query()
+        ->where('reference_type', StockService::REF_TRANSFER_SLIP)
+        ->where('reference_id', $transferSlipId)
+        ->pluck('date')
+        ->map(fn ($date) => $date instanceof \Carbon\CarbonInterface ? $date->toDateString() : (string) $date)
+        ->unique()
+        ->values()
+        ->all();
+
+    expect($ledgerDatesAfter)->toBe([$newDate])
+        ->and(netQtyOut1($transferSlipId))->toBe(7.0)
+        ->and((float) StockInventory::query()->where('item_id', $this->itemA->id)->value('balance'))->toBe(96.0)
+        ->and((float) StockInventory::query()->where('item_id', $this->itemB->id)->value('balance'))->toBe(97.0);
+});
+
 it('rejects quantity that exceeds remaining after excluding the current transfer slip', function () {
     [$storeWithdrawalId, $swsItemA, $swsItemB, $now] = createNormalSwsWithTwoItems($this, 10, 10);
     $swsNumber = DB::table('store_withdrawals')->where('id', $storeWithdrawalId)->value('sws_number');

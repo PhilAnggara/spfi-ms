@@ -66,7 +66,7 @@ class ReceivingReportEntryGenerator
         $po = $receivingReport->purchaseOrder;
         $currencyConversion ??= $this->currencyExchangeRateService->resolveConversionForPurchaseOrder(
             $po?->currency?->code,
-            $receivingReport->received_date ?? $receivingReport->created_at,
+            $receivingReport->received_date,
         );
 
         $convertAmount = static function (float $amount) use ($currencyConversion): float {
@@ -174,8 +174,7 @@ class ReceivingReportEntryGenerator
             'header' => [
                 'doc_type' => 'RR',
                 'doc_number' => (string) ($receivingReport->rr_number ?? ''),
-                'doc_date' => $receivingReport->received_date?->toDateString()
-                    ?? $receivingReport->created_at?->toDateString(),
+                'doc_date' => $receivingReport->received_date?->toDateString() ?? '',
                 'po_number' => (string) ($po?->po_number ?? ''),
                 'supplier_code' => (string) ($po?->supplier?->code ?? ''),
                 'supplier_name' => (string) ($po?->supplier?->name ?? ''),

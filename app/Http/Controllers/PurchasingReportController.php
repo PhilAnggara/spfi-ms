@@ -642,7 +642,7 @@ class PurchasingReportController extends Controller
             'po.created_at as po_date',
             'suppliers.name as supplier_name',
             'rr.rr_number',
-            'rr.created_at as rr_date',
+            'rr.received_date as rr_date',
         ];
 
         $rows = collect();
@@ -650,7 +650,7 @@ class PurchasingReportController extends Controller
         foreach ($rrIds->chunk(self::LEAD_TIME_QUERY_CHUNK_SIZE) as $chunk) {
             $batch = $this->leadTimeRowsQuery($chunk, $canvasserId)
                 ->select($select)
-                ->orderBy('rr.created_at')
+                ->orderBy('rr.received_date')
                 ->orderBy('pi.id')
                 ->get()
                 ->map(fn ($row) => $this->mapPurchasingLeadTimeRow($row));

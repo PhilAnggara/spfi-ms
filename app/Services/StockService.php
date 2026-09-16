@@ -97,6 +97,53 @@ class StockService
     }
 
     /**
+     * @param  array<int|string, array<string, mixed>>  $currentLines
+     */
+    public function replayReceivingReport(
+        ReceivingReport $receivingReport,
+        array $currentLines,
+        ?int $userId = null,
+        bool $allowNegativeBalance = false
+    ): void {
+        $this->purgeDocumentMovementsAndRechain(
+            self::REF_RECEIVING_REPORT,
+            (int) $receivingReport->id,
+        );
+
+        $this->applyReceivingReportAdjustment(
+            receivingReport: $receivingReport,
+            currentLines: $currentLines,
+            previousLines: [],
+            userId: $userId,
+            allowNegativeBalance: $allowNegativeBalance,
+        );
+    }
+
+    /**
+     * @param  array<int, array{item_id: int, product_code: string, quantity: float|int|string, reference_line_id: int, wh_code?: string}>  $lines
+     */
+    public function replayTransferSlipIssue(
+        int $transferSlipId,
+        string $movementDate,
+        array $lines,
+        ?int $userId = null,
+        bool $allowNegativeBalance = false
+    ): void {
+        $this->purgeDocumentMovementsAndRechain(
+            self::REF_TRANSFER_SLIP,
+            $transferSlipId,
+        );
+
+        $this->applyTransferSlipIssue(
+            transferSlipId: $transferSlipId,
+            movementDate: $movementDate,
+            lines: $lines,
+            userId: $userId,
+            allowNegativeBalance: $allowNegativeBalance,
+        );
+    }
+
+    /**
      * @param  array<int, array{item_id: int, product_code: string, quantity: float|int|string, reference_line_id: int, wh_code?: string}>  $lines
      */
     public function applyTransferSlipIssue(

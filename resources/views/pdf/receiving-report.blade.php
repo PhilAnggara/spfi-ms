@@ -353,7 +353,7 @@
         $summaryTotalLineTop = ($hasPph ? $pphTop : ($displayPpnTotal > 0 ? $ppnTop : $subTotalTop)) + $sy(4.2);
         $summaryTotalTop = $summaryTotalLineTop + $sy(1.2);
         $poDateText = $po?->created_at ? $po->created_at->locale('id')->translatedFormat('d M Y') : '-';
-        $rrDateText = $receivingReport->created_at ? $receivingReport->created_at->locale('id')->translatedFormat('d M Y') : '-';
+        $rrDateText = $receivingReport->received_date ? $receivingReport->received_date->locale('id')->translatedFormat('d M Y') : '-';
         $isCapex = (bool) ($po?->items?->first()?->prsItem?->prs?->is_capex ?? false);
         $poNumberText = $po?->po_number ?? '-';
         $poNumberStrokeOffsetsMm = [

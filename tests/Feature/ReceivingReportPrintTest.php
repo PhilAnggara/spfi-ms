@@ -676,3 +676,44 @@ it('shows print calibration controls on receiving reports index', function () {
     $response->assertSee('Click here');
     $response->assertSee('Show options');
 });
+
+it('renders received date on the print form instead of created at', function () {
+    $receivedDate = '2026-03-10';
+    $rrCreatedAt = \Carbon\Carbon::parse('2026-08-20 09:00:00');
+    $poCreatedAt = \Carbon\Carbon::parse('2026-01-05 09:00:00');
+
+    $this->receivingReport->update([
+        'received_date' => $receivedDate,
+    ]);
+
+    \Illuminate\Support\Facades\DB::table('receiving_reports')
+        ->where('id', $this->receivingReport->id)
+        ->update(['created_at' => $rrCreatedAt]);
+
+    \Illuminate\Support\Facades\DB::table('purchase_orders')
+        ->where('id', $this->receivingReport->purchase_order_id)
+        ->update(['created_at' => $poCreatedAt]);
+
+    $receivedDateText = \Carbon\Carbon::parse($receivedDate)->locale('id')->translatedFormat('d M Y');
+    $rrCreatedAtText = $rrCreatedAt->copy()->locale('id')->translatedFormat('d M Y');
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $this->receivingReport->fresh()->load([
+            'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
+            'createdBy',
+        ]),
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    expect($html)->toContain($receivedDateText);
+    expect($html)->not->toContain($rrCreatedAtText);
+});

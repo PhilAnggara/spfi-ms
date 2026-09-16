@@ -324,8 +324,6 @@ class ReceivingReportController extends Controller
         $poItems = $receivingReport->purchaseOrder->items;
         $poItemIds = $poItems->pluck('id')->all();
         $poItemsById = $poItems->keyBy('id');
-        $previousStockLines = $this->buildStockLinesFromReceivingReportItems($receivingReport->items);
-
         $selectedRows = collect($validated['items'])
             ->filter(function ($row) {
                 return ($row['selected'] ?? '0') === '1';
@@ -381,7 +379,7 @@ class ReceivingReportController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($receivingReport, $validated, $selectedRows, $request, $currentStockLines, $previousStockLines, $requiresCustomsDocument) {
+            DB::transaction(function () use ($receivingReport, $validated, $selectedRows, $request, $currentStockLines, $requiresCustomsDocument) {
                 $receivingReport->update([
                     'received_date' => $validated['received_date'],
                     'requires_customs_document' => $requiresCustomsDocument,
@@ -403,10 +401,11 @@ class ReceivingReportController extends Controller
                     ]);
                 }
 
-                app(StockService::class)->applyReceivingReportAdjustment(
+                $receivingReport->refresh();
+
+                app(StockService::class)->replayReceivingReport(
                     receivingReport: $receivingReport,
                     currentLines: $currentStockLines,
-                    previousLines: $previousStockLines,
                     userId: $request->user()->id,
                 );
 
@@ -518,7 +517,7 @@ class ReceivingReportController extends Controller
 
         $currencyConversion = app(CurrencyExchangeRateService::class)->resolveConversionForPurchaseOrder(
             $receivingReport->purchaseOrder?->currency?->code,
-            $receivingReport->received_date ?? $receivingReport->created_at,
+            $receivingReport->received_date,
         );
 
         $rrAccountingPayload = app(ReceivingReportEntryGenerator::class)->generate(
