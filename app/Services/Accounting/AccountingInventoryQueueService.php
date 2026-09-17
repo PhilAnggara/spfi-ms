@@ -109,6 +109,8 @@ class AccountingInventoryQueueService
                 ->map(fn (object $row): object => $this->mapDocumentRow($row));
         }
 
+        $items = $this->hydratePendingTransferSlipAmounts($items);
+
         $documents = (new ConcretePaginator(
             $items,
             $total,
@@ -157,6 +159,43 @@ class AccountingInventoryQueueService
             'transaction_id' => null,
             'is_manual' => (bool) ($row->is_manual ?? false),
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, object>  $items
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function hydratePendingTransferSlipAmounts($items)
+    {
+        $targets = $items
+            ->filter(fn (object $row): bool => strtoupper((string) $row->doc_type) === 'TS'
+                && ! $row->is_encoded
+                && $row->source_id !== null)
+            ->map(fn (object $row): array => [
+                'source_id' => (int) $row->source_id,
+                'category_id' => (int) $row->category_id,
+            ])
+            ->values()
+            ->all();
+
+        if ($targets === []) {
+            return $items;
+        }
+
+        $amounts = $this->prefiller->estimateTransferSlipAmounts($targets);
+
+        return $items->map(function (object $row) use ($amounts): object {
+            if (strtoupper((string) $row->doc_type) !== 'TS' || $row->is_encoded || $row->source_id === null) {
+                return $row;
+            }
+
+            $key = ((int) $row->source_id).':'.((int) $row->category_id);
+            if (array_key_exists($key, $amounts)) {
+                $row->amount = (float) $amounts[$key];
+            }
+
+            return $row;
+        });
     }
 
     public function resolveSourceModel(string $docType, int $id): Model
@@ -556,6 +595,8 @@ class AccountingInventoryQueueService
                 $join->on('lines.transfer_slip_id', '=', 'ts.id');
             })
             ->join('item_categories as ic', 'ic.id', '=', 'lines.category_id')
+            ->leftJoin('store_withdrawals as sw', 'sw.id', '=', 'ts.store_withdrawal_id')
+            ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
             ->leftJoinSub($encodedMeta, 'enc', function ($join): void {
                 $join->on('enc.doc_no', '=', 'ts.ts_number')
                     ->on('enc.category_id', '=', 'ic.id');
@@ -569,8 +610,9 @@ class AccountingInventoryQueueService
                 'ts.ts_number as doc_number',
                 'ts.ts_number as sort_doc_number',
                 'ts.ts_date as doc_date',
-                DB::raw('NULL as reference'),
-                'ts.transfer_to as party_name',
+                'sw.sws_number as reference',
+                DB::raw('COALESCE(d.name, ts.transfer_to) as party_name'),
+                // Pending amounts are hydrated in PHP to match encode prefill costs.
                 DB::raw('COALESCE(enc.encoded_amount, 0) as amount'),
                 DB::raw("CASE WHEN {$encodedExists} THEN 'encoded' ELSE 'pending' END as status"),
                 DB::raw("CASE WHEN {$encodedExists} THEN 1 ELSE 0 END as is_encoded"),
@@ -583,6 +625,8 @@ class AccountingInventoryQueueService
 
         $this->applySourceBranchFilters($query, $filters, 'ts.ts_date', [
             'ts.ts_number',
+            'sw.sws_number',
+            'd.name',
             'ts.transfer_to',
             'ic.name',
         ], $encodedExists);

@@ -16,6 +16,10 @@ use InvalidArgumentException;
 
 class AccountingInventoryPrefiller
 {
+    public function __construct(
+        private readonly AccountingInventoryService $inventoryService,
+    ) {}
+
     /**
      * @return array{
      *     header: array<string, mixed>,
@@ -94,7 +98,23 @@ class AccountingInventoryPrefiller
             ->unique()
             ->values()
             ->all();
-        $averagePrices = $this->operationalAveragePriceMap($itemIds);
+        $unitCosts = $this->resolveUnitCostMap($categoryId, $itemIds);
+
+        $sws = null;
+        if ($transferSlip->store_withdrawal_id) {
+            $sws = DB::table('store_withdrawals as sw')
+                ->leftJoin('departments as d', 'd.id', '=', 'sw.department_id')
+                ->where('sw.id', $transferSlip->store_withdrawal_id)
+                ->first([
+                    'sw.sws_number',
+                    'd.name as department_name',
+                ]);
+        }
+
+        $departmentName = trim((string) ($sws->department_name ?? ''));
+        $partyName = $departmentName !== ''
+            ? $departmentName
+            : $transferSlip->transfer_to;
 
         $lines = [];
         foreach ($transferSlip->items as $index => $slipItem) {
@@ -108,7 +128,7 @@ class AccountingInventoryPrefiller
                 continue;
             }
 
-            $unitCost = (float) ($averagePrices[(int) $item->id] ?? 0);
+            $unitCost = (float) ($unitCosts[(int) $item->id] ?? 0);
             $lines[] = $this->linePayload(
                 item: $item,
                 direction: AccountingInventoryTransactionLine::DIRECTION_OUT,
@@ -125,9 +145,9 @@ class AccountingInventoryPrefiller
                 'doc_type' => 'TS',
                 'doc_number' => trim((string) $transferSlip->ts_number),
                 'doc_date' => $transferSlip->ts_date?->toDateString() ?? now()->toDateString(),
-                'po_number' => null,
+                'po_number' => $sws->sws_number ?? null,
                 'party_code' => null,
-                'party_name' => $transferSlip->transfer_to,
+                'party_name' => $partyName,
             ],
             'lines' => $lines,
         ];
@@ -233,6 +253,99 @@ class AccountingInventoryPrefiller
             'sort_order' => $sortOrder,
             'category_id' => $categoryId,
         ];
+    }
+
+    /**
+     * Unit cost for TS lines: accounting ave_cost first, then stock average_price.
+     *
+     * @param  list<int>  $itemIds
+     * @return array<int, float>
+     */
+    public function resolveUnitCostMap(int $categoryId, array $itemIds): array
+    {
+        $itemIds = array_values(array_unique(array_filter(array_map('intval', $itemIds))));
+        if ($itemIds === []) {
+            return [];
+        }
+
+        $weighted = $this->inventoryService->getWeightedUnitCostMap($categoryId, $itemIds);
+        $operational = $this->operationalAveragePriceMap($itemIds);
+        $map = [];
+
+        foreach ($itemIds as $itemId) {
+            $cost = (float) ($weighted[$itemId] ?? 0);
+            if ($cost <= 0) {
+                $cost = (float) ($operational[$itemId] ?? 0);
+            }
+            $map[$itemId] = round($cost, 5);
+        }
+
+        return $map;
+    }
+
+    /**
+     * Pending TS list amounts using the same cost rules as encode prefill.
+     *
+     * @param  list<array{source_id: int, category_id: int}>  $targets
+     * @return array<string, float> keyed by "{source_id}:{category_id}"
+     */
+    public function estimateTransferSlipAmounts(array $targets): array
+    {
+        if ($targets === []) {
+            return [];
+        }
+
+        $sourceIds = collect($targets)
+            ->pluck('source_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $lines = DB::table('transfer_slip_items as tsi')
+            ->join('items as i', 'i.id', '=', 'tsi.item_id')
+            ->whereIn('tsi.transfer_slip_id', $sourceIds)
+            ->whereNull('tsi.deleted_at')
+            ->where('tsi.quantity', '>', 0)
+            ->get([
+                'tsi.transfer_slip_id',
+                'tsi.item_id',
+                'tsi.quantity',
+                'i.category_id',
+            ]);
+
+        $amounts = [];
+        foreach ($targets as $target) {
+            $sourceId = (int) $target['source_id'];
+            $categoryId = (int) $target['category_id'];
+            $key = $sourceId.':'.$categoryId;
+            $amounts[$key] = 0.0;
+        }
+
+        $grouped = $lines->groupBy(
+            fn (object $row): string => ((int) $row->transfer_slip_id).':'.((int) $row->category_id)
+        );
+
+        foreach ($grouped as $key => $groupLines) {
+            if (! array_key_exists($key, $amounts)) {
+                continue;
+            }
+
+            [$sourceId, $categoryId] = array_map('intval', explode(':', (string) $key, 2));
+            $itemIds = $groupLines->pluck('item_id')->map(fn ($id): int => (int) $id)->unique()->values()->all();
+            $unitCosts = $this->resolveUnitCostMap($categoryId, $itemIds);
+            $total = 0.0;
+
+            foreach ($groupLines as $line) {
+                $qty = (float) $line->quantity;
+                $cost = (float) ($unitCosts[(int) $line->item_id] ?? 0);
+                $total += round($qty * $cost, 4);
+            }
+
+            $amounts[$key] = round($total, 4);
+        }
+
+        return $amounts;
     }
 
     private function operationalAveragePrice(int $itemId): float

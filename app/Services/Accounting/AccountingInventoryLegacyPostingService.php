@@ -154,7 +154,6 @@ class AccountingInventoryLegacyPostingService
         $tQty = $ending;
 
         $docTran = AccountingInventoryDocTran::query()->create([
-            'legacy_tran_id' => null,
             'doc_code' => strtoupper((string) $transaction->doc_type),
             'doc_no' => $docNo,
             'doc_date' => $transaction->doc_date?->toDateString() ?? $tranDate,
@@ -187,7 +186,6 @@ class AccountingInventoryLegacyPostingService
         $monthEnd = Carbon::parse($tranDate)->endOfMonth()->toDateString();
 
         AccountingInventoryMonthly::query()->create([
-            'legacy_monthly_id' => null,
             'item_code' => $itemCode,
             'doc_code' => strtoupper((string) $transaction->doc_type),
             'doc_no' => $docNo,
@@ -213,26 +211,6 @@ class AccountingInventoryLegacyPostingService
      */
     public function latestBalanceSnapshotByIds(int $categoryId, int $itemId, ?string $beforeOrOnDate = null): array
     {
-        $monthlyQuery = AccountingInventoryMonthly::query()
-            ->where('category_id', $categoryId)
-            ->where('item_id', $itemId);
-
-        if ($beforeOrOnDate !== null) {
-            $monthlyQuery->whereDate('tran_date', '<=', $beforeOrOnDate);
-        }
-
-        $row = $monthlyQuery
-            ->orderByDesc('tran_date')
-            ->orderByDesc('id')
-            ->first();
-
-        if ($row !== null) {
-            return [
-                'ending' => (float) $row->ending,
-                'u_cost' => (float) ($row->u_cost ?? 0),
-            ];
-        }
-
         $docTranQuery = AccountingInventoryDocTran::query()
             ->where('category_id', $categoryId)
             ->where('item_id', $itemId);
@@ -246,13 +224,33 @@ class AccountingInventoryLegacyPostingService
             ->orderByDesc('id')
             ->first();
 
-        if ($docTran === null) {
+        if ($docTran !== null) {
+            return [
+                'ending' => (float) ($docTran->t_qty ?? 0),
+                'u_cost' => (float) ($docTran->ave_cost ?? $docTran->u_cost ?? 0),
+            ];
+        }
+
+        $monthlyQuery = AccountingInventoryMonthly::query()
+            ->where('category_id', $categoryId)
+            ->where('item_id', $itemId);
+
+        if ($beforeOrOnDate !== null) {
+            $monthlyQuery->whereDate('tran_date', '<=', $beforeOrOnDate);
+        }
+
+        $row = $monthlyQuery
+            ->orderByDesc('tran_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($row === null) {
             return ['ending' => 0.0, 'u_cost' => 0.0];
         }
 
         return [
-            'ending' => (float) ($docTran->t_qty ?? 0),
-            'u_cost' => (float) ($docTran->ave_cost ?? $docTran->u_cost ?? 0),
+            'ending' => (float) $row->ending,
+            'u_cost' => (float) ($row->u_cost ?? 0),
         ];
     }
 

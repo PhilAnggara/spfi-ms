@@ -46,9 +46,51 @@ class AccountingInventoryService
 
     public function getWeightedUnitCost(int $categoryId, int $itemId): float
     {
-        $snapshot = $this->legacyPostingService->latestBalanceSnapshotByIds($categoryId, $itemId);
+        return (float) ($this->getWeightedUnitCostMap($categoryId, [$itemId])[$itemId] ?? 0);
+    }
 
-        return round((float) ($snapshot['u_cost'] ?? 0), 5);
+    /**
+     * @param  list<int>  $itemIds
+     * @return array<int, float>
+     */
+    public function getWeightedUnitCostMap(int $categoryId, array $itemIds): array
+    {
+        $itemIds = array_values(array_unique(array_filter(array_map('intval', $itemIds))));
+        if ($itemIds === []) {
+            return [];
+        }
+
+        $map = array_fill_keys($itemIds, 0.0);
+
+        $latestRows = DB::table('accounting_inventory_doc_tran as dt')
+            ->joinSub(
+                DB::table('accounting_inventory_doc_tran')
+                    ->select('item_id', DB::raw('MAX(id) as id'))
+                    ->where('category_id', $categoryId)
+                    ->whereIn('item_id', $itemIds)
+                    ->groupBy('item_id'),
+                'latest',
+                function ($join): void {
+                    $join->on('latest.id', '=', 'dt.id');
+                }
+            )
+            ->get(['dt.item_id', 'dt.ave_cost', 'dt.u_cost']);
+
+        foreach ($latestRows as $row) {
+            $map[(int) $row->item_id] = round((float) ($row->ave_cost ?: $row->u_cost ?: 0), 5);
+        }
+
+        $missing = array_values(array_filter(
+            $itemIds,
+            fn (int $itemId): bool => ($map[$itemId] ?? 0) <= 0
+        ));
+
+        foreach ($missing as $itemId) {
+            $snapshot = $this->legacyPostingService->latestBalanceSnapshotByIds($categoryId, $itemId);
+            $map[$itemId] = round((float) ($snapshot['u_cost'] ?? 0), 5);
+        }
+
+        return $map;
     }
 
     /**

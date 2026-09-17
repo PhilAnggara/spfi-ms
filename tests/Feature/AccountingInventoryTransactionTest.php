@@ -393,6 +393,8 @@ it('opens transfer slip process screen with prefilled lines', function () {
 
     $response->assertSuccessful();
     $response->assertSee('TS-INV-001');
+    $response->assertSee('SWS-TS-INV-001');
+    $response->assertSee($this->department->name);
     $response->assertSee($this->item->code);
     $response->assertSee('Pending');
 });
@@ -892,4 +894,248 @@ it('rejects encode when a line has no item code', function () {
         ->where('doc_code', 'CV')
         ->where('doc_no', 'CV-NO-CODE')
         ->exists())->toBeFalse();
+});
+
+it('lists transfer slip with SWS reference, department transfer to, and average-cost amount', function () {
+    $service = app(AccountingInventoryService::class);
+
+    $inbound = AccountingInventoryTransaction::make([
+        'category_id' => $this->category->id,
+        'doc_type' => 'CV',
+        'doc_number' => 'CV-TS-LIST-IN',
+        'doc_date' => now()->toDateString(),
+        'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+        'category' => $this->category,
+    ]);
+
+    $service->encodeDocument($inbound, [
+        [
+            'item_id' => $this->item->id,
+            'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+            'quantity' => 10,
+            'unit_of_measure_id' => $this->unit->id,
+            'unit_cost' => 25,
+            'amount' => 250,
+        ],
+    ], $this->user);
+
+    $storeWithdrawalId = \Illuminate\Support\Facades\DB::table('store_withdrawals')->insertGetId([
+        'sws_number' => 'SWS-TS-LIST-001',
+        'sws_date' => now()->toDateString(),
+        'department_id' => $this->department->id,
+        'department_code' => $this->department->code,
+        'type' => 'regular',
+        'info' => 'TS list columns',
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $storeWithdrawalItemId = \Illuminate\Support\Facades\DB::table('store_withdrawal_items')->insertGetId([
+        'store_withdrawal_id' => $storeWithdrawalId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 4,
+        'uom' => $this->unit->name,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $transferSlipId = \Illuminate\Support\Facades\DB::table('transfer_slips')->insertGetId([
+        'ts_number' => 'TS-LIST-001',
+        'ts_date' => now()->toDateString(),
+        'store_withdrawal_id' => $storeWithdrawalId,
+        'for_production' => false,
+        'transfer_to' => null,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    \Illuminate\Support\Facades\DB::table('transfer_slip_items')->insert([
+        'transfer_slip_id' => $transferSlipId,
+        'store_withdrawal_item_id' => $storeWithdrawalItemId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 4,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $listAmount = app(\App\Services\Accounting\AccountingInventoryPrefiller::class)
+        ->estimateTransferSlipAmounts([
+            ['source_id' => $transferSlipId, 'category_id' => $this->category->id],
+        ])[$transferSlipId.':'.$this->category->id] ?? 0;
+
+    expect((float) $listAmount)->toBe(100.0);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('accounting.inventory-transactions.index', [
+            'status' => 'pending',
+            'category_id' => $this->category->id,
+            'doc_type' => 'TS',
+        ]));
+
+    $response->assertSuccessful();
+    $response->assertSee('TS-LIST-001');
+    $response->assertSee('SWS-TS-LIST-001');
+    $response->assertSee($this->department->name);
+    $response->assertSee('100.00');
+
+    $show = $this->actingAs($this->user)
+        ->get(route('accounting.inventory-transactions.show', [
+            'docType' => 'ts',
+            'id' => $transferSlipId,
+            'category_id' => $this->category->id,
+        ]));
+
+    $show->assertSuccessful();
+    $show->assertSee('100.00');
+});
+
+it('prefills and encodes transfer slip using accounting average cost', function () {
+    $service = app(AccountingInventoryService::class);
+
+    $inbound = AccountingInventoryTransaction::make([
+        'category_id' => $this->category->id,
+        'doc_type' => 'CV',
+        'doc_number' => 'CV-TS-AVG-IN',
+        'doc_date' => now()->toDateString(),
+        'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+        'category' => $this->category,
+    ]);
+
+    $service->encodeDocument($inbound, [
+        [
+            'item_id' => $this->item->id,
+            'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+            'quantity' => 10,
+            'unit_of_measure_id' => $this->unit->id,
+            'unit_cost' => 20,
+            'amount' => 200,
+        ],
+    ], $this->user);
+
+    $storeWithdrawalId = \Illuminate\Support\Facades\DB::table('store_withdrawals')->insertGetId([
+        'sws_number' => 'SWS-TS-AVG-001',
+        'sws_date' => now()->toDateString(),
+        'department_id' => $this->department->id,
+        'department_code' => $this->department->code,
+        'type' => 'regular',
+        'info' => 'TS avg cost',
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $storeWithdrawalItemId = \Illuminate\Support\Facades\DB::table('store_withdrawal_items')->insertGetId([
+        'store_withdrawal_id' => $storeWithdrawalId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 3,
+        'uom' => $this->unit->name,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $transferSlipId = \Illuminate\Support\Facades\DB::table('transfer_slips')->insertGetId([
+        'ts_number' => 'TS-AVG-001',
+        'ts_date' => now()->toDateString(),
+        'store_withdrawal_id' => $storeWithdrawalId,
+        'for_production' => false,
+        'transfer_to' => null,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    \Illuminate\Support\Facades\DB::table('transfer_slip_items')->insert([
+        'transfer_slip_id' => $transferSlipId,
+        'store_withdrawal_item_id' => $storeWithdrawalItemId,
+        'item_id' => $this->item->id,
+        'product_code' => $this->item->code,
+        'quantity' => 3,
+        'created_by' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    expect($service->getWeightedUnitCost($this->category->id, $this->item->id))->toBe(20.0);
+
+    $response = $this->actingAs($this->user)
+        ->withHeader('X-Requested-With', 'XMLHttpRequest')
+        ->putJson(route('accounting.inventory-transactions.update', [
+            'docType' => 'ts',
+            'id' => $transferSlipId,
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
+            'queue_doc_type' => 'TS',
+            'queue_category_id' => $this->category->id,
+            'lines' => [
+                [
+                    'item_id' => $this->item->id,
+                    'direction' => 'out',
+                    'quantity' => 3,
+                    'unit_of_measure_id' => $this->unit->id,
+                    'unit_cost' => 20,
+                    'amount' => 60,
+                    'prefill_quantity' => 3,
+                    'prefill_unit_cost' => 20,
+                ],
+            ],
+        ]);
+
+    $response->assertSuccessful();
+
+    $docTran = AccountingInventoryDocTran::query()
+        ->where('doc_code', 'TS')
+        ->where('doc_no', 'TS-AVG-001')
+        ->where('category_id', $this->category->id)
+        ->first();
+
+    expect($docTran)->not->toBeNull();
+    expect((float) $docTran->u_cost)->toBe(20.0);
+    expect((float) $docTran->amount)->toBe(-60.0);
+    expect((float) $docTran->ave_cost)->toBe(20.0);
+    expect($docTran->legacy_tran_id)->toBeNull();
+});
+
+it('allows multiple native encode rows with null legacy_tran_id', function () {
+    $service = app(AccountingInventoryService::class);
+
+    foreach (['CV-LEGACY-NULL-1', 'CV-LEGACY-NULL-2'] as $docNo) {
+        $document = AccountingInventoryTransaction::make([
+            'category_id' => $this->category->id,
+            'doc_type' => 'CV',
+            'doc_number' => $docNo,
+            'doc_date' => now()->toDateString(),
+            'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+            'category' => $this->category,
+        ]);
+
+        $service->encodeDocument($document, [
+            [
+                'item_id' => $this->item->id,
+                'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+                'quantity' => 1,
+                'unit_of_measure_id' => $this->unit->id,
+                'unit_cost' => 5,
+                'amount' => 5,
+            ],
+        ], $this->user);
+    }
+
+    expect(AccountingInventoryDocTran::query()
+        ->whereNull('legacy_tran_id')
+        ->whereIn('doc_no', ['CV-LEGACY-NULL-1', 'CV-LEGACY-NULL-2'])
+        ->count())->toBe(2);
+
+    expect(AccountingInventoryMonthly::query()
+        ->whereNull('legacy_monthly_id')
+        ->whereIn('doc_no', ['CV-LEGACY-NULL-1', 'CV-LEGACY-NULL-2'])
+        ->count())->toBe(2);
 });
