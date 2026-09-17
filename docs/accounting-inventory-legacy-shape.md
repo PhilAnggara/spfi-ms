@@ -41,9 +41,7 @@ Additional local IDs (alongside codes): `item_id`, `category_id`, `source_type`/
 
 Accounting reports in this app **always** read the two local tables above. There is no fallback to AISystem or warehouse RR/TS/DR. Compare against the legacy system outside this app during parallel testing. Empty filters export empty rows.
 
-Reports are keyed by legacy-shaped string columns (`item_code` + `category`), not by `item_id` / `category_id`. Import rows with null FKs still appear. Local `items` are joined by code only to enrich name/UOM when a master match exists.
-
-UI labels `SPARE PARTS` and `CHEMICAL` also match stored AISystem values `PARTS` and `CHEM` (same aliases as IM reports).
+Accounting reports filter by `category_id` (dropdown loaded from `item_categories` allow-list: PARTS, CHEM, PLASTIC BAG FPL, etc.). Local `items` are joined by code only to enrich name/UOM when a master match exists. Encoded rows store both `category_id` and the category name string.
 
 ## Import
 

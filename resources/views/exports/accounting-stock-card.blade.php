@@ -30,27 +30,11 @@
             font-weight: bold;
             text-align: left;
             text-transform: uppercase;
+            border-bottom: 1.5px solid #374151;
+            padding-bottom: 4px;
         }
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .company-name {
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .report-title {
-            font-size: 13px;
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        .report-info {
-            font-size: 8px;
-            margin-top: 5px;
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-        }
+        .section-col { border-bottom: 1.5px solid #374151; padding-bottom: 4px; }
+        .col-sep { border-right: 7px solid #fff; padding-right: 2px; }
         .number-right {
             text-align: right;
         }
@@ -84,14 +68,14 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width: 10%;">Code</th>
-                    <th style="width: 35%;">Item Description</th>
-                    <th style="width: 10%;">Unit</th>
-                    <th class="number-right" style="width: 10%;">Qty</th>
-                    <th class="number-right" style="width: 10%;">Unit Cost</th>
-                    <th class="number-right" style="width: 10%;">Amount</th>
-                    <th class="number-right" style="width: 10%;">Beginning</th>
-                    <th class="number-right" style="width: 10%;">Transaction</th>
+                    <th class="section-col col-sep" style="width: 10%;">Code</th>
+                    <th class="section-col col-sep" style="width: 35%;">Item Description</th>
+                    <th class="section-col col-sep" style="width: 10%;">Unit</th>
+                    <th class="section-col col-sep number-right" style="width: 10%;">Qty</th>
+                    <th class="section-col col-sep number-right" style="width: 10%;">Unit Cost</th>
+                    <th class="section-col col-sep number-right" style="width: 10%;">Amount</th>
+                    <th class="section-col col-sep number-right" style="width: 10%;">Beginning</th>
+                    <th class="section-col number-right" style="width: 10%;">Transaction</th>
                 </tr>
             </thead>
             <tbody>

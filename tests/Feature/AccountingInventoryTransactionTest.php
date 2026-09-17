@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AccountingInventoryDocTran;
+use App\Models\AccountingInventoryMonthly;
 use App\Models\AccountingInventoryTransaction;
 use App\Models\AccountingInventoryTransactionLine;
 use App\Models\Department;
@@ -37,8 +38,8 @@ beforeEach(function () {
     $this->user->assignRole('accounting-staff');
 
     $this->category = ItemCategory::query()->create([
-        'name' => 'CHEMICAL',
-        'code' => 'CHEM-'.uniqid(),
+        'name' => 'CHEM',
+        'code' => 'CHEM-TX-'.uniqid(),
     ]);
 
     $this->unit = UnitOfMeasure::query()->create(['name' => 'Kilogram', 'code' => 'KG-'.uniqid()]);
@@ -804,4 +805,91 @@ it('encodes prefilled transfer slip without requiring prior accounting balance',
         ->where('doc_no', 'TS-ENC-001')
         ->where('category_id', $this->category->id)
         ->exists())->toBeTrue();
+});
+
+it('chains beginning balance by category_id across encodes', function () {
+    $service = app(AccountingInventoryService::class);
+
+    $inbound = AccountingInventoryTransaction::make([
+        'category_id' => $this->category->id,
+        'doc_type' => 'CV',
+        'doc_number' => 'CV-BAL-IN',
+        'doc_date' => now()->toDateString(),
+        'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+        'category' => $this->category,
+    ]);
+
+    $service->encodeDocument($inbound, [
+        [
+            'item_id' => $this->item->id,
+            'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+            'quantity' => 10,
+            'unit_of_measure_id' => $this->unit->id,
+            'unit_cost' => 5,
+            'amount' => 50,
+        ],
+    ], $this->user);
+
+    $outbound = AccountingInventoryTransaction::make([
+        'category_id' => $this->category->id,
+        'doc_type' => 'CV',
+        'doc_number' => 'CV-BAL-OUT',
+        'doc_date' => now()->toDateString(),
+        'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+        'category' => $this->category,
+    ]);
+
+    $service->encodeDocument($outbound, [
+        [
+            'item_id' => $this->item->id,
+            'direction' => AccountingInventoryTransactionLine::DIRECTION_OUT,
+            'quantity' => 3,
+            'unit_of_measure_id' => $this->unit->id,
+            'unit_cost' => 5,
+            'amount' => 15,
+        ],
+    ], $this->user);
+
+    $monthlyOut = AccountingInventoryMonthly::query()
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-BAL-OUT')
+        ->where('category_id', $this->category->id)
+        ->where('item_id', $this->item->id)
+        ->first();
+
+    expect($monthlyOut)->not->toBeNull();
+    expect((float) $monthlyOut->begining)->toBe(10.0);
+    expect((float) $monthlyOut->ending)->toBe(7.0);
+});
+
+it('rejects encode when a line has no item code', function () {
+    $document = AccountingInventoryTransaction::make([
+        'category_id' => $this->category->id,
+        'doc_type' => 'CV',
+        'doc_number' => 'CV-NO-CODE',
+        'doc_date' => now()->toDateString(),
+        'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+        'category' => $this->category,
+    ]);
+
+    $line = AccountingInventoryTransactionLine::make([
+        'item_id' => $this->item->id,
+        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+        'quantity' => 1,
+        'unit_of_measure_id' => $this->unit->id,
+        'unit_cost' => 1,
+        'amount' => 1,
+        'item' => null,
+    ]);
+    $line->item = Item::make(['id' => $this->item->id, 'code' => '']);
+    $document->lines = collect([$line]);
+
+    expect(fn () => app(\App\Services\Accounting\AccountingInventoryLegacyPostingService::class)
+        ->postEncodedTransaction($document, $this->user))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
+
+    expect(AccountingInventoryDocTran::query()
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-NO-CODE')
+        ->exists())->toBeFalse();
 });

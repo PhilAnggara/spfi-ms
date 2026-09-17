@@ -9,25 +9,6 @@
     $defaultDateFrom = $today->copy()->subDays(30)->toDateString();
     $monthMin = $today->copy()->subMonths(24)->format('Y-m');
     $monthMax = $today->format('Y-m');
-
-    $categories = [
-        'OFFICE SUPPLIES',
-        'SPARE PARTS',
-        'FACTORY SUPPLIES',
-        'CHEMICAL',
-        'FUEL',
-        'LABEL',
-        'CARTON',
-        'CAN',
-        'RAW MATERIALS',
-        'SPICES AND INGREDIENTS',
-        'COAL',
-        'SLUDGE OIL',
-        'LABELING SUPPLIES',
-        // 'MATERIAL IN TRANSIT',
-        // 'FINISHED GOODS',
-        // 'FISH',
-    ];
 @endphp
 <div class="page-heading">
     <div class="page-title">
@@ -54,10 +35,10 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label" for="stock-card-category">Category</label>
-                                <select id="stock-card-category" name="category" class="form-select" required>
+                                <select id="stock-card-category" name="category_id" class="form-select" required>
                                     <option value="">Select Category</option>
                                     @foreach ($categories as $category)
-                                        <option value="{{ $category }}">{{ $category }}</option>
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -93,10 +74,10 @@
                             </div>
                             <div class="col-12 col-md-4">
                                 <label class="form-label" for="transaction-category">Category</label>
-                                <select id="transaction-category" name="category" class="form-select" required>
+                                <select id="transaction-category" name="category_id" class="form-select" required>
                                     <option value="">Select Category</option>
                                     @foreach ($categories as $category)
-                                        <option value="{{ $category }}">{{ $category }}</option>
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -128,10 +109,10 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label" for="restatement-category">Category</label>
-                                <select id="restatement-category" name="category" class="form-select" required>
+                                <select id="restatement-category" name="category_id" class="form-select" required>
                                     <option value="">Select Category</option>
                                     @foreach ($categories as $category)
-                                        <option value="{{ $category }}">{{ $category }}</option>
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -163,10 +144,10 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label" for="stock-card-count-category">Category</label>
-                                <select id="stock-card-count-category" name="category" class="form-select" required>
+                                <select id="stock-card-count-category" name="category_id" class="form-select" required>
                                     <option value="">Select Category</option>
                                     @foreach ($categories as $category)
-                                        <option value="{{ $category }}">{{ $category }}</option>
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -202,10 +183,10 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label" for="doc-summary-category">Category</label>
-                                <select id="doc-summary-category" name="category" class="form-select" required>
+                                <select id="doc-summary-category" name="category_id" class="form-select" required>
                                     <option value="">Select Category</option>
                                     @foreach ($categories as $category)
-                                        <option value="{{ $category }}">{{ $category }}</option>
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -241,10 +222,10 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label" for="purchase-category">Category</label>
-                                <select id="purchase-category" name="category" class="form-select" required>
+                                <select id="purchase-category" name="category_id" class="form-select" required>
                                     <option value="">Select Category</option>
                                     @foreach ($categories as $category)
-                                        <option value="{{ $category }}">{{ $category }}</option>
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </select>
                             </div>

@@ -7,8 +7,10 @@
         body { font-family: Arial, sans-serif; font-size: 8.5px; color: #111; }
         table { width: 100%; border-collapse: separate; border-spacing: 0 3px; }
         th, td { border: none; padding: 2px 5px; vertical-align: top; }
-        th { font-size: 7.5px; text-align: left; font-weight: bold; text-transform: uppercase; }
-        .no-border td { padding: 1px 0; }
+        th { font-size: 7.5px; text-align: left; font-weight: bold; text-transform: uppercase; border-bottom: 1.5px solid #374151; padding-bottom: 4px; }
+        .section-col { border-bottom: 1.5px solid #374151; padding-bottom: 4px; }
+        .col-sep { border-right: 7px solid #fff; padding-right: 2px; }
+        .no-border td { padding: 1px 0; border-bottom: none; }
         .center { text-align: center; }
         .right { text-align: right; }
         th.right { text-align: right; }
@@ -38,17 +40,17 @@
         </tr>
         <tr class="no-border"><td colspan="11">&nbsp;</td></tr>
         <tr>
-            <th>Supplier Name</th>
-            <th>PO Number</th>
-            <th>RR Number</th>
-            <th>Date</th>
-            <th>Currency</th>
-            <th>Item Code</th>
-            <th>Item Name</th>
-            <th>UoM</th>
-            <th class="right">Quantity</th>
-            <th class="right">Unit Price</th>
-            <th class="right">Amount</th>
+            <th class="section-col col-sep">Supplier Name</th>
+            <th class="section-col col-sep">PO Number</th>
+            <th class="section-col col-sep">RR Number</th>
+            <th class="section-col col-sep">Date</th>
+            <th class="section-col col-sep center">Currency</th>
+            <th class="section-col col-sep">Item Code</th>
+            <th class="section-col col-sep">Item Name</th>
+            <th class="section-col col-sep">UoM</th>
+            <th class="section-col col-sep right">Quantity</th>
+            <th class="section-col col-sep right">Unit Price</th>
+            <th class="section-col right">Amount</th>
         </tr>
         @forelse ($rows as $row)
             <tr>

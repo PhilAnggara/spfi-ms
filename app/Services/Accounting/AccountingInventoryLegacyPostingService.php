@@ -8,23 +8,47 @@ use App\Models\AccountingInventoryTransaction;
 use App\Models\AccountingInventoryTransactionLine;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class AccountingInventoryLegacyPostingService
 {
     public function postEncodedTransaction(AccountingInventoryTransaction $transaction, User $user): void
     {
-        $categoryName = (string) ($transaction->category?->name ?? '');
+        $categoryId = (int) $transaction->category_id;
+        if ($categoryId <= 0) {
+            throw ValidationException::withMessages([
+                'category_id' => 'A valid category is required before encoding.',
+            ]);
+        }
+
+        if ($transaction->category === null) {
+            $transaction->category = ItemCategory::query()->find($categoryId);
+        }
+
+        $categoryName = trim((string) ($transaction->category?->name ?? ''));
+        if ($categoryName === '') {
+            throw ValidationException::withMessages([
+                'category_id' => 'Category master record was not found for encoding.',
+            ]);
+        }
+
+        $this->hydratePartyFromSupplier($transaction);
+
         $docNo = $transaction->displayDocNumber();
         $tranDate = $transaction->doc_date?->toDateString() ?? now()->toDateString();
         $inputTime = now()->format('H:i:s');
         $encodedAt = now();
 
-        foreach ($transaction->lines as $line) {
+        foreach ($transaction->lines as $index => $line) {
+            $this->assertLineIsPostable($line, $index);
+
             $this->postLine(
                 transaction: $transaction,
                 line: $line,
+                categoryId: $categoryId,
                 categoryName: $categoryName,
                 docNo: $docNo,
                 tranDate: $tranDate,
@@ -56,9 +80,49 @@ class AccountingInventoryLegacyPostingService
             ->delete();
     }
 
+    private function hydratePartyFromSupplier(AccountingInventoryTransaction $transaction): void
+    {
+        $supplierId = (int) ($transaction->supplier_id ?? 0);
+        if ($supplierId <= 0) {
+            return;
+        }
+
+        $partyName = trim((string) ($transaction->party_name ?? ''));
+        $partyCode = trim((string) ($transaction->party_code ?? ''));
+        if ($partyName !== '' && $partyCode !== '') {
+            return;
+        }
+
+        $supplier = Supplier::query()->find($supplierId);
+        if ($supplier === null) {
+            return;
+        }
+
+        if ($partyName === '') {
+            $transaction->party_name = $supplier->name;
+        }
+
+        if ($partyCode === '') {
+            $transaction->party_code = $supplier->code;
+        }
+    }
+
+    private function assertLineIsPostable(AccountingInventoryTransactionLine $line, int $index): void
+    {
+        $itemId = (int) $line->item_id;
+        $itemCode = trim((string) ($line->item?->code ?? ''));
+
+        if ($itemId <= 0 || $itemCode === '') {
+            throw ValidationException::withMessages([
+                'lines' => 'Line '.($index + 1).' is missing a valid item code and cannot be encoded.',
+            ]);
+        }
+    }
+
     private function postLine(
         AccountingInventoryTransaction $transaction,
         AccountingInventoryTransactionLine $line,
+        int $categoryId,
         string $categoryName,
         string $docNo,
         string $tranDate,
@@ -67,9 +131,13 @@ class AccountingInventoryLegacyPostingService
         Carbon $encodedAt,
     ): void {
         $item = $line->item;
-        $itemCode = (string) ($item?->code ?? '');
-        if ($itemCode === '' || $categoryName === '') {
-            return;
+        $itemCode = trim((string) ($item?->code ?? ''));
+        $itemId = (int) $line->item_id;
+
+        if ($itemId <= 0 || $itemCode === '' || $categoryName === '') {
+            throw ValidationException::withMessages([
+                'lines' => 'Cannot encode a line without item code and category.',
+            ]);
         }
 
         $signedQty = $line->direction === AccountingInventoryTransactionLine::DIRECTION_OUT
@@ -78,7 +146,7 @@ class AccountingInventoryLegacyPostingService
 
         $unitCost = (float) $line->unit_cost;
         $amount = round($signedQty * $unitCost, 4);
-        $snapshot = $this->latestBalanceSnapshot($itemCode, $categoryName, $tranDate);
+        $snapshot = $this->latestBalanceSnapshotByIds($categoryId, $itemId, $tranDate);
         $begining = $snapshot['ending'];
         $beginingUCost = $snapshot['u_cost'];
         $ending = round($begining + $signedQty, 8);
@@ -102,8 +170,8 @@ class AccountingInventoryLegacyPostingService
             'modify_date' => null,
             'category' => $categoryName,
             'amount' => $amount,
-            'item_id' => $line->item_id,
-            'category_id' => $transaction->category_id,
+            'item_id' => $itemId,
+            'category_id' => $categoryId,
             'source_type' => $transaction->source_type,
             'source_id' => $transaction->source_id,
             'supplier_id' => $transaction->supplier_id,
@@ -130,8 +198,8 @@ class AccountingInventoryLegacyPostingService
             'tran_date' => $monthEnd,
             'category' => $categoryName,
             'begining_u_cost' => $beginingUCost > 0 ? round($beginingUCost, 8) : null,
-            'item_id' => $line->item_id,
-            'category_id' => $transaction->category_id,
+            'item_id' => $itemId,
+            'category_id' => $categoryId,
             'source_type' => $transaction->source_type,
             'source_id' => $transaction->source_id,
             'supplier_id' => $transaction->supplier_id,
@@ -143,49 +211,17 @@ class AccountingInventoryLegacyPostingService
     /**
      * @return array{ending: float, u_cost: float}
      */
-    public function latestBalanceSnapshot(string $itemCode, string $categoryName, string $beforeOrOnDate): array
+    public function latestBalanceSnapshotByIds(int $categoryId, int $itemId, ?string $beforeOrOnDate = null): array
     {
-        $row = AccountingInventoryMonthly::query()
-            ->where('item_code', $itemCode)
-            ->where('category', $categoryName)
-            ->whereDate('tran_date', '<=', $beforeOrOnDate)
-            ->orderByDesc('tran_date')
-            ->orderByDesc('id')
-            ->first();
+        $monthlyQuery = AccountingInventoryMonthly::query()
+            ->where('category_id', $categoryId)
+            ->where('item_id', $itemId);
 
-        if ($row === null) {
-            $row = AccountingInventoryDocTran::query()
-                ->where('item_code', $itemCode)
-                ->where('category', $categoryName)
-                ->whereDate('tran_date', '<=', $beforeOrOnDate)
-                ->orderByDesc('tran_date')
-                ->orderByDesc('id')
-                ->first();
-
-            if ($row === null) {
-                return ['ending' => 0.0, 'u_cost' => 0.0];
-            }
-
-            return [
-                'ending' => (float) ($row->t_qty ?? 0),
-                'u_cost' => (float) ($row->ave_cost ?? $row->u_cost ?? 0),
-            ];
+        if ($beforeOrOnDate !== null) {
+            $monthlyQuery->whereDate('tran_date', '<=', $beforeOrOnDate);
         }
 
-        return [
-            'ending' => (float) $row->ending,
-            'u_cost' => (float) ($row->u_cost ?? 0),
-        ];
-    }
-
-    /**
-     * @return array{ending: float, u_cost: float}
-     */
-    public function latestBalanceSnapshotByIds(int $categoryId, int $itemId): array
-    {
-        $row = AccountingInventoryMonthly::query()
-            ->where('category_id', $categoryId)
-            ->where('item_id', $itemId)
+        $row = $monthlyQuery
             ->orderByDesc('tran_date')
             ->orderByDesc('id')
             ->first();
@@ -197,9 +233,15 @@ class AccountingInventoryLegacyPostingService
             ];
         }
 
-        $docTran = AccountingInventoryDocTran::query()
+        $docTranQuery = AccountingInventoryDocTran::query()
             ->where('category_id', $categoryId)
-            ->where('item_id', $itemId)
+            ->where('item_id', $itemId);
+
+        if ($beforeOrOnDate !== null) {
+            $docTranQuery->whereDate('tran_date', '<=', $beforeOrOnDate);
+        }
+
+        $docTran = $docTranQuery
             ->orderByDesc('tran_date')
             ->orderByDesc('id')
             ->first();
