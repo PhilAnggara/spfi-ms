@@ -534,45 +534,95 @@ class AccountingInventoryReportService
     }
 
     /**
-     * Legacy-style stock card snapshot: SUM(begining)/SUM(ending) grouped by item_code + u_cost.
-     * Beginning amount uses the row u_cost (same as legacy AISystem register), not begining_u_cost.
+     * Stock card snapshot per item_code: beginning = prior month last ending;
+     * ending = last monthly row in the selected month. No SUM of running balances.
+     *
+     * Beginning of M always equals ending of M-1 for the category (by construction).
+     * First-row `begining` is only used when the prior month has no monthly rows at all
+     * (seed month). Items that first appear after a prior month already has data open at 0
+     * so they cannot inflate beginning above the prior month ending total.
      *
      * @return Collection<int, array<string, mixed>>
      */
     private function stockCardSnapshotsForMonth(int $categoryId, string $monthStart, string $monthEnd): Collection
     {
-        return DB::table('accounting_inventory_monthly')
-            ->where('category_id', $categoryId)
-            ->whereDate('tran_date', '>=', $monthStart)
-            ->whereDate('tran_date', '<=', $monthEnd)
-            ->groupBy('item_code', 'u_cost')
-            ->orderBy('item_code')
-            ->select([
-                'item_code',
-                'u_cost',
-                DB::raw('SUM(ending) as ending'),
-                DB::raw('SUM(begining) as beginning'),
-            ])
-            ->get()
-            ->map(function (object $row): array {
-                $endingQty = (float) $row->ending;
-                $beginningQty = (float) $row->beginning;
-                $unitCost = (float) $row->u_cost;
+        $priorMonthEnd = Carbon::parse($monthStart)->subDay();
+        $priorMonthStart = $priorMonthEnd->copy()->startOfMonth()->toDateString();
+        $priorMonthEndDate = $priorMonthEnd->toDateString();
+
+        $currentOrdered = $this->monthlyRowsOrderedByItem($categoryId, $monthStart, $monthEnd);
+        $priorOrdered = $this->monthlyRowsOrderedByItem($categoryId, $priorMonthStart, $priorMonthEndDate);
+
+        $currentLastByItem = $currentOrdered->map(fn (Collection $rows): object => $rows->last());
+        $currentFirstByItem = $currentOrdered->map(fn (Collection $rows): object => $rows->first());
+        $priorLastByItem = $priorOrdered->map(fn (Collection $rows): object => $rows->last());
+        $priorMonthHasData = $priorLastByItem->isNotEmpty();
+
+        $itemCodes = $currentLastByItem->keys()
+            ->merge($priorLastByItem->keys())
+            ->unique()
+            ->sort()
+            ->values();
+
+        return $itemCodes
+            ->map(function (string $itemCode) use ($currentLastByItem, $currentFirstByItem, $priorLastByItem, $priorMonthHasData): ?array {
+                $current = $currentLastByItem->get($itemCode);
+                $prior = $priorLastByItem->get($itemCode);
+                $first = $currentFirstByItem->get($itemCode);
+
+                if ($prior !== null) {
+                    $beginningQty = (float) $prior->ending;
+                    $beginningUnitCost = (float) $prior->u_cost;
+                } elseif (! $priorMonthHasData && $first !== null) {
+                    $beginningQty = (float) $first->begining;
+                    $beginningUnitCost = (float) $first->u_cost;
+                } else {
+                    $beginningQty = 0.0;
+                    $beginningUnitCost = 0.0;
+                }
+
+                if ($current !== null) {
+                    $endingQty = (float) $current->ending;
+                    $unitCost = (float) $current->u_cost;
+                } elseif ($beginningQty > 0) {
+                    $endingQty = $beginningQty;
+                    $unitCost = $beginningUnitCost;
+                } else {
+                    return null;
+                }
+
                 $amount = $endingQty * $unitCost;
-                $beginningAmount = $beginningQty * $unitCost;
+                $beginningAmount = $beginningQty * $beginningUnitCost;
 
                 return [
-                    'item_code' => (string) $row->item_code,
+                    'item_code' => $itemCode,
                     'qty' => $endingQty,
                     'unit_cost' => $unitCost,
                     'amount' => $amount,
                     'beginning_qty' => $beginningQty,
-                    'beginning_unit_cost' => $unitCost,
+                    'beginning_unit_cost' => $beginningUnitCost,
                     'beginning_amount' => $beginningAmount,
                     'transaction' => $amount - $beginningAmount,
                 ];
             })
+            ->filter()
             ->values();
+    }
+
+    /**
+     * @return Collection<string, Collection<int, object>>
+     */
+    private function monthlyRowsOrderedByItem(int $categoryId, string $monthStart, string $monthEnd): Collection
+    {
+        return DB::table('accounting_inventory_monthly')
+            ->where('category_id', $categoryId)
+            ->whereDate('tran_date', '>=', $monthStart)
+            ->whereDate('tran_date', '<=', $monthEnd)
+            ->orderBy('item_code')
+            ->orderBy('tran_date')
+            ->orderBy('id')
+            ->get(['id', 'item_code', 'begining', 'ending', 'u_cost', 'tran_date'])
+            ->groupBy(fn (object $row): string => (string) $row->item_code);
     }
 
     /**

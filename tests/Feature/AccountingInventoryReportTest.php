@@ -435,7 +435,7 @@ it('lists report categories from the allow-list only', function () {
     expect($names)->not->toContain('FINISHED GOODS');
 });
 
-it('values stock card beginning with row u_cost like legacy sum register', function () {
+it('values stock card beginning with row u_cost when no prior month', function () {
     $itemCode = 'BEG-COST-'.uniqid();
 
     AccountingInventoryMonthly::query()->create([
@@ -462,13 +462,13 @@ it('values stock card beginning with row u_cost like legacy sum register', funct
     expect((float) $row['transaction'])->toBe(100.0);
 });
 
-it('sums stock card beginning and ending across monthly rows for the same cost layer', function () {
-    $itemCode = 'BEG-SUM-'.uniqid();
+it('uses first begining and last ending within the month, not SUM of running balances', function () {
+    $itemCode = 'BEG-LAST-'.uniqid();
 
     AccountingInventoryMonthly::query()->create([
         'item_code' => $itemCode,
         'doc_code' => 'RR',
-        'doc_no' => 'RR-SUM-001',
+        'doc_no' => 'RR-LAST-001',
         'qty' => 5,
         'u_cost' => 10,
         'begining' => 4,
@@ -481,7 +481,7 @@ it('sums stock card beginning and ending across monthly rows for the same cost l
     AccountingInventoryMonthly::query()->create([
         'item_code' => $itemCode,
         'doc_code' => 'TS',
-        'doc_no' => 'TS-SUM-001',
+        'doc_no' => 'TS-LAST-001',
         'qty' => -2,
         'u_cost' => 10,
         'begining' => 9,
@@ -496,10 +496,161 @@ it('sums stock card beginning and ending across monthly rows for the same cost l
         $this->category->id,
     )->first();
 
-    expect((float) $row['beginning_qty'])->toBe(13.0);
-    expect((float) $row['qty'])->toBe(16.0);
-    expect((float) $row['beginning_amount'])->toBe(130.0);
-    expect((float) $row['amount'])->toBe(160.0);
+    expect((float) $row['beginning_qty'])->toBe(4.0);
+    expect((float) $row['qty'])->toBe(7.0);
+    expect((float) $row['beginning_amount'])->toBe(40.0);
+    expect((float) $row['amount'])->toBe(70.0);
+});
+
+it('sets stock card beginning from prior month last ending', function () {
+    $itemCode = 'BEG-CF-'.uniqid();
+    $june = now()->startOfMonth()->subMonth();
+    $july = now()->startOfMonth();
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $itemCode,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-JUN-001',
+        'qty' => 3,
+        'u_cost' => 5,
+        'begining' => 2,
+        'ending' => 8,
+        'tran_date' => $june->copy()->startOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+    ]);
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $itemCode,
+        'doc_code' => 'TS',
+        'doc_no' => 'TS-JUN-001',
+        'qty' => -1,
+        'u_cost' => 12,
+        'begining' => 8,
+        'ending' => 11,
+        'tran_date' => $june->copy()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+    ]);
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $itemCode,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-JUL-001',
+        'qty' => 2,
+        'u_cost' => 15,
+        'begining' => 99,
+        'ending' => 13,
+        'tran_date' => $july->copy()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+    ]);
+
+    $juneRow = app(AccountingInventoryReportService::class)->stockCardRows(
+        $june->format('Y-m'),
+        $this->category->id,
+    )->firstWhere('item_code', $itemCode);
+
+    $julyRow = app(AccountingInventoryReportService::class)->stockCardRows(
+        $july->format('Y-m'),
+        $this->category->id,
+    )->firstWhere('item_code', $itemCode);
+
+    expect((float) $juneRow['qty'])->toBe(11.0);
+    expect((float) $juneRow['amount'])->toBe(132.0);
+    expect((float) $julyRow['beginning_qty'])->toBe((float) $juneRow['qty']);
+    expect((float) $julyRow['beginning_amount'])->toBe((float) $juneRow['amount']);
+    expect((float) $julyRow['beginning_unit_cost'])->toBe(12.0);
+    expect((float) $julyRow['qty'])->toBe(13.0);
+    expect((float) $julyRow['amount'])->toBe(195.0);
+});
+
+it('does not inflate next-month beginning from first-row begining when prior month has data', function () {
+    $existingCode = 'BEG-EXIST-'.uniqid();
+    $newCode = 'BEG-NEW-'.uniqid();
+    $june = now()->startOfMonth()->subMonth();
+    $july = now()->startOfMonth();
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $existingCode,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-EXIST-JUN',
+        'qty' => 10,
+        'u_cost' => 10,
+        'begining' => 0,
+        'ending' => 10,
+        'tran_date' => $june->copy()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+    ]);
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $existingCode,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-EXIST-JUL',
+        'qty' => 1,
+        'u_cost' => 10,
+        'begining' => 10,
+        'ending' => 11,
+        'tran_date' => $july->copy()->startOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+    ]);
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $newCode,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-NEW-JUL',
+        'qty' => 5,
+        'u_cost' => 100,
+        'begining' => 50,
+        'ending' => 55,
+        'tran_date' => $july->copy()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+    ]);
+
+    $service = app(AccountingInventoryReportService::class);
+    $juneRows = $service->stockCardRows($june->format('Y-m'), $this->category->id);
+    $julyRows = $service->stockCardRows($july->format('Y-m'), $this->category->id);
+    $newRow = $julyRows->firstWhere('item_code', $newCode);
+
+    expect((float) $juneRows->sum('amount'))->toBe(100.0);
+    expect((float) $julyRows->sum('beginning_amount'))->toBe(100.0);
+    expect((float) $newRow['beginning_qty'])->toBe(0.0);
+    expect((float) $newRow['beginning_amount'])->toBe(0.0);
+    expect((float) $newRow['qty'])->toBe(55.0);
+});
+
+it('carry-forwards stock card items with prior ending and no activity in the month', function () {
+    $itemCode = 'BEG-IDLE-'.uniqid();
+    $june = now()->startOfMonth()->subMonth();
+    $july = now()->startOfMonth();
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $itemCode,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-IDLE-JUN',
+        'qty' => 4,
+        'u_cost' => 25,
+        'begining' => 0,
+        'ending' => 4,
+        'tran_date' => $june->copy()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+    ]);
+
+    $julyRow = app(AccountingInventoryReportService::class)->stockCardRows(
+        $july->format('Y-m'),
+        $this->category->id,
+    )->firstWhere('item_code', $itemCode);
+
+    expect($julyRow)->not->toBeNull();
+    expect((float) $julyRow['beginning_qty'])->toBe(4.0);
+    expect((float) $julyRow['qty'])->toBe(4.0);
+    expect((float) $julyRow['beginning_amount'])->toBe(100.0);
+    expect((float) $julyRow['amount'])->toBe(100.0);
+    expect((float) $julyRow['transaction'])->toBe(0.0);
 });
 
 it('resolves purchase supplier_name from suppliers when party_name is blank', function () {
