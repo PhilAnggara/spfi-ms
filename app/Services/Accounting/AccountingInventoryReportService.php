@@ -8,7 +8,9 @@ use App\Models\ItemCategory;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class AccountingInventoryReportService
 {
@@ -184,7 +186,7 @@ class AccountingInventoryReportService
         $monthEnd = $selectedMonth->copy()->endOfMonth()->toDateString();
 
         $stockCards = $this->stockCardRows($month, $categoryId)
-            ->groupBy(fn (array $row): string => strtoupper(trim((string) $row['item_code'])))
+            ->groupBy(fn (array $row): string => $this->normalizeItemCode($row['item_code']))
             ->map(function (Collection $rows): array {
                 $first = $rows->first();
                 $qty = (float) $rows->sum('qty');
@@ -216,20 +218,21 @@ class AccountingInventoryReportService
             ])
             ->groupBy('item_code', 'doc_code')
             ->get()
-            ->groupBy(fn (object $row): string => strtoupper(trim((string) $row->item_code)));
-
-        $imEndings = $this->imEndingQtyByItemCode($categoryId, $monthEnd);
+            ->groupBy(fn (object $row): string => $this->normalizeItemCode($row->item_code));
 
         $itemCodes = $stockCards->keys()
             ->merge($movements->keys())
-            ->merge($imEndings->keys())
             ->unique()
             ->values();
+
+        // Ending inventory percount for month M is tagged on the first day of month M+1.
+        $countTagAsOf = $selectedMonth->copy()->addMonthNoOverflow()->startOfMonth()->toDateString();
+        $countTagQtys = $this->countTagQtyByItemCode($countTagAsOf, $itemCodes->all());
 
         $localItems = $this->localItemsByCode($itemCodes->all());
 
         return $itemCodes
-            ->map(function (string $itemCode) use ($stockCards, $movements, $localItems, $imEndings): array {
+            ->map(function (string $itemCode) use ($stockCards, $movements, $localItems, $countTagQtys): array {
                 $stock = $stockCards->get($itemCode);
                 $itemMovements = $movements->get($itemCode, collect());
 
@@ -264,10 +267,11 @@ class AccountingInventoryReportService
                 $purchaseUnitCost = $purchaseQty > 0 ? round($purchaseAmount / $purchaseQty, 8) : 0.0;
                 $issuanceUnitCost = $issuanceQty > 0 ? round($issuanceAmount / $issuanceQty, 8) : 0.0;
 
-                $percountQty = $imEndings->has($itemCode) ? (float) $imEndings->get($itemCode) : null;
-                $percountAmount = $percountQty === null ? null : round($percountQty * $endUnitCost, 4);
-                $varianceQty = $percountQty === null ? null : round($percountQty - $endQty, 5);
-                $varianceAmount = $percountAmount === null ? null : round($percountAmount - $endAmount, 4);
+                $percountQty = (float) ($countTagQtys->get($itemCode) ?? 0);
+                $percountAmount = round($percountQty * $endUnitCost, 4);
+                // Variances O/(U) = End Percount − End Theoretical (over when physical > book).
+                $varianceQty = round($percountQty - $endQty, 5);
+                $varianceAmount = round($percountAmount - $endAmount, 4);
 
                 $item = $localItems->get($itemCode);
 
@@ -298,8 +302,7 @@ class AccountingInventoryReportService
                 return (float) $row['beg_qty'] != 0
                     || (float) $row['purchase_qty'] != 0
                     || (float) $row['issuance_qty'] != 0
-                    || (float) $row['end_theoretical_qty'] != 0
-                    || (float) ($row['percount_qty'] ?? 0) != 0;
+                    || (float) $row['end_theoretical_qty'] != 0;
             })
             ->sortBy('item_code', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
@@ -310,18 +313,24 @@ class AccountingInventoryReportService
      */
     public function stockCardCountRows(string $month, int $categoryId): Collection
     {
-        $monthEnd = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
-        $imEndings = $this->imEndingQtyByItemCode($categoryId, $monthEnd);
+        $selectedMonth = Carbon::createFromFormat('Y-m', $month);
+        $countTagAsOf = $selectedMonth->copy()->addMonthNoOverflow()->startOfMonth()->toDateString();
 
-        return $this->stockCardRows($month, $categoryId)
-            ->map(function (array $row) use ($imEndings): array {
-                $itemCode = strtoupper(trim((string) $row['item_code']));
+        $stockRows = $this->stockCardRows($month, $categoryId);
+        $countTagQtys = $this->countTagQtyByItemCode(
+            $countTagAsOf,
+            $stockRows->pluck('item_code')->all()
+        );
+
+        return $stockRows
+            ->map(function (array $row) use ($countTagQtys): array {
+                $itemCode = $this->normalizeItemCode($row['item_code']);
                 $stockCardQty = (float) $row['qty'];
                 $stockCardAmount = (float) $row['amount'];
                 $unitCost = $stockCardQty > 0 ? $stockCardAmount / $stockCardQty : (float) $row['unit_cost'];
 
-                $percountQty = $imEndings->has($itemCode) ? (float) $imEndings->get($itemCode) : null;
-                $percountAmount = $percountQty === null ? null : round($percountQty * $unitCost, 4);
+                $percountQty = (float) ($countTagQtys->get($itemCode) ?? 0);
+                $percountAmount = round($percountQty * $unitCost, 4);
 
                 return [
                     'item_name' => $row['item_description'],
@@ -330,8 +339,8 @@ class AccountingInventoryReportService
                     'stock_card_amount' => $stockCardAmount,
                     'percount_qty' => $percountQty,
                     'percount_amount' => $percountAmount,
-                    'variance_qty' => $percountQty === null ? null : round($percountQty - $stockCardQty, 5),
-                    'variance_amount' => $percountAmount === null ? null : round($percountAmount - $stockCardAmount, 4),
+                    'variance_qty' => round($percountQty - $stockCardQty, 5),
+                    'variance_amount' => round($percountAmount - $stockCardAmount, 4),
                 ];
             })
             ->values();
@@ -428,47 +437,100 @@ class AccountingInventoryReportService
     }
 
     /**
-     * IM ending stock as of a date, keyed by uppercase item code.
-     * Uses last stock_balances.end per warehouse (same as IM stock inventory report),
-     * falling back to current stock_inventories.balance when no ledger exists on/before as-of.
+     * Legacy counttag ending inventory percount qty, keyed by normalized ItemCode.
+     * For report month M (asOf = 1st of M+1), each item prefers:
+     * 1) tags on the 1st of M+1,
+     * 2) else earliest tag within M+1,
+     * 3) else tags on the last day of M (month-end physical count).
+     * Missing items resolve to 0 at the call site.
      *
+     * @param  list<mixed>  $itemCodes
      * @return Collection<string, float>
      */
-    private function imEndingQtyByItemCode(int $categoryId, string $asOf): Collection
+    private function countTagQtyByItemCode(string $asOfDate, array $itemCodes = []): Collection
     {
-        $endColumn = DB::getQueryGrammar()->wrap('sb.end');
+        $codes = collect($itemCodes)
+            ->map(fn ($code): string => $this->normalizeItemCode($code))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
-        $ledgerEndings = DB::query()
-            ->fromSub(
-                DB::table('stock_balances as sb')
-                    ->join('items as i', 'i.id', '=', 'sb.item_id')
-                    ->whereNull('i.deleted_at')
-                    ->where('i.category_id', $categoryId)
-                    ->whereDate('sb.date', '<=', $asOf)
-                    ->selectRaw(
-                        "sb.item_id, i.code as item_code, sb.wh_code, {$endColumn} as ending_qty, ".
-                        'ROW_NUMBER() OVER (PARTITION BY sb.item_id, sb.wh_code ORDER BY sb.date DESC, sb.id DESC) as rn'
-                    ),
-                'ranked'
-            )
-            ->where('rn', 1)
-            ->get()
-            ->groupBy(fn (object $row): string => strtoupper(trim((string) $row->item_code)))
-            ->map(fn (Collection $rows): float => (float) $rows->sum('ending_qty'));
+        if ($codes === []) {
+            return collect();
+        }
 
-        $inventoryBalances = DB::table('stock_inventories as si')
-            ->join('items as i', 'i.id', '=', 'si.item_id')
-            ->whereNull('i.deleted_at')
-            ->where('i.category_id', $categoryId)
-            ->where('si.is_delete', false)
-            ->groupBy('i.code')
-            ->selectRaw('i.code as item_code, COALESCE(SUM(si.balance), 0) as balance')
-            ->get()
-            ->mapWithKeys(fn (object $row): array => [
-                strtoupper(trim((string) $row->item_code)) => (float) $row->balance,
+        $connection = (string) config('accounting_inventory.count_tag.connection', 'legacy_sqlsrv_5');
+        $table = (string) config('accounting_inventory.count_tag.table', 'tblNonFGCountTag');
+        $nextMonthStart = $asOfDate;
+        $nextMonthEnd = Carbon::parse($asOfDate)->endOfMonth()->toDateString();
+        $reportMonthEnd = Carbon::parse($asOfDate)->subDay()->toDateString();
+
+        try {
+            // Include report month-end plus the whole next month (legacy tags ending stock on either side).
+            $rows = DB::connection($connection)
+                ->table($table)
+                ->whereDate('Trandate', '>=', $reportMonthEnd)
+                ->whereDate('Trandate', '<=', $nextMonthEnd)
+                ->get(['ItemCode', 'Trandate', 'QTY']);
+
+            if ($rows->isEmpty()) {
+                return collect();
+            }
+
+            $codeLookup = array_fill_keys($codes, true);
+
+            return $rows
+                ->groupBy(fn (object $row): string => $this->normalizeItemCode($row->ItemCode))
+                ->filter(fn (Collection $itemRows, string $itemCode): bool => isset($codeLookup[$itemCode]))
+                ->map(function (Collection $itemRows) use ($nextMonthStart, $nextMonthEnd, $reportMonthEnd): float {
+                    $normalized = $itemRows->map(fn (object $row): array => [
+                        'date' => Carbon::parse($row->Trandate)->toDateString(),
+                        'qty' => (float) $row->QTY,
+                    ]);
+
+                    $sumOnDate = function (string $date) use ($normalized): float {
+                        return (float) $normalized->where('date', $date)->sum('qty');
+                    };
+
+                    $onFirstDayQty = $sumOnDate($nextMonthStart);
+                    if (abs($onFirstDayQty) > 1e-9) {
+                        return round($onFirstDayQty, 5);
+                    }
+
+                    $nextMonthDatesWithQty = $normalized
+                        ->filter(function (array $row) use ($nextMonthStart, $nextMonthEnd): bool {
+                            return $row['date'] >= $nextMonthStart
+                                && $row['date'] <= $nextMonthEnd
+                                && abs($row['qty']) > 1e-9;
+                        })
+                        ->groupBy('date');
+
+                    if ($nextMonthDatesWithQty->isNotEmpty()) {
+                        $earliestNext = $nextMonthDatesWithQty->keys()->sort()->first();
+
+                        return round($sumOnDate((string) $earliestNext), 5);
+                    }
+
+                    return round($sumOnDate($reportMonthEnd), 5);
+                });
+        } catch (Throwable $e) {
+            Log::warning('Accounting restatement counttag percount unavailable.', [
+                'connection' => $connection,
+                'table' => $table,
+                'as_of' => $asOfDate,
+                'error' => $e->getMessage(),
             ]);
 
-        return $ledgerEndings->union($inventoryBalances);
+            return collect();
+        }
+    }
+
+    private function normalizeItemCode(mixed $code): string
+    {
+        $value = strtoupper(trim((string) $code));
+
+        return preg_replace('/\s+/u', '', $value) ?? $value;
     }
 
     /**

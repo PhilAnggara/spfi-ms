@@ -7,14 +7,14 @@ use App\Models\AccountingInventoryTransactionLine;
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
-use App\Models\StockBalance;
-use App\Models\StockInventory;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Services\Accounting\AccountingInventoryReportService;
 use App\Services\Accounting\AccountingInventoryService;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
     $this->seed(RolePermissionSeeder::class);
@@ -597,7 +597,7 @@ it('builds transaction groups per item with document summary', function () {
     expect($content)->toContain($this->item->code);
 });
 
-it('fills restatement percount from IM ending stock and computes variance', function () {
+it('fills restatement percount from legacy counttag and computes variance', function () {
     $document = AccountingInventoryTransaction::make([
         'category_id' => $this->category->id,
         'doc_type' => 'RR',
@@ -618,31 +618,7 @@ it('fills restatement percount from IM ending stock and computes variance', func
         ],
     ], $this->user);
 
-    StockInventory::query()->create([
-        'item_id' => $this->item->id,
-        'product_code' => $this->item->code,
-        'wh_code' => 'MAIN',
-        'balance' => 10,
-        'start_balance' => 0,
-        'average_price' => 4,
-        'is_active' => true,
-        'is_delete' => false,
-    ]);
-
-    StockBalance::query()->create([
-        'date' => now()->endOfMonth()->toDateString(),
-        'item_id' => $this->item->id,
-        'product_code' => $this->item->code,
-        'wh_code' => 'MAIN',
-        'begin' => 0,
-        'qty_in1' => 10,
-        'qty_in2' => 0,
-        'qty_in3' => 0,
-        'qty_out1' => 0,
-        'qty_out2' => 0,
-        'qty_out3' => 0,
-        'end' => 10,
-    ]);
+    seedLegacyCountTagFixture($this->item->code, 10);
 
     $rows = app(AccountingInventoryReportService::class)->restatementRows(
         now()->format('Y-m'),
@@ -670,9 +646,19 @@ it('fills restatement percount from IM ending stock and computes variance', func
     expect($response->streamedContent())->toContain('Beg. Inventory');
     expect($response->streamedContent())->toContain('GRAND TOTAL');
     expect($response->streamedContent())->toContain($this->item->code);
+
+    $pdfResponse = $this->actingAs($this->user)
+        ->post(route('accounting.reports.restatement'), [
+            'month' => now()->format('Y-m'),
+            'category_id' => $this->category->id,
+            'format' => 'pdf',
+        ]);
+
+    $pdfResponse->assertSuccessful();
+    expect($pdfResponse->headers->get('content-type'))->toContain('pdf');
 });
 
-it('fills stock card per count percount from IM ending stock', function () {
+it('fills stock card per count percount from legacy counttag', function () {
     AccountingInventoryMonthly::query()->create([
         'item_code' => $this->item->code,
         'doc_code' => 'RR',
@@ -688,20 +674,7 @@ it('fills stock card per count percount from IM ending stock', function () {
         'item_id' => $this->item->id,
     ]);
 
-    StockBalance::query()->create([
-        'date' => now()->endOfMonth()->toDateString(),
-        'item_id' => $this->item->id,
-        'product_code' => $this->item->code,
-        'wh_code' => 'MAIN',
-        'begin' => 0,
-        'qty_in1' => 5,
-        'qty_in2' => 0,
-        'qty_in3' => 0,
-        'qty_out1' => 0,
-        'qty_out2' => 0,
-        'qty_out3' => 0,
-        'end' => 5,
-    ]);
+    seedLegacyCountTagFixture($this->item->code, 5);
 
     $rows = app(AccountingInventoryReportService::class)->stockCardCountRows(
         now()->format('Y-m'),
@@ -728,3 +701,331 @@ it('fills stock card per count percount from IM ending stock', function () {
     expect($response->streamedContent())->toContain('GRAND TOTAL');
     expect($response->streamedContent())->toContain($this->item->code);
 });
+
+it('leaves restatement percount empty when counttag connection fails', function () {
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-FAIL-001',
+        'qty' => 2,
+        'u_cost' => 5,
+        'begining' => 0,
+        'ending' => 2,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    config(['accounting_inventory.count_tag.connection' => 'missing_counttag_connection']);
+
+    $rows = app(AccountingInventoryReportService::class)->restatementRows(
+        now()->format('Y-m'),
+        $this->category->id,
+    );
+
+    $row = $rows->firstWhere('item_code', $this->item->code);
+    expect($row)->not->toBeNull();
+    expect((float) $row['percount_qty'])->toBe(0.0);
+    expect((float) $row['percount_amount'])->toBe(0.0);
+    expect((float) $row['variance_qty'])->toBe(-2.0);
+    expect((float) $row['variance_amount'])->toBe(-10.0);
+});
+
+it('uses zero percount when item has no counttag for the period', function () {
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-ZERO-001',
+        'qty' => 6,
+        'u_cost' => 2,
+        'begining' => 0,
+        'ending' => 6,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    config(['accounting_inventory.count_tag.connection' => config('database.default')]);
+    if (! Schema::hasTable('tblNonFGCountTag')) {
+        Schema::create('tblNonFGCountTag', function ($table): void {
+            $table->string('ItemCode');
+            $table->decimal('QTY', 20, 5);
+            $table->date('Trandate');
+        });
+    }
+
+    $row = app(AccountingInventoryReportService::class)->restatementRows(
+        now()->format('Y-m'),
+        $this->category->id,
+    )->firstWhere('item_code', $this->item->code);
+
+    expect($row)->not->toBeNull();
+    expect((float) $row['percount_qty'])->toBe(0.0);
+    expect((float) $row['percount_amount'])->toBe(0.0);
+    expect((float) $row['variance_qty'])->toBe(-6.0);
+    expect((float) $row['variance_amount'])->toBe(-12.0);
+});
+
+it('matches counttag ItemCode even when legacy code has extra spaces', function () {
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-SPACE-001',
+        'qty' => 1,
+        'u_cost' => 9,
+        'begining' => 0,
+        'ending' => 1,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    $spacedCode = substr($this->item->code, 0, 2).' '.substr($this->item->code, 2);
+    seedLegacyCountTagFixture(
+        $spacedCode,
+        1,
+        now()->copy()->addMonthNoOverflow()->startOfMonth()->toDateString()
+    );
+
+    $row = app(AccountingInventoryReportService::class)->restatementRows(
+        now()->format('Y-m'),
+        $this->category->id,
+    )->firstWhere('item_code', $this->item->code);
+
+    expect($row)->not->toBeNull();
+    expect((float) $row['percount_qty'])->toBe(1.0);
+    expect((float) $row['variance_qty'])->toBe(0.0);
+});
+
+it('falls back to report month-end counttag when next month has no tag for the item', function () {
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-MONTHEND-001',
+        'qty' => 1,
+        'u_cost' => 59500,
+        'begining' => 1,
+        'ending' => 1,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    seedLegacyCountTagFixture($this->item->code, 1, now()->endOfMonth()->toDateString());
+
+    $row = app(AccountingInventoryReportService::class)->restatementRows(
+        now()->format('Y-m'),
+        $this->category->id,
+    )->firstWhere('item_code', $this->item->code);
+
+    expect($row)->not->toBeNull();
+    expect((float) $row['percount_qty'])->toBe(1.0);
+    expect((float) $row['percount_amount'])->toBe(59500.0);
+    expect((float) $row['variance_qty'])->toBe(0.0);
+    expect((float) $row['variance_amount'])->toBe(0.0);
+});
+
+it('prefers next-month counttag over report month-end when both exist', function () {
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-PREFER-001',
+        'qty' => 2,
+        'u_cost' => 10,
+        'begining' => 0,
+        'ending' => 2,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    seedLegacyCountTagFixture($this->item->code, 9, now()->endOfMonth()->toDateString());
+    seedLegacyCountTagFixture(
+        $this->item->code,
+        2,
+        now()->copy()->addMonthNoOverflow()->startOfMonth()->addDays(4)->toDateString()
+    );
+
+    $row = app(AccountingInventoryReportService::class)->restatementRows(
+        now()->format('Y-m'),
+        $this->category->id,
+    )->firstWhere('item_code', $this->item->code);
+
+    expect((float) $row['percount_qty'])->toBe(2.0);
+    expect((float) $row['variance_qty'])->toBe(0.0);
+});
+
+it('does not add counttag-only items into restatement accounting columns', function () {
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-SCOPE-001',
+        'qty' => 2,
+        'u_cost' => 5,
+        'begining' => 0,
+        'ending' => 2,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    seedLegacyCountTagFixture($this->item->code, 3);
+    seedLegacyCountTagFixture('ONLY-COUNT-TAG-'.uniqid(), 99);
+
+    $rows = app(AccountingInventoryReportService::class)->restatementRows(
+        now()->format('Y-m'),
+        $this->category->id,
+    );
+
+    expect($rows)->toHaveCount(1);
+    expect($rows->first()['item_code'])->toBe($this->item->code);
+    expect((float) $rows->first()['end_theoretical_qty'])->toBe(2.0);
+    expect((float) $rows->first()['percount_qty'])->toBe(3.0);
+    expect($rows->firstWhere(fn (array $row): bool => str_starts_with((string) $row['item_code'], 'ONLY-COUNT-TAG-')))->toBeNull();
+});
+
+it('uses counttag Trandate on the first day of the next month for ending percount', function () {
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-ASOF-001',
+        'qty' => 4,
+        'u_cost' => 5,
+        'begining' => 0,
+        'ending' => 4,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    seedLegacyCountTagFixture($this->item->code, 99, now()->startOfMonth()->toDateString());
+    seedLegacyCountTagFixture(
+        $this->item->code,
+        7,
+        now()->copy()->addMonthNoOverflow()->startOfMonth()->toDateString()
+    );
+
+    $row = app(AccountingInventoryReportService::class)->restatementRows(
+        now()->format('Y-m'),
+        $this->category->id,
+    )->firstWhere('item_code', $this->item->code);
+
+    expect($row)->not->toBeNull();
+    expect((float) $row['percount_qty'])->toBe(7.0);
+    expect((float) $row['percount_amount'])->toBe(35.0);
+});
+
+it('falls back to earliest counttag Trandate in the next month when the first day is missing', function () {
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-FALLBACK-001',
+        'qty' => 4,
+        'u_cost' => 5,
+        'begining' => 0,
+        'ending' => 4,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    $nextMonth = now()->copy()->addMonthNoOverflow();
+    seedLegacyCountTagFixture($this->item->code, 11, $nextMonth->copy()->day(3)->toDateString());
+    seedLegacyCountTagFixture($this->item->code, 22, $nextMonth->copy()->day(5)->toDateString());
+
+    $row = app(AccountingInventoryReportService::class)->restatementRows(
+        now()->format('Y-m'),
+        $this->category->id,
+    )->firstWhere('item_code', $this->item->code);
+
+    expect($row)->not->toBeNull();
+    expect((float) $row['percount_qty'])->toBe(11.0);
+    expect((float) $row['percount_amount'])->toBe(55.0);
+});
+
+it('picks each item counttag date independently for ending percount', function () {
+    $secondItem = Item::query()->create([
+        'name' => 'Second Restatement Item',
+        'code' => 'RST-2-'.uniqid(),
+        'unit_of_measure_id' => $this->unit->id,
+        'category_id' => $this->category->id,
+        'type' => 'Consumable',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-MULTI-001',
+        'qty' => 2,
+        'u_cost' => 10,
+        'begining' => 0,
+        'ending' => 2,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $secondItem->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-REST-MULTI-002',
+        'qty' => 3,
+        'u_cost' => 10,
+        'begining' => 0,
+        'ending' => 3,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'category_id' => $this->category->id,
+        'item_id' => $secondItem->id,
+    ]);
+
+    $nextMonth = now()->copy()->addMonthNoOverflow();
+    seedLegacyCountTagFixture($this->item->code, 5, $nextMonth->copy()->startOfMonth()->toDateString());
+    seedLegacyCountTagFixture($secondItem->code, 8, $nextMonth->copy()->day(4)->toDateString());
+
+    $rows = app(AccountingInventoryReportService::class)->restatementRows(
+        now()->format('Y-m'),
+        $this->category->id,
+    );
+
+    $first = $rows->firstWhere('item_code', $this->item->code);
+    $second = $rows->firstWhere('item_code', $secondItem->code);
+
+    expect((float) $first['percount_qty'])->toBe(5.0);
+    expect((float) $second['percount_qty'])->toBe(8.0);
+    expect((float) $first['variance_qty'])->toBe(3.0);
+    expect((float) $second['variance_qty'])->toBe(5.0);
+});
+
+/**
+ * Point counttag reader at the in-memory test DB and seed tblNonFGCountTag.
+ */
+function seedLegacyCountTagFixture(string $itemCode, float $qty, ?string $tranDate = null): void
+{
+    config(['accounting_inventory.count_tag.connection' => config('database.default')]);
+
+    if (! Schema::hasTable('tblNonFGCountTag')) {
+        Schema::create('tblNonFGCountTag', function ($table): void {
+            $table->string('ItemCode');
+            $table->decimal('QTY', 20, 5);
+            $table->date('Trandate');
+        });
+    }
+
+    DB::table('tblNonFGCountTag')->insert([
+        'ItemCode' => $itemCode,
+        'QTY' => $qty,
+        'Trandate' => $tranDate ?? now()->copy()->addMonthNoOverflow()->startOfMonth()->toDateString(),
+    ]);
+}

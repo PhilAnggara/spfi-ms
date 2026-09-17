@@ -28,9 +28,9 @@
                     <th colspan="3" class="center section-head section-sep">Beg. Inventory</th>
                     <th colspan="3" class="center section-head section-sep">Purchases</th>
                     <th colspan="3" class="center section-head section-sep">Issuances</th>
-                    <th colspan="3" class="center section-head section-sep">End Theoretical</th>
-                    <th colspan="2" class="center section-head section-sep">Percount</th>
-                    <th colspan="2" class="center section-head section-sep">Variance</th>
+                    <th colspan="3" class="center section-head section-sep">End. Inv. Theoretical</th>
+                    <th colspan="2" class="center section-head section-sep">End. Inv. Percount</th>
+                    <th colspan="2" class="center section-head section-sep">Variances O/(U)</th>
                     <th colspan="2" class="center section-head">Total</th>
                 </tr>
                 <tr>

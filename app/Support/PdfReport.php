@@ -35,6 +35,11 @@ class PdfReport
 
     public static function analytical(string $view, array $data, string $filename, bool $landscape = true): Response
     {
+        $currentLimit = ini_get('memory_limit');
+        if (self::memoryLimitBytes($currentLimit) < 1024 * 1024 * 1024) {
+            ini_set('memory_limit', '1024M');
+        }
+
         $data = self::withDefaults($data);
         $data['landscape'] = $landscape;
 
@@ -42,6 +47,23 @@ class PdfReport
             ->setPaper('a4', $landscape ? 'landscape' : 'portrait')
             ->setOption('isPhpEnabled', true)
             ->stream($filename);
+    }
+
+    private static function memoryLimitBytes(string|false $limit): int
+    {
+        if ($limit === false || $limit === '' || $limit === '-1') {
+            return PHP_INT_MAX;
+        }
+
+        $unit = strtolower(substr($limit, -1));
+        $value = (int) $limit;
+
+        return match ($unit) {
+            'g' => $value * 1024 * 1024 * 1024,
+            'm' => $value * 1024 * 1024,
+            'k' => $value * 1024,
+            default => (int) $limit,
+        };
     }
 
     public static function build(string $view, array $data): DomPdfDocument

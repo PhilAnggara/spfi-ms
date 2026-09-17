@@ -198,6 +198,22 @@ return [
             'trust_server_certificate' => env('LEGACY_DB4_TRUST_SERVER_CERTIFICATE', true),
         ],
 
+        // Legacy DB koneksi 5 (counttag — physical count / Non-FG count tags).
+        'legacy_sqlsrv_5' => [
+            'driver' => 'sqlsrv',
+            'host' => env('LEGACY_DB5_HOST', '127.0.0.1'),
+            'port' => env('LEGACY_DB5_PORT', '1433'),
+            'database' => env('LEGACY_DB5_DATABASE', 'counttag'),
+            'username' => env('LEGACY_DB5_USERNAME', ''),
+            'password' => env('LEGACY_DB5_PASSWORD', ''),
+            'charset' => env('LEGACY_DB5_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('LEGACY_DB5_ENCRYPT', 'no'),
+            'trust_server_certificate' => env('LEGACY_DB5_TRUST_SERVER_CERTIFICATE', true),
+            'login_timeout' => (int) env('LEGACY_DB5_LOGIN_TIMEOUT', 5),
+        ],
+
     ],
 
     /*
