@@ -36,7 +36,9 @@ return [
     ],
 
     'fish_system' => [
-        'url' => env('FISH_SYSTEM_URL', 'http://192.168.11.159/testing/'),
+        // 'url' => env('FISH_SYSTEM_URL', 'http://192.168.11.159/testing/'),
+        // 'url' => env('FISH_SYSTEM_URL', 'http://192.168.11.16/SPFIMS'),
+        'url' => env('FISH_SYSTEM_URL', 'http://202.65.232.98:81/MS'),
     ],
 
 ];
