@@ -273,8 +273,18 @@
         $entryGenerator = app(\App\Services\Accounting\ReceivingReportEntryGenerator::class);
         $rrAccountingPayload = $rrAccountingPayload ?? $entryGenerator->generate($receivingReport, $currencyConversion);
 
-        $accountingEntries = $entryGenerator->formatEntriesForPdf($rrAccountingPayload['lines'] ?? []);
-        $accountingCodeTotal = (int) ($rrAccountingPayload['totals']['acct_code_total'] ?? 0);
+        $termOfPaymentType = $allItems
+            ->map(fn ($rrItem) => strtolower(trim((string) data_get($rrItem, 'purchaseOrderItem.meta.term_of_payment_type', ''))))
+            ->first(fn ($value) => $value !== '');
+        $isCashAdvancePrint = \App\Enums\TermOfPaymentType::tryFrom((string) $termOfPaymentType)
+            === \App\Enums\TermOfPaymentType::CashAdvance;
+
+        $accountingEntries = $isCashAdvancePrint
+            ? []
+            : $entryGenerator->formatEntriesForPdf($rrAccountingPayload['lines'] ?? []);
+        $accountingCodeTotal = $isCashAdvancePrint
+            ? ''
+            : (int) ($rrAccountingPayload['totals']['acct_code_total'] ?? 0);
         $displaySubTotal = (float) ($rrAccountingPayload['display']['sub_total'] ?? 0);
         $displayPpnTotal = (float) ($rrAccountingPayload['display']['ppn_total'] ?? 0);
         $displayPphTotal = (float) ($rrAccountingPayload['display']['pph_total'] ?? 0);
@@ -329,10 +339,10 @@
         }
 
         $rowCount = count($layoutRows);
-        $hasPph = $displayPphTotal > 0;
-        $hasPpn = $displayPpnTotal > 0;
-        $showSubTotal = $rowCount > 1;
-        $showFinalTotal = $hasPpn || $hasPph;
+        $hasPph = ! $isCashAdvancePrint && $displayPphTotal > 0;
+        $hasPpn = ! $isCashAdvancePrint && $displayPpnTotal > 0;
+        $showSubTotal = ! $isCashAdvancePrint && $rowCount > 1;
+        $showFinalTotal = ! $isCashAdvancePrint && ($hasPpn || $hasPph);
         $subTotalPlusPpn = $displaySubTotal + $displayPpnTotal;
         $displayGrandTotal = (float) ($rrAccountingPayload['display']['grand_total'] ?? ($subTotalPlusPpn - $displayPphTotal));
         $summaryBaseTop = $rowCount > 0 ? $currentTop + $sy(0.8) : 0;
@@ -383,8 +393,8 @@
             <div class="cell center" style="left: {{ $mmX(108) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(25) }};">{{ $row['department_code'] }}</div>
             <div class="cell right" style="left: {{ $mmX(138) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(23) }};">{{ \App\Support\PdfFormatters::qty($row['qty_total']) }}</div>
             <div class="cell center" style="left: {{ $mmX(163) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(23) }};">{{ $row['unit'] }}</div>
-            <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(35) }};">{{ \App\Support\PdfFormatters::trimmedDecimal($row['unit_cost'], 3, '.', ',') }}</div>
-            <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(50) }};">{{ \App\Support\PdfFormatters::trimmedDecimal($row['amount'], 3, '.', ',') }}</div>
+            <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(35) }};">{{ $isCashAdvancePrint ? '' : \App\Support\PdfFormatters::trimmedDecimal($row['unit_cost'], 3, '.', ',') }}</div>
+            <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(50) }};">{{ $isCashAdvancePrint ? '' : \App\Support\PdfFormatters::trimmedDecimal($row['amount'], 3, '.', ',') }}</div>
         @endforeach
 
         @if ($rowCount > 0)
@@ -436,8 +446,10 @@
             <div class="acct-amount-cell right" style="left: {{ $mmX($acctCreditLeftBaseMm) }}; top: {{ $oy($entryTop) }}; width: {{ $mmW($acctCreditWidthBaseMm) }};">{{ $entry['credit'] !== null ? number_format((float) $entry['credit'], 2, '.', ',') : '' }}</div>
         @endforeach
 
-        <div style="position: absolute; left: {{ $mmX(30) }}; top: {{ $oy($totalLineTop) }}; width: {{ $mmW(12) }}; border-top: 1px solid #111827;"></div>
-        <div class="acct-cell" style="left: {{ $mmX(30) }}; top: {{ $oy($totalEntryTop) }}; width: {{ $mmW(12) }};">{{ $accountingCodeTotal }}</div>
+        @if (! $isCashAdvancePrint)
+            <div style="position: absolute; left: {{ $mmX(30) }}; top: {{ $oy($totalLineTop) }}; width: {{ $mmW(12) }}; border-top: 1px solid #111827;"></div>
+            <div class="acct-cell" style="left: {{ $mmX(30) }}; top: {{ $oy($totalEntryTop) }}; width: {{ $mmW(12) }};">{{ $accountingCodeTotal }}</div>
+        @endif
 
         <div class="field center" style="left: {{ $mmX(175) }}; top: {{ $mmY(168) }}; width: {{ $mmW(47) }};">{{ $receivingReport->createdBy?->name ?? '-' }}</div>
         <div class="field center" style="left: {{ $mmX(233) }}; top: {{ $mmY(168) }}; width: {{ $mmW(45) }};">{{ $approvedByName ?? '-' }}</div>

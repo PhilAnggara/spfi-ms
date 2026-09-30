@@ -554,6 +554,137 @@ it('renders full accounting entry debit and credit amounts without clipping larg
     expect(collect($amounts)->filter(fn (string $amount) => $amount === '1,360,000.00'))->toBeEmpty();
 });
 
+it('hides unit cost amount and accounting entries on cash advance rr print', function () {
+    $unit = UnitOfMeasure::query()->create(['name' => 'Pieces', 'code' => 'PCS-CA']);
+    $category = ItemCategory::query()->create(['name' => 'Office Supplies', 'code' => 'OFF-CA']);
+    $item = Item::query()->create([
+        'name' => 'Cash Advance Part',
+        'code' => 'CA-ITEM',
+        'unit_of_measure_id' => $unit->id,
+        'category_id' => $category->id,
+        'type' => 'Consumable',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    $purchaseOrder = $this->receivingReport->purchaseOrder;
+    $purchaseOrder->update(['term_of_payment_type' => 'cash_advance']);
+
+    $poItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $item->id,
+        'quantity' => 2,
+        'unit_price' => 1234.5,
+        'total' => 2469,
+        'line_subtotal' => 2469,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+        'meta' => ['term_of_payment_type' => 'cash_advance'],
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $this->receivingReport->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 2,
+        'qty_bad' => 0,
+    ]);
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $this->receivingReport->fresh()->load([
+            'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
+            'createdBy',
+        ]),
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    expect($html)
+        ->toContain('Cash Advance Part')
+        ->toContain('CA-ITEM')
+        ->not->toContain('1,234.5')
+        ->not->toContain('2,469')
+        ->not->toContain('>122<')
+        ->not->toContain('Sub Total');
+
+    preg_match_all('/class="acct-amount-cell right"[^>]*>([^<]*)</', $html, $amountMatches);
+    $acctAmounts = array_values(array_filter($amountMatches[1] ?? [], fn (string $value) => trim($value) !== ''));
+
+    expect($acctAmounts)->toBeEmpty();
+});
+
+it('still shows unit cost amount and accounting entries for credit rr print', function () {
+    $unit = UnitOfMeasure::query()->create(['name' => 'Pieces', 'code' => 'PCS-CR']);
+    $category = ItemCategory::query()->create(['name' => 'Office Supplies', 'code' => 'OFF-CR']);
+    $item = Item::query()->create([
+        'name' => 'Credit Part',
+        'code' => 'CR-ITEM',
+        'unit_of_measure_id' => $unit->id,
+        'category_id' => $category->id,
+        'type' => 'Consumable',
+        'stock_on_hand' => 0,
+        'is_active' => true,
+    ]);
+
+    $purchaseOrder = $this->receivingReport->purchaseOrder;
+    $purchaseOrder->update(['term_of_payment_type' => 'credit']);
+
+    $poItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $item->id,
+        'quantity' => 2,
+        'unit_price' => 1500,
+        'total' => 3000,
+        'line_subtotal' => 3000,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+        'meta' => ['term_of_payment_type' => 'credit'],
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $this->receivingReport->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 2,
+        'qty_bad' => 0,
+    ]);
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $this->receivingReport->fresh()->load([
+            'purchaseOrder.supplier',
+            'purchaseOrder.items.prsItem.prs',
+            'items.purchaseOrderItem.item.unit',
+            'items.purchaseOrderItem.item.category',
+            'items.purchaseOrderItem.prsItem.prs.department',
+            'customsDocumentType',
+            'createdBy',
+        ]),
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    expect($html)
+        ->toContain('Credit Part')
+        ->toContain('1,500')
+        ->toContain('3,000')
+        ->toContain('201');
+});
+
 it('prints rr items in purchase order item order even when rr rows were inserted reversed', function () {
     $unit = UnitOfMeasure::query()->create(['name' => 'Pieces', 'code' => 'PCS']);
     $category = ItemCategory::query()->create(['name' => 'Spare Parts', 'code' => 'SPR']);
