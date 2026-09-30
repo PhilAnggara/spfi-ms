@@ -125,6 +125,7 @@ it('saves a supplier selection over ajax and returns json', function () {
             'message' => 'Supplier selected for this item.',
             'prs_item_id' => $this->prsItem->id,
             'canvassing_item_id' => $this->canvassingItem->id,
+            'selected_canvassing_item_id' => $this->canvassingItem->id,
             'selected_supplier_name' => 'Select Supplier',
             'selection_reason' => 'Best lead time',
         ])

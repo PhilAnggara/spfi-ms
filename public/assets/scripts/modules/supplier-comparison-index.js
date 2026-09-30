@@ -85,23 +85,53 @@
     }
 
     function updateSelectionState(form) {
-        const checkedRadio = form.querySelector('input[name="canvassing_item_id"]:checked:not(:disabled)');
+        const checkedRadio = form.querySelector('input[name="canvassing_item_id"]:checked');
+        const anyEnabledRadio = form.querySelector('input[name="canvassing_item_id"]:not(:disabled)');
         const saveButton = form.querySelector('[data-save-selection-button]');
+        const savedId = String(form.dataset.savedCanvassingItemId || '');
+        const checkedId = checkedRadio ? String(checkedRadio.value) : '';
+        const isDirty = Boolean(checkedId && checkedId !== savedId);
+        const isLocked = !anyEnabledRadio;
+        const isSavedClean = Boolean(checkedId && checkedId === savedId);
 
         if (saveButton) {
-            saveButton.disabled = !checkedRadio;
+            const icon = saveButton.querySelector('[data-save-icon]');
+            const label = saveButton.querySelector('[data-save-label]');
+
+            saveButton.disabled = isLocked || !isDirty;
+
+            if (isSavedClean) {
+                saveButton.classList.remove('btn-primary');
+                saveButton.classList.add('btn-outline-success');
+                if (icon) {
+                    icon.className = 'fa-duotone fa-solid fa-circle-check';
+                    icon.setAttribute('data-save-icon', '');
+                }
+                if (label) {
+                    label.textContent = 'Saved';
+                }
+            } else {
+                saveButton.classList.add('btn-primary');
+                saveButton.classList.remove('btn-outline-success');
+                if (icon) {
+                    icon.className = 'fa-duotone fa-solid fa-floppy-disk';
+                    icon.setAttribute('data-save-icon', '');
+                }
+                if (label) {
+                    label.textContent = 'Save Selection';
+                }
+            }
         }
 
         form.querySelectorAll('[data-supplier-row]').forEach((row) => {
             const rowRadio = row.querySelector('input[name="canvassing_item_id"]');
-            const isSelected = Boolean(rowRadio && rowRadio.checked);
-            const badge = row.querySelector('[data-selection-badge]');
+            const rowId = rowRadio ? String(rowRadio.value) : '';
+            const isChecked = Boolean(rowRadio && rowRadio.checked);
+            const isSavedRow = Boolean(savedId && rowId === savedId);
+            const isUnsavedChecked = isChecked && isDirty;
 
-            row.classList.toggle('sc-selected-row', isSelected);
-
-            if (badge) {
-                badge.classList.toggle('d-none', !isSelected);
-            }
+            row.classList.toggle('sc-selected-row', isSavedRow);
+            row.classList.toggle('sc-unsaved-row', isUnsavedChecked);
         });
     }
 
@@ -345,10 +375,13 @@
         }
 
         window.Swal.fire({
+            toast: true,
+            position: 'top-end',
             icon,
             title,
-            timer: 5000,
-            showConfirmButton: icon !== 'success',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
         });
     }
 
@@ -416,6 +449,11 @@
         const reasonText = document.getElementById('reasonText-' + (payload.prs_item_id || card.dataset.prsItemId));
         if (reasonText && Object.prototype.hasOwnProperty.call(payload, 'selection_reason')) {
             reasonText.value = payload.selection_reason || '';
+        }
+
+        const savedId = payload.selected_canvassing_item_id ?? payload.canvassing_item_id;
+        if (savedId != null && savedId !== '') {
+            form.dataset.savedCanvassingItemId = String(savedId);
         }
 
         updateSelectionState(form);

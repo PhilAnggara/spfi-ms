@@ -82,6 +82,10 @@
                                 $selectedSupplier = $prsItem->selectedCanvassingItem?->supplier?->name;
                                 $isLocked = (bool) $prsItem->purchase_order_id;
                                 $hasSelectedSupplier = (bool) $prsItem->selected_canvassing_item_id;
+                                $quoteCount = $prsItem->canvassingItems->count();
+                                $lowestUnitPrice = $quoteCount > 1
+                                    ? $prsItem->canvassingItems->min('unit_price')
+                                    : null;
                             @endphp
                             <div class="card shadow-sm border-0 sc-comparison-card position-relative" id="supplier-comparison-item-{{ $prsItem->id }}" data-prs-item-id="{{ $prsItem->id }}">
                                 <div class="sc-card-loading d-none" data-card-loading aria-hidden="true">
@@ -123,7 +127,7 @@
                                         </div>
                                     </div>
 
-                                    <form method="post" action="{{ route('procurement.supplier-comparison.select', $prsItem) }}" id="form-{{ $prsItem->id }}" class="sc-selection-form {{ $isLocked ? 'opacity-75' : '' }}" data-selection-form data-select-url="{{ route('procurement.supplier-comparison.select', $prsItem) }}">
+                                    <form method="post" action="{{ route('procurement.supplier-comparison.select', $prsItem) }}" id="form-{{ $prsItem->id }}" class="sc-selection-form {{ $isLocked ? 'opacity-75' : '' }}" data-selection-form data-select-url="{{ route('procurement.supplier-comparison.select', $prsItem) }}" data-saved-canvassing-item-id="{{ $prsItem->selected_canvassing_item_id }}">
                                         @csrf
                                         <input type="hidden" name="selection_reason" id="reason-{{ $prsItem->id }}">
                                         <div class="table-responsive sc-table-responsive">
@@ -143,6 +147,8 @@
                                                     @foreach ($prsItem->canvassingItems as $canvassing)
                                                         @php
                                                             $isSelectedQuote = $prsItem->selected_canvassing_item_id === $canvassing->id;
+                                                            $isLowestPrice = $lowestUnitPrice !== null
+                                                                && (float) $canvassing->unit_price === (float) $lowestUnitPrice;
                                                         @endphp
                                                         <tr class="sc-supplier-row {{ $isLocked ? 'sc-supplier-row-disabled' : '' }} {{ $isSelectedQuote ? 'sc-selected-row' : '' }}" data-supplier-row tabindex="{{ $isLocked ? '-1' : '0' }}" aria-disabled="{{ $isLocked ? 'true' : 'false' }}">
                                                             <td class="text-center sc-select-cell" data-label="Select">
@@ -151,11 +157,15 @@
                                                             <td data-label="Supplier">
                                                                 <div class="sc-supplier-cell">
                                                                     <span>{{ $canvassing->supplier?->name ?? '-' }}</span>
-                                                                    <span class="badge bg-light-success text-success {{ $isSelectedQuote ? '' : 'd-none' }}" data-selection-badge>Selected</span>
                                                                 </div>
                                                             </td>
                                                             <td class="text-end" data-label="Unit Price">
-                                                                <span class="sc-price">{{ format_po_decimal($canvassing->unit_price) }}</span>
+                                                                <div class="sc-price-cell {{ $quoteCount > 1 ? 'sc-price-cell-compared' : '' }}">
+                                                                    <span class="sc-price {{ $isLowestPrice ? 'sc-price-lowest' : '' }}">{{ format_po_decimal($canvassing->unit_price) }}</span>
+                                                                    @if ($quoteCount > 1)
+                                                                        <span class="badge bg-light-success text-success sc-lowest-badge {{ $isLowestPrice ? '' : 'invisible' }}">Lowest</span>
+                                                                    @endif
+                                                                </div>
                                                             </td>
                                                             <td class="text-center" data-label="Lead Time">{{ $canvassing->lead_time_days ?? '-' }}</td>
                                                             <td data-label="Term of Payment">
@@ -198,9 +208,9 @@
                                                     Reject Canvassing
                                                 </button>
                                             @endcan
-                                            <button type="button" class="btn btn-primary icon icon-left sc-action-btn" data-bs-toggle="modal" data-bs-target="#reasonModal-{{ $prsItem->id }}" data-save-selection-button @disabled($isLocked || ! $hasSelectedSupplier)>
-                                                <i class="fa-duotone fa-solid fa-floppy-disk"></i>
-                                                Save Selection
+                                            <button type="button" class="btn {{ $hasSelectedSupplier ? 'btn-outline-success' : 'btn-primary' }} icon icon-left sc-action-btn" data-bs-toggle="modal" data-bs-target="#reasonModal-{{ $prsItem->id }}" data-save-selection-button @disabled(true)>
+                                                <i class="fa-duotone fa-solid {{ $hasSelectedSupplier ? 'fa-circle-check' : 'fa-floppy-disk' }}" data-save-icon></i>
+                                                <span data-save-label>{{ $hasSelectedSupplier ? 'Saved' : 'Save Selection' }}</span>
                                             </button>
                                         </div>
                                     </form>

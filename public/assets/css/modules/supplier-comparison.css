@@ -269,6 +269,11 @@
     box-shadow: inset 3px 0 0 var(--sc-accent);
 }
 
+.sc-table tbody tr.sc-unsaved-row {
+    background: #fffbeb;
+    box-shadow: inset 3px 0 0 #f59e0b;
+}
+
 .sc-table td {
     color: #334155;
 }
@@ -291,14 +296,11 @@
 }
 
 .sc-supplier-cell {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
     min-width: 0;
 }
 
-.sc-supplier-cell span:first-child {
+.sc-supplier-cell span {
+    display: block;
     min-width: 0;
     overflow-wrap: anywhere;
     font-weight: 700;
@@ -308,6 +310,32 @@
     color: var(--sc-ink);
     font-weight: 800;
     white-space: nowrap;
+    line-height: 1.2;
+}
+
+.sc-price-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.15rem;
+    width: 100%;
+}
+
+.sc-price-cell-compared {
+    justify-content: flex-start;
+}
+
+.sc-price-lowest {
+    color: #15803d;
+}
+
+.sc-lowest-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    padding: 0.2rem 0.4rem;
 }
 
 .sc-note-text {
@@ -465,6 +493,11 @@
         box-shadow: inset 3px 0 0 var(--sc-accent), 0 0.45rem 1rem rgba(15, 23, 42, 0.04);
     }
 
+    .sc-table tbody tr.sc-unsaved-row {
+        background: #fffbeb;
+        box-shadow: inset 3px 0 0 #f59e0b, 0 0.45rem 1rem rgba(15, 23, 42, 0.04);
+    }
+
     .sc-table tbody td {
         display: grid;
         grid-template-columns: minmax(7.5rem, 40%) minmax(0, 1fr);
@@ -489,12 +522,6 @@
 
     .sc-select-cell {
         align-items: center !important;
-    }
-
-    .sc-supplier-cell {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 0.35rem;
     }
 
     .sc-note-text {

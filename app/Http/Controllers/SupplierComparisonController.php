@@ -149,6 +149,7 @@ class SupplierComparisonController extends Controller
                 'message' => $message,
                 'prs_item_id' => $prsItem->id,
                 'canvassing_item_id' => $canvassing->id,
+                'selected_canvassing_item_id' => $canvassing->id,
                 'selected_supplier_name' => $supplierName,
                 'selection_reason' => $prsItem->selection_reason,
                 'report_url' => route('procurement.supplier-comparison.report', $prsItem),

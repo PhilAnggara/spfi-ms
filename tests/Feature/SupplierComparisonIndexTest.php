@@ -167,3 +167,40 @@ it('filters supplier comparison rows by keyword and fills the search input', fun
         ->assertDontSee('OTHER-ITEM-001')
         ->assertDontSee('Other Comparison Item');
 });
+
+it('marks the lowest unit price when an item has multiple supplier quotes', function () {
+    $cheaperSupplier = Supplier::query()->create([
+        'name' => 'Cheaper Index Supplier',
+        'code' => 'SUP-IDX-002',
+        'created_by' => $this->canvasser->id,
+    ]);
+
+    PrsCanvassingItem::query()->create([
+        'prs_id' => $this->matchingPrsItem->prs_id,
+        'prs_item_id' => $this->matchingPrsItem->id,
+        'supplier_id' => $cheaperSupplier->id,
+        'unit_price' => 900,
+        'lead_time_days' => 5,
+        'term_of_payment_type' => 'cash',
+        'canvased_by' => $this->canvasser->id,
+    ]);
+
+    $response = $this->actingAs($this->manager)
+        ->get(route('procurement.supplier-comparison.index', [
+            'keyword' => 'MATCH-ITEM-001',
+        ]));
+
+    $response->assertOk()
+        ->assertSee('Cheaper Index Supplier')
+        ->assertSee('sc-lowest-badge', false)
+        ->assertSee('>Lowest</span>', false);
+
+    $singleQuoteHtml = $this->actingAs($this->manager)
+        ->get(route('procurement.supplier-comparison.index', [
+            'keyword' => 'OTHER-ITEM-001',
+        ]))
+        ->assertOk()
+        ->getContent();
+
+    expect($singleQuoteHtml)->not->toContain('sc-lowest-badge');
+});
