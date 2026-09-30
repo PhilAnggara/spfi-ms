@@ -6,7 +6,9 @@ use App\Models\ItemCategory;
 use App\Services\Accounting\AccountingInventoryReportService;
 use App\Support\PdfReport;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AccountingReportController extends Controller
@@ -87,41 +89,56 @@ class AccountingReportController extends Controller
     public function restatement(Request $request)
     {
         $validated = $this->validateReportRequest($request, [
-            'month' => ['required', 'date_format:Y-m'],
+            'month_from' => ['required', 'date_format:Y-m'],
+            'month_to' => ['required', 'date_format:Y-m', 'after_or_equal:month_from'],
         ]);
 
+        $months = $this->inventoryReportService->monthsInRange(
+            $validated['month_from'],
+            $validated['month_to'],
+        );
+
+        if ($months === [] || count($months) > 12) {
+            throw ValidationException::withMessages([
+                'month_to' => 'Month range must include between 1 and 12 months.',
+            ]);
+        }
+
         $category = $this->resolveCategory((int) $validated['category_id']);
-        $rows = $this->inventoryReportService->restatementRows($validated['month'], $category->id);
+        $sections = $this->inventoryReportService->restatementSections($months, $category->id);
+
+        $monthFrom = $months[0];
+        $monthTo = $months[array_key_last($months)];
+        $isRange = count($months) > 1;
+        $periodLabel = $isRange
+            ? Carbon::createFromFormat('Y-m', $monthFrom)->format('M Y')
+                .' to '
+                .Carbon::createFromFormat('Y-m', $monthTo)->format('M Y')
+            : Carbon::createFromFormat('Y-m', $monthFrom)->format('F Y');
+
+        $filePrefix = $isRange
+            ? sprintf('accounting-restatement-%s_to_%s', $monthFrom, $monthTo)
+            : sprintf('accounting-restatement-%s', $monthFrom);
 
         $data = [
             'company' => 'PT. SINAR PURE FOODS INTERNATIONAL',
             'title' => 'Restatement Report',
-            'month' => $validated['month'],
+            'period_label' => $periodLabel,
+            'month' => $monthFrom,
+            'month_from' => $monthFrom,
+            'month_to' => $monthTo,
+            'is_range' => $isRange,
             'category' => $category->name,
-            'rows' => $rows,
-            'totals' => [
-                'beg_qty' => $rows->sum('beg_qty'),
-                'beg_amount' => $rows->sum('beg_amount'),
-                'purchase_qty' => $rows->sum('purchase_qty'),
-                'purchase_amount' => $rows->sum('purchase_amount'),
-                'issuance_qty' => $rows->sum('issuance_qty'),
-                'issuance_amount' => $rows->sum('issuance_amount'),
-                'end_theoretical_qty' => $rows->sum('end_theoretical_qty'),
-                'end_theoretical_amount' => $rows->sum('end_theoretical_amount'),
-                'percount_qty' => $rows->sum(fn (array $row): float => (float) ($row['percount_qty'] ?? 0)),
-                'percount_amount' => $rows->sum(fn (array $row): float => (float) ($row['percount_amount'] ?? 0)),
-                'variance_qty' => $rows->sum(fn (array $row): float => (float) ($row['variance_qty'] ?? 0)),
-                'variance_amount' => $rows->sum(fn (array $row): float => (float) ($row['variance_amount'] ?? 0)),
-                'total_qty' => $rows->sum('total_qty'),
-                'total_amount' => $rows->sum('total_amount'),
-            ],
+            'sections' => $sections,
+            'rows' => $sections[0]['rows'],
+            'totals' => $sections[0]['totals'],
         ];
 
         return $this->exportReport(
             $validated['format'],
             'exports.accounting-restatement',
             $data,
-            'accounting-restatement',
+            $filePrefix,
             'pdf.reports.accounting-restatement'
         );
     }

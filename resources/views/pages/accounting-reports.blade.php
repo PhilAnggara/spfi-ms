@@ -101,11 +101,15 @@
                 <div class="card shadow-sm h-100">
                     <div class="card-body">
                         <h5 class="card-title">Restatement Report</h5>
-                        <form method="post" action="{{ route('accounting.reports.restatement') }}" class="row g-3">
+                        <form method="post" action="{{ route('accounting.reports.restatement') }}" class="row g-3" data-restatement-form>
                             @csrf
-                            <div class="col-12 col-md-6">
-                                <label class="form-label" for="restatement-month">Month</label>
-                                <input type="month" id="restatement-month" name="month" class="form-control" value="{{ $defaultMonth }}" min="{{ $monthMin }}" max="{{ $monthMax }}" required>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="restatement-month-from">Month From</label>
+                                <input type="month" id="restatement-month-from" name="month_from" class="form-control" value="{{ $defaultMonth }}" min="{{ $monthMin }}" max="{{ $monthMax }}" required data-restatement-month-from>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="restatement-month-to">Month To</label>
+                                <input type="month" id="restatement-month-to" name="month_to" class="form-control" value="{{ $defaultMonth }}" min="{{ $monthMin }}" max="{{ $monthMax }}" required data-restatement-month-to>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label" for="restatement-category">Category</label>
@@ -247,3 +251,55 @@
     </section>
 </div>
 @endsection
+
+@push('addon-script')
+<script>
+(() => {
+    const form = document.querySelector('[data-restatement-form]');
+    if (!form) {
+        return;
+    }
+
+    const monthFrom = form.querySelector('[data-restatement-month-from]');
+    const monthTo = form.querySelector('[data-restatement-month-to]');
+    if (!monthFrom || !monthTo) {
+        return;
+    }
+
+    const absoluteMin = monthTo.getAttribute('min') || '';
+    const absoluteMax = monthTo.getAttribute('max') || '';
+
+    function monthsBetween(from, to) {
+        const [fy, fm] = from.split('-').map(Number);
+        const [ty, tm] = to.split('-').map(Number);
+        return (ty - fy) * 12 + (tm - fm);
+    }
+
+    function syncMonthConstraints() {
+        const from = monthFrom.value;
+        const to = monthTo.value;
+
+        monthTo.min = from || absoluteMin;
+        monthTo.max = absoluteMax;
+
+        monthTo.setCustomValidity('');
+
+        if (from && to && from > to) {
+            monthTo.setCustomValidity('Month To must be the same as or after Month From.');
+            return;
+        }
+
+        if (from && to && monthsBetween(from, to) > 11) {
+            monthTo.setCustomValidity('Month range cannot exceed 12 months.');
+        }
+    }
+
+    monthFrom.addEventListener('change', syncMonthConstraints);
+    monthFrom.addEventListener('input', syncMonthConstraints);
+    monthTo.addEventListener('change', syncMonthConstraints);
+    monthTo.addEventListener('input', syncMonthConstraints);
+    form.addEventListener('submit', syncMonthConstraints);
+    syncMonthConstraints();
+})();
+</script>
+@endpush

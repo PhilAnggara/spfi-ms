@@ -309,6 +309,74 @@ class AccountingInventoryReportService
     }
 
     /**
+     * Build one restatement section per month (beg/end/percount stay month-bound).
+     *
+     * @param  list<string>  $months  Y-m values in chronological order
+     * @return list<array{month: string, rows: Collection<int, array<string, mixed>>, totals: array<string, float>}>
+     */
+    public function restatementSections(array $months, int $categoryId): array
+    {
+        $sections = [];
+
+        foreach ($months as $month) {
+            $rows = $this->restatementRows($month, $categoryId);
+            $sections[] = [
+                'month' => $month,
+                'rows' => $rows,
+                'totals' => $this->restatementTotals($rows),
+            ];
+        }
+
+        return $sections;
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array<string, float>
+     */
+    public function restatementTotals(Collection $rows): array
+    {
+        return [
+            'beg_qty' => (float) $rows->sum('beg_qty'),
+            'beg_amount' => (float) $rows->sum('beg_amount'),
+            'purchase_qty' => (float) $rows->sum('purchase_qty'),
+            'purchase_amount' => (float) $rows->sum('purchase_amount'),
+            'issuance_qty' => (float) $rows->sum('issuance_qty'),
+            'issuance_amount' => (float) $rows->sum('issuance_amount'),
+            'end_theoretical_qty' => (float) $rows->sum('end_theoretical_qty'),
+            'end_theoretical_amount' => (float) $rows->sum('end_theoretical_amount'),
+            'percount_qty' => (float) $rows->sum(fn (array $row): float => (float) ($row['percount_qty'] ?? 0)),
+            'percount_amount' => (float) $rows->sum(fn (array $row): float => (float) ($row['percount_amount'] ?? 0)),
+            'variance_qty' => (float) $rows->sum(fn (array $row): float => (float) ($row['variance_qty'] ?? 0)),
+            'variance_amount' => (float) $rows->sum(fn (array $row): float => (float) ($row['variance_amount'] ?? 0)),
+            'total_qty' => (float) $rows->sum('total_qty'),
+            'total_amount' => (float) $rows->sum('total_amount'),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function monthsInRange(string $monthFrom, string $monthTo): array
+    {
+        $from = Carbon::createFromFormat('Y-m', $monthFrom)->startOfMonth();
+        $to = Carbon::createFromFormat('Y-m', $monthTo)->startOfMonth();
+
+        if ($to->lt($from)) {
+            return [];
+        }
+
+        $months = [];
+        $cursor = $from->copy();
+        while ($cursor->lte($to)) {
+            $months[] = $cursor->format('Y-m');
+            $cursor->addMonthNoOverflow();
+        }
+
+        return $months;
+    }
+
+    /**
      * @return Collection<int, array<string, mixed>>
      */
     public function stockCardCountRows(string $month, int $categoryId): Collection

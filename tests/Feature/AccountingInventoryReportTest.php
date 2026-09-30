@@ -788,7 +788,8 @@ it('fills restatement percount from legacy counttag and computes variance', func
 
     $response = $this->actingAs($this->user)
         ->post(route('accounting.reports.restatement'), [
-            'month' => now()->format('Y-m'),
+            'month_from' => now()->format('Y-m'),
+            'month_to' => now()->format('Y-m'),
             'category_id' => $this->category->id,
             'format' => 'excel',
         ]);
@@ -800,7 +801,8 @@ it('fills restatement percount from legacy counttag and computes variance', func
 
     $pdfResponse = $this->actingAs($this->user)
         ->post(route('accounting.reports.restatement'), [
-            'month' => now()->format('Y-m'),
+            'month_from' => now()->format('Y-m'),
+            'month_to' => now()->format('Y-m'),
             'category_id' => $this->category->id,
             'format' => 'pdf',
         ]);
@@ -1157,6 +1159,134 @@ it('picks each item counttag date independently for ending percount', function (
     expect((float) $second['percount_qty'])->toBe(8.0);
     expect((float) $first['variance_qty'])->toBe(3.0);
     expect((float) $second['variance_qty'])->toBe(5.0);
+});
+
+it('exports restatement for a month range with one section per month', function () {
+    $monthA = now()->subMonth()->format('Y-m');
+    $monthB = now()->format('Y-m');
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-RANGE-A',
+        'qty' => 4,
+        'u_cost' => 5,
+        'begining' => 0,
+        'ending' => 4,
+        'tran_date' => now()->subMonth()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'begining_u_cost' => 0,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    AccountingInventoryDocTran::query()->create([
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-RANGE-A',
+        'doc_date' => now()->subMonth()->startOfMonth()->toDateString(),
+        'item_code' => $this->item->code,
+        'qty' => 4,
+        'u_cost' => 5,
+        'ave_cost' => 5,
+        't_qty' => 4,
+        'tran_date' => now()->subMonth()->startOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'amount' => 20,
+        'item_id' => $this->item->id,
+        'category_id' => $this->category->id,
+        'encoded_by' => $this->user->id,
+        'encoded_at' => now(),
+    ]);
+
+    AccountingInventoryMonthly::query()->create([
+        'item_code' => $this->item->code,
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-RANGE-B',
+        'qty' => 2,
+        'u_cost' => 5,
+        'begining' => 4,
+        'ending' => 6,
+        'tran_date' => now()->endOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'begining_u_cost' => 5,
+        'category_id' => $this->category->id,
+        'item_id' => $this->item->id,
+    ]);
+
+    AccountingInventoryDocTran::query()->create([
+        'doc_code' => 'RR',
+        'doc_no' => 'RR-RANGE-B',
+        'doc_date' => now()->startOfMonth()->toDateString(),
+        'item_code' => $this->item->code,
+        'qty' => 2,
+        'u_cost' => 5,
+        'ave_cost' => 5,
+        't_qty' => 6,
+        'tran_date' => now()->startOfMonth()->toDateString(),
+        'category' => $this->category->name,
+        'amount' => 10,
+        'item_id' => $this->item->id,
+        'category_id' => $this->category->id,
+        'encoded_by' => $this->user->id,
+        'encoded_at' => now(),
+    ]);
+
+    $service = app(AccountingInventoryReportService::class);
+    $sections = $service->restatementSections([$monthA, $monthB], $this->category->id);
+
+    expect($sections)->toHaveCount(2);
+    expect($sections[0]['month'])->toBe($monthA);
+    expect($sections[1]['month'])->toBe($monthB);
+    expect((float) $sections[0]['totals']['purchase_qty'])->toBe(4.0);
+    expect((float) $sections[1]['totals']['purchase_qty'])->toBe(2.0);
+    expect((float) $sections[1]['totals']['beg_qty'])->toBe(4.0);
+
+    $excel = $this->actingAs($this->user)
+        ->post(route('accounting.reports.restatement'), [
+            'month_from' => $monthA,
+            'month_to' => $monthB,
+            'category_id' => $this->category->id,
+            'format' => 'excel',
+        ]);
+
+    $excel->assertSuccessful();
+    $content = $excel->streamedContent();
+    expect($content)->toContain('Period:');
+    expect($content)->toContain(\Carbon\Carbon::createFromFormat('Y-m', $monthA)->format('F Y'));
+    expect($content)->toContain(\Carbon\Carbon::createFromFormat('Y-m', $monthB)->format('F Y'));
+    expect($content)->toContain($this->item->code);
+    expect($content)->toContain('GRAND TOTAL');
+
+    $pdf = $this->actingAs($this->user)
+        ->post(route('accounting.reports.restatement'), [
+            'month_from' => $monthA,
+            'month_to' => $monthB,
+            'category_id' => $this->category->id,
+            'format' => 'pdf',
+        ]);
+
+    $pdf->assertSuccessful();
+    expect($pdf->headers->get('content-type'))->toContain('pdf');
+});
+
+it('rejects invalid restatement month ranges', function () {
+    $this->actingAs($this->user)
+        ->post(route('accounting.reports.restatement'), [
+            'month_from' => now()->format('Y-m'),
+            'month_to' => now()->subMonth()->format('Y-m'),
+            'category_id' => $this->category->id,
+            'format' => 'excel',
+        ])
+        ->assertSessionHasErrors('month_to');
+
+    $this->actingAs($this->user)
+        ->post(route('accounting.reports.restatement'), [
+            'month_from' => now()->subMonths(13)->format('Y-m'),
+            'month_to' => now()->format('Y-m'),
+            'category_id' => $this->category->id,
+            'format' => 'excel',
+        ])
+        ->assertSessionHasErrors('month_to');
 });
 
 /**
