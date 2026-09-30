@@ -6,6 +6,7 @@ use App\Enums\TermOfPaymentType;
 use App\Models\AccountingCode;
 use App\Models\ReceivingReport;
 use App\Services\CurrencyExchangeRateService;
+use App\Support\PdfFormatters;
 
 class ReceivingReportEntryGenerator
 {
@@ -69,14 +70,6 @@ class ReceivingReportEntryGenerator
             $receivingReport->received_date,
         );
 
-        $convertAmount = static function (float $amount) use ($currencyConversion): float {
-            if (! ($currencyConversion['should_convert'] ?? false)) {
-                return round($amount, 2);
-            }
-
-            return round($amount * (float) ($currencyConversion['multiplier'] ?? 1), 2);
-        };
-
         $debitRows = [];
         $totalAmountAllItems = 0.0;
         $totalPpnAmountAllItems = 0.0;
@@ -88,11 +81,11 @@ class ReceivingReportEntryGenerator
             $poItem = $rrItem->purchaseOrderItem;
             $item = $poItem?->item;
             $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
-            $lineAmounts = $this->resolveReceivedLineAmounts($poItem, $qtyTotal);
-            $amount = $convertAmount($lineAmounts['base_amount']);
-            $ppnAmount = $convertAmount($lineAmounts['ppn_amount']);
-            $pphAmount = $convertAmount($lineAmounts['pph_amount']);
-            $lineTotal = $convertAmount($lineAmounts['line_total']);
+            $converted = $this->convertReceivedLine($poItem, $qtyTotal, $currencyConversion);
+            $amount = $converted['amount'];
+            $ppnAmount = $converted['ppn_amount'];
+            $pphAmount = $converted['pph_amount'];
+            $lineTotal = $converted['line_total'];
 
             $totalAmountAllItems += $amount;
             $totalPpnAmountAllItems += $ppnAmount;
@@ -274,6 +267,27 @@ class ReceivingReportEntryGenerator
             'ppn_amount' => $ppnAmount,
             'pph_amount' => $pphAmount,
             'line_total' => $baseAmount + $ppnAmount - $pphAmount,
+        ];
+    }
+
+    /**
+     * @param  array{should_convert?: bool, multiplier?: float|int|string|null}  $currencyConversion
+     * @return array{unit_cost: float, amount: float, ppn_amount: float, pph_amount: float, line_total: float}
+     */
+    public function convertReceivedLine(mixed $poItem, float $qtyTotal, array $currencyConversion): array
+    {
+        $lineAmounts = $this->resolveReceivedLineAmounts($poItem, $qtyTotal);
+        $unitCost = PdfFormatters::convertedUnitCost((float) $lineAmounts['discounted_unit_cost'], $currencyConversion);
+        $amount = PdfFormatters::lineAmountFromUnit($unitCost, $qtyTotal);
+        $ppnAmount = PdfFormatters::convertedAmount((float) $lineAmounts['ppn_amount'], $currencyConversion);
+        $pphAmount = PdfFormatters::convertedAmount((float) $lineAmounts['pph_amount'], $currencyConversion);
+
+        return [
+            'unit_cost' => $unitCost,
+            'amount' => $amount,
+            'ppn_amount' => $ppnAmount,
+            'pph_amount' => $pphAmount,
+            'line_total' => round($amount + $ppnAmount - $pphAmount, 4),
         ];
     }
 

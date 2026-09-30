@@ -59,6 +59,22 @@ if (! function_exists('format_po_decimal')) {
     }
 }
 
+if (! function_exists('format_trimmed_decimal')) {
+    function format_trimmed_decimal(
+        mixed $value,
+        int $maxDecimals,
+        string $decimalSeparator = ',',
+        string $thousandsSeparator = '.',
+    ): string {
+        return \App\Support\PdfFormatters::trimmedDecimal(
+            (float) ($value ?? 0),
+            $maxDecimals,
+            $decimalSeparator,
+            $thousandsSeparator,
+        );
+    }
+}
+
 if (! function_exists('tgl')) {
     function tgl($date)
     {

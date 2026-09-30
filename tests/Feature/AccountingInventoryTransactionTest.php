@@ -4,6 +4,8 @@ use App\Models\AccountingInventoryDocTran;
 use App\Models\AccountingInventoryMonthly;
 use App\Models\AccountingInventoryTransaction;
 use App\Models\AccountingInventoryTransactionLine;
+use App\Models\Currency;
+use App\Models\CurrencyExchangeRate;
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -1138,4 +1140,115 @@ it('allows multiple native encode rows with null legacy_tran_id', function () {
         ->whereNull('legacy_monthly_id')
         ->whereIn('doc_no', ['CV-LEGACY-NULL-1', 'CV-LEGACY-NULL-2'])
         ->count())->toBe(2);
+});
+
+it('encodes receiving report using three-decimal converted unit cost', function () {
+    $usd = Currency::query()->create([
+        'name' => 'US Dollar',
+        'code' => 'USD',
+        'symbol' => '$',
+        'created_by' => $this->user->id,
+    ]);
+
+    CurrencyExchangeRate::query()->create([
+        'currency_id' => $usd->id,
+        'rate_to_idr' => 17594,
+        'effective_date' => now()->toDateString(),
+        'created_by' => $this->user->id,
+    ]);
+
+    $supplier = Supplier::query()->create([
+        'name' => 'USD Supplier',
+        'code' => 'USD-SUP',
+        'created_by' => $this->user->id,
+    ]);
+
+    $po = PurchaseOrder::query()->create([
+        'po_number' => 'PO-USD-ENC-001',
+        'supplier_id' => $supplier->id,
+        'po_date' => now()->toDateString(),
+        'status' => 'APPROVED',
+        'created_by' => $this->user->id,
+        'currency_id' => $usd->id,
+    ]);
+
+    $poItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $po->id,
+        'item_id' => $this->item->id,
+        'quantity' => 14000,
+        'unit_price' => 0.65660,
+        'total' => 9192.4,
+        'line_subtotal' => 9192.4,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+    ]);
+
+    $rr = ReceivingReport::query()->create([
+        'rr_number' => 'RR-USD-ENC-001',
+        'purchase_order_id' => $po->id,
+        'received_date' => now()->toDateString(),
+        'created_by' => $this->user->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $rr->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 14000,
+    ]);
+
+    $index = $this->actingAs($this->user)
+        ->get(route('accounting.inventory-transactions.index', [
+            'status' => 'pending',
+            'category_id' => $this->category->id,
+            'doc_type' => 'RR',
+        ]));
+
+    $index->assertSuccessful();
+    $index->assertSee('161,731,080');
+
+    $show = $this->actingAs($this->user)
+        ->get(route('accounting.inventory-transactions.show', [
+            'docType' => 'rr',
+            'id' => $rr->id,
+            'category_id' => $this->category->id,
+        ]));
+
+    $show->assertSuccessful();
+    $show->assertSee('11552.22');
+
+    $response = $this->actingAs($this->user)
+        ->put(route('accounting.inventory-transactions.update', [
+            'docType' => 'rr',
+            'id' => $rr->id,
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
+            'lines' => [
+                [
+                    'item_id' => $this->item->id,
+                    'direction' => 'in',
+                    'quantity' => 14000,
+                    'unit_of_measure_id' => $this->unit->id,
+                    'unit_cost' => 11552.22,
+                    'amount' => 161731080,
+                    'prefill_quantity' => 14000,
+                    'prefill_unit_cost' => 11552.22,
+                ],
+            ],
+        ]);
+
+    $response->assertRedirect(route('accounting.inventory-transactions.index', ['status' => 'encoded']));
+
+    $row = AccountingInventoryDocTran::query()
+        ->where('doc_code', 'RR')
+        ->where('doc_no', 'RR-USD-ENC-001')
+        ->where('category_id', $this->category->id)
+        ->first();
+
+    expect($row)->not->toBeNull();
+    expect((float) $row->u_cost)->toBe(11552.22);
+    expect((float) $row->amount)->toBe(161731080.0);
 });

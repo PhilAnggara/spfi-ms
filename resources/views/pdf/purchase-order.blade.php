@@ -236,7 +236,7 @@
         $firstPoMeta = $firstPoItem?->meta ?? [];
         $isCapex = (bool) ($firstPoItem?->prsItem?->prs?->is_capex ?? ($firstPoMeta['is_capex'] ?? false));
         $decimalPlaces = (int) ($decimalPlaces ?? config('purchase-order.print.decimal_places.default', 2));
-        $formatMoney = fn ($amount) => number_format((float) $amount, $decimalPlaces, ',', '.');
+        $formatMoney = fn ($amount) => \App\Support\PdfFormatters::trimmedDecimal($amount, 5, ',', '.');
 
         $certifiedName = $purchaseOrder->printCertifiedByName();
         $approvedName = $purchaseOrder->printApprovedByName();

@@ -110,6 +110,7 @@ class AccountingInventoryQueueService
         }
 
         $items = $this->hydratePendingTransferSlipAmounts($items);
+        $items = $this->hydratePendingReceivingReportAmounts($items);
 
         $documents = (new ConcretePaginator(
             $items,
@@ -198,6 +199,43 @@ class AccountingInventoryQueueService
         });
     }
 
+    /**
+     * @param  \Illuminate\Support\Collection<int, object>  $items
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function hydratePendingReceivingReportAmounts($items)
+    {
+        $targets = $items
+            ->filter(fn (object $row): bool => strtoupper((string) $row->doc_type) === 'RR'
+                && ! $row->is_encoded
+                && $row->source_id !== null)
+            ->map(fn (object $row): array => [
+                'source_id' => (int) $row->source_id,
+                'category_id' => (int) $row->category_id,
+            ])
+            ->values()
+            ->all();
+
+        if ($targets === []) {
+            return $items;
+        }
+
+        $amounts = $this->prefiller->estimateReceivingReportAmounts($targets);
+
+        return $items->map(function (object $row) use ($amounts): object {
+            if (strtoupper((string) $row->doc_type) !== 'RR' || $row->is_encoded || $row->source_id === null) {
+                return $row;
+            }
+
+            $key = ((int) $row->source_id).':'.((int) $row->category_id);
+            if (array_key_exists($key, $amounts)) {
+                $row->amount = (float) $amounts[$key];
+            }
+
+            return $row;
+        });
+    }
+
     public function resolveSourceModel(string $docType, int $id): Model
     {
         $docType = strtoupper(trim($docType));
@@ -213,7 +251,7 @@ class AccountingInventoryQueueService
     public function buildDocumentForSource(Model $source, int $categoryId): AccountingInventoryTransaction
     {
         if ($source instanceof ReceivingReport) {
-            $source->loadMissing(['purchaseOrder.supplier']);
+            $source->loadMissing(['purchaseOrder.supplier', 'purchaseOrder.currency']);
         } elseif ($source instanceof Delivery) {
             $source->loadMissing('supplier');
         }

@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\ReceivingReport;
 use App\Models\StockInventory;
 use App\Models\TransferSlip;
+use App\Services\CurrencyExchangeRateService;
 use App\Services\StockService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -18,6 +19,8 @@ class AccountingInventoryPrefiller
 {
     public function __construct(
         private readonly AccountingInventoryService $inventoryService,
+        private readonly CurrencyExchangeRateService $currencyExchangeRateService,
+        private readonly ReceivingReportEntryGenerator $entryGenerator,
     ) {}
 
     /**
@@ -43,9 +46,15 @@ class AccountingInventoryPrefiller
     {
         $receivingReport->loadMissing([
             'purchaseOrder.supplier',
+            'purchaseOrder.currency',
             'items.purchaseOrderItem.item.unit',
             'items.purchaseOrderItem.item.category',
         ]);
+
+        $currencyConversion = $this->currencyExchangeRateService->resolveConversionForPurchaseOrder(
+            $receivingReport->purchaseOrder?->currency?->code,
+            $receivingReport->received_date,
+        );
 
         $lines = [];
         foreach ($receivingReport->items as $index => $reportItem) {
@@ -60,7 +69,8 @@ class AccountingInventoryPrefiller
                 continue;
             }
 
-            $unitCost = (float) ($poItem->unit_price ?? 0);
+            $converted = $this->entryGenerator->convertReceivedLine($poItem, $quantity, $currencyConversion);
+            $unitCost = $converted['unit_cost'];
             $lines[] = $this->linePayload(
                 item: $item,
                 direction: AccountingInventoryTransactionLine::DIRECTION_IN,
@@ -340,6 +350,74 @@ class AccountingInventoryPrefiller
                 $qty = (float) $line->quantity;
                 $cost = (float) ($unitCosts[(int) $line->item_id] ?? 0);
                 $total += round($qty * $cost, 4);
+            }
+
+            $amounts[$key] = round($total, 4);
+        }
+
+        return $amounts;
+    }
+
+    /**
+     * Pending RR list amounts using converted 3-decimal unit cost, same as encode prefill.
+     *
+     * @param  list<array{source_id: int, category_id: int}>  $targets
+     * @return array<string, float> keyed by "{source_id}:{category_id}"
+     */
+    public function estimateReceivingReportAmounts(array $targets): array
+    {
+        if ($targets === []) {
+            return [];
+        }
+
+        $sourceIds = collect($targets)
+            ->pluck('source_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $reports = ReceivingReport::query()
+            ->with([
+                'purchaseOrder.currency',
+                'items.purchaseOrderItem.item',
+            ])
+            ->whereIn('id', $sourceIds)
+            ->get()
+            ->keyBy('id');
+
+        $amounts = [];
+        foreach ($targets as $target) {
+            $sourceId = (int) $target['source_id'];
+            $categoryId = (int) $target['category_id'];
+            $key = $sourceId.':'.$categoryId;
+            $report = $reports->get($sourceId);
+            if ($report === null) {
+                $amounts[$key] = 0.0;
+
+                continue;
+            }
+
+            $currencyConversion = $this->currencyExchangeRateService->resolveConversionForPurchaseOrder(
+                $report->purchaseOrder?->currency?->code,
+                $report->received_date,
+            );
+
+            $total = 0.0;
+            foreach ($report->items as $reportItem) {
+                $poItem = $reportItem->purchaseOrderItem;
+                $item = $poItem?->item;
+                if ($item === null || (int) $item->category_id !== $categoryId) {
+                    continue;
+                }
+
+                $quantity = (float) $reportItem->qty_good;
+                if ($quantity <= 0) {
+                    continue;
+                }
+
+                $converted = $this->entryGenerator->convertReceivedLine($poItem, $quantity, $currencyConversion);
+                $total += $converted['amount'];
             }
 
             $amounts[$key] = round($total, 4);

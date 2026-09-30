@@ -269,19 +269,9 @@
             'multiplier' => 1.0,
             'rate_note' => null,
         ]);
-        $convertAmount = static function (float $amount) use ($currencyConversion): float {
-            if (! ($currencyConversion['should_convert'] ?? false)) {
-                return $amount;
-            }
-
-            return round($amount * (float) ($currencyConversion['multiplier'] ?? 1), 2);
-        };
 
         $entryGenerator = app(\App\Services\Accounting\ReceivingReportEntryGenerator::class);
         $rrAccountingPayload = $rrAccountingPayload ?? $entryGenerator->generate($receivingReport, $currencyConversion);
-        $resolveReceivedLineAmounts = static function ($poItem, float $qtyTotal) use ($entryGenerator): array {
-            return $entryGenerator->resolveReceivedLineAmounts($poItem, $qtyTotal);
-        };
 
         $accountingEntries = $entryGenerator->formatEntriesForPdf($rrAccountingPayload['lines'] ?? []);
         $accountingCodeTotal = (int) ($rrAccountingPayload['totals']['acct_code_total'] ?? 0);
@@ -305,7 +295,7 @@
             $poItem = $rrItem->purchaseOrderItem;
             $item = $poItem?->item;
             $qtyTotal = (float) $rrItem->qty_good + (float) $rrItem->qty_bad;
-            $lineAmounts = $resolveReceivedLineAmounts($poItem, $qtyTotal);
+            $convertedLine = $entryGenerator->convertReceivedLine($poItem, $qtyTotal, $currencyConversion);
             $remainingMm = $itemsBottomLimitMm - $currentTop;
             if ($remainingMm < $minRowHeightMm) {
                 break;
@@ -332,8 +322,8 @@
                 'department_code' => $poItem?->prsItem?->prs?->department?->code ?? '-',
                 'qty_total' => $qtyTotal,
                 'unit' => $item?->unit?->name ?? 'PCS',
-                'unit_cost' => $convertAmount($lineAmounts['discounted_unit_cost']),
-                'amount' => $convertAmount($lineAmounts['base_amount']),
+                'unit_cost' => $convertedLine['unit_cost'],
+                'amount' => $convertedLine['amount'],
             ];
             $currentTop = round($currentTop + $rowHeight, 2);
         }
@@ -393,8 +383,8 @@
             <div class="cell center" style="left: {{ $mmX(108) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(25) }};">{{ $row['department_code'] }}</div>
             <div class="cell right" style="left: {{ $mmX(138) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(23) }};">{{ \App\Support\PdfFormatters::qty($row['qty_total']) }}</div>
             <div class="cell center" style="left: {{ $mmX(163) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(23) }};">{{ $row['unit'] }}</div>
-            <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(35) }};">{{ number_format($row['unit_cost'], 2, '.', ',') }}</div>
-            <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(50) }};">{{ number_format($row['amount'], 2, '.', ',') }}</div>
+            <div class="cell right" style="left: {{ $mmX(189) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(35) }};">{{ \App\Support\PdfFormatters::trimmedDecimal($row['unit_cost'], 3, '.', ',') }}</div>
+            <div class="cell right" style="left: {{ $mmX(228) }}; top: {{ $oy($row['top']) }}; width: {{ $mmW(50) }};">{{ \App\Support\PdfFormatters::trimmedDecimal($row['amount'], 3, '.', ',') }}</div>
         @endforeach
 
         @if ($rowCount > 0)

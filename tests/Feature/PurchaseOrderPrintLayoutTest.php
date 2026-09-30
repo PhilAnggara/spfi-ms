@@ -143,7 +143,7 @@ it('renders compact item table, three column summary, and aligned supplier signa
         ->toContain('white-space: nowrap')
         ->toContain('>Price</th>')
         ->toContain('>Amount</th>')
-        ->toContain('class="text-right col-amount">100.000,00</td>')
+        ->toContain('class="text-right col-amount">100.000</td>')
         ->toContain('.po-items th,')
         ->toContain('border: none')
         ->toContain('.po-items thead th')
@@ -321,4 +321,30 @@ it('shows paper form size and print checklist in confirm print modal', function 
     $response->assertSee($paperLabel, false);
     $response->assertSee('Decimal places', false);
     $response->assertSee('Actual size / 100%', false);
+});
+
+it('prints unit prices with up to five decimals and strips trailing zeros', function () {
+    $this->purchaseOrder->items()->first()->update([
+        'unit_price' => 0.10021,
+        'line_subtotal' => 0.12100,
+        'total' => 0.12100,
+    ]);
+
+    $html = view('pdf.purchase-order', [
+        'purchaseOrder' => $this->purchaseOrder->fresh()->load([
+            'supplier',
+            'currency',
+            'items.item.unit',
+            'items.prsItem.prs.department',
+            'certifiedBy',
+            'approvedBy',
+        ]),
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+    ])->render();
+
+    expect($html)
+        ->toContain('0,10021')
+        ->toContain('0,121')
+        ->not->toContain('0,12100');
 });

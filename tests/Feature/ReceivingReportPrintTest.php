@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Currency;
+use App\Models\CurrencyExchangeRate;
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -11,6 +13,7 @@ use App\Models\ReceivingReportItem;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
+use App\Services\Accounting\ReceivingReportEntryGenerator;
 use App\Services\Print\PrintCalibrationService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Support\Facades\Hash;
@@ -716,4 +719,104 @@ it('renders received date on the print form instead of created at', function () 
 
     expect($html)->toContain($receivedDateText);
     expect($html)->not->toContain($rrCreatedAtText);
+});
+
+it('rounds converted RR unit cost to three decimals before multiplying quantity', function () {
+    $usd = Currency::query()->create([
+        'name' => 'US Dollar',
+        'code' => 'USD',
+        'symbol' => '$',
+        'created_by' => $this->user->id,
+    ]);
+
+    CurrencyExchangeRate::query()->create([
+        'currency_id' => $usd->id,
+        'rate_to_idr' => 17594,
+        'effective_date' => now()->toDateString(),
+        'created_by' => $this->user->id,
+    ]);
+
+    $unit = UnitOfMeasure::query()->create(['name' => 'Kilogram', 'code' => 'KG-USD-'.uniqid()]);
+    $category = ItemCategory::query()->create(['name' => 'CHEM', 'code' => 'CHEM-USD-'.uniqid()]);
+    $item = Item::query()->create([
+        'name' => 'USD Chemical',
+        'code' => 'USD-CHEM-001',
+        'category_id' => $category->id,
+        'unit_of_measure_id' => $unit->id,
+        'is_active' => true,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::query()->create([
+        'supplier_id' => $this->receivingReport->purchaseOrder->supplier_id,
+        'created_by' => $this->user->id,
+        'status' => 'APPROVED',
+        'po_number' => 'PO-USD-024046',
+        'currency_id' => $usd->id,
+    ]);
+
+    $poItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'item_id' => $item->id,
+        'quantity' => 14000,
+        'unit_price' => 0.65660,
+        'line_subtotal' => 9192.4,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+        'total' => 9192.4,
+    ]);
+
+    $receivingReport = ReceivingReport::query()->create([
+        'rr_number' => '024046',
+        'purchase_order_id' => $purchaseOrder->id,
+        'received_date' => now()->toDateString(),
+        'created_by' => $this->user->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $receivingReport->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 14000,
+        'qty_bad' => 0,
+    ]);
+
+    $receivingReport = $receivingReport->fresh()->load([
+        'purchaseOrder.supplier',
+        'purchaseOrder.currency',
+        'purchaseOrder.items.prsItem.prs',
+        'items.purchaseOrderItem.item.unit',
+        'items.purchaseOrderItem.item.category',
+        'items.purchaseOrderItem.prsItem.prs.department',
+        'customsDocumentType',
+        'createdBy',
+    ]);
+
+    $payload = app(ReceivingReportEntryGenerator::class)->generate($receivingReport);
+    $converted = app(ReceivingReportEntryGenerator::class)->convertReceivedLine(
+        $poItem->fresh(),
+        14000,
+        $payload['currency_conversion'],
+    );
+
+    expect($converted['unit_cost'])->toBe(11552.22);
+    expect($converted['amount'])->toBe(161731080.0);
+    expect((float) $payload['display']['sub_total'])->toBe(161731080.0);
+
+    $html = view('pdf.receiving-report', [
+        'receivingReport' => $receivingReport,
+        'isPreview' => true,
+        'approvedByName' => 'Approver',
+        'backgroundImageDataUri' => null,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+        'currencyConversion' => $payload['currency_conversion'],
+        'rrAccountingPayload' => $payload,
+    ])->render();
+
+    expect($html)
+        ->toContain('11,552.22')
+        ->toContain('161,731,080')
+        ->not->toContain('161,731,085.6');
 });
