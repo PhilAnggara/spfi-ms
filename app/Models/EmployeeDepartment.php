@@ -22,6 +22,7 @@ class EmployeeDepartment extends Model
         return [
             'id' => 'integer',
             'is_active' => 'boolean',
+            'meta' => 'array',
         ];
     }
 

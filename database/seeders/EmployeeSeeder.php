@@ -22,6 +22,7 @@ class EmployeeSeeder extends Seeder
 
         if (empty($rows)) {
             $this->command?->warn('No employee rows found from configured source.');
+
             return;
         }
 
@@ -44,6 +45,7 @@ class EmployeeSeeder extends Seeder
 
                 if ($employeeId === null || $employeeName === null) {
                     $skipped++;
+
                     continue;
                 }
 
@@ -110,16 +112,31 @@ class EmployeeSeeder extends Seeder
                     'deleted_at' => null,
                 ];
 
-                if ($legacyId !== null) {
-                    DB::table('employees')->updateOrInsert(
-                        ['id' => $legacyId],
-                        ['created_at' => now()] + $payload
-                    );
+                $existingQuery = $legacyId !== null
+                    ? DB::table('employees')->where('id', $legacyId)
+                    : DB::table('employees')->where('employee_id', $employeeId);
+
+                $existing = $existingQuery->first();
+                $existingPhotoPath = $existing?->photo_path;
+                $existingCreatedAt = $existing?->created_at;
+
+                $payload['photo_path'] = filled($existingPhotoPath) ? $existingPhotoPath : null;
+
+                if ($existing === null) {
+                    DB::table('employees')->insert([
+                        ...($legacyId !== null ? ['id' => $legacyId] : []),
+                        ...$payload,
+                        'created_at' => now(),
+                    ]);
                 } else {
-                    DB::table('employees')->updateOrInsert(
-                        ['employee_id' => $employeeId],
-                        ['created_at' => now()] + $payload
-                    );
+                    unset($payload['deleted_at']);
+                    DB::table('employees')
+                        ->where('id', $existing->id)
+                        ->update([
+                            ...$payload,
+                            'deleted_at' => null,
+                            'created_at' => $existingCreatedAt ?? now(),
+                        ]);
                 }
 
                 $inserted++;
@@ -146,14 +163,15 @@ class EmployeeSeeder extends Seeder
 
         if ($this->isLegacySource() && ! empty($legacyRows)) {
             $this->logImportSource($dataset, 'legacy');
-            $this->command?->info("ℹ [{$dataset}] rows loaded: " . count($legacyRows));
+            $this->command?->info("ℹ [{$dataset}] rows loaded: ".count($legacyRows));
+
             return $legacyRows;
         }
 
         $csvRows = $this->readCsvRows($dataset);
 
         $this->logImportSource($dataset, $this->isLegacySource() ? 'csv-fallback' : 'csv');
-        $this->command?->info("ℹ [{$dataset}] rows loaded: " . count($csvRows));
+        $this->command?->info("ℹ [{$dataset}] rows loaded: ".count($csvRows));
 
         return $csvRows;
     }
@@ -167,18 +185,21 @@ class EmployeeSeeder extends Seeder
 
         if (! file_exists($csvPath)) {
             $this->command?->warn("CSV for dataset [{$dataset}] not found at {$csvPath}");
+
             return [];
         }
 
         $handle = fopen($csvPath, 'r');
         if ($handle === false) {
             $this->command?->warn("Unable to open CSV for dataset [{$dataset}] at {$csvPath}");
+
             return [];
         }
 
         $header = fgetcsv($handle, 0, ';');
         if ($header === false) {
             fclose($handle);
+
             return [];
         }
 
@@ -259,7 +280,7 @@ class EmployeeSeeder extends Seeder
 
     private function ownerKeyFor(string $employeeId): string
     {
-        return 'emp:' . strtolower(trim($employeeId));
+        return 'emp:'.strtolower(trim($employeeId));
     }
 
     /**
@@ -289,12 +310,13 @@ class EmployeeSeeder extends Seeder
 
             if (! isset($ownerLookup[$normalizedCandidate]) || $ownerLookup[$normalizedCandidate] === $ownerKey) {
                 $ownerLookup[$normalizedCandidate] = $ownerKey;
+
                 return $candidate;
             }
 
-            $suffix = '-dup-' . $suffixCounter;
+            $suffix = '-dup-'.$suffixCounter;
             $baseLimit = max(1, 100 - strlen($suffix));
-            $candidate = rtrim(substr($baseCode, 0, $baseLimit)) . $suffix;
+            $candidate = rtrim(substr($baseCode, 0, $baseLimit)).$suffix;
             $suffixCounter++;
             $duplicateAdjusted++;
         }
@@ -325,6 +347,9 @@ class EmployeeSeeder extends Seeder
         $employees = DB::table('employees')
             ->select(['id', 'code_employee', 'employee_name', 'photo_path'])
             ->whereNotNull('code_employee')
+            ->where(function ($query): void {
+                $query->whereNull('photo_path')->orWhere('photo_path', '');
+            })
             ->get();
 
         $relinked = 0;
@@ -338,14 +363,11 @@ class EmployeeSeeder extends Seeder
             $candidate = $this->findLatestPhotoByNewPattern($photoFiles, $codeToken, $employeeNameSlug);
             if ($candidate === null) {
                 $missing++;
+
                 continue;
             }
 
-            $path = 'assets/images/employee_photos/' . $candidate['name'];
-            if ((string) $employee->photo_path === $path) {
-                $alreadyLinked++;
-                continue;
-            }
+            $path = 'assets/images/employee_photos/'.$candidate['name'];
 
             DB::table('employees')
                 ->where('id', $employee->id)
@@ -356,6 +378,13 @@ class EmployeeSeeder extends Seeder
 
             $relinked++;
         }
+
+        // Count employees that already had a photo_path and were therefore skipped above.
+        $alreadyLinked = (int) DB::table('employees')
+            ->whereNotNull('code_employee')
+            ->whereNotNull('photo_path')
+            ->where('photo_path', '!=', '')
+            ->count();
 
         return ['relinked' => $relinked, 'missing' => $missing, 'already_linked' => $alreadyLinked];
     }
@@ -374,10 +403,10 @@ class EmployeeSeeder extends Seeder
         }
 
         $pattern = '/^'
-            . preg_quote($codeToken, '/')
-            . '-'
-            . preg_quote($employeeNameSlug, '/')
-            . '-\d{8}_\d{6}_\d{3}(?:-\d+)?\.[a-z0-9]+$/i';
+            .preg_quote($codeToken, '/')
+            .'-'
+            .preg_quote($employeeNameSlug, '/')
+            .'-\d{8}_\d{6}_\d{3}(?:-\d+)?\.[a-z0-9]+$/i';
 
         $matches = [];
         foreach ($photoFiles as $photoFile) {
@@ -400,7 +429,7 @@ class EmployeeSeeder extends Seeder
         $normalized = trim($codeEmployee);
         $normalized = preg_replace('/[\\\\\/:*?"<>|]+/', '-', $normalized) ?? '';
         $normalized = preg_replace('/\s+/', '-', $normalized) ?? '';
-        $normalized = trim($normalized, " .-_");
+        $normalized = trim($normalized, ' .-_');
 
         return $normalized === '' ? 'employee-code' : $normalized;
     }
