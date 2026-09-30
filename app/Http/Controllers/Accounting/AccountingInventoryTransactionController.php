@@ -152,56 +152,30 @@ class AccountingInventoryTransactionController extends Controller
                 ->with('error', $exception->getMessage());
         }
 
-        if ($document->isEncoded()) {
+        return $this->encodeOrUpdateDocument($request, $document);
+    }
+
+    public function updateManual(EncodeAccountingInventoryTransactionRequest $request, string $docType, string $docNumber): RedirectResponse|JsonResponse
+    {
+        $categoryId = (int) ($request->input('category_id') ?: $request->query('category_id'));
+        abort_if($categoryId <= 0, 404);
+
+        try {
+            $document = $this->queueService->buildManualDocument($docType, $docNumber, $categoryId);
+        } catch (\InvalidArgumentException $exception) {
             if ($request->ajax() || $request->expectsJson()) {
-                return response()->json(['message' => 'This document is already encoded and cannot be edited.'], 409);
+                return response()->json(['message' => $exception->getMessage()], 400);
             }
 
             return redirect()
                 ->route('accounting.inventory-transactions.index')
-                ->with('error', 'This document is already encoded and cannot be edited.');
+                ->with('error', $exception->getMessage());
         }
 
-        try {
-            $document = $this->inventoryService->encodeDocument(
-                $document,
-                $request->validated('lines'),
-                $request->user(),
-            );
-        } catch (ValidationException $exception) {
-            if ($request->ajax() || $request->expectsJson()) {
-                throw $exception;
-            }
-
-            return redirect()
-                ->back()
-                ->withErrors($exception->errors())
-                ->withInput();
-        }
-
-        if ($request->ajax() || $request->expectsJson()) {
-            $queueFilters = $this->resolveQueueFiltersFromRequest($request);
-            $queueState = $this->queueService->resolveEncodeQueueState($document, $queueFilters);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Accounting inventory transaction encoded successfully.',
-                'encoded' => [
-                    'doc_type' => $document->doc_type,
-                    'doc_number' => $document->displayDocNumber(),
-                ],
-                'next' => $queueState['next'],
-                'queue_stats' => $queueState['queue_stats'],
-                'close_after' => $request->boolean('close_after'),
-            ]);
-        }
-
-        return redirect()
-            ->route('accounting.inventory-transactions.index', ['status' => 'encoded'])
-            ->with('success', 'Accounting inventory transaction encoded successfully.');
+        return $this->encodeOrUpdateDocument($request, $document);
     }
 
-    public function void(VoidAccountingInventoryTransactionRequest $request, string $docType, int $id): RedirectResponse
+    public function void(VoidAccountingInventoryTransactionRequest $request, string $docType, int $id): RedirectResponse|JsonResponse
     {
         $categoryId = (int) ($request->input('category_id') ?: $request->query('category_id'));
         abort_if($categoryId <= 0, 404);
@@ -209,33 +183,17 @@ class AccountingInventoryTransactionController extends Controller
         $source = $this->queueService->resolveSourceModel($docType, $id);
         $document = $this->queueService->buildDocumentForSource($source, $categoryId);
 
-        $this->inventoryService->voidDocument(
-            $document,
-            $request->user(),
-            $request->validated('void_reason'),
-        );
-
-        return redirect()
-            ->route('accounting.inventory-transactions.index')
-            ->with('success', 'Transaction voided successfully.');
+        return $this->voidEncodedDocument($request, $document);
     }
 
-    public function voidManual(VoidAccountingInventoryTransactionRequest $request, string $docType, string $docNumber): RedirectResponse
+    public function voidManual(VoidAccountingInventoryTransactionRequest $request, string $docType, string $docNumber): RedirectResponse|JsonResponse
     {
         $categoryId = (int) ($request->input('category_id') ?: $request->query('category_id'));
         abort_if($categoryId <= 0, 404);
 
         $document = $this->queueService->buildManualDocument($docType, $docNumber, $categoryId);
 
-        $this->inventoryService->voidDocument(
-            $document,
-            $request->user(),
-            $request->validated('void_reason'),
-        );
-
-        return redirect()
-            ->route('accounting.inventory-transactions.index')
-            ->with('success', 'Transaction voided successfully.');
+        return $this->voidEncodedDocument($request, $document);
     }
 
     public function bulkEncode(Request $request): RedirectResponse
@@ -330,17 +288,131 @@ class AccountingInventoryTransactionController extends Controller
         ];
     }
 
+    private function encodeOrUpdateDocument(
+        EncodeAccountingInventoryTransactionRequest $request,
+        AccountingInventoryTransaction $document,
+    ): RedirectResponse|JsonResponse {
+        $wasEncoded = $document->isEncoded();
+
+        try {
+            $document = $this->inventoryService->encodeDocument(
+                $document,
+                $request->validated('lines'),
+                $request->user(),
+            );
+        } catch (ValidationException $exception) {
+            if ($request->ajax() || $request->expectsJson()) {
+                throw $exception;
+            }
+
+            return redirect()
+                ->back()
+                ->withErrors($exception->errors())
+                ->withInput();
+        }
+
+        $successMessage = $wasEncoded
+            ? 'Accounting inventory transaction updated successfully.'
+            : 'Accounting inventory transaction encoded successfully.';
+
+        if ($request->ajax() || $request->expectsJson()) {
+            $queueFilters = $this->resolveQueueFiltersFromRequest($request);
+            $queueState = $this->queueService->resolveEncodeQueueState($document, $queueFilters);
+
+            return response()->json([
+                'success' => true,
+                'message' => $successMessage,
+                'updated' => $wasEncoded,
+                'encoded' => [
+                    'doc_type' => $document->doc_type,
+                    'doc_number' => $document->displayDocNumber(),
+                    'total_amount' => $document->total_amount,
+                ],
+                'next' => $wasEncoded ? null : $queueState['next'],
+                'queue_stats' => $queueState['queue_stats'],
+                'close_after' => $request->boolean('close_after'),
+            ]);
+        }
+
+        if ($wasEncoded) {
+            if ($document->isManual()) {
+                return redirect()
+                    ->route('accounting.inventory-transactions.manual', [
+                        'docType' => strtolower($document->doc_type),
+                        'docNumber' => $document->displayDocNumber(),
+                        'category_id' => $document->category_id,
+                    ])
+                    ->with('success', $successMessage);
+            }
+
+            return redirect()
+                ->route('accounting.inventory-transactions.show', [
+                    'docType' => strtolower($document->doc_type),
+                    'id' => $document->source_id,
+                    'category_id' => $document->category_id,
+                ])
+                ->with('success', $successMessage);
+        }
+
+        return redirect()
+            ->route('accounting.inventory-transactions.index', ['status' => 'encoded'])
+            ->with('success', $successMessage);
+    }
+
+    private function voidEncodedDocument(
+        VoidAccountingInventoryTransactionRequest $request,
+        AccountingInventoryTransaction $document,
+    ): RedirectResponse|JsonResponse {
+        try {
+            $this->inventoryService->voidDocument(
+                $document,
+                $request->user(),
+                $request->validated('void_reason'),
+            );
+        } catch (ValidationException $exception) {
+            if ($request->ajax() || $request->expectsJson()) {
+                throw $exception;
+            }
+
+            return redirect()
+                ->back()
+                ->withErrors($exception->errors())
+                ->withInput();
+        }
+
+        if ($request->ajax() || $request->expectsJson()) {
+            $queueFilters = $this->resolveQueueFiltersFromRequest($request);
+            $queueState = $this->queueService->resolveEncodeQueueState($document, $queueFilters);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaction voided successfully.',
+                'voided' => [
+                    'doc_type' => $document->doc_type,
+                    'doc_number' => $document->displayDocNumber(),
+                ],
+                'queue_stats' => $queueState['queue_stats'],
+            ]);
+        }
+
+        return redirect()
+            ->route('accounting.inventory-transactions.index')
+            ->with('success', 'Transaction voided successfully.');
+    }
+
     private function renderEncodeScreen(Request $request, AccountingInventoryTransaction $transaction): View|Response
     {
         $displayDocNumber = $this->queueService->displayDocNumber($transaction);
         $queueFilters = $this->resolveQueueFiltersFromRequest($request);
         $queueState = $this->queueService->resolveEncodeQueueState($transaction, $queueFilters);
+        $canEncodePermission = $request->user()?->can('encode-accounting-inventory') ?? false;
 
         $payload = [
             'transaction' => $transaction,
             'displayDocNumber' => $displayDocNumber,
-            'canEncode' => $transaction->isDraft() && $request->user()?->can('encode-accounting-inventory'),
-            'canVoid' => $transaction->isEncoded() && $request->user()?->can('void-accounting-inventory'),
+            'canEncode' => $transaction->isDraft() && $canEncodePermission,
+            'canUpdate' => $transaction->isEncoded() && $canEncodePermission,
+            'canVoid' => $transaction->isEncoded() && ($request->user()?->can('void-accounting-inventory') ?? false),
             'inModal' => $request->ajax() || $request->boolean('modal'),
             'queueStats' => $queueState['queue_stats'],
             'queueFilters' => $queueFilters,
@@ -360,7 +432,7 @@ class AccountingInventoryTransactionController extends Controller
     private function resolveEncodeUrl(AccountingInventoryTransaction $transaction): string
     {
         if ($transaction->isManual()) {
-            return route('accounting.inventory-transactions.manual', [
+            return route('accounting.inventory-transactions.update-manual', [
                 'docType' => strtolower($transaction->doc_type),
                 'docNumber' => $transaction->displayDocNumber(),
                 'category_id' => $transaction->category_id,

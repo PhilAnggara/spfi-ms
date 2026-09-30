@@ -5,10 +5,12 @@ namespace App\Services\Accounting;
 use App\Models\AccountingInventoryDocTran;
 use App\Models\AccountingInventoryTransaction;
 use App\Models\AccountingInventoryTransactionLine;
+use App\Models\AccountingInventoryVoidLog;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AccountingInventoryService
@@ -99,9 +101,7 @@ class AccountingInventoryService
     public function encodeDocument(AccountingInventoryTransaction $document, array $lines, User $user): AccountingInventoryTransaction
     {
         if ($document->isEncoded()) {
-            throw ValidationException::withMessages([
-                'transaction' => 'This document is already encoded.',
-            ]);
+            return $this->updateEncodedDocument($document, $lines, $user);
         }
 
         $normalized = $this->normalizeLines($lines);
@@ -150,6 +150,80 @@ class AccountingInventoryService
         });
     }
 
+    /**
+     * Reverse legacy posting, re-post updated lines, then rechain affected item balances.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     */
+    public function updateEncodedDocument(AccountingInventoryTransaction $document, array $lines, User $user): AccountingInventoryTransaction
+    {
+        if (! $document->isEncoded()) {
+            throw ValidationException::withMessages([
+                'transaction' => 'Only encoded transactions can be updated this way.',
+            ]);
+        }
+
+        $docCode = strtoupper((string) $document->doc_type);
+        $docNo = $document->displayDocNumber();
+        $categoryId = (int) $document->category_id;
+        $fromDate = $document->doc_date?->toDateString() ?? now()->toDateString();
+        $oldItemIds = $this->legacyPostingService->itemIdsForDocument($docCode, $docNo, $categoryId);
+        $reuseDocTranIds = $this->legacyPostingService->docTranIdsForDocument($docCode, $docNo, $categoryId);
+
+        $normalized = $this->normalizeLines($lines);
+
+        return DB::transaction(function () use ($document, $normalized, $user, $docCode, $docNo, $categoryId, $fromDate, $oldItemIds, $reuseDocTranIds): AccountingInventoryTransaction {
+            $this->legacyPostingService->reverseEncodedDocument($docCode, $docNo, $categoryId);
+
+            $this->hydrateDocumentLines($document, $normalized);
+
+            if ($document->lines->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'lines' => 'At least one line is required before updating.',
+                ]);
+            }
+
+            $projected = $this->getAvailableQtyMap(
+                $categoryId,
+                $document->lines->map(fn (AccountingInventoryTransactionLine $line): int => (int) $line->item_id)->all(),
+            );
+
+            foreach ($document->lines as $line) {
+                $this->assertLineCanPost($document, $line, $projected);
+
+                $itemId = (int) $line->item_id;
+                if ($line->direction === AccountingInventoryTransactionLine::DIRECTION_IN) {
+                    $projected[$itemId] = round(($projected[$itemId] ?? 0) + (float) $line->quantity, 5);
+                } else {
+                    $projected[$itemId] = round(($projected[$itemId] ?? 0) - (float) $line->quantity, 5);
+                }
+            }
+
+            $reuseIds = count($reuseDocTranIds) === $document->lines->count()
+                ? $reuseDocTranIds
+                : [];
+
+            $this->legacyPostingService->postEncodedTransaction($document, $user, $reuseIds);
+            $this->glJournalEncoder->encodeIfEnabled($document, $user);
+
+            $newItemIds = $document->lines
+                ->map(fn (AccountingInventoryTransactionLine $line): int => (int) $line->item_id)
+                ->all();
+            $affectedItemIds = array_values(array_unique(array_merge($oldItemIds, $newItemIds)));
+
+            $this->legacyPostingService->rechainItemBalances($categoryId, $affectedItemIds, $fromDate);
+
+            $document->status = AccountingInventoryTransaction::STATUS_ENCODED;
+            $document->encoded_by = $user->id;
+            $document->encoded_at = now();
+            $document->encodedBy = $user;
+            $document->is_corrected = $document->lines->contains(fn (AccountingInventoryTransactionLine $line): bool => $line->wasCorrected());
+            $document->total_amount = round($document->lines->sum(fn (AccountingInventoryTransactionLine $line): float => (float) $line->amount), 4);
+
+            return $document;
+        });
+    }
+
     public function voidDocument(AccountingInventoryTransaction $document, User $user, string $reason): AccountingInventoryTransaction
     {
         if (! $document->isEncoded()) {
@@ -165,12 +239,46 @@ class AccountingInventoryService
             ]);
         }
 
-        return DB::transaction(function () use ($document): AccountingInventoryTransaction {
-            $this->legacyPostingService->reverseEncodedDocument(
-                $document->doc_type,
-                $document->displayDocNumber(),
-                $document->category_id,
-            );
+        $docCode = strtoupper((string) $document->doc_type);
+        $docNo = $document->displayDocNumber();
+        $categoryId = (int) $document->category_id;
+        $fromDate = $document->doc_date?->toDateString() ?? now()->toDateString();
+        $itemIds = $this->legacyPostingService->itemIdsForDocument($docCode, $docNo, $categoryId);
+
+        $payloadSnapshot = [
+            'doc_date' => $fromDate,
+            'total_amount' => $document->total_amount,
+            'lines' => $document->lines->map(fn (AccountingInventoryTransactionLine $line): array => [
+                'item_id' => (int) $line->item_id,
+                'item_code' => $line->item?->code,
+                'direction' => $line->direction,
+                'quantity' => (float) $line->quantity,
+                'unit_cost' => (float) $line->unit_cost,
+                'amount' => (float) $line->amount,
+            ])->values()->all(),
+        ];
+
+        return DB::transaction(function () use ($document, $user, $reason, $docCode, $docNo, $categoryId, $fromDate, $itemIds, $payloadSnapshot): AccountingInventoryTransaction {
+            AccountingInventoryVoidLog::query()->create([
+                'doc_code' => $docCode,
+                'doc_no' => $docNo,
+                'category_id' => $categoryId,
+                'reason' => $reason,
+                'voided_by' => $user->id,
+                'voided_at' => now(),
+                'payload_snapshot' => $payloadSnapshot,
+            ]);
+
+            Log::info('Accounting inventory document voided', [
+                'doc_code' => $docCode,
+                'doc_no' => $docNo,
+                'category_id' => $categoryId,
+                'voided_by' => $user->id,
+                'reason' => $reason,
+            ]);
+
+            $this->legacyPostingService->reverseEncodedDocument($docCode, $docNo, $categoryId);
+            $this->legacyPostingService->rechainItemBalances($categoryId, $itemIds, $fromDate);
 
             $document->status = AccountingInventoryTransaction::STATUS_VOIDED;
 

@@ -2,9 +2,6 @@
 @section('title', ' | Encode Inventory Transaction')
 
 @section('content')
-@php
-    $isReadOnly = $transaction->isEncoded() || $transaction->isVoided();
-@endphp
 <div class="page-heading po-page" id="inv-encode-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
@@ -48,32 +45,16 @@
             'transaction' => $transaction,
             'displayDocNumber' => $displayDocNumber,
             'canEncode' => $canEncode,
+            'canUpdate' => $canUpdate ?? false,
+            'canVoid' => $canVoid ?? false,
             'inModal' => false,
             'queueStats' => $queueStats ?? null,
             'queueFilters' => $queueFilters ?? [],
             'sourceUrl' => $sourceUrl ?? null,
             'encodeUrl' => $encodeUrl ?? '#',
+            'voidUrl' => $voidUrl ?? null,
             'nextDocument' => $nextDocument ?? null,
         ])
-
-        @if ($canVoid && ($voidUrl ?? null))
-            <div class="card shadow-sm border-0 mt-4">
-                <div class="card-body">
-                    <h5 class="card-title">Void Transaction</h5>
-                    <form method="POST" action="{{ $voidUrl }}" class="row g-3">
-                        @csrf
-                        <input type="hidden" name="category_id" value="{{ $transaction->category_id }}">
-                        <div class="col-12">
-                            <label class="form-label">Reason</label>
-                            <textarea name="void_reason" class="form-control" rows="3" required></textarea>
-                        </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Void this encoded transaction?')">Void Transaction</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        @endif
     </section>
 </div>
 @endsection
@@ -91,6 +72,7 @@
             const page = document.getElementById('inv-encode-page');
             if (page) {
                 window.initAccountingInventoryEncodeForm(page);
+                window.initAccountingInventoryEncodedActions?.(page);
             }
         });
     </script>

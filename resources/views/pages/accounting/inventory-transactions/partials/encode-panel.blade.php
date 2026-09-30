@@ -1,9 +1,14 @@
 @php
-    $isReadOnly = $transaction->isEncoded() || $transaction->isVoided();
+    $canEncode = (bool) ($canEncode ?? false);
+    $canUpdate = (bool) ($canUpdate ?? false);
+    $canVoid = (bool) ($canVoid ?? false);
+    $isEncoded = $transaction->isEncoded();
+    $isVoided = $transaction->isVoided();
     $inModal = (bool) ($inModal ?? false);
     $queueStats = $queueStats ?? null;
     $sourceUrl = $sourceUrl ?? null;
     $nextDocument = $nextDocument ?? null;
+    $voidUrl = $voidUrl ?? null;
     $partyLabel = $transaction->doc_type === 'TS' ? 'Transfer To' : 'Supplier';
 @endphp
 
@@ -13,6 +18,11 @@
     data-transaction-id="{{ $transaction->source_id ?? $transaction->doc_number }}"
     data-doc-type="{{ $transaction->doc_type }}"
     data-display-number="{{ $displayDocNumber }}"
+    data-is-encoded="{{ $isEncoded ? '1' : '0' }}"
+    data-can-encode="{{ $canEncode ? '1' : '0' }}"
+    data-can-update="{{ $canUpdate ? '1' : '0' }}"
+    data-can-void="{{ $canVoid ? '1' : '0' }}"
+    @if ($voidUrl) data-void-url="{{ $voidUrl }}" @endif
     @if ($nextDocument) data-next-document='@json($nextDocument)' @endif
 >
     @if ($inModal)
@@ -32,9 +42,9 @@
                     @else
                         <span class="fs-5 fw-semibold">{{ $displayDocNumber }}</span>
                     @endif
-                    @if ($transaction->isEncoded())
+                    @if ($isEncoded)
                         <span class="badge rounded-pill bg-success bg-opacity-10 text-success">Encoded</span>
-                    @elseif ($transaction->isVoided())
+                    @elseif ($isVoided)
                         <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger">Voided</span>
                     @else
                         <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning">Pending</span>
@@ -57,7 +67,7 @@
                     <div class="text-muted small text-uppercase">{{ $partyLabel }}</div>
                     <div class="fw-semibold">{{ $transaction->party_name }}</div>
                 @endif
-                @if ($transaction->isEncoded() && $transaction->encodedBy)
+                @if ($isEncoded && $transaction->encodedBy)
                     <div class="text-muted small mt-2">
                         <i class="fa-light fa-user-check me-1"></i>
                         {{ $transaction->encodedBy->name }}
@@ -77,7 +87,17 @@
         @endif
     </div>
 
-    @if ($isReadOnly)
+    @if ($isVoided)
+        <div class="alert alert-secondary border-0 py-2 mb-3 d-flex align-items-center gap-2" role="alert">
+            <i class="fa-light fa-lock"></i>
+            <span>This transaction is voided and read-only.</span>
+        </div>
+    @elseif ($isEncoded && $canUpdate)
+        <div class="alert alert-secondary border-0 py-2 mb-3 d-flex align-items-center gap-2 inv-encode-locked-hint" role="alert" data-inv-edit-hint>
+            <i class="fa-light fa-lock"></i>
+            <span>This transaction is encoded. Click Edit to change qty or unit cost.</span>
+        </div>
+    @elseif ($isEncoded)
         <div class="alert alert-secondary border-0 py-2 mb-3 d-flex align-items-center gap-2" role="alert">
             <i class="fa-light fa-lock"></i>
             <span>This transaction is read-only.</span>
@@ -90,12 +110,13 @@
         id="inventory-encode-form"
         class="inv-encode-form"
         data-encode-url="{{ $encodeUrl }}"
+        data-mode="{{ $canEncode ? 'encode' : ($canUpdate ? 'update' : 'view') }}"
     >
         @csrf
         @method('PUT')
         <input type="hidden" name="category_id" value="{{ $transaction->category_id }}">
 
-        @if ($inModal && $canEncode)
+        @if ($inModal && ($canEncode || $canUpdate))
             <input type="hidden" name="queue_doc_type" value="{{ $queueFilters['doc_type'] ?? 'all' }}" class="inv-queue-filter" data-filter="doc_type">
             <input type="hidden" name="queue_category_id" value="{{ (int) ($queueFilters['category_id'] ?? 0) }}" class="inv-queue-filter" data-filter="category_id">
             <input type="hidden" name="queue_keyword" value="{{ $queueFilters['keyword'] ?? '' }}" class="inv-queue-filter" data-filter="keyword">
@@ -122,11 +143,13 @@
                     @foreach ($transaction->lines as $index => $line)
                         @php
                             $corrected = $line->wasCorrected();
+                            $qtyValue = rtrim(rtrim(number_format((float) old('lines.'.$index.'.quantity', $line->quantity), 5, '.', ','), '0'), '.');
+                            $costValue = rtrim(rtrim(number_format((float) old('lines.'.$index.'.unit_cost', $line->unit_cost), 5, '.', ','), '0'), '.');
                         @endphp
-                        <tr @class(['table-warning' => $corrected && ! $isReadOnly, 'inv-encode-line-row' => true])>
+                        <tr @class(['table-warning' => $corrected && $canEncode, 'inv-encode-line-row' => true])>
                             <td>
                                 <div class="fw-semibold d-flex align-items-center gap-1">
-                                    @if ($corrected && ! $isReadOnly)
+                                    @if ($corrected && $canEncode)
                                         <i class="fa-light fa-pen-to-square text-warning" title="Corrected from prefill"></i>
                                     @endif
                                     {{ $line->item?->code }}
@@ -148,41 +171,41 @@
                                         'fieldName' => 'lines['.$index.'][direction]',
                                         'rowId' => $index,
                                         'selected' => old('lines.'.$index.'.direction', $line->direction),
-                                        'readonly' => $isReadOnly,
+                                        'readonly' => ! $canEncode,
                                     ])
                                 </td>
                             @endif
                             <td class="text-end">
-                                @if ($isReadOnly)
-                                    <span class="font-monospace">{{ rtrim(rtrim(number_format((float) $line->quantity, 5, '.', ','), '0'), '.') }}</span>
-                                @else
+                                <span class="font-monospace inv-qty-display @if ($canEncode) d-none @endif" data-index="{{ $index }}">{{ $qtyValue }}</span>
+                                @if ($canEncode || $canUpdate)
                                     <input
                                         type="text"
                                         inputmode="decimal"
                                         autocomplete="off"
-                                        class="form-control form-control-sm text-end inv-qty"
+                                        class="form-control form-control-sm text-end inv-qty @if ($isEncoded) d-none @endif"
                                         name="lines[{{ $index }}][quantity]"
-                                        value="{{ rtrim(rtrim(number_format((float) old('lines.'.$index.'.quantity', $line->quantity), 5, '.', ','), '0'), '.') }}"
+                                        value="{{ $qtyValue }}"
                                         data-index="{{ $index }}"
                                         data-max-decimals="5"
                                         @if ($corrected) data-corrected="1" @endif
+                                        @if ($isEncoded) disabled @endif
                                         required
                                     >
                                 @endif
                             </td>
                             <td class="text-end">
-                                @if ($isReadOnly)
-                                    <span class="font-monospace">{{ rtrim(rtrim(number_format((float) $line->unit_cost, 5, '.', ','), '0'), '.') }}</span>
-                                @else
+                                <span class="font-monospace inv-cost-display @if ($canEncode) d-none @endif" data-index="{{ $index }}">{{ $costValue }}</span>
+                                @if ($canEncode || $canUpdate)
                                     <input
                                         type="text"
                                         inputmode="decimal"
                                         autocomplete="off"
-                                        class="form-control form-control-sm text-end inv-cost"
+                                        class="form-control form-control-sm text-end inv-cost @if ($isEncoded) d-none @endif"
                                         name="lines[{{ $index }}][unit_cost]"
-                                        value="{{ rtrim(rtrim(number_format((float) old('lines.'.$index.'.unit_cost', $line->unit_cost), 5, '.', ','), '0'), '.') }}"
+                                        value="{{ $costValue }}"
                                         data-index="{{ $index }}"
                                         data-max-decimals="5"
+                                        @if ($isEncoded) disabled @endif
                                         required
                                     >
                                 @endif
@@ -197,17 +220,56 @@
             </table>
         </div>
 
-        @if ($canEncode && ! $inModal)
-            <div class="d-flex justify-content-end gap-2 mt-4">
-                <button type="submit" class="btn btn-success icon icon-left">
-                    <i class="fa-regular fa-check"></i>
-                    Encode
-                </button>
+        @if (! $inModal && ($canEncode || $canUpdate || $canVoid))
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-4" data-inv-page-actions>
+                @if ($canUpdate)
+                    <button type="button" class="btn btn-outline-primary icon icon-left" data-inv-edit-toggle>
+                        <i class="fa-light fa-pen"></i>
+                        Edit
+                    </button>
+                    <button type="button" class="btn btn-light-secondary d-none" data-inv-edit-cancel>Cancel</button>
+                    <button type="submit" class="btn btn-success icon icon-left d-none" data-inv-update-submit>
+                        <i class="fa-regular fa-check"></i>
+                        Update
+                    </button>
+                @endif
+                @if ($canEncode)
+                    <button type="submit" class="btn btn-success icon icon-left">
+                        <i class="fa-regular fa-check"></i>
+                        Encode
+                    </button>
+                @endif
+                @if ($canVoid && $voidUrl)
+                    <button type="button" class="btn btn-outline-danger icon icon-left" data-inv-void-open>
+                        <i class="fa-light fa-ban"></i>
+                        Void
+                    </button>
+                @endif
             </div>
         @endif
     </form>
 
-    @if ($inModal && $canEncode)
+    @if (! $inModal && $canVoid && $voidUrl)
+        <div class="card shadow-sm border-0 mt-4 d-none" data-inv-void-panel>
+            <div class="card-body">
+                <h5 class="card-title">Void Transaction</h5>
+                <form method="POST" action="{{ $voidUrl }}" class="row g-3" data-inv-void-form>
+                    @csrf
+                    <input type="hidden" name="category_id" value="{{ $transaction->category_id }}">
+                    <div class="col-12">
+                        <label class="form-label">Reason</label>
+                        <textarea name="void_reason" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="submit" class="btn btn-outline-danger">Confirm Void</button>
+                        <button type="button" class="btn btn-light-secondary" data-inv-void-cancel>Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    @if ($inModal && ($canEncode || $canUpdate || $canVoid))
         <div class="inv-encode-modal-footer-placeholder d-none"></div>
     @elseif ($inModal)
         <div class="d-flex justify-content-end mt-4 pt-3 border-top">

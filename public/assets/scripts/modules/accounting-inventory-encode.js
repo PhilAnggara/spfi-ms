@@ -231,9 +231,12 @@ window.initAccountingInventoryEncodeForm = function (root) {
     });
 
     function focusFirstEditableField() {
-        const correctedQty = panel.querySelector('.inv-qty[data-corrected="1"]');
-        const firstQty = panel.querySelector('.inv-qty');
-        const target = correctedQty || firstQty;
+        const candidates = [
+            ...panel.querySelectorAll('.inv-qty:not([disabled])'),
+            ...panel.querySelectorAll('.inv-cost:not([disabled])'),
+        ].filter((el) => el.offsetParent !== null);
+        const correctedQty = candidates.find((el) => el.classList.contains('inv-qty') && el.dataset.corrected === '1');
+        const target = correctedQty || candidates[0];
         if (target) {
             target.focus();
             target.select?.();
@@ -250,8 +253,11 @@ window.initAccountingInventoryEncodeForm = function (root) {
     form.addEventListener('keydown', (event) => {
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
             event.preventDefault();
+            const updateBtn = document.querySelector('#inv-encode-update-btn');
             const nextBtn = document.querySelector('#inv-encode-submit-next');
-            if (nextBtn && !nextBtn.disabled) {
+            if (updateBtn && !updateBtn.classList.contains('d-none') && !updateBtn.disabled) {
+                updateBtn.click();
+            } else if (nextBtn && !nextBtn.disabled) {
                 nextBtn.click();
             }
         }
@@ -265,4 +271,62 @@ window.initAccountingInventoryEncodeForm = function (root) {
         getForm: () => form,
         getPanel: () => panel,
     };
+};
+
+window.initAccountingInventoryEncodedActions = function (root) {
+    if (!root) {
+        return;
+    }
+
+    const panel = root.querySelector('[data-inventory-encode-panel]') || root;
+    if (!panel || panel.dataset.encodedActionsBound === '1') {
+        return;
+    }
+    panel.dataset.encodedActionsBound = '1';
+
+    const form = panel.querySelector('#inventory-encode-form');
+    const editToggle = panel.querySelector('[data-inv-edit-toggle]');
+    const editCancel = panel.querySelector('[data-inv-edit-cancel]');
+    const updateSubmit = panel.querySelector('[data-inv-update-submit]');
+    const voidOpen = panel.querySelector('[data-inv-void-open]');
+    const voidCancel = panel.querySelector('[data-inv-void-cancel]');
+    const voidPanel = panel.querySelector('[data-inv-void-panel]');
+    const hint = panel.querySelector('[data-inv-edit-hint]');
+
+    function setEditing(editing) {
+        panel.querySelectorAll('.inv-qty, .inv-cost').forEach((input) => {
+            input.disabled = !editing;
+            input.classList.toggle('d-none', !editing);
+        });
+        panel.querySelectorAll('.inv-qty-display, .inv-cost-display').forEach((el) => {
+            el.classList.toggle('d-none', editing);
+        });
+        editToggle?.classList.toggle('d-none', editing);
+        editCancel?.classList.toggle('d-none', !editing);
+        updateSubmit?.classList.toggle('d-none', !editing);
+        hint?.classList.toggle('d-none', editing);
+        if (editing) {
+            window.initAccountingInventoryEncodeForm?.(panel)?.focusFirstEditableField?.();
+        }
+    }
+
+    editToggle?.addEventListener('click', () => setEditing(true));
+    editCancel?.addEventListener('click', () => {
+        setEditing(false);
+        window.location.reload();
+    });
+    voidOpen?.addEventListener('click', () => {
+        voidPanel?.classList.remove('d-none');
+        voidPanel?.scrollIntoView({ block: 'nearest' });
+    });
+    voidCancel?.addEventListener('click', () => {
+        voidPanel?.classList.add('d-none');
+    });
+
+    const voidForm = panel.querySelector('[data-inv-void-form]');
+    voidForm?.addEventListener('submit', (event) => {
+        if (!window.confirm('Void this encoded transaction?')) {
+            event.preventDefault();
+        }
+    });
 };

@@ -158,6 +158,21 @@
                     </div>
                     <div class="inv-encode-footer-actions d-flex flex-wrap gap-2">
                         <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-outline-danger d-none" id="inv-encode-void-btn" disabled>
+                            <i class="fa-regular fa-ban me-1"></i>
+                            Void
+                        </button>
+                        <button type="button" class="btn btn-outline-primary d-none" id="inv-encode-edit-btn" disabled>
+                            <i class="fa-regular fa-pen me-1"></i>
+                            Edit
+                        </button>
+                        <button type="button" class="btn btn-light-secondary d-none" id="inv-encode-edit-cancel-btn" disabled>
+                            Cancel Edit
+                        </button>
+                        <button type="button" class="btn btn-success d-none" id="inv-encode-update-btn" disabled>
+                            <i class="fa-regular fa-check me-1"></i>
+                            Update
+                        </button>
                         <button type="button" class="btn btn-outline-success" id="inv-encode-submit-close" disabled>
                             <i class="fa-regular fa-check me-1"></i>
                             Encode &amp; Close

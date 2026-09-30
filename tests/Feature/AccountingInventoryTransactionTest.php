@@ -4,6 +4,7 @@ use App\Models\AccountingInventoryDocTran;
 use App\Models\AccountingInventoryMonthly;
 use App\Models\AccountingInventoryTransaction;
 use App\Models\AccountingInventoryTransactionLine;
+use App\Models\AccountingInventoryVoidLog;
 use App\Models\Currency;
 use App\Models\CurrencyExchangeRate;
 use App\Models\Department;
@@ -1251,4 +1252,368 @@ it('encodes receiving report using three-decimal converted unit cost', function 
     expect($row)->not->toBeNull();
     expect((float) $row->u_cost)->toBe(11552.22);
     expect((float) $row->amount)->toBe(161731080.0);
+});
+
+it('updates encoded receiving report qty and cost', function () {
+    $supplier = Supplier::query()->create([
+        'name' => 'Update Supplier',
+        'code' => 'UPD-SUP',
+        'created_by' => $this->user->id,
+    ]);
+
+    $po = PurchaseOrder::query()->create([
+        'po_number' => 'PO-UPD-001',
+        'supplier_id' => $supplier->id,
+        'po_date' => now()->toDateString(),
+        'status' => 'APPROVED',
+        'created_by' => $this->user->id,
+    ]);
+
+    $poItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $po->id,
+        'item_id' => $this->item->id,
+        'quantity' => 100,
+        'unit_price' => 10,
+        'total' => 1000,
+        'line_subtotal' => 1000,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+    ]);
+
+    $rr = ReceivingReport::query()->create([
+        'rr_number' => 'RR-UPD-001',
+        'purchase_order_id' => $po->id,
+        'received_date' => now()->toDateString(),
+        'created_by' => $this->user->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $rr->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 5,
+    ]);
+
+    $this->actingAs($this->user)
+        ->put(route('accounting.inventory-transactions.update', [
+            'docType' => 'rr',
+            'id' => $rr->id,
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
+            'lines' => [[
+                'item_id' => $this->item->id,
+                'direction' => 'in',
+                'quantity' => 5,
+                'unit_of_measure_id' => $this->unit->id,
+                'unit_cost' => 10,
+                'amount' => 50,
+                'prefill_quantity' => 5,
+                'prefill_unit_cost' => 10,
+            ]],
+        ])
+        ->assertRedirect();
+
+    $json = $this->actingAs($this->user)
+        ->putJson(route('accounting.inventory-transactions.update', [
+            'docType' => 'rr',
+            'id' => $rr->id,
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
+            'lines' => [[
+                'item_id' => $this->item->id,
+                'direction' => 'in',
+                'quantity' => 7,
+                'unit_of_measure_id' => $this->unit->id,
+                'unit_cost' => 12,
+                'amount' => 84,
+                'prefill_quantity' => 5,
+                'prefill_unit_cost' => 10,
+            ]],
+        ]);
+
+    $json->assertSuccessful();
+    $json->assertJsonPath('success', true);
+    $json->assertJsonPath('updated', true);
+    $json->assertJsonPath('encoded.doc_number', 'RR-UPD-001');
+
+    $row = AccountingInventoryDocTran::query()
+        ->where('doc_code', 'RR')
+        ->where('doc_no', 'RR-UPD-001')
+        ->where('category_id', $this->category->id)
+        ->first();
+
+    expect($row)->not->toBeNull();
+    expect((float) $row->qty)->toBe(7.0);
+    expect((float) $row->u_cost)->toBe(12.0);
+    expect((float) $row->amount)->toBe(84.0);
+    expect((float) $row->t_qty)->toBe(7.0);
+
+    $monthly = AccountingInventoryMonthly::query()
+        ->where('accounting_inventory_doc_tran_id', $row->id)
+        ->first();
+
+    expect($monthly)->not->toBeNull();
+    expect((float) $monthly->ending)->toBe(7.0);
+    expect((float) $monthly->qty)->toBe(7.0);
+});
+
+it('rechains later document balances after updating an earlier encoded document', function () {
+    $service = app(AccountingInventoryService::class);
+
+    $first = AccountingInventoryTransaction::make([
+        'category_id' => $this->category->id,
+        'doc_type' => 'CV',
+        'doc_number' => 'CV-RECHAIN-A',
+        'doc_date' => now()->subDay()->toDateString(),
+        'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+        'category' => $this->category,
+    ]);
+
+    $service->encodeDocument($first, [[
+        'item_id' => $this->item->id,
+        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+        'quantity' => 10,
+        'unit_of_measure_id' => $this->unit->id,
+        'unit_cost' => 5,
+        'amount' => 50,
+    ]], $this->user);
+
+    $second = AccountingInventoryTransaction::make([
+        'category_id' => $this->category->id,
+        'doc_type' => 'CV',
+        'doc_number' => 'CV-RECHAIN-B',
+        'doc_date' => now()->toDateString(),
+        'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+        'category' => $this->category,
+    ]);
+
+    $service->encodeDocument($second, [[
+        'item_id' => $this->item->id,
+        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+        'quantity' => 4,
+        'unit_of_measure_id' => $this->unit->id,
+        'unit_cost' => 8,
+        'amount' => 32,
+    ]], $this->user);
+
+    $first->status = AccountingInventoryTransaction::STATUS_ENCODED;
+    $service->updateEncodedDocument($first, [[
+        'item_id' => $this->item->id,
+        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+        'quantity' => 20,
+        'unit_of_measure_id' => $this->unit->id,
+        'unit_cost' => 5,
+        'amount' => 100,
+    ]], $this->user);
+
+    $rowA = AccountingInventoryDocTran::query()
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-RECHAIN-A')
+        ->where('category_id', $this->category->id)
+        ->first();
+    $rowB = AccountingInventoryDocTran::query()
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-RECHAIN-B')
+        ->where('category_id', $this->category->id)
+        ->first();
+
+    expect((float) $rowA->t_qty)->toBe(20.0);
+    expect((float) $rowB->t_qty)->toBe(24.0);
+
+    $monthlyB = AccountingInventoryMonthly::query()
+        ->where('accounting_inventory_doc_tran_id', $rowB->id)
+        ->first();
+
+    expect((float) $monthlyB->begining)->toBe(20.0);
+    expect((float) $monthlyB->ending)->toBe(24.0);
+});
+
+it('voids encoded document with audit log and rechains remaining balances', function () {
+    $service = app(AccountingInventoryService::class);
+
+    $first = AccountingInventoryTransaction::make([
+        'category_id' => $this->category->id,
+        'doc_type' => 'CV',
+        'doc_number' => 'CV-VOID-A',
+        'doc_date' => now()->subDay()->toDateString(),
+        'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+        'category' => $this->category,
+    ]);
+
+    $service->encodeDocument($first, [[
+        'item_id' => $this->item->id,
+        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+        'quantity' => 10,
+        'unit_of_measure_id' => $this->unit->id,
+        'unit_cost' => 5,
+        'amount' => 50,
+    ]], $this->user);
+
+    $second = AccountingInventoryTransaction::make([
+        'category_id' => $this->category->id,
+        'doc_type' => 'CV',
+        'doc_number' => 'CV-VOID-B',
+        'doc_date' => now()->toDateString(),
+        'status' => AccountingInventoryTransaction::STATUS_DRAFT,
+        'category' => $this->category,
+    ]);
+
+    $service->encodeDocument($second, [[
+        'item_id' => $this->item->id,
+        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+        'quantity' => 3,
+        'unit_of_measure_id' => $this->unit->id,
+        'unit_cost' => 6,
+        'amount' => 18,
+    ]], $this->user);
+
+    $this->actingAs($this->user)
+        ->postJson(route('accounting.inventory-transactions.void-manual', [
+            'docType' => 'cv',
+            'docNumber' => 'CV-VOID-A',
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
+            'void_reason' => 'Incorrect quantity entered',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('success', true);
+
+    expect(AccountingInventoryDocTran::query()
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-VOID-A')
+        ->where('category_id', $this->category->id)
+        ->exists())->toBeFalse();
+
+    $log = AccountingInventoryVoidLog::query()
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-VOID-A')
+        ->where('category_id', $this->category->id)
+        ->first();
+
+    expect($log)->not->toBeNull();
+    expect($log->reason)->toBe('Incorrect quantity entered');
+    expect($log->voided_by)->toBe($this->user->id);
+    expect($log->payload_snapshot)->toBeArray();
+
+    $rowB = AccountingInventoryDocTran::query()
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-VOID-B')
+        ->where('category_id', $this->category->id)
+        ->first();
+
+    expect((float) $rowB->t_qty)->toBe(3.0);
+
+    $first->status = AccountingInventoryTransaction::STATUS_DRAFT;
+    $service->encodeDocument($first, [[
+        'item_id' => $this->item->id,
+        'direction' => AccountingInventoryTransactionLine::DIRECTION_IN,
+        'quantity' => 2,
+        'unit_of_measure_id' => $this->unit->id,
+        'unit_cost' => 5,
+        'amount' => 10,
+    ]], $this->user);
+
+    expect(AccountingInventoryDocTran::query()
+        ->where('doc_code', 'CV')
+        ->where('doc_no', 'CV-VOID-A')
+        ->where('category_id', $this->category->id)
+        ->exists())->toBeTrue();
+});
+
+it('forbids updating encoded inventory without encode permission', function () {
+    $supplier = Supplier::query()->create([
+        'name' => 'Forbidden Supplier',
+        'code' => 'FORB-SUP',
+        'created_by' => $this->user->id,
+    ]);
+
+    $po = PurchaseOrder::query()->create([
+        'po_number' => 'PO-FORB-001',
+        'supplier_id' => $supplier->id,
+        'po_date' => now()->toDateString(),
+        'status' => 'APPROVED',
+        'created_by' => $this->user->id,
+    ]);
+
+    $poItem = PurchaseOrderItem::query()->create([
+        'purchase_order_id' => $po->id,
+        'item_id' => $this->item->id,
+        'quantity' => 10,
+        'unit_price' => 10,
+        'total' => 100,
+        'line_subtotal' => 100,
+        'discount_amount' => 0,
+        'ppn_rate' => 0,
+        'ppn_amount' => 0,
+        'pph_rate' => 0,
+        'pph_amount' => 0,
+    ]);
+
+    $rr = ReceivingReport::query()->create([
+        'rr_number' => 'RR-FORB-001',
+        'purchase_order_id' => $po->id,
+        'received_date' => now()->toDateString(),
+        'created_by' => $this->user->id,
+    ]);
+
+    ReceivingReportItem::query()->create([
+        'receiving_report_id' => $rr->id,
+        'purchase_order_item_id' => $poItem->id,
+        'qty_good' => 2,
+    ]);
+
+    $this->actingAs($this->user)
+        ->put(route('accounting.inventory-transactions.update', [
+            'docType' => 'rr',
+            'id' => $rr->id,
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
+            'lines' => [[
+                'item_id' => $this->item->id,
+                'direction' => 'in',
+                'quantity' => 2,
+                'unit_of_measure_id' => $this->unit->id,
+                'unit_cost' => 10,
+                'amount' => 20,
+                'prefill_quantity' => 2,
+                'prefill_unit_cost' => 10,
+            ]],
+        ])
+        ->assertRedirect();
+
+    $viewer = User::query()->create([
+        'name' => 'Viewer Only',
+        'username' => 'viewer-'.uniqid(),
+        'email' => 'viewer-'.uniqid().'@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $this->department->id,
+        'role' => 'Staff',
+    ]);
+    $viewer->givePermissionTo('view-accounting-inventory');
+
+    $this->actingAs($viewer)
+        ->putJson(route('accounting.inventory-transactions.update', [
+            'docType' => 'rr',
+            'id' => $rr->id,
+            'category_id' => $this->category->id,
+        ]), [
+            'category_id' => $this->category->id,
+            'lines' => [[
+                'item_id' => $this->item->id,
+                'direction' => 'in',
+                'quantity' => 3,
+                'unit_of_measure_id' => $this->unit->id,
+                'unit_cost' => 10,
+                'amount' => 30,
+                'prefill_quantity' => 2,
+                'prefill_unit_cost' => 10,
+            ]],
+        ])
+        ->assertForbidden();
 });

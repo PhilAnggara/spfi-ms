@@ -15,8 +15,14 @@ use Illuminate\Validation\ValidationException;
 
 class AccountingInventoryLegacyPostingService
 {
-    public function postEncodedTransaction(AccountingInventoryTransaction $transaction, User $user): void
-    {
+    /**
+     * @param  list<int>  $reuseDocTranIds  Optional ids to reuse after reverse so same-day order stays stable.
+     */
+    public function postEncodedTransaction(
+        AccountingInventoryTransaction $transaction,
+        User $user,
+        array $reuseDocTranIds = [],
+    ): void {
         $categoryId = (int) $transaction->category_id;
         if ($categoryId <= 0) {
             throw ValidationException::withMessages([
@@ -55,6 +61,7 @@ class AccountingInventoryLegacyPostingService
                 inputTime: $inputTime,
                 user: $user,
                 encodedAt: $encodedAt,
+                forceId: isset($reuseDocTranIds[$index]) ? (int) $reuseDocTranIds[$index] : null,
             );
         }
     }
@@ -78,6 +85,54 @@ class AccountingInventoryLegacyPostingService
         AccountingInventoryDocTran::query()
             ->whereIn('id', $docTranIds)
             ->delete();
+    }
+
+    /**
+     * Recalculate running balances for item rows on/after $fromDate (ordered by tran_date, id).
+     *
+     * @param  list<int>  $itemIds
+     */
+    public function rechainItemBalances(int $categoryId, array $itemIds, string $fromDate): void
+    {
+        $itemIds = array_values(array_unique(array_filter(array_map('intval', $itemIds))));
+        if ($categoryId <= 0 || $itemIds === []) {
+            return;
+        }
+
+        foreach ($itemIds as $itemId) {
+            $this->rechainSingleItemBalances($categoryId, $itemId, $fromDate);
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function itemIdsForDocument(string $docCode, string $docNo, int $categoryId): array
+    {
+        return AccountingInventoryDocTran::query()
+            ->where('doc_code', strtoupper($docCode))
+            ->where('doc_no', $docNo)
+            ->where('category_id', $categoryId)
+            ->whereNotNull('item_id')
+            ->distinct()
+            ->pluck('item_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function docTranIdsForDocument(string $docCode, string $docNo, int $categoryId): array
+    {
+        return AccountingInventoryDocTran::query()
+            ->where('doc_code', strtoupper($docCode))
+            ->where('doc_no', $docNo)
+            ->where('category_id', $categoryId)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
     }
 
     private function hydratePartyFromSupplier(AccountingInventoryTransaction $transaction): void
@@ -129,6 +184,7 @@ class AccountingInventoryLegacyPostingService
         string $inputTime,
         User $user,
         Carbon $encodedAt,
+        ?int $forceId = null,
     ): void {
         $item = $line->item;
         $itemCode = trim((string) ($item?->code ?? ''));
@@ -153,7 +209,7 @@ class AccountingInventoryLegacyPostingService
         $aveCost = $this->resolveAverageCost($signedQty, $unitCost, $begining, $beginingUCost, $ending);
         $tQty = $ending;
 
-        $docTran = AccountingInventoryDocTran::query()->create([
+        $attributes = [
             'doc_code' => strtoupper((string) $transaction->doc_type),
             'doc_no' => $docNo,
             'doc_date' => $transaction->doc_date?->toDateString() ?? $tranDate,
@@ -181,7 +237,13 @@ class AccountingInventoryLegacyPostingService
             'is_corrected' => $line->wasCorrected() || $transaction->is_corrected,
             'encoded_by' => $user->id,
             'encoded_at' => $encodedAt,
-        ]);
+        ];
+
+        if ($forceId !== null && $forceId > 0) {
+            $attributes['id'] = $forceId;
+        }
+
+        $docTran = AccountingInventoryDocTran::query()->create($attributes);
 
         $monthEnd = Carbon::parse($tranDate)->endOfMonth()->toDateString();
 
@@ -252,6 +314,88 @@ class AccountingInventoryLegacyPostingService
             'ending' => (float) $row->ending,
             'u_cost' => (float) ($row->u_cost ?? 0),
         ];
+    }
+
+    /**
+     * @return array{ending: float, u_cost: float}
+     */
+    public function balanceSnapshotStrictlyBefore(int $categoryId, int $itemId, string $beforeDate): array
+    {
+        $docTran = AccountingInventoryDocTran::query()
+            ->where('category_id', $categoryId)
+            ->where('item_id', $itemId)
+            ->whereDate('tran_date', '<', $beforeDate)
+            ->orderByDesc('tran_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($docTran !== null) {
+            return [
+                'ending' => (float) ($docTran->t_qty ?? 0),
+                'u_cost' => (float) ($docTran->ave_cost ?? $docTran->u_cost ?? 0),
+            ];
+        }
+
+        $row = AccountingInventoryMonthly::query()
+            ->where('category_id', $categoryId)
+            ->where('item_id', $itemId)
+            ->whereDate('tran_date', '<', $beforeDate)
+            ->orderByDesc('tran_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($row === null) {
+            return ['ending' => 0.0, 'u_cost' => 0.0];
+        }
+
+        return [
+            'ending' => (float) $row->ending,
+            'u_cost' => (float) ($row->u_cost ?? 0),
+        ];
+    }
+
+    private function rechainSingleItemBalances(int $categoryId, int $itemId, string $fromDate): void
+    {
+        $snapshot = $this->balanceSnapshotStrictlyBefore($categoryId, $itemId, $fromDate);
+        $runningEnding = $snapshot['ending'];
+        $runningUCost = $snapshot['u_cost'];
+
+        $rows = AccountingInventoryDocTran::query()
+            ->where('category_id', $categoryId)
+            ->where('item_id', $itemId)
+            ->whereDate('tran_date', '>=', $fromDate)
+            ->orderBy('tran_date')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($rows as $row) {
+            $signedQty = (float) $row->qty;
+            $unitCost = (float) $row->u_cost;
+            $begining = $runningEnding;
+            $beginingUCost = $runningUCost;
+            $ending = round($begining + $signedQty, 8);
+            $aveCost = $this->resolveAverageCost($signedQty, $unitCost, $begining, $beginingUCost, $ending);
+            $tQty = $ending;
+
+            $row->forceFill([
+                'ave_cost' => round($aveCost, 8),
+                't_qty' => round($tQty, 5),
+                'amount' => round($signedQty * $unitCost, 4),
+            ])->save();
+
+            AccountingInventoryMonthly::query()
+                ->where('accounting_inventory_doc_tran_id', $row->id)
+                ->update([
+                    'qty' => round($signedQty, 8),
+                    'u_cost' => round($unitCost, 8),
+                    'begining' => round($begining, 8),
+                    'ending' => $ending,
+                    'begining_u_cost' => $beginingUCost > 0 ? round($beginingUCost, 8) : null,
+                ]);
+
+            $runningEnding = $ending;
+            $runningUCost = $aveCost;
+        }
     }
 
     private function resolveAverageCost(

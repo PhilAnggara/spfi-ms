@@ -355,6 +355,10 @@
         const modalSubtitle = document.getElementById('inventory-encode-modal-subtitle');
         const submitNextBtn = document.getElementById('inv-encode-submit-next');
         const submitCloseBtn = document.getElementById('inv-encode-submit-close');
+        const editBtn = document.getElementById('inv-encode-edit-btn');
+        const editCancelBtn = document.getElementById('inv-encode-edit-cancel-btn');
+        const updateBtn = document.getElementById('inv-encode-update-btn');
+        const voidBtn = document.getElementById('inv-encode-void-btn');
         const nextUpEl = document.getElementById('inv-encode-next-up');
         const nextTypeEl = document.getElementById('inv-encode-next-type');
         const nextNumberEl = document.getElementById('inv-encode-next-number');
@@ -366,6 +370,7 @@
         }
 
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        let encodeEditMode = false;
 
         function formatNextMeta(next) {
             const parts = [];
@@ -430,16 +435,65 @@
             }
         }
 
-        function setEncodeFooterVisible(visible, canEncode) {
+        function setEncodeFooterVisible(visible, mode = 'none') {
             if (!modalFooter) {
                 return;
             }
+
+            const canEncode = mode === 'encode';
+            const canUpdate = mode === 'update' || mode === 'editing';
+            const canVoid = mode === 'update' || mode === 'editing';
+            const isEditing = mode === 'editing';
+
             modalFooter.classList.toggle('d-none', !visible);
+
             if (submitNextBtn) {
+                submitNextBtn.classList.toggle('d-none', !canEncode);
                 submitNextBtn.disabled = !canEncode || encodeSubmitting;
             }
             if (submitCloseBtn) {
+                submitCloseBtn.classList.toggle('d-none', !canEncode);
                 submitCloseBtn.disabled = !canEncode || encodeSubmitting;
+            }
+            if (editBtn) {
+                editBtn.classList.toggle('d-none', !(canUpdate && !isEditing));
+                editBtn.disabled = encodeSubmitting || !(canUpdate && !isEditing);
+            }
+            if (editCancelBtn) {
+                editCancelBtn.classList.toggle('d-none', !isEditing);
+                editCancelBtn.disabled = encodeSubmitting || !isEditing;
+            }
+            if (updateBtn) {
+                updateBtn.classList.toggle('d-none', !isEditing);
+                updateBtn.disabled = encodeSubmitting || !isEditing;
+            }
+            if (voidBtn) {
+                voidBtn.classList.toggle('d-none', !canVoid);
+                voidBtn.disabled = encodeSubmitting || !canVoid;
+            }
+        }
+
+        function setPanelEditing(editing) {
+            const panel = modalBody.querySelector('[data-inventory-encode-panel]');
+            if (!panel) {
+                return;
+            }
+
+            encodeEditMode = editing;
+            panel.querySelectorAll('.inv-qty, .inv-cost').forEach((input) => {
+                input.disabled = !editing;
+                input.classList.toggle('d-none', !editing);
+            });
+            panel.querySelectorAll('.inv-qty-display, .inv-cost-display').forEach((el) => {
+                el.classList.toggle('d-none', editing);
+            });
+            panel.querySelector('[data-inv-edit-hint]')?.classList.toggle('d-none', editing);
+
+            if (editing) {
+                window.initAccountingInventoryEncodeForm?.(modalBody)?.focusFirstEditableField?.();
+                setEncodeFooterVisible(true, 'editing');
+            } else {
+                setEncodeFooterVisible(true, 'update');
             }
         }
 
@@ -575,7 +629,10 @@
 
                 const panel = modalBody.querySelector('[data-inventory-encode-panel]');
                 const form = modalBody.querySelector('#inventory-encode-form');
-                const canEncode = Boolean(form);
+                const canEncode = panel?.dataset.canEncode === '1';
+                const canUpdate = panel?.dataset.canUpdate === '1';
+                const canVoid = panel?.dataset.canVoid === '1';
+                encodeEditMode = false;
 
                 if (panel) {
                     syncNextPreviewFromPanel(panel);
@@ -585,16 +642,21 @@
 
                 syncQueueHiddenFields(form);
 
-                if (canEncode && window.initAccountingInventoryEncodeForm) {
+                if ((canEncode || canUpdate) && window.initAccountingInventoryEncodeForm) {
                     window.initAccountingInventoryEncodeForm(modalBody);
-                    setEncodeFooterVisible(true, true);
+                }
+
+                if (canEncode) {
+                    setEncodeFooterVisible(true, 'encode');
+                } else if (canUpdate || canVoid) {
+                    setEncodeFooterVisible(true, 'update');
                 } else {
-                    setEncodeFooterVisible(false, false);
+                    setEncodeFooterVisible(false, 'none');
                 }
             } catch (_) {
                 setBodyOverlayVisible(false);
                 await swapEncodeBody('<div class="alert alert-danger mb-0">Unable to load encode panel. Please try again.</div>');
-                setEncodeFooterVisible(false, false);
+                setEncodeFooterVisible(false, 'none');
             }
         }
 
@@ -605,7 +667,8 @@
             }
 
             encodeSubmitting = true;
-            setEncodeFooterVisible(true, false);
+            const mode = encodeEditMode ? 'editing' : (form.dataset.mode === 'update' ? 'update' : 'encode');
+            setEncodeFooterVisible(true, mode);
             syncQueueHiddenFields(form);
 
             const formData = new FormData(form);
@@ -621,6 +684,7 @@
                         'X-Requested-With': 'XMLHttpRequest',
                         Accept: 'application/json',
                         'X-CSRF-TOKEN': getCsrfToken(),
+                        'X-HTTP-Method-Override': 'PUT',
                     },
                     credentials: 'same-origin',
                     body: formData,
@@ -634,7 +698,7 @@
                     } else {
                         showEncodeErrors({ message: data.message || 'Encode failed. Please review the form.' });
                     }
-                    setEncodeFooterVisible(true, true);
+                    setEncodeFooterVisible(true, mode);
                     encodeSubmitting = false;
                     return;
                 }
@@ -648,6 +712,26 @@
                 }
 
                 const encodedLabel = `${data.encoded?.doc_type || ''} ${data.encoded?.doc_number || ''}`.trim();
+                const wasUpdate = Boolean(data.updated);
+
+                if (wasUpdate) {
+                    showEncodeToast(`Updated ${encodedLabel}`);
+                    encodeSubmitting = false;
+                    encodeEditMode = false;
+
+                    const currentOpenUrl = modalEl.dataset.currentEncodeUrl;
+                    if (currentOpenUrl) {
+                        await loadEncodePanel(currentOpenUrl, modalTitle?.textContent || 'Encode Inventory', {
+                            animate: false,
+                            keepChrome: true,
+                        });
+                    } else {
+                        setPanelEditing(false);
+                        setEncodeFooterVisible(true, 'update');
+                    }
+                    return;
+                }
+
                 const nextLabel = data.next ? `${data.next.doc_type} ${data.next.doc_number}` : null;
                 showEncodeToast(nextLabel ? `Encoded ${encodedLabel} · Next: ${nextLabel}` : `Encoded ${encodedLabel}`);
                 updateNextPreview(data.next);
@@ -659,7 +743,7 @@
                         encodeListNeedsRefresh = false;
                     }
                     updateNextPreview(null);
-                    setEncodeFooterVisible(false, false);
+                    setEncodeFooterVisible(false, 'none');
                     encodeSubmitting = false;
                     modal.hide();
                 } else {
@@ -671,18 +755,106 @@
                 }
             } catch (_) {
                 showEncodeErrors({ message: 'Network error while encoding. Please try again.' });
-                setEncodeFooterVisible(true, true);
+                setEncodeFooterVisible(true, mode);
+                encodeSubmitting = false;
+            }
+        }
+
+        async function submitVoid() {
+            const panel = modalBody.querySelector('[data-inventory-encode-panel]');
+            const voidUrl = panel?.dataset.voidUrl;
+            if (!voidUrl || encodeSubmitting) {
+                return;
+            }
+
+            const reason = window.prompt('Reason for voiding this transaction:');
+            if (reason === null) {
+                return;
+            }
+            if (!String(reason).trim()) {
+                showEncodeErrors({ void_reason: 'A void reason is required.' });
+                return;
+            }
+
+            encodeSubmitting = true;
+            setEncodeFooterVisible(true, encodeEditMode ? 'editing' : 'update');
+
+            const categoryId = modalBody.querySelector('#inventory-encode-form [name="category_id"]')?.value || '';
+            const body = new URLSearchParams();
+            body.set('void_reason', String(reason).trim());
+            body.set('category_id', categoryId);
+            syncQueueHiddenFields(modalBody.querySelector('#inventory-encode-form'));
+            const form = modalBody.querySelector('#inventory-encode-form');
+            if (form) {
+                ['queue_doc_type', 'queue_category_id', 'queue_keyword', 'queue_date_from', 'queue_date_to'].forEach((name) => {
+                    const input = form.querySelector(`[name="${name}"]`);
+                    if (input) {
+                        body.set(name, input.value);
+                    }
+                });
+            }
+
+            try {
+                const response = await fetch(voidUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    credentials: 'same-origin',
+                    body: body.toString(),
+                });
+
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    if (response.status === 422 && data.errors) {
+                        showEncodeErrors(data.errors);
+                    } else {
+                        showEncodeErrors({ message: data.message || 'Void failed.' });
+                    }
+                    setEncodeFooterVisible(true, encodeEditMode ? 'editing' : 'update');
+                    encodeSubmitting = false;
+                    return;
+                }
+
+                updateSummaryBadges(data.queue_stats);
+                encodeListNeedsRefresh = true;
+                showEncodeToast(`Voided ${data.voided?.doc_type || ''} ${data.voided?.doc_number || ''}`.trim());
+                encodeSubmitting = false;
+                setEncodeFooterVisible(false, 'none');
+                modal.hide();
+            } catch (_) {
+                showEncodeErrors({ message: 'Network error while voiding. Please try again.' });
+                setEncodeFooterVisible(true, encodeEditMode ? 'editing' : 'update');
                 encodeSubmitting = false;
             }
         }
 
         function openEncodeModal(url, title) {
+            modalEl.dataset.currentEncodeUrl = url;
             modal.show();
             loadEncodePanel(url, title, { animate: false, keepChrome: false });
         }
 
         submitNextBtn?.addEventListener('click', () => submitEncode(false));
         submitCloseBtn?.addEventListener('click', () => submitEncode(true));
+        updateBtn?.addEventListener('click', () => submitEncode(true));
+        editBtn?.addEventListener('click', () => setPanelEditing(true));
+        editCancelBtn?.addEventListener('click', () => {
+            const url = modalEl.dataset.currentEncodeUrl;
+            if (url) {
+                loadEncodePanel(url, modalTitle?.textContent || 'Encode Inventory', {
+                    animate: false,
+                    keepChrome: true,
+                });
+            } else {
+                setPanelEditing(false);
+            }
+        });
+        voidBtn?.addEventListener('click', () => submitVoid());
 
         modalEl.addEventListener('hidden.bs.modal', () => {
             if (encodeListNeedsRefresh) {
@@ -693,8 +865,9 @@
             const stage = ensureBodyStage();
             stage.classList.remove('is-leaving', 'is-entering');
             stage.innerHTML = '<div class="text-center text-muted py-5"><div class="spinner-border text-primary" role="status" aria-hidden="true"></div><div class="mt-2">Loading document...</div></div>';
-            setEncodeFooterVisible(false, false);
+            setEncodeFooterVisible(false, 'none');
             updateNextPreview(null);
+            encodeEditMode = false;
         });
 
         pageContainer?.addEventListener('click', (event) => {

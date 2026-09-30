@@ -498,6 +498,9 @@ Route::middleware('auth')->group(function () {
             Route::put('inventory-transactions/{docType}/{id}', [AccountingInventoryTransactionController::class, 'update'])
                 ->where(['docType' => 'rr|ts|dr', 'id' => '[0-9]+'])
                 ->name('inventory-transactions.update');
+            Route::put('inventory-transactions/manual/{docType}/{docNumber}', [AccountingInventoryTransactionController::class, 'updateManual'])
+                ->where(['docType' => 'cv|jv'])
+                ->name('inventory-transactions.update-manual');
             Route::post('inventory-transactions/bulk-encode', [AccountingInventoryTransactionController::class, 'bulkEncode'])
                 ->name('inventory-transactions.bulk-encode');
         });
