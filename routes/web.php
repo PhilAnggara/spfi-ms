@@ -13,6 +13,7 @@ use App\Http\Controllers\BatchController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\CanvassingController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\CountTagNonFgController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\EmployeeController;
@@ -650,6 +651,15 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:delete-stock-adjustment')->prefix('stock-adjustments')->name('stock-adjustments.')->group(function () {
         Route::delete('/{stockAdjustment}', [StockAdjustmentController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::middleware('permission:view-count-tag-non-fg')->prefix('count-tags/non-fg')->name('count-tags.non-fg.')->group(function () {
+        Route::get('/', [CountTagNonFgController::class, 'index'])->name('index');
+    });
+
+    Route::middleware('permission:create-count-tag-non-fg')->prefix('count-tags/non-fg')->name('count-tags.non-fg.')->group(function () {
+        Route::get('/scan', [CountTagNonFgController::class, 'scan'])->name('scan');
+        Route::get('/lookup', [CountTagNonFgController::class, 'lookup'])->name('lookup');
     });
 
     Route::middleware('permission:create-opening-balance-correction')->prefix('opening-balance-corrections')->name('opening-balance-corrections.')->group(function () {

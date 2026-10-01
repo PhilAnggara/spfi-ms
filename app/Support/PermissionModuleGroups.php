@@ -22,6 +22,7 @@ class PermissionModuleGroups
         'transfer' => 'Transfer Slips',
         'delivery' => 'Delivery',
         'stock_adjustment' => 'Stock Adjustments',
+        'count_tag' => 'Count Tags',
         'opening_balance' => 'Opening Balance',
         'stores_withdrawal' => 'Stores Withdrawal',
         'products' => 'Products',
@@ -43,6 +44,7 @@ class PermissionModuleGroups
     private const RESOURCE_GROUPS = [
         'opening-balance-correction' => 'opening_balance',
         'stock-adjustment' => 'stock_adjustment',
+        'count-tag-non-fg' => 'count_tag',
         'stores-withdrawal' => 'stores_withdrawal',
         'all-stores-withdrawal' => 'stores_withdrawal',
         'product-categories' => 'master_data',
@@ -150,6 +152,7 @@ class PermissionModuleGroups
         'fish-suppliers' => 'Fish suppliers',
         'stores-withdrawal' => 'Stores withdrawal',
         'stock-adjustment' => 'Stock adjustments',
+        'count-tag-non-fg' => 'Count Tag Non-FG',
         'opening-balance-correction' => 'Opening balance',
         'supplier-comparison' => 'Supplier comparison',
         'doc-entries' => 'Document entries',

@@ -361,6 +361,15 @@
                             </li>
                         @endcan
 
+                        @can('view-count-tag-non-fg')
+                            <li class="sidebar-item {{ Request::is('count-tags/non-fg*') ? 'active' : '' }}">
+                                <a href="{{ route('count-tags.non-fg.index') }}" class='sidebar-link'>
+                                    <i class="fa-duotone fa-solid fa-qrcode {{ Request::is('count-tags/non-fg*') ? 'fa-fade' : '' }}"></i>
+                                    <span>Count Tag Non-FG</span>
+                                </a>
+                            </li>
+                        @endcan
+
                         @can('view-opening-balance-correction')
                             <li class="sidebar-item {{ Request::is('opening-balance-corrections*') ? 'active' : '' }}">
                                 <a href="{{ route('opening-balance-corrections.index') }}" class='sidebar-link'>

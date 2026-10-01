@@ -1,0 +1,98 @@
+.count-tag-scan-page {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.count-tag-scan-layout {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.count-tag-qr-reader {
+    width: 100%;
+    min-height: 280px;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: #0f172a;
+}
+
+.count-tag-qr-reader video {
+    width: 100% !important;
+    border-radius: 0.75rem;
+}
+
+.count-tag-scan-status {
+    font-size: 0.9rem;
+}
+
+.count-tag-manual-group .form-control-lg {
+    min-height: 3rem;
+}
+
+.count-tag-result-empty-icon {
+    font-size: 2rem;
+    opacity: 0.55;
+}
+
+.count-tag-result-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.count-tag-result-code {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #0f172a;
+    word-break: break-all;
+}
+
+.count-tag-result-name {
+    margin-top: 0.35rem;
+    font-size: 1rem;
+    color: #334155;
+    line-height: 1.35;
+}
+
+.count-tag-result-meta {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+@media (max-width: 991.98px) {
+    .count-tag-scan-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .count-tag-qr-reader {
+        min-height: 320px;
+    }
+
+    .count-tag-scan-page .po-top-actions {
+        text-align: left !important;
+    }
+
+    .count-tag-manual-group {
+        flex-wrap: nowrap;
+    }
+
+    .count-tag-manual-group .btn {
+        flex: 0 0 auto;
+        min-width: 5.5rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .count-tag-qr-reader {
+        min-height: 260px;
+    }
+
+    .count-tag-result-code {
+        font-size: 1.2rem;
+    }
+}

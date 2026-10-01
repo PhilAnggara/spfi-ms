@@ -97,6 +97,11 @@ class RolePermissionSeeder extends Seeder
             'delete-stock-adjustment',
         ];
 
+        $permissionsCountTagNonFg = [
+            'view-count-tag-non-fg',
+            'create-count-tag-non-fg',
+        ];
+
         $permissionsOpeningBalance = [
             'create-opening-balance-correction',
             'view-opening-balance-correction',
@@ -192,6 +197,7 @@ class RolePermissionSeeder extends Seeder
             $permissionsTransfer,
             $permissionsDelivery,
             $permissionsStockAdjustment,
+            $permissionsCountTagNonFg,
             $permissionsOpeningBalance,
             $permissionsStoresWithdrawal,
             $permissionsMaster,
