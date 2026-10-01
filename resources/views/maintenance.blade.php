@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Maintenance - SPFI-MS</title>
     {{-- Root-relative paths so prerendered HTML works from any host (not APP_URL/localhost). --}}
-    <link rel="shortcut icon" href="{{ parse_url(url('assets/images/favicon.png'), PHP_URL_PATH) }}" type="image/x-icon">
+    @include('includes.icons', ['rootRelative' => true])
     @include('includes.error-style', ['rootRelative' => true])
 </head>
 <body>

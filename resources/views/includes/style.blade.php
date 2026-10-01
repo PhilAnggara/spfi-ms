@@ -1,4 +1,4 @@
-    <link rel="shortcut icon" href="{{ url('assets/images/favicon.png') }}" type="image/x-icon">
+    @include('includes.icons')
     {{-- <link rel="stylesheet" href="https://site-assets.fontawesome.com/releases/v7.0.1/css/all.css"> --}}
     <link rel="stylesheet" href="{{ url('assets/vendors/fontawesome/pro/v7.0.1/css/all.css') }}">
     {{-- <link rel="stylesheet" href="{{ url('assets/vendors/fontawesome/pro/v7.0.1/css/solid.css') }}">

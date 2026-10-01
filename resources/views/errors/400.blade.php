@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>400 - SPFI-MS</title>
-    <link rel="shortcut icon" href="{{ url('assets/images/favicon.png') }}" type="image/x-icon">
+    @include('includes.icons')
     @include('includes.error-style')
 </head>
 <body>
