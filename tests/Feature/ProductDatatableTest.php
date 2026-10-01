@@ -80,7 +80,7 @@ it('filters product datatable rows by keyword', function () {
         'length' => 10,
         'keyword' => 'PRD-001',
         'order' => [
-            ['column' => 1, 'dir' => 'asc'],
+            ['column' => 2, 'dir' => 'asc'],
         ],
     ]));
 
@@ -95,7 +95,7 @@ it('orders product datatable rows by name ascending', function () {
         'start' => 0,
         'length' => 5,
         'order' => [
-            ['column' => 2, 'dir' => 'asc'],
+            ['column' => 3, 'dir' => 'asc'],
         ],
     ]));
 
@@ -159,7 +159,7 @@ it('orders product datatable rows by avg unit price', function () {
         'start' => 0,
         'length' => 15,
         'order' => [
-            ['column' => 6, 'dir' => 'asc'],
+            ['column' => 8, 'dir' => 'asc'],
         ],
     ]));
 

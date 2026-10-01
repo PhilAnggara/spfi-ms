@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const historyRouteTemplate = table.data('historyRouteTemplate');
     const canvassingHistoryRouteTemplate = table.data('canvassingHistoryRouteTemplate');
     const canvassingHistoryExportRouteTemplate = table.data('canvassingHistoryExportRouteTemplate');
+    const barcodeShowRouteTemplate = table.data('barcodeShowRouteTemplate');
+    const barcodePrintRoute = table.data('barcodePrintRoute');
     const poShowRouteTemplate = table.data('poShowRouteTemplate');
     const prsShowRouteTemplate = table.data('prsShowRouteTemplate');
     const canManage = table.data('canManage') === 1 || table.data('canManage') === '1';
@@ -25,6 +27,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const filterForm = document.getElementById('product-filter-form');
     const loadingEl = document.getElementById('product-page-loading');
     const resultBadge = document.getElementById('product-filter-result');
+    const pageContainer = document.getElementById('product-page-container');
 
     const filterElements = {
         keyword: document.getElementById('filter-product-keyword'),
@@ -37,32 +40,38 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const DEFAULT_SORT = 'name_asc';
     const SORT_OPTIONS = {
-        name_asc: { column: 2, dir: 'asc' },
-        name_desc: { column: 2, dir: 'desc' },
-        code_asc: { column: 1, dir: 'asc' },
-        code_desc: { column: 1, dir: 'desc' },
-        stock_asc: { column: 3, dir: 'asc' },
-        stock_desc: { column: 3, dir: 'desc' },
-        category_asc: { column: 5, dir: 'asc' },
-        category_desc: { column: 5, dir: 'desc' },
+        name_asc: { column: 3, dir: 'asc' },
+        name_desc: { column: 3, dir: 'desc' },
+        code_asc: { column: 2, dir: 'asc' },
+        code_desc: { column: 2, dir: 'desc' },
+        stock_asc: { column: 4, dir: 'asc' },
+        stock_desc: { column: 4, dir: 'desc' },
+        category_asc: { column: 6, dir: 'asc' },
+        category_desc: { column: 6, dir: 'desc' },
     };
     const COLUMN_TO_SORT = {
-        '2:asc': 'name_asc',
-        '2:desc': 'name_desc',
-        '1:asc': 'code_asc',
-        '1:desc': 'code_desc',
-        '3:asc': 'stock_asc',
-        '3:desc': 'stock_desc',
-        '5:asc': 'category_asc',
-        '5:desc': 'category_desc',
+        '3:asc': 'name_asc',
+        '3:desc': 'name_desc',
+        '2:asc': 'code_asc',
+        '2:desc': 'code_desc',
+        '4:asc': 'stock_asc',
+        '4:desc': 'stock_desc',
+        '6:asc': 'category_asc',
+        '6:desc': 'category_desc',
     };
 
     if (canViewPurchaseHistory) {
-        SORT_OPTIONS.avg_unit_price_asc = { column: 7, dir: 'asc' };
-        SORT_OPTIONS.avg_unit_price_desc = { column: 7, dir: 'desc' };
-        COLUMN_TO_SORT['7:asc'] = 'avg_unit_price_asc';
-        COLUMN_TO_SORT['7:desc'] = 'avg_unit_price_desc';
+        SORT_OPTIONS.avg_unit_price_asc = { column: 8, dir: 'asc' };
+        SORT_OPTIONS.avg_unit_price_desc = { column: 8, dir: 'desc' };
+        COLUMN_TO_SORT['8:asc'] = 'avg_unit_price_asc';
+        COLUMN_TO_SORT['8:desc'] = 'avg_unit_price_desc';
     }
+
+    const selectionState = {
+        selectedIds: new Set(),
+        selectingAll: false,
+        filteredTotal: 0,
+    };
 
     const editModalElement = document.getElementById('edit-modal');
     const editModal = editModalElement && window.bootstrap && window.bootstrap.Modal
@@ -181,6 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const applyFilters = (useDebounce = false) => {
         const reload = () => {
+            clearProductSelection();
             syncFilterUrl(true);
             if (productDataTable) {
                 productDataTable.ajax.reload();
@@ -499,6 +509,28 @@ document.addEventListener('DOMContentLoaded', function () {
     const tableColumns = [
         {
             data: 'id',
+            orderable: false,
+            searchable: false,
+            className: 'product-select-cell',
+            render: function (data, type, row) {
+                const itemId = Number(row.id);
+                const checked = selectionState.selectedIds.has(itemId) ? 'checked' : '';
+                return `
+                    <div class="product-select-cell-inner">
+                        <input
+                            type="checkbox"
+                            class="form-check-input product-select-checkbox"
+                            value="${itemId}"
+                            data-product-code="${escapeHtml(row.code ?? '')}"
+                            data-product-name="${escapeHtml(row.name ?? '')}"
+                            ${checked}
+                        >
+                    </div>
+                `;
+            },
+        },
+        {
+            data: 'id',
             visible: false,
             searchable: false,
         },
@@ -585,6 +617,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 data-category="${safeCategory}"
             `;
 
+            const qrButton = `
+                <button type="button" class="btn icon view-product-barcode" data-id="${row.id}" data-code="${safeCode}" data-name="${safeName}" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="QR Code">
+                    <i class="fa-light fa-qrcode text-dark"></i>
+                </button>
+            `;
+
             let manageButtons = '';
             if (canManage) {
                 const editAttrs = `
@@ -627,6 +665,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             return `
                 <div class="btn-group btn-group-sm">
+                    ${qrButton}
                     ${historyButton}
                     ${canvassingHistoryButton}
                     ${manageButtons}
@@ -634,6 +673,102 @@ document.addEventListener('DOMContentLoaded', function () {
             `;
         },
     });
+
+    const syncProductSelectionUi = () => {
+        const selectedCount = selectionState.selectedIds.size;
+        const total = selectionState.filteredTotal;
+        const selectedBadge = document.getElementById('product-selected-count');
+        const printSelectedButton = document.getElementById('product-print-selected-btn');
+        const headerCheckbox = document.getElementById('product-select-all-checkbox');
+
+        if (selectedBadge) {
+            selectedBadge.textContent = `${selectedCount} selected`;
+        }
+
+        if (printSelectedButton) {
+            printSelectedButton.disabled = selectedCount === 0 || selectionState.selectingAll;
+        }
+
+        document.querySelectorAll('.product-select-checkbox').forEach((input) => {
+            input.checked = selectionState.selectedIds.has(Number(input.value));
+        });
+
+        if (headerCheckbox) {
+            headerCheckbox.checked = total > 0 && selectedCount === total;
+            headerCheckbox.indeterminate = selectedCount > 0 && selectedCount < total;
+            headerCheckbox.disabled = selectionState.selectingAll;
+        }
+    };
+
+    const clearProductSelection = () => {
+        selectionState.selectedIds.clear();
+        syncProductSelectionUi();
+    };
+
+    const openProductPrintModal = (itemIds, singleLabel = null) => {
+        const printForm = document.getElementById('product-barcode-print-form');
+        const hiddenInputs = document.getElementById('product-barcode-hidden-inputs');
+        const summary = document.getElementById('product-barcode-print-summary');
+        const printModalEl = document.getElementById('product-barcode-print-modal');
+
+        if (!printForm || !hiddenInputs || !summary || !printModalEl || !itemIds.length) {
+            return;
+        }
+
+        if (barcodePrintRoute) {
+            printForm.setAttribute('action', barcodePrintRoute);
+        }
+
+        hiddenInputs.innerHTML = '';
+        itemIds.forEach((itemId) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'item_ids[]';
+            input.value = String(itemId);
+            hiddenInputs.appendChild(input);
+        });
+
+        summary.textContent = singleLabel
+            ? `Selected product: ${singleLabel}`
+            : `Selected products: ${itemIds.length}`;
+
+        const printModal = window.bootstrap?.Modal
+            ? window.bootstrap.Modal.getOrCreateInstance(printModalEl)
+            : null;
+        printModal?.show();
+    };
+
+    const fetchAllFilteredProductIds = async () => {
+        const url = new URL(tableUrl, window.location.origin);
+        const filters = getFilterPayload();
+
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value) {
+                url.searchParams.set(key, value);
+            }
+        });
+        url.searchParams.set('selection_scope', 'all_ids');
+
+        const response = await fetch(url.toString(), {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load product selections.');
+        }
+
+        const payload = await response.json();
+
+        return {
+            ids: Array.isArray(payload.ids)
+                ? payload.ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+                : [],
+            total: Number(payload.total || 0),
+        };
+    };
 
     productDataTable = table.DataTable({
         processing: true,
@@ -665,12 +800,23 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         order: [[initialSortOrder.column, initialSortOrder.dir]],
         columns: tableColumns,
+        columnDefs: [
+            { orderable: false, targets: 0 },
+        ],
         drawCallback: function () {
             const info = productDataTable.page.info();
+            selectionState.filteredTotal = info.recordsDisplay ?? 0;
+
+            if (pageContainer) {
+                pageContainer.dataset.filteredTotal = String(selectionState.filteredTotal);
+            }
+
             if (resultBadge) {
-                const total = info.recordsDisplay ?? 0;
+                const total = selectionState.filteredTotal;
                 resultBadge.textContent = `${total.toLocaleString()} record${total === 1 ? '' : 's'}`;
             }
+
+            syncProductSelectionUi();
 
             if (window.bootstrap && window.bootstrap.Tooltip) {
                 document.querySelectorAll('#product-table [data-bstooltip-toggle="tooltip"]').forEach((el) => {
@@ -898,6 +1044,185 @@ document.addEventListener('DOMContentLoaded', function () {
     $('#product-table tbody').on('click', '.copy-name', function () {
         const name = $(this).data('name');
         copyToClipboard(name);
+    });
+
+    $('#product-table tbody').on('change', '.product-select-checkbox', function () {
+        const itemId = Number(this.value);
+
+        if (!Number.isInteger(itemId) || itemId <= 0) {
+            return;
+        }
+
+        if (this.checked) {
+            selectionState.selectedIds.add(itemId);
+        } else {
+            selectionState.selectedIds.delete(itemId);
+        }
+
+        syncProductSelectionUi();
+    });
+
+    $('#product-table tbody').on('click', '.product-select-cell', function (event) {
+        if (event.target.closest('input, button, a, label')) {
+            return;
+        }
+
+        const checkbox = this.querySelector('.product-select-checkbox');
+        if (!checkbox || checkbox.disabled) {
+            return;
+        }
+
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    const headerCheckbox = document.getElementById('product-select-all-checkbox');
+    const selectAllButton = document.getElementById('product-select-all-btn');
+    const clearSelectionButton = document.getElementById('product-clear-selection-btn');
+    const printSelectedButton = document.getElementById('product-print-selected-btn');
+
+    headerCheckbox?.addEventListener('change', async function () {
+        if (selectionState.selectingAll) {
+            return;
+        }
+
+        if (!this.checked) {
+            clearProductSelection();
+            return;
+        }
+
+        selectionState.selectingAll = true;
+        syncProductSelectionUi();
+
+        try {
+            const payload = await fetchAllFilteredProductIds();
+            selectionState.selectedIds = new Set(payload.ids);
+            selectionState.filteredTotal = payload.total;
+        } catch (_) {
+            this.checked = false;
+        } finally {
+            selectionState.selectingAll = false;
+            syncProductSelectionUi();
+        }
+    });
+
+    selectAllButton?.addEventListener('click', async function () {
+        if (selectionState.selectingAll) {
+            return;
+        }
+
+        selectionState.selectingAll = true;
+        syncProductSelectionUi();
+
+        try {
+            const payload = await fetchAllFilteredProductIds();
+            selectionState.selectedIds = new Set(payload.ids);
+            selectionState.filteredTotal = payload.total;
+        } catch (_) {
+            // Keep current selection on failure.
+        } finally {
+            selectionState.selectingAll = false;
+            syncProductSelectionUi();
+        }
+    });
+
+    clearSelectionButton?.addEventListener('click', function () {
+        clearProductSelection();
+    });
+
+    printSelectedButton?.addEventListener('click', function () {
+        const itemIds = Array.from(selectionState.selectedIds.values()).sort((left, right) => left - right);
+        openProductPrintModal(itemIds);
+    });
+
+    const barcodePreviewModalEl = document.getElementById('product-barcode-preview-modal');
+    const barcodePreviewModal = barcodePreviewModalEl && window.bootstrap?.Modal
+        ? window.bootstrap.Modal.getOrCreateInstance(barcodePreviewModalEl)
+        : null;
+    const barcodePreviewPrintBtn = document.getElementById('product-barcode-preview-print-btn');
+    let previewItemId = null;
+    let previewItemLabel = null;
+
+    const setBarcodePreviewState = ({ loading = false, content = false, error = false } = {}) => {
+        document.getElementById('product-barcode-preview-loading')?.classList.toggle('d-none', !loading);
+        document.getElementById('product-barcode-preview-content')?.classList.toggle('d-none', !content);
+        document.getElementById('product-barcode-preview-error')?.classList.toggle('d-none', !error);
+    };
+
+    $('#product-table tbody').on('click', '.view-product-barcode', async function () {
+        const button = $(this);
+        const itemId = Number(button.data('id'));
+        const code = String(button.data('code') || '-');
+        const name = String(button.data('name') || '-');
+
+        previewItemId = Number.isInteger(itemId) && itemId > 0 ? itemId : null;
+        previewItemLabel = `${code} — ${name}`;
+
+        const title = document.getElementById('product-barcode-preview-title');
+        const meta = document.getElementById('product-barcode-preview-meta');
+        const qrContainer = document.getElementById('product-barcode-preview-qr');
+        const codeEl = document.getElementById('product-barcode-preview-code');
+
+        if (title) {
+            title.textContent = `Product QR — ${code}`;
+        }
+        if (meta) {
+            meta.textContent = name;
+        }
+        if (codeEl) {
+            codeEl.textContent = code;
+        }
+        if (qrContainer) {
+            qrContainer.innerHTML = '';
+        }
+        if (barcodePreviewPrintBtn) {
+            barcodePreviewPrintBtn.disabled = true;
+        }
+
+        setBarcodePreviewState({ loading: true });
+        barcodePreviewModal?.show();
+
+        if (!previewItemId || !barcodeShowRouteTemplate) {
+            setBarcodePreviewState({ error: true });
+            return;
+        }
+
+        try {
+            const url = String(barcodeShowRouteTemplate).replace('__ID__', String(previewItemId));
+            const response = await fetch(url, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load QR preview.');
+            }
+
+            const payload = await response.json();
+            if (qrContainer) {
+                qrContainer.innerHTML = payload.qr_svg || '';
+            }
+            if (codeEl) {
+                codeEl.textContent = payload.code || code;
+            }
+            if (barcodePreviewPrintBtn) {
+                barcodePreviewPrintBtn.disabled = false;
+            }
+            setBarcodePreviewState({ content: true });
+        } catch (_) {
+            setBarcodePreviewState({ error: true });
+        }
+    });
+
+    barcodePreviewPrintBtn?.addEventListener('click', function () {
+        if (!previewItemId) {
+            return;
+        }
+
+        barcodePreviewModal?.hide();
+        openProductPrintModal([previewItemId], previewItemLabel);
     });
 
     if (openCreateModal) {

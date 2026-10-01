@@ -10,11 +10,14 @@ use App\Models\PurchaseOrderItem;
 use App\Models\UnitOfMeasure;
 use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\PdfReport;
+use App\Support\QrCodeImage;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -91,7 +94,9 @@ class ProductController extends Controller
     {
         $canViewPurchaseHistory = $request->user()?->can('view-purchase-history') ?? false;
 
+        // Index 0 is the checkbox column (not orderable in the UI).
         $columns = [
+            'items.id',
             'items.id',
             'items.code',
             'items.name',
@@ -172,11 +177,25 @@ class ProductController extends Controller
             $baseQuery->where('items.type', $request->input('type'));
         }
 
+        if ($request->query('selection_scope') === 'all_ids') {
+            $itemIds = (clone $baseQuery)
+                ->reorder()
+                ->orderBy('items.id')
+                ->pluck('items.id')
+                ->map(static fn ($id): int => (int) $id)
+                ->values();
+
+            return response()->json([
+                'ids' => $itemIds,
+                'total' => $itemIds->count(),
+            ]);
+        }
+
         // Total data setelah filter
         $recordsFiltered = (clone $baseQuery)->reorder()->count();
 
         // Sorting yang dikirim DataTables (default id desc di sisi client)
-        $orderColumnIndex = (int) $request->input('order.0.column', 0);
+        $orderColumnIndex = (int) $request->input('order.0.column', 1);
         $orderDirection = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
         $orderColumn = $columns[$orderColumnIndex] ?? 'items.id';
 
@@ -230,6 +249,59 @@ class ProductController extends Controller
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
         ]);
+    }
+
+    /**
+     * Preview QR code for a product (encoded from item code).
+     */
+    public function showBarcode(Item $item): JsonResponse
+    {
+        return response()->json([
+            'id' => $item->id,
+            'code' => $item->code,
+            'name' => $item->name,
+            'qr_svg' => (string) QrCode::size(180)->generate((string) $item->code),
+        ]);
+    }
+
+    /**
+     * Print one or more product QR labels.
+     */
+    public function printBarcodes(Request $request): Response
+    {
+        $validated = $request->validate([
+            'item_ids' => ['required', 'array', 'min:1'],
+            'item_ids.*' => ['required', 'integer', 'exists:items,id'],
+        ]);
+
+        $itemIds = collect($validated['item_ids'])
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        $itemsById = Item::query()
+            ->whereIn('id', $itemIds)
+            ->get(['id', 'code', 'name'])
+            ->keyBy('id');
+
+        $items = $itemIds
+            ->map(static fn (int $id) => $itemsById->get($id))
+            ->filter()
+            ->values()
+            ->map(function (Item $item): array {
+                return [
+                    'id' => $item->id,
+                    'code' => $item->code,
+                    'name' => $item->name,
+                    'qr_data_uri' => QrCodeImage::dataUri((string) $item->code, 220),
+                ];
+            });
+
+        abort_if($items->isEmpty(), 404, 'Selected products were not found.');
+
+        return Pdf::loadView('pdf.product-barcode-labels', [
+            'items' => $items,
+        ])->setPaper('a4', 'portrait')->stream('product-qr-labels.pdf');
     }
 
     public function purchaseHistory(Request $request, Item $item)

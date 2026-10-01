@@ -103,7 +103,16 @@
 
                     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                         <h5 class="card-title mb-0">Product List</h5>
-                        <span class="badge bg-light-primary" id="product-filter-result">0 records</span>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge bg-light-info text-info-emphasis" id="product-selected-count">0 selected</span>
+                            <button type="button" class="btn btn-light-secondary btn-sm" id="product-select-all-btn">Select All Results</button>
+                            <button type="button" class="btn btn-light-secondary btn-sm" id="product-clear-selection-btn">Clear Selection</button>
+                            <button type="button" class="btn btn-primary btn-sm" id="product-print-selected-btn" disabled>
+                                <i class="fa-light fa-qrcode me-1"></i>
+                                Print Selected Labels
+                            </button>
+                            <span class="badge bg-light-primary" id="product-filter-result">0 records</span>
+                        </div>
                     </div>
 
                     <div class="table-responsive">
@@ -111,6 +120,8 @@
                             class="table table-striped align-middle po-table text-nowrap w-100"
                             id="product-table"
                             data-source="{{ route('product.datatables') }}"
+                            data-barcode-show-route-template="{{ route('product.barcode.show', '__ID__') }}"
+                            data-barcode-print-route="{{ route('product.barcodes.print') }}"
                             data-csrf-token="{{ csrf_token() }}"
                             data-update-route-template="{{ route('product.update', '__ID__') }}"
                             data-destroy-route-template="{{ route('product.destroy', '__ID__') }}"
@@ -129,6 +140,9 @@
                             data-editing-product-id="{{ (string) session('editing_product_id', '') }}">
                             <thead>
                                 <tr>
+                                    <th class="spfi-col-icon">
+                                        <input type="checkbox" class="form-check-input" id="product-select-all-checkbox">
+                                    </th>
                                     <th class="d-none">ID</th>
                                     <th>Product Code</th>
                                     <th>Name</th>
@@ -161,6 +175,68 @@
 @if ($canViewCanvassingHistory)
     @include('includes.modals.product-canvassing-history-modal')
 @endif
+
+<div class="modal fade" id="product-barcode-preview-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1" id="product-barcode-preview-title">Product QR Code</h5>
+                    <small class="text-muted" id="product-barcode-preview-meta">-</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="product-barcode-preview-loading" class="py-4 text-muted">
+                    <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                    <div class="mt-2">Loading QR code...</div>
+                </div>
+                <div id="product-barcode-preview-content" class="d-none">
+                    <div class="d-inline-block border border-dark-subtle p-2 rounded" id="product-barcode-preview-qr"></div>
+                    <div class="mt-3">
+                        <div class="fw-semibold" id="product-barcode-preview-code"></div>
+                        <small class="text-muted">Scan to identify product code</small>
+                    </div>
+                </div>
+                <div id="product-barcode-preview-error" class="d-none text-danger py-3">Failed to load QR code.</div>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="product-barcode-preview-print-btn" disabled>
+                    <i class="fa-light fa-print me-1"></i>
+                    Print Label
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="product-barcode-print-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="GET" action="{{ route('product.barcodes.print') }}" target="_blank" id="product-barcode-print-form">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-1">Print Product QR Labels</h5>
+                        <small class="text-muted" id="product-barcode-print-summary">Selected products: 0</small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0 text-muted">Open a printable PDF of QR labels for the selected products. Each label encodes the product code.</p>
+                    <div id="product-barcode-hidden-inputs"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-light fa-print me-1"></i>
+                        Print Labels
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('prepend-style')

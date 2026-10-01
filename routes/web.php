@@ -61,6 +61,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:view-products')->prefix('master')->group(function () {
         Route::get('product', [ProductController::class, 'index'])->name('product.index');
         Route::get('product/datatables', [ProductController::class, 'datatable'])->name('product.datatables');
+        Route::get('product/barcodes/print', [ProductController::class, 'printBarcodes'])->name('product.barcodes.print');
+        Route::get('product/{item}/barcode', [ProductController::class, 'showBarcode'])->name('product.barcode.show');
     });
 
     Route::middleware('permission:view-purchase-history')->prefix('master')->group(function () {

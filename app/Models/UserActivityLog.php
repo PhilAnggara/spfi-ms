@@ -59,6 +59,8 @@ class UserActivityLog extends Model
         'employees.index' => 'Employees',
         'employees.id-cards.print' => 'Employee ID Cards',
         'product.index' => 'Products',
+        'product.barcode.show' => 'Product QR Preview',
+        'product.barcodes.print' => 'Product QR Labels',
         'product-category.index' => 'Product Categories',
         'unit-of-measurement.index' => 'Units of Measure',
         'supplier.index' => 'Suppliers',
