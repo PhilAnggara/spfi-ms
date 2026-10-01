@@ -4,25 +4,23 @@
 @section('content')
 <div
     id="count-tag-scan-page"
-    class="count-tag-scan-page"
+    class="count-tag-scan-page page-heading po-page"
     data-lookup-url="{{ $lookupUrl }}"
 >
-    <div class="page-heading po-page mb-3">
-        <div class="page-title">
-            <div class="row g-3 align-items-center">
-                <div class="col-12 col-lg-8">
-                    <div class="po-hero">
-                        <h3 class="mb-1">Scan Product QR</h3>
-                        <p class="text-muted mb-0">Point the camera at a product label, or type the product code manually.</p>
-                    </div>
+    <div class="page-title mb-4">
+        <div class="row g-3 align-items-center">
+            <div class="col-12 col-lg-8">
+                <div class="po-hero">
+                    <h3 class="mb-1">Scan Product QR</h3>
+                    <p class="text-muted mb-0">Point the camera at a product label, or type the product code manually.</p>
                 </div>
-                <div class="col-12 col-lg-4">
-                    <div class="po-top-actions text-lg-end">
-                        <a href="{{ route('count-tags.non-fg.index') }}" class="btn btn-light-secondary icon icon-left">
-                            <i class="fa-regular fa-arrow-left"></i>
-                            Back to List
-                        </a>
-                    </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="po-top-actions text-lg-end">
+                    <a href="{{ route('count-tags.non-fg.index') }}" class="btn btn-light-secondary icon icon-left">
+                        <i class="fa-regular fa-arrow-left"></i>
+                        Back to List
+                    </a>
                 </div>
             </div>
         </div>

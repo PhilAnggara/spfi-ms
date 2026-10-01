@@ -1,18 +1,17 @@
 .count-tag-scan-page {
-    max-width: 1100px;
-    margin: 0 auto;
+    width: 100%;
 }
 
 .count-tag-scan-layout {
     display: grid;
-    grid-template-columns: 1.2fr 0.8fr;
-    gap: 1rem;
+    grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
+    gap: 1.25rem;
     align-items: start;
 }
 
 .count-tag-qr-reader {
     width: 100%;
-    min-height: 280px;
+    min-height: 420px;
     border-radius: 0.75rem;
     overflow: hidden;
     background: #0f172a;
@@ -39,12 +38,12 @@
 .count-tag-result-card {
     border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: 0.75rem;
-    padding: 1rem;
+    padding: 1.25rem;
     background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
 }
 
 .count-tag-result-code {
-    font-size: 1.35rem;
+    font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     color: #0f172a;
@@ -53,14 +52,14 @@
 
 .count-tag-result-name {
     margin-top: 0.35rem;
-    font-size: 1rem;
+    font-size: 1.05rem;
     color: #334155;
     line-height: 1.35;
 }
 
 .count-tag-result-meta {
     margin-top: 0.75rem;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     color: #64748b;
 }
 
