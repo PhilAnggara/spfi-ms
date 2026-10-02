@@ -19,15 +19,52 @@ document.addEventListener('DOMContentLoaded', function () {
     const resultName = document.getElementById('count-tag-result-name');
     const resultMeta = document.getElementById('count-tag-result-meta');
 
+    const entryModalEl = document.getElementById('count-tag-entry-modal');
+    const modalCode = document.getElementById('count-tag-modal-code');
+    const modalName = document.getElementById('count-tag-modal-name');
+    const modalMeta = document.getElementById('count-tag-modal-meta');
+    const entryModal = entryModalEl && window.bootstrap?.Modal
+        ? window.bootstrap.Modal.getOrCreateInstance(entryModalEl)
+        : null;
+
     let html5QrCode = null;
+    let audioContext = null;
     let isScanning = false;
     let isLookingUp = false;
+    let isEntryModalOpen = false;
     let lastScannedCode = '';
     let lastScanAt = 0;
+    let lastItem = null;
 
     const setCameraStatus = (message) => {
         if (cameraStatus) {
             cameraStatus.textContent = message;
+        }
+    };
+
+    const pauseCameraForModal = () => {
+        if (!html5QrCode || !isScanning || typeof html5QrCode.pause !== 'function') {
+            return;
+        }
+
+        try {
+            html5QrCode.pause(true);
+            setCameraStatus('Camera paused while count tag entry is open.');
+        } catch (_) {
+            // Ignore pause failures; lookup guard still blocks updates.
+        }
+    };
+
+    const resumeCameraAfterModal = () => {
+        if (!html5QrCode || !isScanning || typeof html5QrCode.resume !== 'function') {
+            return;
+        }
+
+        try {
+            html5QrCode.resume();
+            setCameraStatus('Camera ready. Align the QR code inside the frame.');
+        } catch (_) {
+            setCameraStatus('Camera paused. Close the modal, then restart the camera if needed.');
         }
     };
 
@@ -36,6 +73,90 @@ document.addEventListener('DOMContentLoaded', function () {
         resultLoading?.classList.toggle('d-none', !loading);
         resultError?.classList.toggle('d-none', !error);
         resultCard?.classList.toggle('d-none', !card);
+
+        if (resultCard) {
+            resultCard.setAttribute('aria-disabled', card ? 'false' : 'true');
+            resultCard.classList.toggle('is-active', card);
+        }
+    };
+
+    const formatItemMeta = (item) => {
+        const parts = [];
+        if (item.unit_name) {
+            parts.push(item.unit_name);
+        }
+        if (item.category_name) {
+            parts.push(item.category_name);
+        }
+        return parts.length ? parts.join(' · ') : 'Product found';
+    };
+
+    const ensureAudioContext = () => {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) {
+            return null;
+        }
+
+        if (!audioContext) {
+            audioContext = new AudioCtx();
+        }
+
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().catch(() => {});
+        }
+
+        return audioContext;
+    };
+
+    const playSuccessSound = () => {
+        const ctx = ensureAudioContext();
+        if (!ctx) {
+            return;
+        }
+
+        const now = ctx.currentTime;
+
+        const playTone = (frequency, startAt, duration) => {
+            const oscillator = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(frequency, startAt);
+
+            gain.gain.setValueAtTime(0.0001, startAt);
+            gain.gain.exponentialRampToValueAtTime(0.12, startAt + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+
+            oscillator.connect(gain);
+            gain.connect(ctx.destination);
+            oscillator.start(startAt);
+            oscillator.stop(startAt + duration + 0.02);
+        };
+
+        // Soft two-note confirmation chime (A5 → E6)
+        playTone(880, now, 0.14);
+        playTone(1318.51, now + 0.11, 0.22);
+    };
+
+    const fillModal = (item) => {
+        if (modalCode) {
+            modalCode.textContent = item.code || '-';
+        }
+        if (modalName) {
+            modalName.textContent = item.name || '-';
+        }
+        if (modalMeta) {
+            modalMeta.textContent = formatItemMeta(item);
+        }
+    };
+
+    const openEntryModal = (item) => {
+        if (!item) {
+            return;
+        }
+
+        fillModal(item);
+        entryModal?.show();
     };
 
     const showError = (message) => {
@@ -45,7 +166,9 @@ document.addEventListener('DOMContentLoaded', function () {
         setResultState({ error: true });
     };
 
-    const showItem = (item) => {
+    const showItem = (item, { fromCamera = false } = {}) => {
+        lastItem = item;
+
         if (resultCode) {
             resultCode.textContent = item.code || '-';
         }
@@ -53,21 +176,25 @@ document.addEventListener('DOMContentLoaded', function () {
             resultName.textContent = item.name || '-';
         }
         if (resultMeta) {
-            const parts = [];
-            if (item.unit_name) {
-                parts.push(item.unit_name);
-            }
-            if (item.category_name) {
-                parts.push(item.category_name);
-            }
-            resultMeta.textContent = parts.length ? parts.join(' · ') : 'Product found';
+            resultMeta.textContent = formatItemMeta(item);
         }
+
         setResultState({ card: true });
+
+        if (fromCamera) {
+            playSuccessSound();
+        }
+
+        openEntryModal(item);
     };
 
     const lookupCode = async (rawCode, { fromCamera = false } = {}) => {
         const code = String(rawCode || '').trim();
         if (!code || !lookupUrl) {
+            return;
+        }
+
+        if (isEntryModalOpen) {
             return;
         }
 
@@ -106,7 +233,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            showItem(payload);
+            showItem(payload, { fromCamera });
             if (manualInput && !fromCamera) {
                 manualInput.value = payload.code || code;
             }
@@ -153,6 +280,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (isScanning) {
             return;
         }
+
+        ensureAudioContext();
 
         if (!html5QrCode) {
             html5QrCode = new Html5Qrcode('count-tag-qr-reader');
@@ -207,6 +336,34 @@ document.addEventListener('DOMContentLoaded', function () {
             event.preventDefault();
             lookupCode(manualInput.value || '');
         }
+    });
+
+    resultCard?.addEventListener('click', () => {
+        if (!lastItem) {
+            return;
+        }
+        openEntryModal(lastItem);
+    });
+
+    resultCard?.addEventListener('keydown', (event) => {
+        if (!lastItem) {
+            return;
+        }
+
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openEntryModal(lastItem);
+        }
+    });
+
+    entryModalEl?.addEventListener('show.bs.modal', () => {
+        isEntryModalOpen = true;
+        pauseCameraForModal();
+    });
+
+    entryModalEl?.addEventListener('hidden.bs.modal', () => {
+        isEntryModalOpen = false;
+        resumeCameraAfterModal();
     });
 
     window.addEventListener('beforeunload', () => {

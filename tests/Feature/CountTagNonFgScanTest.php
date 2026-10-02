@@ -88,7 +88,12 @@ it('allows users with create permission to open the scan page', function () {
         ->get(route('count-tags.non-fg.scan'))
         ->assertSuccessful()
         ->assertSee('Scan Product QR')
-        ->assertSee('Manual Lookup');
+        ->assertSee('Manual Lookup')
+        ->assertSee('id="count-tag-entry-modal"', false)
+        ->assertSee('Count Tag Entry')
+        ->assertSee('id="count-tag-result-card"', false)
+        ->assertSee('role="button"', false)
+        ->assertSee('Tap to open');
 });
 
 it('forbids users without permission from opening count tag pages', function () {

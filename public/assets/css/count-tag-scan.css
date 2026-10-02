@@ -42,6 +42,23 @@
     background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
 }
 
+.count-tag-result-card-clickable {
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    user-select: none;
+}
+
+.count-tag-result-card-clickable.is-active:hover,
+.count-tag-result-card-clickable.is-active:focus-visible {
+    border-color: rgba(14, 165, 233, 0.45);
+    box-shadow: 0 0 0 0.2rem rgba(14, 165, 233, 0.15);
+    outline: none;
+}
+
+.count-tag-result-card-clickable[aria-disabled="true"] {
+    cursor: default;
+}
+
 .count-tag-result-code {
     font-size: 1.5rem;
     font-weight: 700;
@@ -61,6 +78,52 @@
     margin-top: 0.75rem;
     font-size: 0.9rem;
     color: #64748b;
+}
+
+.count-tag-result-hint {
+    margin-top: 0.85rem;
+    font-size: 0.8rem;
+    color: #0ea5e9;
+    font-weight: 600;
+}
+
+.count-tag-entry-modal-content .modal-body {
+    padding-top: 1rem;
+}
+
+.count-tag-modal-item {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.75rem;
+    padding: 1rem 1.1rem;
+    background: #f8fafc;
+}
+
+.count-tag-modal-code {
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #0f172a;
+    word-break: break-all;
+}
+
+.count-tag-modal-name {
+    margin-top: 0.35rem;
+    font-size: 1.05rem;
+    color: #334155;
+    line-height: 1.35;
+}
+
+.count-tag-modal-meta {
+    margin-top: 0.65rem;
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.count-tag-modal-placeholder {
+    border: 1px dashed rgba(100, 116, 139, 0.35);
+    border-radius: 0.75rem;
+    padding: 0.9rem 1rem;
+    background: #ffffff;
 }
 
 @media (max-width: 991.98px) {
