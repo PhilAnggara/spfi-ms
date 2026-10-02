@@ -1117,3 +1117,58 @@ it('limits conversation list size while preserving newest activity first', funct
 
     expect($originalLimit)->toBeGreaterThan(0);
 });
+
+it('always keeps the viewer support thread in a truncated personal list', function () {
+    Event::fake([MessageSent::class, ConversationRead::class, MessageDelivered::class]);
+
+    $service = app(\App\Services\ChatService::class);
+    $support = $service->findOrCreateSupportThread($this->alice);
+    $peers = User::factory()->count(4)->create();
+
+    foreach ($peers as $index => $peer) {
+        $conversation = Conversation::factory()->directBetween($this->alice, $peer)->create();
+        Message::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $peer->id,
+            'body' => 'Busy '.$index,
+            'created_at' => now()->subMinutes(4 - $index),
+        ]);
+    }
+
+    $limited = $service->listConversations($this->alice, ensureSupportThread: false, limit: 3);
+
+    expect($limited)->toHaveCount(3)
+        ->and(collect($limited)->contains(fn (array $item): bool => (int) $item['id'] === (int) $support->id))->toBeTrue()
+        ->and(collect($limited)->firstWhere('id', $support->id)['type'])->toBe('support');
+});
+
+it('returns the full support inbox without the personal list cap', function () {
+    Event::fake([MessageSent::class, ConversationRead::class, MessageDelivered::class]);
+
+    \Spatie\Permission\Models\Permission::findOrCreate('chat-support-operate', 'web');
+    $this->carol->givePermissionTo('chat-support-operate');
+
+    $service = app(\App\Services\ChatService::class);
+    $endUsers = User::factory()->count(3)->create();
+
+    foreach ($endUsers as $index => $endUser) {
+        $thread = $service->findOrCreateSupportThread($endUser);
+        Message::factory()->create([
+            'conversation_id' => $thread->id,
+            'user_id' => $endUser->id,
+            'persona' => \App\Enums\MessagePersona::User,
+            'body' => 'Help '.$index,
+            'created_at' => now()->subMinutes(3 - $index),
+        ]);
+    }
+
+    $inbox = $this->actingAs($this->carol)
+        ->getJson(route('chat.support.conversations.index'))
+        ->assertOk()
+        ->json('data');
+
+    expect($inbox)->toHaveCount(3);
+
+    $capped = $service->listSupportConversations($this->carol, limit: 2);
+    expect($capped)->toHaveCount(2);
+});

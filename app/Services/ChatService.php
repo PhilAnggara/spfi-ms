@@ -46,6 +46,18 @@ class ChatService
             $this->findOrCreateSupportThread($user);
         }
 
+        $limit ??= self::CONVERSATION_LIST_LIMIT;
+        $relations = [
+            'latestMessage.user',
+            'participants',
+            'users' => fn ($query) => $query->with([
+                'department:id,name',
+                'sessions' => fn ($sessions) => $sessions->select('id', 'user_id', 'last_activity'),
+            ]),
+            'supportUser.department:id,name',
+            'assignee:id,name,username',
+        ];
+
         $latestActivity = Message::query()
             ->select('conversation_id', DB::raw('MAX(created_at) as latest_message_at'))
             ->groupBy('conversation_id');
@@ -60,21 +72,37 @@ class ChatService
                 $query->whereHas('messages')
                     ->orWhere('type', ConversationType::Support);
             })
-            ->with([
-                'latestMessage.user',
-                'participants',
-                'users' => fn ($query) => $query->with([
-                    'department:id,name',
-                    'sessions' => fn ($sessions) => $sessions->select('id', 'user_id', 'last_activity'),
-                ]),
-                'supportUser.department:id,name',
-                'assignee:id,name,username',
-            ])
+            ->with($relations)
             ->orderByRaw('case when chat_latest_messages.latest_message_at is null then 1 else 0 end')
             ->orderByDesc('chat_latest_messages.latest_message_at')
             ->orderByDesc('conversations.id')
-            ->limit($limit ?? self::CONVERSATION_LIST_LIMIT)
+            ->limit($limit)
             ->get();
+
+        // If the personal list was truncated, empty/idle SPFI-MS can fall off. Pin it without
+        // create/ensure — only when an existing support thread is missing from this page.
+        $hasOwnSupport = $conversations->contains(
+            fn (Conversation $conversation): bool => $conversation->isSupport()
+                && (int) $conversation->support_user_id === (int) $user->id
+        );
+
+        if (! $hasOwnSupport) {
+            $ownSupport = Conversation::query()
+                ->where('type', ConversationType::Support)
+                ->where('support_user_id', $user->id)
+                ->with($relations)
+                ->first();
+
+            if ($ownSupport) {
+                if ($conversations->count() >= $limit) {
+                    $conversations = $conversations->take($limit - 1)->values();
+                }
+                $conversations->push($ownSupport);
+                $conversations = $conversations
+                    ->sortByDesc(fn (Conversation $conversation) => $conversation->latestMessage?->created_at?->timestamp ?? 0)
+                    ->values();
+            }
+        }
 
         $unreadCounts = $this->unreadCountsForConversations($conversations, $user);
 
@@ -89,6 +117,7 @@ class ChatService
 
     /**
      * Support inbox for operators (not limited to participation).
+     * No default row cap — operators need the full inbox; pass $limit only for tests/tooling.
      *
      * @return Collection<int, array<string, mixed>>
      */
@@ -98,7 +127,7 @@ class ChatService
             ->select('conversation_id', DB::raw('MAX(created_at) as latest_message_at'))
             ->groupBy('conversation_id');
 
-        $conversations = Conversation::query()
+        $query = Conversation::query()
             ->select('conversations.*')
             ->leftJoinSub($latestActivity, 'chat_latest_messages', function ($join): void {
                 $join->on('conversations.id', '=', 'chat_latest_messages.conversation_id');
@@ -113,9 +142,13 @@ class ChatService
             ])
             ->orderByRaw('case when chat_latest_messages.latest_message_at is null then 1 else 0 end')
             ->orderByDesc('chat_latest_messages.latest_message_at')
-            ->orderByDesc('conversations.id')
-            ->limit($limit ?? self::CONVERSATION_LIST_LIMIT)
-            ->get();
+            ->orderByDesc('conversations.id');
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        $conversations = $query->get();
 
         $unreadCounts = $this->unreadCountsForConversations($conversations, $operator, forOperatorInbox: true);
 
