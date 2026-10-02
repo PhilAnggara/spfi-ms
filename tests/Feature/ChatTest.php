@@ -479,6 +479,39 @@ it('marks delivered and read statuses on message payloads', function () {
         ->and($read['delivered_at'])->not->toBeNull();
 });
 
+it('exposes receipt timestamps on payloads when status comes from peer read cursors', function () {
+    Event::fake([MessageSent::class, ConversationRead::class, MessageDelivered::class]);
+
+    $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Cursor receipt',
+        ])
+        ->assertCreated();
+
+    $message = Message::query()->where('conversation_id', $conversation->id)->firstOrFail();
+    $message->forceFill([
+        'delivered_at' => null,
+        'read_at' => null,
+    ])->save();
+
+    $bobParticipant = $conversation->participants()->where('user_id', $this->bob->id)->firstOrFail();
+    $bobParticipant->forceFill([
+        'last_delivered_at' => now(),
+        'last_read_at' => now(),
+    ])->save();
+
+    $payload = $this->actingAs($this->alice)
+        ->getJson(route('chat.messages.index', $conversation))
+        ->assertOk()
+        ->json('data.0');
+
+    expect($payload['status'])->toBe('read')
+        ->and($payload['delivered_at'])->not->toBeNull()
+        ->and($payload['read_at'])->not->toBeNull();
+});
+
 it('keeps distinct delivered and read times across message batches', function () {
     Event::fake([MessageSent::class, MessageDelivered::class, ConversationRead::class]);
 

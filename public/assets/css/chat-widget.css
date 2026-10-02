@@ -784,6 +784,9 @@ html[data-bs-theme="dark"] .chat-widget__day {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
+    overflow: visible;
+    position: relative;
+    z-index: 0;
 }
 
 .chat-bubble.is-mine {
@@ -823,6 +826,7 @@ html[data-bs-theme="dark"] .chat-widget__day {
     line-height: 1.4;
     max-width: 100%;
     position: relative;
+    overflow: visible;
 }
 
 .chat-bubble.has-image {
@@ -896,6 +900,9 @@ html[data-bs-theme="dark"] .chat-widget__day {
     line-height: 1;
     white-space: nowrap;
     user-select: none;
+    overflow: visible;
+    position: relative;
+    z-index: 1;
 }
 
 .chat-bubble.is-mine .chat-bubble__meta {
@@ -991,9 +998,10 @@ html[data-bs-theme="dark"] .chat-widget__day {
     letter-spacing: -0.08em;
     color: var(--chat-tick);
     font-weight: 700;
-    cursor: default;
+    cursor: help;
     flex: 0 0 auto;
     box-sizing: border-box;
+    z-index: 2;
 }
 
 .chat-bubble__ticks.is-pending {
@@ -1001,6 +1009,7 @@ html[data-bs-theme="dark"] .chat-widget__day {
     color: var(--chat-muted);
     font-weight: 500;
     font-size: 0.72rem;
+    cursor: default;
 }
 
 .chat-bubble__ticks.is-failed {
@@ -1029,7 +1038,8 @@ html[data-bs-theme="dark"] .chat-widget__day {
 .chat-bubble__ticks-tip {
     position: absolute;
     right: 0;
-    bottom: calc(100% + 0.4rem);
+    bottom: auto;
+    top: calc(100% + 0.4rem);
     min-width: 9.5rem;
     padding: 0.45rem 0.55rem;
     border-radius: 0.55rem;
@@ -1043,19 +1053,25 @@ html[data-bs-theme="dark"] .chat-widget__day {
     box-shadow: 0 8px 20px rgba(15, 23, 42, 0.28);
     opacity: 0;
     visibility: hidden;
-    transform: translateY(4px);
+    transform: translateY(-4px);
     transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
-    z-index: 40;
+    z-index: 80;
     pointer-events: none;
 }
 
 .chat-bubble__ticks-tip::after {
     content: '';
     position: absolute;
-    top: 100%;
+    bottom: 100%;
+    top: auto;
     right: 0.55rem;
     border: 5px solid transparent;
-    border-top-color: #0f172a;
+    border-bottom-color: #0f172a;
+}
+
+.chat-bubble__ticks:hover,
+.chat-bubble__ticks:focus-visible {
+    z-index: 90;
 }
 
 .chat-bubble__ticks:hover .chat-bubble__ticks-tip,
@@ -1092,6 +1108,10 @@ html[data-bs-theme="dark"] .chat-widget__day {
 
 html[data-bs-theme="dark"] .chat-bubble__ticks-tip {
     background: #020617;
+}
+
+html[data-bs-theme="dark"] .chat-bubble__ticks-tip::after {
+    border-bottom-color: #020617;
 }
 
 .chat-bubble__image-link {

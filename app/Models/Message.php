@@ -80,15 +80,22 @@ class Message extends Model
     public function toChatPayload(?ConversationParticipant $viewerParticipant = null, ?ConversationParticipant $peerParticipant = null): array
     {
         $status = 'sent';
+        $deliveredAt = $this->delivered_at;
+        $readAt = $this->read_at;
 
-        if ($this->read_at) {
+        if ($readAt) {
             $status = 'read';
-        } elseif ($this->delivered_at) {
+        } elseif ($deliveredAt) {
             $status = 'delivered';
         } elseif ($peerParticipant?->last_read_at && $peerParticipant->last_read_at->gte($this->created_at)) {
             $status = 'read';
+            $readAt = $peerParticipant->last_read_at;
+            $deliveredAt = $deliveredAt
+                ?? $peerParticipant->last_delivered_at
+                ?? $peerParticipant->last_read_at;
         } elseif ($peerParticipant?->last_delivered_at && $peerParticipant->last_delivered_at->gte($this->created_at)) {
             $status = 'delivered';
+            $deliveredAt = $peerParticipant->last_delivered_at;
         }
 
         return [
@@ -105,8 +112,8 @@ class Message extends Model
             'attachment_width' => $this->attachment_width,
             'attachment_height' => $this->attachment_height,
             'status' => $status,
-            'delivered_at' => $this->delivered_at?->toIso8601String(),
-            'read_at' => $this->read_at?->toIso8601String(),
+            'delivered_at' => $deliveredAt?->toIso8601String(),
+            'read_at' => $readAt?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'user' => $this->relationLoaded('user') && $this->user ? [
                 'id' => $this->user->id,

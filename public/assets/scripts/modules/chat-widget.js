@@ -810,16 +810,36 @@
 
     function ticksTooltipHtml(message) {
         const rows = [];
-        if (message?.delivered_at) {
-            rows.push(`<div class="chat-bubble__ticks-tip-row"><span class="chat-bubble__ticks-tip-label">Delivered</span><span>${escapeHtml(formatClockTime(message.delivered_at))}</span></div>`);
+        const status = message?.status || 'sent';
+        const deliveredAt = message?.delivered_at || null;
+        const readAt = message?.read_at || null;
+
+        if (deliveredAt || status === 'delivered' || status === 'read') {
+            rows.push(`<div class="chat-bubble__ticks-tip-row"><span class="chat-bubble__ticks-tip-label">Delivered</span><span>${escapeHtml(deliveredAt ? formatClockTime(deliveredAt) : '—')}</span></div>`);
         }
-        if (message?.read_at) {
-            rows.push(`<div class="chat-bubble__ticks-tip-row"><span class="chat-bubble__ticks-tip-label">Read</span><span>${escapeHtml(formatClockTime(message.read_at))}</span></div>`);
+        if (readAt || status === 'read') {
+            rows.push(`<div class="chat-bubble__ticks-tip-row"><span class="chat-bubble__ticks-tip-label">Read</span><span>${escapeHtml(readAt ? formatClockTime(readAt) : '—')}</span></div>`);
         }
         if (!rows.length) {
             return '';
         }
         return `<span class="chat-bubble__ticks-tip" role="tooltip">${rows.join('')}</span>`;
+    }
+
+    function ticksTitleAttr(message) {
+        const parts = [];
+        const status = message?.status || 'sent';
+        if (message?.delivered_at) {
+            parts.push(`Delivered ${formatClockTime(message.delivered_at)}`);
+        } else if (status === 'delivered' || status === 'read') {
+            parts.push('Delivered');
+        }
+        if (message?.read_at) {
+            parts.push(`Read ${formatClockTime(message.read_at)}`);
+        } else if (status === 'read') {
+            parts.push('Read');
+        }
+        return parts.join(' · ');
     }
 
     function ticksHtml(message, isMine) {
@@ -834,13 +854,15 @@
             return `<button type="button" class="chat-bubble__ticks is-failed" data-retry-message="${escapeHtml(messageDomId(message))}" aria-label="Failed, tap to retry" title="Tap to retry"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i></button>`;
         }
         const tip = ticksTooltipHtml(message);
+        const title = ticksTitleAttr(message);
+        const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
         if (status === 'read') {
-            return `<span class="chat-bubble__ticks is-read" tabindex="0" aria-label="Read">${tip}✓✓</span>`;
+            return `<span class="chat-bubble__ticks is-read" tabindex="0" aria-label="Read"${titleAttr}>${tip}✓✓</span>`;
         }
         if (status === 'delivered') {
-            return `<span class="chat-bubble__ticks" tabindex="0" aria-label="Delivered">${tip}✓✓</span>`;
+            return `<span class="chat-bubble__ticks" tabindex="0" aria-label="Delivered"${titleAttr}>${tip}✓✓</span>`;
         }
-        return `<span class="chat-bubble__ticks" tabindex="0" aria-label="Sent">${tip}✓</span>`;
+        return `<span class="chat-bubble__ticks" tabindex="0" aria-label="Sent"${titleAttr}>${tip}✓</span>`;
     }
 
     function applyStatusToBubble(bubble, message) {
