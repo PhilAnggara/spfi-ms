@@ -616,7 +616,7 @@ it('includes the chat widget on authenticated app pages', function () {
         ->assertSee('id="chat-toast-host"', false);
 });
 
-it('defers eager chat-widget script and stylesheet on first paint', function () {
+it('defers eager chat-widget script on first paint but keeps stylesheet for layout', function () {
     $html = $this->actingAs($this->alice)
         ->get(route('dashboard'))
         ->assertOk()
@@ -626,8 +626,8 @@ it('defers eager chat-widget script and stylesheet on first paint', function () 
         ->toContain('__spfiChatLoaderBound')
         ->toContain('requestIdleCallback')
         ->toContain('chat-widget.css')
-        ->not->toMatch('/<script[^>]+assets\/scripts\/modules\/chat-widget\.js[^>]*>\s*<\/script>/')
-        ->not->toMatch('/<link[^>]+assets\/css\/chat-widget\.css[^>]*>/');
+        ->toMatch('/<link[^>]+chat-widget\.css[^>]*>/')
+        ->not->toMatch('/<script[^>]+assets\/scripts\/modules\/chat-widget\.js[^>]*>\s*<\/script>/');
 });
 
 it('boots laravel echo from config values on authenticated pages', function () {
