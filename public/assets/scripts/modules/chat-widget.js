@@ -4448,4 +4448,12 @@
         }
         syncFallbackPolling();
     });
+
+    window.__spfiChatWidgetReady = true;
+    if (root.dataset.pendingOpen === '1') {
+        delete root.dataset.pendingOpen;
+        if (!state.open) {
+            togglePanel();
+        }
+    }
 })();

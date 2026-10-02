@@ -285,4 +285,112 @@
 
     <div class="chat-widget__toast-host" id="chat-toast-host" aria-live="polite" aria-relevant="additions"></div>
 </div>
+<style>
+    /* Minimal FAB chrome before deferred chat-widget.css loads */
+    #chat-widget-fab {
+        position: fixed;
+        right: 1.25rem;
+        bottom: 1.25rem;
+        z-index: 1040;
+        width: 3.25rem;
+        height: 3.25rem;
+        border: 0;
+        border-radius: 999px;
+        background: #2563eb;
+        color: #fff;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #chat-widget-badge {
+        position: absolute;
+        top: -0.2rem;
+        right: -0.2rem;
+        min-width: 1.15rem;
+        height: 1.15rem;
+        padding: 0 0.25rem;
+        border-radius: 999px;
+        background: #dc2626;
+        color: #fff;
+        font-size: 0.7rem;
+        line-height: 1.15rem;
+        text-align: center;
+    }
+</style>
+@php
+    $chatWidgetCssVersion = @filemtime(public_path('assets/css/chat-widget.css')) ?: time();
+    $chatWidgetJsVersion = @filemtime(public_path('assets/scripts/modules/chat-widget.js')) ?: time();
+    $chatWidgetCssUrl = url('assets/css/chat-widget.css').'?v='.$chatWidgetCssVersion;
+    $chatWidgetJsUrl = url('assets/scripts/modules/chat-widget.js').'?v='.$chatWidgetJsVersion;
+@endphp
+<script>
+    (function () {
+        const root = document.getElementById('chat-widget');
+        if (!root || window.__spfiChatLoaderBound) {
+            return;
+        }
+        window.__spfiChatLoaderBound = true;
+
+        const cssUrl = @json($chatWidgetCssUrl);
+        const jsUrl = @json($chatWidgetJsUrl);
+        let loadPromise = null;
+
+        function loadChatAssets() {
+            if (window.__spfiChatWidgetReady) {
+                return Promise.resolve();
+            }
+            if (loadPromise) {
+                return loadPromise;
+            }
+
+            loadPromise = new Promise((resolve, reject) => {
+                if (!document.querySelector('link[data-spfi-chat-css]')) {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = cssUrl;
+                    link.setAttribute('data-spfi-chat-css', '1');
+                    document.head.appendChild(link);
+                }
+
+                if (document.querySelector('script[data-spfi-chat-js]')) {
+                    resolve();
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = jsUrl;
+                script.async = true;
+                script.setAttribute('data-spfi-chat-js', '1');
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error('Failed to load chat widget'));
+                document.body.appendChild(script);
+            });
+
+            return loadPromise;
+        }
+
+        const fab = document.getElementById('chat-widget-fab');
+        fab?.addEventListener('click', function (event) {
+            if (window.__spfiChatWidgetReady) {
+                return;
+            }
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            root.dataset.pendingOpen = '1';
+            fab.classList.add('is-loading');
+            loadChatAssets()
+                .catch((error) => console.error(error))
+                .finally(() => fab.classList.remove('is-loading'));
+        }, true);
+
+        const scheduleIdle = window.requestIdleCallback
+            ? (callback) => window.requestIdleCallback(callback, { timeout: 5000 })
+            : (callback) => window.setTimeout(callback, 3500);
+
+        scheduleIdle(() => {
+            loadChatAssets().catch(() => {});
+        });
+    })();
+</script>
 @endauth
