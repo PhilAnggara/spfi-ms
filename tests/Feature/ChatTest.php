@@ -72,7 +72,7 @@ it('sends an image attachment', function () {
     $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
     $file = UploadedFile::fake()->image('photo.jpg', 200, 200);
 
-    $this->actingAs($this->alice)
+    $payload = $this->actingAs($this->alice)
         ->post(route('chat.messages.store', $conversation), [
             'body' => 'See this',
             'attachment' => $file,
@@ -80,13 +80,17 @@ it('sends an image attachment', function () {
         ->assertCreated()
         ->assertJsonPath('data.type', 'image')
         ->assertJsonPath('data.attachment_width', 200)
-        ->assertJsonPath('data.attachment_height', 200);
+        ->assertJsonPath('data.attachment_height', 200)
+        ->json('data');
+
+    expect($payload['attachment_url'])->toStartWith('/storage/');
 
     $message = Message::query()->first();
     expect($message)->not->toBeNull()
         ->and($message->attachment_path)->not->toBeNull()
         ->and($message->attachment_width)->toBe(200)
-        ->and($message->attachment_height)->toBe(200);
+        ->and($message->attachment_height)->toBe(200)
+        ->and($message->attachmentUrl())->toStartWith('/storage/');
 
     Storage::disk('public')->assertExists($message->attachment_path);
 });
@@ -456,8 +460,9 @@ it('marks delivered and read statuses on message payloads', function () {
         ->assertOk()
         ->json('data.0');
 
-    expect($delivered['status'])->toBe('delivered');
-    expect($delivered['delivered_at'])->not->toBeNull();
+    expect($delivered['status'])->toBe('delivered')
+        ->and($delivered['delivered_at'])->not->toBeNull()
+        ->and($delivered['read_at'])->toBeNull();
 
     $this->actingAs($this->bob)
         ->postJson(route('chat.read', $conversation))
@@ -471,6 +476,66 @@ it('marks delivered and read statuses on message payloads', function () {
     expect($read['status'])->toBe('read')
         ->and($read['read_at'])->not->toBeNull()
         ->and($read['delivered_at'])->not->toBeNull();
+});
+
+it('keeps distinct delivered and read times across message batches', function () {
+    Event::fake([MessageSent::class, MessageDelivered::class, ConversationRead::class]);
+
+    $conversation = Conversation::factory()->directBetween($this->alice, $this->bob)->create();
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Batch one',
+        ])
+        ->assertCreated();
+
+    $this->travel(2)->minutes();
+
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.delivered', $conversation))
+        ->assertOk();
+
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.read', $conversation))
+        ->assertOk();
+
+    $first = $this->actingAs($this->alice)
+        ->getJson(route('chat.messages.index', $conversation))
+        ->assertOk()
+        ->json('data.0');
+
+    $this->travel(5)->minutes();
+
+    $this->actingAs($this->alice)
+        ->postJson(route('chat.messages.store', $conversation), [
+            'body' => 'Batch two',
+        ])
+        ->assertCreated();
+
+    $this->travel(1)->minutes();
+
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.delivered', $conversation))
+        ->assertOk();
+
+    $this->actingAs($this->bob)
+        ->postJson(route('chat.read', $conversation))
+        ->assertOk();
+
+    $messages = $this->actingAs($this->alice)
+        ->getJson(route('chat.messages.index', $conversation))
+        ->assertOk()
+        ->json('data');
+
+    $second = collect($messages)->firstWhere('body', 'Batch two');
+    $firstAgain = collect($messages)->firstWhere('body', 'Batch one');
+
+    expect($firstAgain['delivered_at'])->toBe($first['delivered_at'])
+        ->and($firstAgain['read_at'])->toBe($first['read_at'])
+        ->and($second['delivered_at'])->not->toBe($firstAgain['delivered_at'])
+        ->and($second['read_at'])->not->toBe($firstAgain['read_at'])
+        ->and(strtotime($second['delivered_at']))->toBeGreaterThan(strtotime($firstAgain['delivered_at']))
+        ->and(strtotime($second['read_at']))->toBeGreaterThan(strtotime($firstAgain['read_at']));
 });
 
 it('broadcasts MessageSent on conversation and recipient user channels', function () {

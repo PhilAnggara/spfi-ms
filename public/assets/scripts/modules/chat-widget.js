@@ -249,7 +249,7 @@
         return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
 
-    function formatTooltipDateTime(iso) {
+    function formatClockTime(iso) {
         if (!iso) {
             return '';
         }
@@ -257,12 +257,11 @@
         if (Number.isNaN(date.getTime())) {
             return '';
         }
-        const now = new Date();
-        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        if (date.toDateString() === now.toDateString()) {
-            return time;
-        }
-        return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatTooltipDateTime(iso) {
+        return formatClockTime(iso);
     }
 
     function urlTemplate(template, id) {
@@ -682,6 +681,8 @@
 
     function openPanel() {
         state.open = true;
+        root.classList.add('is-open');
+        document.body.classList.add('chat-widget-open');
         panel.classList.remove('d-none');
         fab.classList.add('is-open');
         fab.setAttribute('aria-expanded', 'true');
@@ -702,6 +703,8 @@
         state.messageLoadToken += 1;
         saveComposerDraft();
         state.open = false;
+        root.classList.remove('is-open');
+        document.body.classList.remove('chat-widget-open');
         panel.classList.add('d-none');
         fab.classList.remove('is-open');
         fab.setAttribute('aria-expanded', 'false');
@@ -709,6 +712,7 @@
         hideUserProfile();
         hideDropzone();
         stopOutgoingTyping();
+        restoreIosFormNavIsolation();
         leaveConversationChannel();
         stopThreadPolling();
         restoreBootstrapFocusTraps();
@@ -805,14 +809,11 @@
 
     function ticksTooltipHtml(message) {
         const rows = [];
-        if (message?.created_at) {
-            rows.push(`<div class="chat-bubble__ticks-tip-row"><span class="chat-bubble__ticks-tip-label">Sent</span><span>${escapeHtml(formatTooltipDateTime(message.created_at))}</span></div>`);
+        if (message?.delivered_at) {
+            rows.push(`<div class="chat-bubble__ticks-tip-row"><span class="chat-bubble__ticks-tip-label">Delivered</span><span>${escapeHtml(formatClockTime(message.delivered_at))}</span></div>`);
         }
-        if (message?.delivered_at || message?.status === 'delivered' || message?.status === 'read') {
-            rows.push(`<div class="chat-bubble__ticks-tip-row"><span class="chat-bubble__ticks-tip-label">Delivered</span><span>${escapeHtml(formatTooltipDateTime(message.delivered_at) || '—')}</span></div>`);
-        }
-        if (message?.read_at || message?.status === 'read') {
-            rows.push(`<div class="chat-bubble__ticks-tip-row"><span class="chat-bubble__ticks-tip-label">Read</span><span>${escapeHtml(formatTooltipDateTime(message.read_at) || '—')}</span></div>`);
+        if (message?.read_at) {
+            rows.push(`<div class="chat-bubble__ticks-tip-row"><span class="chat-bubble__ticks-tip-label">Read</span><span>${escapeHtml(formatClockTime(message.read_at))}</span></div>`);
         }
         if (!rows.length) {
             return '';
@@ -1714,10 +1715,12 @@
 
         return `
             <div class="${classes}" data-message-id="${escapeHtml(messageDomId(message))}"${tempAttr}${seqAttr}>
-                <div class="chat-bubble__content">${messageBodyHtml(message)}</div>
-                <div class="chat-bubble__meta">
-                    <span class="chat-bubble__time">${escapeHtml(formatTime(message.created_at))}</span>
-                    ${ticksHtml(message, isMine)}
+                <div class="chat-bubble__content">
+                    ${messageBodyHtml(message)}
+                    <div class="chat-bubble__meta">
+                        <span class="chat-bubble__time">${escapeHtml(formatClockTime(message.created_at))}</span>
+                        ${ticksHtml(message, isMine)}
+                    </div>
                 </div>
             </div>
         `;
@@ -2282,8 +2285,11 @@
                 patch.delivered_at = at;
                 changed = true;
             }
-            if (status === 'read' && at) {
+            if (status === 'read' && at && !message.read_at) {
                 patch.read_at = at;
+                if (!message.delivered_at && !patch.delivered_at) {
+                    patch.delivered_at = at;
+                }
                 changed = true;
             }
             if (Object.keys(patch).length) {
@@ -2300,8 +2306,11 @@
             if ((status === 'delivered' || status === 'read') && at && !item.latest_message.delivered_at) {
                 item.latest_message.delivered_at = at;
             }
-            if (status === 'read' && at) {
+            if (status === 'read' && at && !item.latest_message.read_at) {
                 item.latest_message.read_at = at;
+                if (!item.latest_message.delivered_at) {
+                    item.latest_message.delivered_at = at;
+                }
             }
             return true;
         };
@@ -2358,6 +2367,47 @@
             if (state.open && state.view === 'thread') {
                 input.focus({ preventScroll: true });
             }
+        });
+    }
+
+    function isIosTouchDevice() {
+        return /iPad|iPhone|iPod/i.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
+    let iosFormNavIsolation = [];
+
+    function restoreIosFormNavIsolation() {
+        iosFormNavIsolation.forEach(({ el, tabindex }) => {
+            if (!el.isConnected) {
+                return;
+            }
+            if (tabindex === null) {
+                el.removeAttribute('tabindex');
+            } else {
+                el.setAttribute('tabindex', tabindex);
+            }
+        });
+        iosFormNavIsolation = [];
+    }
+
+    function isolateIosFormNavForComposer() {
+        // iOS Safari/Chrome always shows the ↑↓✓ accessory bar above the keyboard for
+        // form fields; web pages cannot remove it. Isolating other focusable fields at
+        // least disables the prev/next arrows so they don't jump around the page.
+        if (!isIosTouchDevice() || !input) {
+            return;
+        }
+        restoreIosFormNavIsolation();
+        document.querySelectorAll('input, textarea, select, [contenteditable="true"]').forEach((el) => {
+            if (el === input || el.disabled || el.readOnly) {
+                return;
+            }
+            iosFormNavIsolation.push({
+                el,
+                tabindex: el.getAttribute('tabindex'),
+            });
+            el.setAttribute('tabindex', '-1');
         });
     }
 
@@ -3314,6 +3364,8 @@
 
         if (!state.open) {
             state.open = true;
+            root.classList.add('is-open');
+            document.body.classList.add('chat-widget-open');
             panel.classList.remove('d-none');
             fab.classList.add('is-open');
             fab.setAttribute('aria-expanded', 'true');
@@ -4243,6 +4295,7 @@
         }
     });
     input.addEventListener('focus', () => {
+        isolateIosFormNavForComposer();
         syncOutgoingTyping();
     });
     input.addEventListener('blur', () => {
@@ -4251,6 +4304,7 @@
                 syncOutgoingTyping();
                 return;
             }
+            restoreIosFormNavIsolation();
             const composer = root.querySelector('.chat-widget__composer');
             if (composer && composer.contains(document.activeElement) && (input.value || '').trim()) {
                 return;

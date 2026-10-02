@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 
 class Message extends Model
 {
@@ -29,6 +28,8 @@ class Message extends Model
         'attachment_size',
         'attachment_width',
         'attachment_height',
+        'delivered_at',
+        'read_at',
     ];
 
     /**
@@ -42,6 +43,8 @@ class Message extends Model
             'attachment_size' => 'integer',
             'attachment_width' => 'integer',
             'attachment_height' => 'integer',
+            'delivered_at' => 'datetime',
+            'read_at' => 'datetime',
         ];
     }
 
@@ -67,7 +70,8 @@ class Message extends Model
             return null;
         }
 
-        return Storage::disk('public')->url($this->attachment_path);
+        // Host-relative so media works when browsing via localhost, LAN IP, or any APP_URL mismatch.
+        return '/storage/'.ltrim(str_replace('\\', '/', $this->attachment_path), '/');
     }
 
     /**
@@ -77,7 +81,11 @@ class Message extends Model
     {
         $status = 'sent';
 
-        if ($peerParticipant?->last_read_at && $peerParticipant->last_read_at->gte($this->created_at)) {
+        if ($this->read_at) {
+            $status = 'read';
+        } elseif ($this->delivered_at) {
+            $status = 'delivered';
+        } elseif ($peerParticipant?->last_read_at && $peerParticipant->last_read_at->gte($this->created_at)) {
             $status = 'read';
         } elseif ($peerParticipant?->last_delivered_at && $peerParticipant->last_delivered_at->gte($this->created_at)) {
             $status = 'delivered';
@@ -97,12 +105,8 @@ class Message extends Model
             'attachment_width' => $this->attachment_width,
             'attachment_height' => $this->attachment_height,
             'status' => $status,
-            'delivered_at' => in_array($status, ['delivered', 'read'], true)
-                ? $peerParticipant?->last_delivered_at?->toIso8601String()
-                : null,
-            'read_at' => $status === 'read'
-                ? $peerParticipant?->last_read_at?->toIso8601String()
-                : null,
+            'delivered_at' => $this->delivered_at?->toIso8601String(),
+            'read_at' => $this->read_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'user' => $this->relationLoaded('user') && $this->user ? [
                 'id' => $this->user->id,

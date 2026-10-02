@@ -119,7 +119,7 @@
                         <i class="fa-solid fa-paperclip"></i>
                         <input type="file" id="chat-attachment" class="d-none" accept="image/*,video/*,.mp4,.mov,.webm,.m4v,.avi,.3gp,.mkv,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.ppt,.pptx">
                     </label>
-                    <textarea id="chat-input" class="form-control" rows="1" placeholder="Type a message..."></textarea>
+                    <textarea id="chat-input" class="form-control" rows="1" placeholder="Type a message..." enterkeyhint="send" inputmode="text" autocomplete="off"></textarea>
                     <button type="button" class="chat-widget__send-btn" id="chat-send-btn" aria-label="Send">
                         <svg class="chat-widget__send-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                             <path fill="currentColor" d="M3.4 20.4 20.85 12.92a1 1 0 0 0 0-1.84L3.4 3.6a.993.993 0 0 0-1.39.91L2 9.12a1 1 0 0 0 .83.98L17 12 2.83 13.9a1 1 0 0 0-.83.98l.01 4.61c.01.72.78 1.17 1.39.91z"/>

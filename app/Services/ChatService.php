@@ -21,6 +21,7 @@ use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -289,6 +290,19 @@ class ChatService
         abort_unless($conversation->isSupport() && $operator->can('chat-support-operate'), 403);
 
         $now = now();
+
+        Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('persona', MessagePersona::User)
+            ->whereNull('delivered_at')
+            ->update(['delivered_at' => $now]);
+
+        Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('persona', MessagePersona::User)
+            ->whereNull('read_at')
+            ->update(['read_at' => $now]);
+
         $conversation->forceFill([
             'support_last_read_at' => $now,
             'assigned_to' => $conversation->assigned_to ?: $operator->id,
@@ -566,6 +580,8 @@ class ChatService
             'attachment_size' => $attachmentSize,
             'attachment_width' => $resolvedWidth,
             'attachment_height' => $resolvedHeight,
+            // Support system replies are received by the platform immediately.
+            'delivered_at' => $persona === MessagePersona::System ? now() : null,
         ]);
 
         $conversation->touch();
@@ -582,6 +598,8 @@ class ChatService
         $participant = $this->participantOrFail($conversation, $user);
         $now = now();
 
+        $this->stampIncomingReceipts($conversation, $user, deliveredAt: $now);
+
         if (! $participant->last_delivered_at || $participant->last_delivered_at->lt($now)) {
             $participant->forceFill(['last_delivered_at' => $now])->save();
             broadcast(new MessageDelivered($conversation, $user, $now))->toOthers();
@@ -595,6 +613,8 @@ class ChatService
         $participant = $this->participantOrFail($conversation, $user);
         $now = now();
 
+        $this->stampIncomingReceipts($conversation, $user, deliveredAt: $now, readAt: $now);
+
         $participant->forceFill([
             'last_read_at' => $now,
             'last_delivered_at' => $participant->last_delivered_at && $participant->last_delivered_at->gt($now)
@@ -605,6 +625,29 @@ class ChatService
         broadcast(new ConversationRead($conversation, $user, $now))->toOthers();
 
         return $participant->fresh();
+    }
+
+    private function stampIncomingReceipts(
+        Conversation $conversation,
+        User $user,
+        ?Carbon $deliveredAt = null,
+        ?Carbon $readAt = null,
+    ): void {
+        $query = Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('user_id', '!=', $user->id);
+
+        if ($deliveredAt) {
+            (clone $query)
+                ->whereNull('delivered_at')
+                ->update(['delivered_at' => $deliveredAt]);
+        }
+
+        if ($readAt) {
+            (clone $query)
+                ->whereNull('read_at')
+                ->update(['read_at' => $readAt]);
+        }
     }
 
     public function unreadCount(User $user): int
