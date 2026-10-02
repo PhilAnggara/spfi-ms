@@ -226,9 +226,53 @@
         }
     }
 
+    let pollTimer = null;
+
+    function echoConnected() {
+        return !!window.SpfiRealtime?.isConnected?.();
+    }
+
+    function startFallbackPolling() {
+        if (pollTimer) {
+            return;
+        }
+
+        pollTimer = setInterval(() => {
+            if (document.visibilityState === 'hidden' || echoConnected()) {
+                return;
+            }
+            refreshDropdown();
+        }, 15000);
+    }
+
+    function stopFallbackPolling() {
+        if (!pollTimer) {
+            return;
+        }
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+
+    function syncFallbackPolling() {
+        if (echoConnected() || document.visibilityState === 'hidden') {
+            stopFallbackPolling();
+            return;
+        }
+        startFallbackPolling();
+    }
+
     subscribeRealtime();
     refreshDropdown();
+    syncFallbackPolling();
 
-    // Safety fallback when websocket is down or reconnecting.
-    setInterval(refreshDropdown, 15000);
+    if (window.SpfiRealtime?.onChange) {
+        window.SpfiRealtime.onChange(() => syncFallbackPolling());
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            refreshDropdown();
+        }
+        syncFallbackPolling();
+    });
 })();

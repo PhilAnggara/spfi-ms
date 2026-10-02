@@ -115,15 +115,31 @@
         return response.json().catch(() => ({}));
     }
 
+    function echoConnected() {
+        return !!window.SpfiRealtime?.isConnected?.();
+    }
+
     function schedulePoll() {
         if (pollTimerId) {
             clearTimeout(pollTimerId);
+            pollTimerId = null;
         }
+
+        // Echo primary while idle; keep a short poll only for an active overlay
+        // (expiry / reconcile) or when the websocket is down.
+        if (!current && (echoConnected() || document.visibilityState === 'hidden')) {
+            return;
+        }
+
         const delay = current ? ACTIVE_POLL_MS : IDLE_POLL_MS;
         pollTimerId = setTimeout(async () => {
             await loadPending();
             schedulePoll();
         }, delay);
+    }
+
+    function syncFallbackPolling() {
+        schedulePoll();
     }
 
     function enqueue(message) {
@@ -505,6 +521,7 @@
         if (document.visibilityState === 'visible') {
             loadPending();
         }
+        syncFallbackPolling();
     });
 
     window.addEventListener('focus', () => {
@@ -512,7 +529,11 @@
     });
 
     loadPending().finally(() => {
-        schedulePoll();
+        syncFallbackPolling();
     });
     bindEcho();
+
+    if (window.SpfiRealtime?.onChange) {
+        window.SpfiRealtime.onChange(() => syncFallbackPolling());
+    }
 })();

@@ -2667,9 +2667,20 @@
         }
     }
 
+    function echoConnected() {
+        return !!window.SpfiRealtime?.isConnected?.();
+    }
+
     function startThreadPolling() {
         stopThreadPolling();
+        if (echoConnected()) {
+            return;
+        }
         state.threadPollTimer = setInterval(() => {
+            if (echoConnected()) {
+                stopThreadPolling();
+                return;
+            }
             if (state.open && state.view === 'thread' && state.activeConversationId && !state.loadingMessages) {
                 loadMessages(state.activeConversationId, { merge: true });
             }
@@ -2680,6 +2691,45 @@
         if (state.threadPollTimer) {
             clearInterval(state.threadPollTimer);
             state.threadPollTimer = null;
+        }
+    }
+
+    function startFallbackPolling() {
+        if (state.pollTimer) {
+            return;
+        }
+
+        state.pollTimer = setInterval(() => {
+            if (document.visibilityState === 'hidden' || echoConnected()) {
+                return;
+            }
+            refreshUnread();
+            if (state.open && state.view === 'list') {
+                loadConversations();
+            }
+        }, 15000);
+    }
+
+    function stopFallbackPolling() {
+        if (!state.pollTimer) {
+            return;
+        }
+        clearInterval(state.pollTimer);
+        state.pollTimer = null;
+    }
+
+    function syncFallbackPolling() {
+        if (echoConnected() || document.visibilityState === 'hidden') {
+            stopFallbackPolling();
+            if (echoConnected()) {
+                stopThreadPolling();
+            }
+            return;
+        }
+
+        startFallbackPolling();
+        if (state.open && state.view === 'thread' && state.activeConversationId) {
+            startThreadPolling();
         }
     }
 
@@ -4382,20 +4432,20 @@
     loadToastedMessageIds();
     refreshUnread();
     loadConversations().then(() => catchUpMissedToasts());
+    syncFallbackPolling();
+
+    if (window.SpfiRealtime?.onChange) {
+        window.SpfiRealtime.onChange(() => syncFallbackPolling());
+    }
+
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState !== 'visible') {
-            return;
+        if (document.visibilityState === 'visible') {
+            if (Date.now() - state.catchUpToastAt >= 2500) {
+                state.catchUpToastAt = Date.now();
+                refreshUnread();
+                loadConversations().then(() => catchUpMissedToasts());
+            }
         }
-        if (Date.now() - state.catchUpToastAt < 2500) {
-            return;
-        }
-        state.catchUpToastAt = Date.now();
-        loadConversations().then(() => catchUpMissedToasts());
+        syncFallbackPolling();
     });
-    state.pollTimer = setInterval(() => {
-        refreshUnread();
-        if (state.open && state.view === 'list') {
-            loadConversations();
-        }
-    }, 15000);
 })();

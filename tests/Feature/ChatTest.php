@@ -636,8 +636,23 @@ it('boots laravel echo from config values on authenticated pages', function () {
 
     expect($html)
         ->toContain('const wsPort = broadcaster === \'reverb\'')
+        ->toContain('window.SpfiRealtime')
         ->toMatch('/\?\s*8081/')
         ->toMatch('/forceTLS = broadcaster === \'reverb\'[\s\S]*?\?\s*false/');
+});
+
+it('keeps notification and chat poll fallback helpers when echo boots', function () {
+    $notificationsJs = file_get_contents(public_path('assets/scripts/modules/realtime-notifications.js'));
+    $chatJs = file_get_contents(public_path('assets/scripts/modules/chat-widget.js'));
+
+    expect($notificationsJs)
+        ->toContain('syncFallbackPolling')
+        ->toContain('startFallbackPolling')
+        ->toContain('15000')
+        ->and($chatJs)
+        ->toContain('syncFallbackPolling')
+        ->toContain('startFallbackPolling')
+        ->toContain('15000');
 });
 
 it('creates distinct SPFI-MS threads for multiple users without colliding on direct_key', function () {

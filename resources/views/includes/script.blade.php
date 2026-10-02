@@ -59,6 +59,53 @@
                     },
                 },
             });
+
+            // Shared Echo connection flag for poll-backoff (notifications/chat/screen-messages).
+            window.SpfiRealtime = window.SpfiRealtime || {
+                connected: false,
+                listeners: [],
+                isConnected() {
+                    const state = window.Echo?.connector?.pusher?.connection?.state;
+                    if (typeof state === 'string') {
+                        return state === 'connected';
+                    }
+
+                    return !!this.connected;
+                },
+                onChange(callback) {
+                    if (typeof callback === 'function') {
+                        this.listeners.push(callback);
+                    }
+                },
+                _set(connected) {
+                    const next = !!connected;
+                    if (this.connected === next) {
+                        return;
+                    }
+                    this.connected = next;
+                    this.listeners.forEach((callback) => {
+                        try {
+                            callback(next);
+                        } catch (error) {
+                            console.error('SpfiRealtime listener failed', error);
+                        }
+                    });
+                },
+                bind() {
+                    const connection = window.Echo?.connector?.pusher?.connection;
+                    if (!connection || typeof connection.bind !== 'function') {
+                        this._set(false);
+                        return;
+                    }
+
+                    const sync = () => this._set(connection.state === 'connected');
+                    ['connected', 'disconnected', 'unavailable', 'failed', 'connecting'].forEach((eventName) => {
+                        connection.bind(eventName, sync);
+                    });
+                    sync();
+                },
+            };
+            window.SpfiRealtime.bind();
         })();
     </script>
 
