@@ -87,6 +87,7 @@
     ]);
 
     const state = {
+        supportThreadEnsured: false,
         open: false,
         view: 'list',
         listTab: 'personal',
@@ -2062,18 +2063,29 @@
         }, 200);
     }
 
-    async function loadConversations() {
+    async function loadConversations({ ensureSupport = null } = {}) {
         try {
-            const url = isSystemTab()
+            const baseUrl = isSystemTab()
                 ? root.dataset.supportConversationsUrl
                 : root.dataset.conversationsUrl;
-            const payload = await api(url);
+            const url = new URL(baseUrl, window.location.origin);
+            const shouldEnsureSupport = !isSystemTab()
+                && (ensureSupport == null ? !state.supportThreadEnsured : ensureSupport);
+
+            if (!isSystemTab() && !shouldEnsureSupport) {
+                url.searchParams.set('ensure_support', '0');
+            }
+
+            const payload = await api(url.toString());
             if (isSystemTab()) {
                 state.supportConversations = payload.data || [];
                 state.supportConversations.forEach((item) => subscribeConversation(item.id));
             } else {
                 state.conversations = payload.data || [];
                 state.conversations.forEach((item) => subscribeConversation(item.id));
+                if (shouldEnsureSupport) {
+                    state.supportThreadEnsured = true;
+                }
             }
             updateBadge(Number(payload.unread_count || 0));
             state.listRenderKey = '';

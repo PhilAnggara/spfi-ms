@@ -1,3 +1,8 @@
+@php
+    $navbarAuthUser = Auth::user();
+    $navbarUnreadNotificationCount = $navbarAuthUser->unreadNotifications()->count();
+    $navbarRecentNotifications = $navbarAuthUser->notifications()->limit(5)->get();
+@endphp
 <header>
     <nav class="navbar navbar-expand navbar-light navbar-top">
         <div class="container-fluid">
@@ -20,9 +25,9 @@
 
                             <span
                                 id="notificationBadge"
-                                class="badge badge-notification bg-danger {{ Auth::user()->unreadNotifications->count() > 0 ? '' : 'd-none' }}"
+                                class="badge badge-notification bg-danger {{ $navbarUnreadNotificationCount > 0 ? '' : 'd-none' }}"
                             >
-                                {{ Auth::user()->unreadNotifications->count() }}
+                                {{ $navbarUnreadNotificationCount }}
                             </span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end notification-dropdown shadow"
@@ -32,7 +37,7 @@
                             <li class="dropdown-header d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0">Notifications</h6>
                                 <button
-                                    class="btn btn-sm btn-link p-0 {{ Auth::user()->unreadNotifications->count() > 0 ? '' : 'd-none' }}"
+                                    class="btn btn-sm btn-link p-0 {{ $navbarUnreadNotificationCount > 0 ? '' : 'd-none' }}"
                                     id="markAllReadBtn"
                                     style="font-size: 0.75rem;"
                                 >
@@ -44,7 +49,7 @@
 
                             <li class="p-0 border-0">
                             <ul id="notificationList" class="list-unstyled mb-0">
-                            @forelse(Auth::user()->notifications->take(5) as $notification)
+                            @forelse($navbarRecentNotifications as $notification)
                                 <li class="dropdown-item notification-item {{ $notification->read_at ? '' : 'bg-light' }}"
                                     style="white-space: normal; cursor: pointer;"
                                     data-notification-id="{{ $notification->id }}"
@@ -86,7 +91,7 @@
                             </li>
 
                             <!-- Footer -->
-                            @if(Auth::user()->notifications->count() > 0)
+                            @if($navbarRecentNotifications->isNotEmpty())
                                 <li><hr class="dropdown-divider"></li>
                                 <li id="notificationFooter">
                                     <a href="{{ route('notifications.index') }}" class="dropdown-item text-center text-primary">

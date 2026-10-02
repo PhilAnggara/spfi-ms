@@ -7,6 +7,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 
@@ -854,4 +855,202 @@ it('updates support status for operators', function () {
         ->assertJsonPath('data.support_status', 'resolved');
 
     expect($conversation->fresh()->support_status->value)->toBe('resolved');
+});
+
+it('computes unread count with a bounded aggregate instead of per-conversation counts', function () {
+    Event::fake([MessageSent::class, ConversationRead::class, MessageDelivered::class]);
+
+    $peers = User::factory()->count(5)->create();
+
+    foreach ($peers as $index => $peer) {
+        $conversation = Conversation::factory()->directBetween($this->alice, $peer)->create();
+
+        $this->actingAs($peer)
+            ->postJson(route('chat.messages.store', $conversation), [
+                'body' => 'Unread '.$index,
+            ])
+            ->assertCreated();
+    }
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $sql = strtolower($query->sql);
+        if (str_contains($sql, 'messages') || str_contains($sql, 'conversation_participants')) {
+            $queries[] = $sql;
+        }
+    });
+
+    $this->actingAs($this->alice)
+        ->getJson(route('chat.unread-count'))
+        ->assertOk()
+        ->assertJsonPath('count', 5);
+
+    $messageCountQueries = collect($queries)->filter(
+        fn (string $sql): bool => str_contains($sql, 'count(') && str_contains($sql, 'messages')
+    );
+
+    expect($messageCountQueries)->toHaveCount(1)
+        ->and($messageCountQueries->first())->toContain('join')
+        ->and($messageCountQueries->first())->toContain('conversation_participants');
+});
+
+it('aggregates support inbox unread for operators in a single join query', function () {
+    Event::fake([MessageSent::class, ConversationRead::class, MessageDelivered::class]);
+
+    \Spatie\Permission\Models\Permission::findOrCreate('chat-support-operate', 'web');
+    $this->carol->givePermissionTo('chat-support-operate');
+
+    $endUsers = [$this->alice, $this->bob];
+
+    foreach ($endUsers as $endUser) {
+        $thread = collect($this->actingAs($endUser)
+            ->getJson(route('chat.conversations.index'))
+            ->assertOk()
+            ->json('data'))->firstWhere('type', 'support');
+
+        $conversation = Conversation::query()->findOrFail($thread['id']);
+
+        $this->actingAs($endUser)
+            ->postJson(route('chat.messages.store', $conversation), [
+                'body' => 'Help from '.$endUser->username,
+            ])
+            ->assertCreated();
+    }
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $sql = strtolower($query->sql);
+        if (str_contains($sql, 'messages') || str_contains($sql, 'conversations')) {
+            $queries[] = $sql;
+        }
+    });
+
+    $this->actingAs($this->carol)
+        ->getJson(route('chat.unread-count'))
+        ->assertOk()
+        ->assertJsonPath('count', 2);
+
+    $supportCountQueries = collect($queries)->filter(
+        fn (string $sql): bool => str_contains($sql, 'count(')
+            && str_contains($sql, 'messages')
+            && str_contains($sql, 'conversations')
+    );
+
+    expect($supportCountQueries)->toHaveCount(1)
+        ->and($supportCountQueries->first())->toContain('join');
+});
+
+it('lists conversations with grouped unread counts and keeps badge aligned with unread-count', function () {
+    Event::fake([MessageSent::class, ConversationRead::class, MessageDelivered::class]);
+
+    $peers = User::factory()->count(3)->create();
+
+    foreach ($peers as $index => $peer) {
+        $conversation = Conversation::factory()->directBetween($this->alice, $peer)->create();
+
+        $this->actingAs($peer)
+            ->postJson(route('chat.messages.store', $conversation), [
+                'body' => 'List unread '.$index,
+            ])
+            ->assertCreated();
+    }
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $sql = strtolower($query->sql);
+        if (str_contains($sql, 'messages') && str_contains($sql, 'count(')) {
+            $queries[] = $sql;
+        }
+    });
+
+    $list = $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk()
+        ->json();
+
+    $badge = $this->actingAs($this->alice)
+        ->getJson(route('chat.unread-count'))
+        ->assertOk()
+        ->json('count');
+
+    $directUnreadSum = collect($list['data'])
+        ->where('type', 'direct')
+        ->sum('unread_count');
+
+    expect($list['unread_count'])->toBe($badge)
+        ->and($list['unread_count'])->toBe(3)
+        ->and($directUnreadSum)->toBe(3);
+
+    $perConversationCounts = collect($queries)->filter(
+        fn (string $sql): bool => str_contains($sql, 'count(')
+            && str_contains($sql, 'messages')
+            && ! str_contains($sql, 'group by')
+            && ! str_contains($sql, 'join')
+    );
+
+    $groupedUnread = collect($queries)->filter(
+        fn (string $sql): bool => str_contains($sql, 'group by')
+            && str_contains($sql, 'messages')
+    );
+
+    expect($perConversationCounts)->toBeEmpty()
+        ->and($groupedUnread->isNotEmpty())->toBeTrue();
+});
+
+it('skips support thread ensure lookup when ensure_support is false', function () {
+    $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index'))
+        ->assertOk();
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $sql = strtolower($query->sql);
+        if (str_contains($sql, 'conversations') && str_contains($sql, 'support_user_id')) {
+            $queries[] = $sql;
+        }
+    });
+
+    $this->actingAs($this->alice)
+        ->getJson(route('chat.conversations.index', ['ensure_support' => 0]))
+        ->assertOk()
+        ->assertJsonPath('data.0.type', 'support');
+
+    $ensureLookups = collect($queries)->filter(
+        fn (string $sql): bool => str_contains($sql, 'support_user_id')
+            && ! str_contains($sql, 'join')
+            && ! str_contains($sql, 'count(')
+            && (str_contains($sql, 'limit 1') || str_contains($sql, 'top 1'))
+    );
+
+    // Poll path should not run findOrCreateSupportThread's existence SELECT.
+    expect($ensureLookups)->toBeEmpty();
+});
+
+it('limits conversation list size while preserving newest activity first', function () {
+    Event::fake([MessageSent::class, ConversationRead::class, MessageDelivered::class]);
+
+    $originalLimit = \App\Services\ChatService::CONVERSATION_LIST_LIMIT;
+
+    // Keep the public constant, but exercise limit via service argument.
+    $service = app(\App\Services\ChatService::class);
+    $peers = User::factory()->count(5)->create();
+
+    foreach ($peers as $index => $peer) {
+        $conversation = Conversation::factory()->directBetween($this->alice, $peer)->create();
+        Message::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $peer->id,
+            'body' => 'Msg '.$index,
+            'created_at' => now()->subMinutes(5 - $index),
+        ]);
+    }
+
+    $service->findOrCreateSupportThread($this->alice);
+
+    $limited = $service->listConversations($this->alice, ensureSupportThread: false, limit: 3);
+
+    expect($limited)->toHaveCount(3)
+        ->and($limited->first()['latest_message']['body'])->toBe('Msg 4');
+
+    expect($originalLimit)->toBeGreaterThan(0);
 });

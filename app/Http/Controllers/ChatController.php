@@ -26,7 +26,10 @@ class ChatController extends Controller
     public function conversations(Request $request): JsonResponse
     {
         $user = $request->user();
-        $items = $this->chatService->listConversations($user);
+        $items = $this->chatService->listConversations(
+            $user,
+            ensureSupportThread: $request->boolean('ensure_support', true),
+        );
 
         return response()->json([
             'data' => $items,

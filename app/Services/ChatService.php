@@ -35,14 +35,26 @@ class ChatService
 
     public const SYSTEM_USERNAME = 'spfi-ms';
 
+    public const CONVERSATION_LIST_LIMIT = 50;
+
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    public function listConversations(User $user): Collection
+    public function listConversations(User $user, bool $ensureSupportThread = true, ?int $limit = null): Collection
     {
-        $this->findOrCreateSupportThread($user);
+        if ($ensureSupportThread) {
+            $this->findOrCreateSupportThread($user);
+        }
+
+        $latestActivity = Message::query()
+            ->select('conversation_id', DB::raw('MAX(created_at) as latest_message_at'))
+            ->groupBy('conversation_id');
 
         $conversations = Conversation::query()
+            ->select('conversations.*')
+            ->leftJoinSub($latestActivity, 'chat_latest_messages', function ($join): void {
+                $join->on('conversations.id', '=', 'chat_latest_messages.conversation_id');
+            })
             ->whereHas('participants', fn ($query) => $query->where('user_id', $user->id))
             ->where(function ($query): void {
                 $query->whereHas('messages')
@@ -58,11 +70,21 @@ class ChatService
                 'supportUser.department:id,name',
                 'assignee:id,name,username',
             ])
-            ->get()
-            ->sortByDesc(fn (Conversation $conversation) => $conversation->latestMessage?->created_at?->timestamp ?? 0)
-            ->values();
+            ->orderByRaw('case when chat_latest_messages.latest_message_at is null then 1 else 0 end')
+            ->orderByDesc('chat_latest_messages.latest_message_at')
+            ->orderByDesc('conversations.id')
+            ->limit($limit ?? self::CONVERSATION_LIST_LIMIT)
+            ->get();
 
-        return $conversations->map(fn (Conversation $conversation): array => $this->conversationPayload($conversation, $user));
+        $unreadCounts = $this->unreadCountsForConversations($conversations, $user);
+
+        return $conversations->map(
+            fn (Conversation $conversation): array => $this->conversationPayload(
+                $conversation,
+                $user,
+                unreadCount: $unreadCounts[(int) $conversation->id] ?? 0,
+            )
+        );
     }
 
     /**
@@ -70,9 +92,17 @@ class ChatService
      *
      * @return Collection<int, array<string, mixed>>
      */
-    public function listSupportConversations(User $operator): Collection
+    public function listSupportConversations(User $operator, ?int $limit = null): Collection
     {
+        $latestActivity = Message::query()
+            ->select('conversation_id', DB::raw('MAX(created_at) as latest_message_at'))
+            ->groupBy('conversation_id');
+
         $conversations = Conversation::query()
+            ->select('conversations.*')
+            ->leftJoinSub($latestActivity, 'chat_latest_messages', function ($join): void {
+                $join->on('conversations.id', '=', 'chat_latest_messages.conversation_id');
+            })
             ->where('type', ConversationType::Support)
             ->whereHas('messages')
             ->with([
@@ -81,11 +111,22 @@ class ChatService
                 'supportUser.department:id,name',
                 'assignee:id,name,username',
             ])
-            ->get()
-            ->sortByDesc(fn (Conversation $conversation) => $conversation->latestMessage?->created_at?->timestamp ?? $conversation->updated_at?->timestamp ?? 0)
-            ->values();
+            ->orderByRaw('case when chat_latest_messages.latest_message_at is null then 1 else 0 end')
+            ->orderByDesc('chat_latest_messages.latest_message_at')
+            ->orderByDesc('conversations.id')
+            ->limit($limit ?? self::CONVERSATION_LIST_LIMIT)
+            ->get();
 
-        return $conversations->map(fn (Conversation $conversation): array => $this->conversationPayload($conversation, $operator, forOperatorInbox: true));
+        $unreadCounts = $this->unreadCountsForConversations($conversations, $operator, forOperatorInbox: true);
+
+        return $conversations->map(
+            fn (Conversation $conversation): array => $this->conversationPayload(
+                $conversation,
+                $operator,
+                forOperatorInbox: true,
+                unreadCount: $unreadCounts[(int) $conversation->id] ?? 0,
+            )
+        );
     }
 
     /**
@@ -652,44 +693,130 @@ class ChatService
 
     public function unreadCount(User $user): int
     {
-        $participantRows = ConversationParticipant::query()
-            ->where('user_id', $user->id)
-            ->get(['conversation_id', 'last_read_at']);
+        $participantUnread = (int) Message::query()
+            ->join('conversation_participants', function ($join) use ($user): void {
+                $join->on('conversation_participants.conversation_id', '=', 'messages.conversation_id')
+                    ->where('conversation_participants.user_id', '=', $user->id);
+            })
+            ->where('messages.user_id', '!=', $user->id)
+            ->where(function ($query): void {
+                $query->whereNull('conversation_participants.last_read_at')
+                    ->orWhereColumn('messages.created_at', '>', 'conversation_participants.last_read_at');
+            })
+            ->count('messages.id');
 
-        $total = 0;
-
-        foreach ($participantRows as $row) {
-            $query = Message::query()
-                ->where('conversation_id', $row->conversation_id)
-                ->where('user_id', '!=', $user->id);
-
-            if ($row->last_read_at) {
-                $query->where('created_at', '>', $row->last_read_at);
-            }
-
-            $total += $query->count();
+        if (! $user->can('chat-support-operate')) {
+            return $participantUnread;
         }
 
-        if ($user->can('chat-support-operate')) {
-            $supportThreads = Conversation::query()
-                ->where('type', ConversationType::Support)
-                ->where('support_user_id', '!=', $user->id)
-                ->get(['id', 'support_last_read_at']);
+        $supportUnread = (int) Message::query()
+            ->join('conversations', 'conversations.id', '=', 'messages.conversation_id')
+            ->where('conversations.type', ConversationType::Support)
+            ->where('conversations.support_user_id', '!=', $user->id)
+            ->where('messages.persona', MessagePersona::User)
+            ->where(function ($query): void {
+                $query->whereNull('conversations.support_last_read_at')
+                    ->orWhereColumn('messages.created_at', '>', 'conversations.support_last_read_at');
+            })
+            ->count('messages.id');
 
-            foreach ($supportThreads as $thread) {
-                $query = Message::query()
-                    ->where('conversation_id', $thread->id)
-                    ->where('persona', MessagePersona::User);
+        return $participantUnread + $supportUnread;
+    }
 
-                if ($thread->support_last_read_at) {
-                    $query->where('created_at', '>', $thread->support_last_read_at);
-                }
+    /**
+     * Prefetch per-conversation unread counts for a loaded list (one/two grouped queries).
+     *
+     * @param  Collection<int, Conversation>  $conversations
+     * @return array<int, int>
+     */
+    public function unreadCountsForConversations(
+        Collection $conversations,
+        User $viewer,
+        bool $forOperatorInbox = false,
+    ): array {
+        $ids = $conversations->pluck('id')->map(fn ($id): int => (int) $id)->all();
 
-                $total += $query->count();
+        if ($ids === []) {
+            return [];
+        }
+
+        $counts = array_fill_keys($ids, 0);
+
+        if ($forOperatorInbox) {
+            $rows = Message::query()
+                ->select('messages.conversation_id', DB::raw('COUNT(messages.id) as aggregate'))
+                ->join('conversations', 'conversations.id', '=', 'messages.conversation_id')
+                ->whereIn('messages.conversation_id', $ids)
+                ->where('messages.persona', MessagePersona::User)
+                ->where(function ($query): void {
+                    $query->whereNull('conversations.support_last_read_at')
+                        ->orWhereColumn('messages.created_at', '>', 'conversations.support_last_read_at');
+                })
+                ->groupBy('messages.conversation_id')
+                ->pluck('aggregate', 'conversation_id');
+
+            foreach ($rows as $conversationId => $aggregate) {
+                $counts[(int) $conversationId] = (int) $aggregate;
+            }
+
+            return $counts;
+        }
+
+        $directIds = $conversations
+            ->reject(fn (Conversation $conversation): bool => $conversation->isSupport())
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        $supportIds = $conversations
+            ->filter(fn (Conversation $conversation): bool => $conversation->isSupport())
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        if ($directIds !== []) {
+            $rows = Message::query()
+                ->select('messages.conversation_id', DB::raw('COUNT(messages.id) as aggregate'))
+                ->join('conversation_participants', function ($join) use ($viewer): void {
+                    $join->on('conversation_participants.conversation_id', '=', 'messages.conversation_id')
+                        ->where('conversation_participants.user_id', '=', $viewer->id);
+                })
+                ->whereIn('messages.conversation_id', $directIds)
+                ->where('messages.user_id', '!=', $viewer->id)
+                ->where(function ($query): void {
+                    $query->whereNull('conversation_participants.last_read_at')
+                        ->orWhereColumn('messages.created_at', '>', 'conversation_participants.last_read_at');
+                })
+                ->groupBy('messages.conversation_id')
+                ->pluck('aggregate', 'conversation_id');
+
+            foreach ($rows as $conversationId => $aggregate) {
+                $counts[(int) $conversationId] = (int) $aggregate;
             }
         }
 
-        return $total;
+        if ($supportIds !== []) {
+            $rows = Message::query()
+                ->select('messages.conversation_id', DB::raw('COUNT(messages.id) as aggregate'))
+                ->join('conversation_participants', function ($join) use ($viewer): void {
+                    $join->on('conversation_participants.conversation_id', '=', 'messages.conversation_id')
+                        ->where('conversation_participants.user_id', '=', $viewer->id);
+                })
+                ->whereIn('messages.conversation_id', $supportIds)
+                ->where('messages.persona', MessagePersona::System)
+                ->where(function ($query): void {
+                    $query->whereNull('conversation_participants.last_read_at')
+                        ->orWhereColumn('messages.created_at', '>', 'conversation_participants.last_read_at');
+                })
+                ->groupBy('messages.conversation_id')
+                ->pluck('aggregate', 'conversation_id');
+
+            foreach ($rows as $conversationId => $aggregate) {
+                $counts[(int) $conversationId] = (int) $aggregate;
+            }
+        }
+
+        return $counts;
     }
 
     /**
@@ -777,10 +904,14 @@ class ChatService
     /**
      * @return array<string, mixed>
      */
-    public function conversationPayload(Conversation $conversation, User $viewer, bool $forOperatorInbox = false): array
-    {
+    public function conversationPayload(
+        Conversation $conversation,
+        User $viewer,
+        bool $forOperatorInbox = false,
+        ?int $unreadCount = null,
+    ): array {
         if ($conversation->isSupport()) {
-            return $this->supportConversationPayload($conversation, $viewer, $forOperatorInbox);
+            return $this->supportConversationPayload($conversation, $viewer, $forOperatorInbox, $unreadCount);
         }
 
         $peer = $conversation->otherParticipant($viewer);
@@ -792,12 +923,17 @@ class ChatService
             : ($peer ? $conversation->participants()->where('user_id', $peer->id)->first() : null);
 
         $latest = $conversation->latestMessage;
-        $unreadQuery = Message::query()
-            ->where('conversation_id', $conversation->id)
-            ->where('user_id', '!=', $viewer->id);
 
-        if ($viewerParticipant?->last_read_at) {
-            $unreadQuery->where('created_at', '>', $viewerParticipant->last_read_at);
+        if ($unreadCount === null) {
+            $unreadQuery = Message::query()
+                ->where('conversation_id', $conversation->id)
+                ->where('user_id', '!=', $viewer->id);
+
+            if ($viewerParticipant?->last_read_at) {
+                $unreadQuery->where('created_at', '>', $viewerParticipant->last_read_at);
+            }
+
+            $unreadCount = (int) $unreadQuery->count();
         }
 
         return [
@@ -807,7 +943,7 @@ class ChatService
             'latest_message' => $latest
                 ? $latest->toChatPayload($viewerParticipant, $peerParticipant)
                 : null,
-            'unread_count' => $unreadQuery->count(),
+            'unread_count' => $unreadCount,
             'viewer_last_read_at' => $viewerParticipant?->last_read_at?->toIso8601String(),
             'updated_at' => $conversation->updated_at?->toIso8601String(),
         ];
@@ -816,8 +952,12 @@ class ChatService
     /**
      * @return array<string, mixed>
      */
-    public function supportConversationPayload(Conversation $conversation, User $viewer, bool $forOperatorInbox = false): array
-    {
+    public function supportConversationPayload(
+        Conversation $conversation,
+        User $viewer,
+        bool $forOperatorInbox = false,
+        ?int $unreadCount = null,
+    ): array {
         if (! $conversation->relationLoaded('participants')) {
             $conversation->load('participants');
         }
@@ -836,18 +976,23 @@ class ChatService
         [$viewerParticipant, $peerParticipant] = $this->supportReadParticipants($conversation, $asOperator, $endUserParticipant);
 
         $latest = $conversation->latestMessage;
-        $unreadQuery = Message::query()->where('conversation_id', $conversation->id);
 
-        if ($asOperator) {
-            $unreadQuery->where('persona', MessagePersona::User);
-            if ($conversation->support_last_read_at) {
-                $unreadQuery->where('created_at', '>', $conversation->support_last_read_at);
+        if ($unreadCount === null) {
+            $unreadQuery = Message::query()->where('conversation_id', $conversation->id);
+
+            if ($asOperator) {
+                $unreadQuery->where('persona', MessagePersona::User);
+                if ($conversation->support_last_read_at) {
+                    $unreadQuery->where('created_at', '>', $conversation->support_last_read_at);
+                }
+            } else {
+                $unreadQuery->where('persona', MessagePersona::System);
+                if ($endUserParticipant?->last_read_at) {
+                    $unreadQuery->where('created_at', '>', $endUserParticipant->last_read_at);
+                }
             }
-        } else {
-            $unreadQuery->where('persona', MessagePersona::System);
-            if ($endUserParticipant?->last_read_at) {
-                $unreadQuery->where('created_at', '>', $endUserParticipant->last_read_at);
-            }
+
+            $unreadCount = (int) $unreadQuery->count();
         }
 
         $assignee = $conversation->relationLoaded('assignee')
@@ -863,7 +1008,7 @@ class ChatService
             'latest_message' => $latest
                 ? $latest->toChatPayload($viewerParticipant, $peerParticipant)
                 : null,
-            'unread_count' => $unreadQuery->count(),
+            'unread_count' => $unreadCount,
             'viewer_last_read_at' => $asOperator
                 ? $conversation->support_last_read_at?->toIso8601String()
                 : $endUserParticipant?->last_read_at?->toIso8601String(),

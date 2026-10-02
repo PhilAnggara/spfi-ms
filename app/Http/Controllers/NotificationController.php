@@ -42,7 +42,7 @@ class NotificationController extends Controller
      */
     public function getUnreadCount()
     {
-        $count = Auth::user()->unreadNotifications->count();
+        $count = Auth::user()->unreadNotifications()->count();
 
         return response()->json([
             'count' => $count,
@@ -89,7 +89,7 @@ class NotificationController extends Controller
      */
     public function markAllAsRead()
     {
-        Auth::user()->unreadNotifications->markAsRead();
+        Auth::user()->unreadNotifications()->update(['read_at' => now()]);
 
         if (request()->expectsJson() || request()->ajax()) {
             return response()->json([
