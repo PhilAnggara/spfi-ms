@@ -128,39 +128,48 @@ it('saves an edited po number when printing from the confirmation modal', functi
     expect($this->purchaseOrder->fresh()->po_number)->toBe('PO-PAPER-777');
 });
 
-it('prints money amounts using up to five decimals and strips trailing zeros', function () {
+it('prints money amounts using the selected decimal places', function () {
     $this->purchaseOrder->update([
         'subtotal' => 0.12121,
-        'total' => 0.12120,
+        'total' => 0.12121,
     ]);
     $this->purchaseOrder->items()->first()->update([
         'unit_price' => 0.12121,
-        'line_subtotal' => 0.12120,
-        'total' => 0.12100,
+        'line_subtotal' => 0.12121,
+        'total' => 0.12121,
     ]);
 
-    $html = view('pdf.purchase-order', [
-        'purchaseOrder' => $this->purchaseOrder->fresh()->load([
-            'supplier',
-            'currency',
-            'items.item.unit',
-            'items.prsItem.prs.department',
-            'certifiedBy',
-            'approvedBy',
-        ]),
+    $purchaseOrder = $this->purchaseOrder->fresh()->load([
+        'supplier',
+        'currency',
+        'items.item.unit',
+        'items.prsItem.prs.department',
+        'certifiedBy',
+        'approvedBy',
+    ]);
+
+    $htmlTwoDecimals = view('pdf.purchase-order', [
+        'purchaseOrder' => $purchaseOrder,
         'pageWidthMm' => 215,
         'pageHeightMm' => 160,
         'decimalPlaces' => 2,
     ])->render();
 
-    expect($html)
-        ->toContain('0,12121')
-        ->toContain('0,1212')
-        ->not->toContain('0,12100')
-        ->not->toContain('0,12120</td>');
+    expect($htmlTwoDecimals)
+        ->toContain('0,12')
+        ->not->toContain('0,12121');
+
+    $htmlFiveDecimals = view('pdf.purchase-order', [
+        'purchaseOrder' => $purchaseOrder,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+        'decimalPlaces' => 5,
+    ])->render();
+
+    expect($htmlFiveDecimals)->toContain('0,12121');
 });
 
-it('defaults printed money amounts to trimmed decimals without forced two places', function () {
+it('defaults printed money amounts to two decimal places', function () {
     $html = view('pdf.purchase-order', [
         'purchaseOrder' => $this->purchaseOrder->load([
             'supplier',
@@ -174,9 +183,7 @@ it('defaults printed money amounts to trimmed decimals without forced two places
         'pageHeightMm' => 160,
     ])->render();
 
-    expect($html)
-        ->toContain('1.000')
-        ->not->toContain('1.000,00');
+    expect($html)->toContain('1.000,00');
 });
 
 it('rejects invalid decimal places when printing', function () {

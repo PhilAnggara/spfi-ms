@@ -323,28 +323,41 @@ it('shows paper form size and print checklist in confirm print modal', function 
     $response->assertSee('Actual size / 100%', false);
 });
 
-it('prints unit prices with up to five decimals and strips trailing zeros', function () {
+it('prints unit prices using the selected decimal places', function () {
     $this->purchaseOrder->items()->first()->update([
         'unit_price' => 0.10021,
         'line_subtotal' => 0.12100,
         'total' => 0.12100,
     ]);
 
-    $html = view('pdf.purchase-order', [
-        'purchaseOrder' => $this->purchaseOrder->fresh()->load([
-            'supplier',
-            'currency',
-            'items.item.unit',
-            'items.prsItem.prs.department',
-            'certifiedBy',
-            'approvedBy',
-        ]),
+    $purchaseOrder = $this->purchaseOrder->fresh()->load([
+        'supplier',
+        'currency',
+        'items.item.unit',
+        'items.prsItem.prs.department',
+        'certifiedBy',
+        'approvedBy',
+    ]);
+
+    $htmlDefault = view('pdf.purchase-order', [
+        'purchaseOrder' => $purchaseOrder,
         'pageWidthMm' => 215,
         'pageHeightMm' => 160,
     ])->render();
 
-    expect($html)
+    expect($htmlDefault)
+        ->toContain('0,10')
+        ->toContain('0,12')
+        ->not->toContain('0,10021');
+
+    $htmlFiveDecimals = view('pdf.purchase-order', [
+        'purchaseOrder' => $purchaseOrder,
+        'pageWidthMm' => 215,
+        'pageHeightMm' => 160,
+        'decimalPlaces' => 5,
+    ])->render();
+
+    expect($htmlFiveDecimals)
         ->toContain('0,10021')
-        ->toContain('0,121')
-        ->not->toContain('0,12100');
+        ->toContain('0,12100');
 });
