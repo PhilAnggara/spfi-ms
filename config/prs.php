@@ -65,11 +65,11 @@ return [
             'title' => 'Export Documentation Supervisor',
             'priority' => 'fallback',
         ],
-        '7034' => [
-            'name' => 'James Runtukahu',
-            'title' => 'Fixed Production Supervisor',
-            'priority' => 'fallback',
-        ],
+        // '7034' => [
+        //     'name' => 'James Runtukahu',
+        //     'title' => 'Fixed Production Supervisor',
+        //     'priority' => 'fallback',
+        // ],
         '7063' => [
             'name' => 'Hakimin Mamonto',
             'title' => 'Team Leader TV',

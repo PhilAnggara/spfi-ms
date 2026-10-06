@@ -28,8 +28,8 @@ return [
             'priority' => 'fallback',
         ],
         '7034' => [
-            'name' => 'James Runtukahu',
-            'title' => 'Fixed Production Supervisor',
+            'name' => 'Rikky Manik',
+            'title' => 'Operation Manager',
             'priority' => 'fallback',
         ],
         '7063' => [
