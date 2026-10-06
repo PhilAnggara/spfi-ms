@@ -789,6 +789,11 @@ html[data-bs-theme="dark"] .chat-widget__day {
     z-index: 0;
 }
 
+.chat-bubble:has(.chat-bubble__ticks:hover),
+.chat-bubble:has(.chat-bubble__ticks:focus-visible) {
+    z-index: 30;
+}
+
 .chat-bubble.is-mine {
     align-self: flex-end;
     align-items: flex-end;
@@ -998,7 +1003,7 @@ html[data-bs-theme="dark"] .chat-widget__day {
     letter-spacing: -0.08em;
     color: var(--chat-tick);
     font-weight: 700;
-    cursor: help;
+    cursor: default;
     flex: 0 0 auto;
     box-sizing: border-box;
     z-index: 2;
