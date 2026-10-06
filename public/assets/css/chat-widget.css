@@ -1043,8 +1043,8 @@ html[data-bs-theme="dark"] .chat-widget__day {
 .chat-bubble__ticks-tip {
     position: absolute;
     right: 0;
-    bottom: auto;
-    top: calc(100% + 0.4rem);
+    top: auto;
+    bottom: calc(100% + 0.4rem);
     min-width: 9.5rem;
     padding: 0.45rem 0.55rem;
     border-radius: 0.55rem;
@@ -1058,7 +1058,7 @@ html[data-bs-theme="dark"] .chat-widget__day {
     box-shadow: 0 8px 20px rgba(15, 23, 42, 0.28);
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-4px);
+    transform: translateY(4px);
     transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
     z-index: 80;
     pointer-events: none;
@@ -1067,11 +1067,11 @@ html[data-bs-theme="dark"] .chat-widget__day {
 .chat-bubble__ticks-tip::after {
     content: '';
     position: absolute;
-    bottom: 100%;
-    top: auto;
+    top: 100%;
+    bottom: auto;
     right: 0.55rem;
     border: 5px solid transparent;
-    border-bottom-color: #0f172a;
+    border-top-color: #0f172a;
 }
 
 .chat-bubble__ticks:hover,
@@ -1116,7 +1116,7 @@ html[data-bs-theme="dark"] .chat-bubble__ticks-tip {
 }
 
 html[data-bs-theme="dark"] .chat-bubble__ticks-tip::after {
-    border-bottom-color: #020617;
+    border-top-color: #020617;
 }
 
 .chat-bubble__image-link {
