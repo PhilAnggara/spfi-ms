@@ -244,3 +244,30 @@ it('uses reviewed_by override priority even when department has a manager', func
         ->and($html)->toContain('Acting Supervisor')
         ->and($html)->not->toContain('Should Be Ignored Manager');
 });
+
+it('keys reviewed_by overrides by creator department not document department', function () {
+    $creatorDepartment = createDepartment('9101', 'Creator Responsible Dept', 'CRD');
+    $documentDepartment = createDepartment('9102', 'Target Document Dept', 'TDD');
+    $creator = createPrintUser($creatorDepartment, 'crossdept');
+    $prs = createPrsForPrint($documentDepartment, $creator, $this->item);
+
+    config()->set('prs.reviewed_by_overrides', [
+        '9101' => [
+            'name' => 'Creator Dept Supervisor',
+            'title' => 'Responsible Supervisor',
+            'priority' => 'fallback',
+        ],
+        '9102' => [
+            'name' => 'Document Dept Supervisor',
+            'title' => 'Target Supervisor',
+            'priority' => 'fallback',
+        ],
+    ]);
+
+    $html = renderApprovalPrintHtml($prs);
+
+    expect($html)->toContain('Creator Dept Supervisor')
+        ->and($html)->toContain('Responsible Supervisor')
+        ->and($html)->not->toContain('Document Dept Supervisor')
+        ->and($html)->not->toContain('Target Supervisor');
+});

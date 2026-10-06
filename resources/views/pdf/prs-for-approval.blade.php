@@ -200,7 +200,7 @@
         $manager = get_manager($prs->user);
         $reviewer = resolve_print_signer(
             $manager,
-            $prs->department?->code,
+            $prs->user?->department?->code,
             config('prs.reviewed_by_overrides', [])
         );
         $approverCount = count($approvers);

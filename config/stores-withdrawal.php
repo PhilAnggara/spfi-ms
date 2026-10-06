@@ -4,11 +4,13 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Approved By Overrides (exact department code)
+    | Approved By Overrides (creator department code)
     |--------------------------------------------------------------------------
     |
     | Optional print name/title for the Approved By column on the SWS slip,
-    | keyed by the full department code (exact match). Priority:
+    | keyed by the full department code of the SWS creator (exact match) —
+    | same basis as get_manager(), not the department selected on the SWS.
+    | Priority:
     | - fallback: use only when the creator's department has no Manager user
     | - override: always use this entry, even when a Manager exists
     |
@@ -26,11 +28,6 @@ return [
             'priority' => 'fallback',
         ],
         '7034' => [
-            'name' => 'James Runtukahu',
-            'title' => 'Fixed Production Supervisor',
-            'priority' => 'fallback',
-        ],
-        '7032' => [
             'name' => 'James Runtukahu',
             'title' => 'Fixed Production Supervisor',
             'priority' => 'fallback',

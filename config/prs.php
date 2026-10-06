@@ -42,12 +42,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Reviewed By Overrides (exact department code)
+    | Reviewed By Overrides (creator department code)
     |--------------------------------------------------------------------------
     |
     | Optional print name/title for the Reviewed By column, keyed by the full
-    | department code (exact match). Priority:
-    | - fallback: use only when the department has no Manager user
+    | department code of the PRS creator (exact match) — same basis as
+    | get_manager(), not the department selected on the PRS document.
+    | Priority:
+    | - fallback: use only when the creator's department has no Manager user
     | - override: always use this entry, even when a Manager exists
     |
     */
@@ -64,11 +66,6 @@ return [
             'priority' => 'fallback',
         ],
         '7034' => [
-            'name' => 'James Runtukahu',
-            'title' => 'Fixed Production Supervisor',
-            'priority' => 'fallback',
-        ],
-        '7032' => [
             'name' => 'James Runtukahu',
             'title' => 'Fixed Production Supervisor',
             'priority' => 'fallback',

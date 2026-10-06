@@ -571,18 +571,18 @@ class StoreWithdrawalController extends Controller
         }
 
         $manager = null;
-        $departmentCode = $sws->department_code ?? null;
+        $creatorDepartmentCode = null;
         if (! empty($sws->created_by)) {
             $creator = User::with('department')->find((int) $sws->created_by);
             if ($creator?->department) {
                 $manager = get_manager($creator);
-                $departmentCode = $departmentCode ?: $creator->department->code;
+                $creatorDepartmentCode = $creator->department->code;
             }
         }
 
         $approver = resolve_print_signer(
             $manager,
-            $departmentCode,
+            $creatorDepartmentCode,
             config('stores-withdrawal.approved_by_overrides', [])
         );
 
