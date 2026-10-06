@@ -151,6 +151,43 @@ if (! function_exists('get_manager')) {
     }
 }
 
+if (! function_exists('resolve_print_signer')) {
+    /**
+     * Resolve a print signature name/title from an optional department manager
+     * and optional config overrides keyed by exact department code.
+     *
+     * @param  array<string, array{name?: string, title?: string, priority?: string}>  $overrides
+     * @return object{name: string, title: string}|null
+     */
+    function resolve_print_signer(?User $manager, ?string $departmentCode, array $overrides): ?object
+    {
+        $override = ($departmentCode !== null && $departmentCode !== '' && isset($overrides[$departmentCode]))
+            ? $overrides[$departmentCode]
+            : null;
+
+        $priority = is_array($override) ? ($override['priority'] ?? 'fallback') : null;
+        $useOverride = is_array($override)
+            && filled($override['name'] ?? null)
+            && ($priority === 'override' || $manager === null);
+
+        if ($useOverride) {
+            return (object) [
+                'name' => (string) $override['name'],
+                'title' => (string) ($override['title'] ?? ''),
+            ];
+        }
+
+        if ($manager !== null) {
+            return (object) [
+                'name' => $manager->name,
+                'title' => get_job_title($manager),
+            ];
+        }
+
+        return null;
+    }
+}
+
 if (! function_exists('status_badge_color')) {
     function status_badge_color($status)
     {

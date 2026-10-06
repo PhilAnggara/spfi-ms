@@ -571,12 +571,20 @@ class StoreWithdrawalController extends Controller
         }
 
         $manager = null;
+        $departmentCode = $sws->department_code ?? null;
         if (! empty($sws->created_by)) {
             $creator = User::with('department')->find((int) $sws->created_by);
             if ($creator?->department) {
                 $manager = get_manager($creator);
+                $departmentCode = $departmentCode ?: $creator->department->code;
             }
         }
+
+        $approver = resolve_print_signer(
+            $manager,
+            $departmentCode,
+            config('stores-withdrawal.approved_by_overrides', [])
+        );
 
         $items = DB::table('store_withdrawal_items as swi')
             ->leftJoin('items as i', 'i.id', '=', 'swi.item_id')
@@ -615,6 +623,7 @@ class StoreWithdrawalController extends Controller
             'sws' => $sws,
             'items' => $items,
             'manager' => $manager,
+            'approver' => $approver,
         ])
             ->setPaper('a4', 'portrait')
             ->stream($filename);

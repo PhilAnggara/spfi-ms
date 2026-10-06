@@ -198,6 +198,11 @@
 <body>
     @php
         $manager = get_manager($prs->user);
+        $reviewer = resolve_print_signer(
+            $manager,
+            $prs->department?->code,
+            config('prs.reviewed_by_overrides', [])
+        );
         $approverCount = count($approvers);
         $hasSharedApprovers = $approverCount > 1;
         $columnCount = $hasSharedApprovers ? (2 + $approverCount) : 3;
@@ -315,7 +320,7 @@
                 </td>
                 <td style="width: {{ $columnWidth }};">
                     <div class="sig-line"></div>
-                    {{ $manager?->name ?? '____________________' }}
+                    {{ $reviewer?->name ?? '____________________' }}
                 </td>
                 @foreach ($approvers as $approver)
                     <td style="width: {{ $columnWidth }};">
@@ -327,7 +332,7 @@
 
             <tr class="sig-titles">
                 <td style="width: {{ $columnWidth }};">Requester</td>
-                <td style="width: {{ $columnWidth }};">{{ $manager ? get_job_title($manager) : 'Manager' }}</td>
+                <td style="width: {{ $columnWidth }};">{{ $reviewer?->title ?: 'Manager' }}</td>
                 @foreach ($approvers as $approver)
                     <td style="width: {{ $columnWidth }};">{{ $approver['title'] }}</td>
                 @endforeach

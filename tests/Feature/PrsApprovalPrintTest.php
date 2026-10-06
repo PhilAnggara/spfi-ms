@@ -168,3 +168,79 @@ it('streams a pdf for the print route without qr payload', function () {
     expect($response->getContent())->not->toContain('data:image/svg+xml;base64')
         ->and($response->getContent())->not->toContain('PRS QR Code');
 });
+
+it('uses reviewed_by fallback override when department has no manager', function () {
+    $department = createDepartment('9001', 'No Manager Dept', 'NMD');
+    $creator = createPrintUser($department, 'nofallback');
+    $prs = createPrsForPrint($department, $creator, $this->item);
+
+    config()->set('prs.reviewed_by_overrides', [
+        '9001' => [
+            'name' => 'PRS Supervisor',
+            'title' => 'Department Supervisor',
+            'priority' => 'fallback',
+        ],
+    ]);
+
+    $html = renderApprovalPrintHtml($prs);
+
+    expect($html)->toContain('PRS Supervisor')
+        ->and($html)->toContain('Department Supervisor')
+        ->and($html)->toContain('Reviewed By');
+});
+
+it('keeps department manager for reviewed_by when fallback override exists', function () {
+    $department = createDepartment('9002', 'With Manager Dept', 'WMD');
+    $creator = createPrintUser($department, 'keepmgr');
+    $manager = User::query()->create([
+        'name' => 'DB Manager Person',
+        'username' => 'prs-print-db-mgr',
+        'email' => 'prs-print-db-mgr@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $department->id,
+        'role' => 'Manager',
+    ]);
+    $prs = createPrsForPrint($department, $creator, $this->item);
+
+    config()->set('prs.reviewed_by_overrides', [
+        '9002' => [
+            'name' => 'PRS Supervisor',
+            'title' => 'Department Supervisor',
+            'priority' => 'fallback',
+        ],
+    ]);
+
+    $html = renderApprovalPrintHtml($prs);
+
+    expect($html)->toContain($manager->name)
+        ->and($html)->toContain(get_job_title($manager->load('department')))
+        ->and($html)->not->toContain('PRS Supervisor');
+});
+
+it('uses reviewed_by override priority even when department has a manager', function () {
+    $department = createDepartment('9003', 'Forced Reviewer Dept', 'FRD');
+    $creator = createPrintUser($department, 'forceovr');
+    User::query()->create([
+        'name' => 'Should Be Ignored Manager',
+        'username' => 'prs-print-ignored-mgr',
+        'email' => 'prs-print-ignored-mgr@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $department->id,
+        'role' => 'Manager',
+    ]);
+    $prs = createPrsForPrint($department, $creator, $this->item);
+
+    config()->set('prs.reviewed_by_overrides', [
+        '9003' => [
+            'name' => 'Forced Reviewer',
+            'title' => 'Acting Supervisor',
+            'priority' => 'override',
+        ],
+    ]);
+
+    $html = renderApprovalPrintHtml($prs);
+
+    expect($html)->toContain('Forced Reviewer')
+        ->and($html)->toContain('Acting Supervisor')
+        ->and($html)->not->toContain('Should Be Ignored Manager');
+});

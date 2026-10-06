@@ -40,4 +40,44 @@ return [
         'title' => 'General Manager',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Reviewed By Overrides (exact department code)
+    |--------------------------------------------------------------------------
+    |
+    | Optional print name/title for the Reviewed By column, keyed by the full
+    | department code (exact match). Priority:
+    | - fallback: use only when the department has no Manager user
+    | - override: always use this entry, even when a Manager exists
+    |
+    */
+
+    'reviewed_by_overrides' => [
+        // '7033C' => [
+        //     'name' => 'Nama Supervisor',
+        //     'title' => 'Engineering Supervisor',
+        //     'priority' => 'fallback', // fallback | override
+        // ],
+        '7036' => [
+            'name' => 'Evita Patanduk',
+            'title' => 'Export Documentation Supervisor',
+            'priority' => 'fallback',
+        ],
+        '7034' => [
+            'name' => 'James Runtukahu',
+            'title' => 'Fixed Production Supervisor',
+            'priority' => 'fallback',
+        ],
+        '7032' => [
+            'name' => 'James Runtukahu',
+            'title' => 'Fixed Production Supervisor',
+            'priority' => 'fallback',
+        ],
+        '7063' => [
+            'name' => 'Hakimin Mamonto',
+            'title' => 'Team Leader TV',
+            'priority' => 'fallback',
+        ],
+    ],
+
 ];

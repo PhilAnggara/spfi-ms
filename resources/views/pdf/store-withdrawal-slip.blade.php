@@ -354,13 +354,13 @@
                 </td>
                 <td style="width: {{ $columnWidth }};">
                     <div class="sig-line"></div>
-                    {{ $manager?->name ?? $sws->approved_by_name ?? '____________________' }}
+                    {{ $approver?->name ?? $sws->approved_by_name ?? '____________________' }}
                 </td>
             </tr>
 
             <tr class="sig-titles">
                 <td style="width: {{ $columnWidth }};">Requester</td>
-                <td style="width: {{ $columnWidth }};">{{ $manager ? get_job_title($manager) : 'Approver' }}</td>
+                <td style="width: {{ $columnWidth }};">{{ $approver?->title ?: 'Approver' }}</td>
             </tr>
 
             <tr class="sig-dates">
