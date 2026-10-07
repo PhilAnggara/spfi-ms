@@ -119,12 +119,40 @@ it('builds short english activity summaries', function () {
         ],
     ]);
 
+    $visitWithSubject = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_ACTIVE,
+        'meta' => [
+            'page' => 'Stores Withdrawals Detail',
+            'subject' => '#88 (SWS-2603-0012)',
+        ],
+    ]);
+
+    $createFromInput = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_CREATED,
+        'meta' => [
+            'page' => 'Currencies',
+            'subject' => '(TST)',
+            'subject_code' => 'TST',
+        ],
+    ]);
+
+    $employeeEdit = new UserActivityLog([
+        'action' => UserActivityLog::ACTION_UPDATED,
+        'meta' => [
+            'page' => 'Employees',
+            'subject' => '#7 (E1024 · Maria Santos)',
+        ],
+    ]);
+
     expect($typing->summary())->toBe('Typing to #9 Jane Doe')
         ->and($visit->summary())->toBe('Visited Purchase Requisitions')
+        ->and($visitWithSubject->summary())->toBe('Visited Stores Withdrawals Detail #88 (SWS-2603-0012)')
         ->and($openedChat->summary())->toBe('Opened chat with #9 Jane Doe')
         ->and($chat->summary())->toBe('Sent chat to #9 Jane Doe')
         ->and($startedChat->summary())->toBe('Started chat with #9 Jane Doe')
-        ->and($edit->summary())->toBe('Edited product #45 (SKU-001)');
+        ->and($edit->summary())->toBe('Edited product #45 (SKU-001)')
+        ->and($createFromInput->summary())->toBe('Created currency (TST)')
+        ->and($employeeEdit->summary())->toBe('Edited employee #7 (E1024 · Maria Santos)');
 
     $printed = new UserActivityLog([
         'action' => UserActivityLog::ACTION_PRINTED,

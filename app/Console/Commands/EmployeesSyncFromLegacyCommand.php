@@ -54,10 +54,11 @@ class EmployeesSyncFromLegacyCommand extends Command
             $employees['merged_manual'],
         ));
         $this->line(sprintf(
-            '  soft_deleted=%d  restored=%d  skipped=%d',
+            '  soft_deleted=%d  restored=%d  skipped=%d  code_adjusted=%d',
             $employees['soft_deleted'],
             $employees['restored'],
             $employees['skipped'],
+            $employees['code_adjusted'],
         ));
         $this->line(sprintf(
             '  photos_preserved=%d  photos_relinked=%d',

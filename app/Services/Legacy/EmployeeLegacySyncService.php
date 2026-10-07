@@ -32,6 +32,7 @@ class EmployeeLegacySyncService
      *         soft_deleted: int,
      *         restored: int,
      *         skipped: int,
+     *         code_adjusted: int,
      *         photos_preserved: int,
      *         photos_relinked: int
      *     },
@@ -146,6 +147,7 @@ class EmployeeLegacySyncService
      *     soft_deleted: int,
      *     restored: int,
      *     skipped: int,
+     *     code_adjusted: int,
      *     photos_preserved: int,
      *     photos_relinked: int
      * }
@@ -162,16 +164,16 @@ class EmployeeLegacySyncService
         $softDeleted = 0;
         $restored = 0;
         $skipped = 0;
+        $codeAdjusted = 0;
         $photosPreserved = 0;
         $photosRelinked = 0;
 
         $employees = Employee::withTrashed()->get();
         $byLegacyId = [];
         $byEmployeeId = [];
-        $byCodeEmployee = [];
 
         foreach ($employees as $employee) {
-            $this->indexEmployee($employee, $byLegacyId, $byEmployeeId, $byCodeEmployee);
+            $this->indexEmployee($employee, $byLegacyId, $byEmployeeId);
         }
 
         $codeEmployeeOwnerLookup = $this->buildCodeEmployeeOwnerLookup($employees);
@@ -201,21 +203,18 @@ class EmployeeLegacySyncService
             [$match, $matchType] = $this->findMatch(
                 $legacyId,
                 $employeeId,
-                $rawCodeEmployee,
                 $byLegacyId,
                 $byEmployeeId,
-                $byCodeEmployee,
             );
 
-            $codeEmployee = $match?->code_employee
-                ? (string) $match->code_employee
-                : $this->resolveUniqueCodeEmployee($rawCodeEmployee, $ownerKey, $codeEmployeeOwnerLookup);
+            $codeEmployee = $this->resolveUniqueCodeEmployee(
+                $rawCodeEmployee,
+                $ownerKey,
+                $codeEmployeeOwnerLookup,
+            );
 
-            if ($match !== null && $match->code_employee) {
-                $normalizedExisting = $this->normalizeLookupKey($match->code_employee);
-                if ($normalizedExisting !== null) {
-                    $codeEmployeeOwnerLookup[$normalizedExisting] = $ownerKey;
-                }
+            if ($codeEmployee !== $rawCodeEmployee) {
+                $codeAdjusted++;
             }
 
             $payload = $this->buildEmployeePayload(
@@ -234,7 +233,7 @@ class EmployeeLegacySyncService
                 if (! $dryRun) {
                     $payload['photo_path'] = null;
                     $employee = Employee::query()->create($payload);
-                    $this->indexEmployee($employee, $byLegacyId, $byEmployeeId, $byCodeEmployee);
+                    $this->indexEmployee($employee, $byLegacyId, $byEmployeeId);
                 }
 
                 continue;
@@ -251,12 +250,8 @@ class EmployeeLegacySyncService
                 $payload['photo_path'] = null;
             }
 
-            if ($matchType === 'employee_id' || $matchType === 'code_employee') {
-                if ($hadNoLegacyId) {
-                    $mergedManual++;
-                } else {
-                    $updated++;
-                }
+            if ($matchType === 'employee_id' && $hadNoLegacyId) {
+                $mergedManual++;
             } else {
                 $updated++;
             }
@@ -269,7 +264,7 @@ class EmployeeLegacySyncService
                 $match->fill($payload);
                 $match->deleted_at = null;
                 $match->save();
-                $this->indexEmployee($match, $byLegacyId, $byEmployeeId, $byCodeEmployee);
+                $this->indexEmployee($match, $byLegacyId, $byEmployeeId);
             }
         }
 
@@ -308,6 +303,7 @@ class EmployeeLegacySyncService
             'soft_deleted' => $softDeleted,
             'restored' => $restored,
             'skipped' => $skipped,
+            'code_adjusted' => $codeAdjusted,
             'photos_preserved' => $photosPreserved,
             'photos_relinked' => $photosRelinked,
         ];
@@ -383,18 +379,18 @@ class EmployeeLegacySyncService
     }
 
     /**
+     * Match only by legacy id / employee_id.
+     * Never match by code_employee alone — legacy reuses codes across people.
+     *
      * @param  array<int, Employee>  $byLegacyId
      * @param  array<string, Employee>  $byEmployeeId
-     * @param  array<string, Employee>  $byCodeEmployee
      * @return array{0: Employee|null, 1: string|null}
      */
     private function findMatch(
         ?int $legacyId,
         string $employeeId,
-        string $rawCodeEmployee,
         array $byLegacyId,
         array $byEmployeeId,
-        array $byCodeEmployee,
     ): array {
         if ($legacyId !== null && isset($byLegacyId[$legacyId])) {
             return [$byLegacyId[$legacyId], 'legacy_id'];
@@ -405,24 +401,17 @@ class EmployeeLegacySyncService
             return [$byEmployeeId[$employeeIdKey], 'employee_id'];
         }
 
-        $codeKey = $this->normalizeLookupKey($rawCodeEmployee);
-        if ($codeKey !== null && isset($byCodeEmployee[$codeKey])) {
-            return [$byCodeEmployee[$codeKey], 'code_employee'];
-        }
-
         return [null, null];
     }
 
     /**
      * @param  array<int, Employee>  $byLegacyId
      * @param  array<string, Employee>  $byEmployeeId
-     * @param  array<string, Employee>  $byCodeEmployee
      */
     private function indexEmployee(
         Employee $employee,
         array &$byLegacyId,
         array &$byEmployeeId,
-        array &$byCodeEmployee,
     ): void {
         $legacyId = $this->toInteger(data_get($employee->meta, 'legacy_id'));
         if ($legacyId !== null) {
@@ -432,11 +421,6 @@ class EmployeeLegacySyncService
         $employeeIdKey = $this->normalizeLookupKey($employee->employee_id);
         if ($employeeIdKey !== null) {
             $byEmployeeId[$employeeIdKey] = $employee;
-        }
-
-        $codeKey = $this->normalizeLookupKey($employee->code_employee);
-        if ($codeKey !== null) {
-            $byCodeEmployee[$codeKey] = $employee;
         }
     }
 

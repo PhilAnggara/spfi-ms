@@ -110,6 +110,10 @@ class LogUserCrudActivity
         $path = '/'.$request->path();
         $subject = UserActivitySubject::resolve($request, $user);
 
+        if ($subject === [] && $action === UserActivityLog::ACTION_CREATED) {
+            $subject = UserActivitySubject::resolveFromCreateInput($request);
+        }
+
         $this->logger->log(
             $user,
             $action,

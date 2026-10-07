@@ -278,7 +278,9 @@ class UserActivityLog extends Model
             return $code !== '' ? $id.' ('.$code.')' : $id;
         }
 
-        return null;
+        $code = trim((string) ($this->meta['subject_code'] ?? ''));
+
+        return $code !== '' ? '('.$code.')' : null;
     }
 
     /**
@@ -387,6 +389,10 @@ class UserActivityLog extends Model
     {
         if ($route === 'chat.messages.index') {
             return $subject !== null ? 'Opened chat with '.$subject : 'Opened chat';
+        }
+
+        if ($page !== null && $subject !== null) {
+            return 'Visited '.$page.' '.$subject;
         }
 
         return $page !== null ? 'Visited '.$page : 'Visited page';

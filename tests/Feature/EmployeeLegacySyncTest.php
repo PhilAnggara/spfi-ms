@@ -286,3 +286,112 @@ it('runs via artisan command', function () {
         ->and($output)->toContain('Dry run')
         ->and($output)->toContain('Employees');
 });
+
+it('creates a new employee when legacy reuses an existing code_employee', function () {
+    $department = EmployeeDepartment::query()->create([
+        'code' => '70482',
+        'name' => 'HUMAN RESOURCES',
+    ]);
+
+    $owner = Employee::query()->create([
+        'employee_department_id' => $department->id,
+        'employee_id' => '269929',
+        'code_employee' => 'C2611000160',
+        'employee_name' => 'FEBIOLA POSUMAH',
+        'photo_path' => 'assets/images/employee_photos/C2611000160-febiola-posumah-20260101_120000_001.jpg',
+        'meta' => ['legacy_id' => 13455],
+    ]);
+
+    $result = employeeLegacySync()->sync([
+        'department_rows' => sampleDepartmentRows(),
+        'employee_rows' => [
+            [
+                'Id' => 13455,
+                'EmployeeId' => '269929',
+                'EmployeeName' => 'FEBIOLA POSUMAH',
+                'DeptCode' => '70482',
+                'CodeEmployee' => 'C2611000160',
+            ],
+            [
+                'Id' => 13816,
+                'EmployeeId' => '2691044',
+                'EmployeeName' => 'JULIAGUS HUTABARAT',
+                'DeptCode' => '70482',
+                'CodeEmployee' => 'C2611000160',
+            ],
+        ],
+    ]);
+
+    $owner->refresh();
+    $juliagus = Employee::query()->where('employee_id', '2691044')->first();
+
+    expect($result['employees']['created'])->toBe(1)
+        ->and($result['employees']['code_adjusted'])->toBe(1)
+        ->and($owner->employee_name)->toBe('FEBIOLA POSUMAH')
+        ->and($owner->code_employee)->toBe('C2611000160')
+        ->and($owner->photo_path)->toBe('assets/images/employee_photos/C2611000160-febiola-posumah-20260101_120000_001.jpg')
+        ->and($juliagus)->not->toBeNull()
+        ->and($juliagus->employee_name)->toBe('JULIAGUS HUTABARAT')
+        ->and($juliagus->code_employee)->toBe('C2611000160-dup-2')
+        ->and(data_get($juliagus->meta, 'legacy_id'))->toBe(13816)
+        ->and($juliagus->photo_path)->toBeNull();
+});
+
+it('does not relink another employees photo onto a reused-code newcomer', function () {
+    $directory = public_path('assets/images/employee_photos');
+    if (! is_dir($directory)) {
+        mkdir($directory, 0755, true);
+    }
+
+    $ownerPhoto = 'C2611000159-fenny-old-owner-20260101_120000_001.jpg';
+    $ownerPhotoPath = $directory.DIRECTORY_SEPARATOR.$ownerPhoto;
+    file_put_contents($ownerPhotoPath, 'fake-image');
+
+    try {
+        $department = EmployeeDepartment::query()->create([
+            'code' => '70482',
+            'name' => 'HUMAN RESOURCES',
+        ]);
+
+        $owner = Employee::query()->create([
+            'employee_department_id' => $department->id,
+            'employee_id' => '269928',
+            'code_employee' => 'C2611000159',
+            'employee_name' => 'SITI HAPSAH',
+            'photo_path' => 'assets/images/employee_photos/'.$ownerPhoto,
+            'meta' => ['legacy_id' => 13454],
+        ]);
+
+        employeeLegacySync()->sync([
+            'department_rows' => sampleDepartmentRows(),
+            'employee_rows' => [
+                [
+                    'Id' => 13454,
+                    'EmployeeId' => '269928',
+                    'EmployeeName' => 'SITI HAPSAH',
+                    'DeptCode' => '70482',
+                    'CodeEmployee' => 'C2611000159',
+                ],
+                [
+                    'Id' => 13815,
+                    'EmployeeId' => '2691043',
+                    'EmployeeName' => 'FENNY F BARAKATI',
+                    'DeptCode' => '70482',
+                    'CodeEmployee' => 'C2611000159',
+                ],
+            ],
+        ]);
+
+        $owner->refresh();
+        $fenny = Employee::query()->where('employee_id', '2691043')->firstOrFail();
+
+        expect($owner->photo_path)->toBe('assets/images/employee_photos/'.$ownerPhoto)
+            ->and($owner->code_employee)->toBe('C2611000159')
+            ->and($fenny->code_employee)->toBe('C2611000159-dup-2')
+            ->and($fenny->photo_path)->toBeNull();
+    } finally {
+        if (is_file($ownerPhotoPath)) {
+            unlink($ownerPhotoPath);
+        }
+    }
+});

@@ -2,11 +2,18 @@
 
 namespace App\Support;
 
+use App\Models\Buyer;
 use App\Models\Conversation;
+use App\Models\Employee;
 use App\Models\Item;
+use App\Models\ItemCategory;
+use App\Models\PrsItem;
+use App\Models\ScreenMessage;
+use App\Models\UnitOfMeasure;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class UserActivitySubject
@@ -29,7 +36,32 @@ class UserActivitySubject
         'dr_number',
         'obc_number',
         'doc_number',
+        'title',
+        'display_code',
         'name',
+    ];
+
+    /**
+     * Request input keys that may carry a document/master code on create.
+     *
+     * @var list<string>
+     */
+    private const CREATE_INPUT_CODE_KEYS = [
+        'sws_number',
+        'po_number',
+        'prs_number',
+        'rr_number',
+        'ts_number',
+        'sa_number',
+        'obc_number',
+        'dr_number',
+        'doc_number',
+        'code',
+        'employee_id',
+        'code_employee',
+        'employee_name',
+        'name',
+        'title',
     ];
 
     /**
@@ -77,6 +109,11 @@ class UserActivitySubject
 
         foreach ($parameters as $name => $value) {
             if ($value instanceof Model) {
+                // Route models are resolved before the controller mutates them.
+                if (in_array($request->method(), ['PUT', 'PATCH'], true) && $value->exists) {
+                    $value->refresh();
+                }
+
                 return self::fromModel($value, (string) $name);
             }
         }
@@ -91,6 +128,14 @@ class UserActivitySubject
             }
 
             $key = is_numeric($value) ? $value + 0 : (int) $value;
+            $normalized = str_replace('-', '_', strtolower((string) $name));
+            $compact = str_replace('_', '', $normalized);
+
+            if (in_array($normalized, ['store_withdrawal', 'storewithdrawal'], true)
+                || in_array($compact, ['storewithdrawal'], true)) {
+                return self::fromStoreWithdrawalId($key, (string) $name);
+            }
+
             $model = self::resolveModelForParameter((string) $name, $key, $routeName);
 
             if ($model instanceof Model) {
@@ -108,6 +153,33 @@ class UserActivitySubject
     }
 
     /**
+     * Lightweight create enrichment from request input only (no DB lookup).
+     *
+     * @return array{
+     *     subject?: string,
+     *     subject_type?: string,
+     *     subject_code?: string
+     * }
+     */
+    public static function resolveFromCreateInput(Request $request): array
+    {
+        $code = self::extractCreateInputCode($request);
+
+        if ($code === null) {
+            return [];
+        }
+
+        $routeName = (string) $request->route()?->getName();
+        $type = self::subjectTypeFromStoreRoute($routeName);
+
+        return array_filter([
+            'subject' => '('.$code.')',
+            'subject_type' => $type,
+            'subject_code' => $code,
+        ], static fn ($value) => $value !== null && $value !== '');
+    }
+
+    /**
      * @return array{
      *     subject: string,
      *     subject_type: string,
@@ -118,11 +190,20 @@ class UserActivitySubject
     public static function fromModel(Model $model, string $type): array
     {
         $key = $model->getKey();
-        $code = self::extractCode($model);
 
         if ($model instanceof User) {
             return self::personSubject((int) $key, $model->name, $type);
         }
+
+        if ($model instanceof Employee) {
+            return self::employeeSubject($model, $type);
+        }
+
+        if ($model instanceof PrsItem) {
+            return self::prsItemSubject($model, $type);
+        }
+
+        $code = self::extractCode($model);
 
         return array_filter([
             'subject' => $code !== null && $code !== ''
@@ -162,6 +243,92 @@ class UserActivitySubject
         return ! str_ends_with($routeName, '.index') && ! str_ends_with($routeName, '.print');
     }
 
+    /**
+     * @return array{
+     *     subject: string,
+     *     subject_type: string,
+     *     subject_id: int|string,
+     *     subject_code?: string
+     * }
+     */
+    private static function fromStoreWithdrawalId(int|string $id, string $type): array
+    {
+        $swsNumber = DB::table('store_withdrawals')
+            ->where('id', $id)
+            ->value('sws_number');
+        $code = is_string($swsNumber) ? trim($swsNumber) : '';
+
+        return array_filter([
+            'subject' => $code !== '' ? '#'.$id.' ('.$code.')' : '#'.$id,
+            'subject_type' => $type,
+            'subject_id' => $id,
+            'subject_code' => $code !== '' ? $code : null,
+        ], static fn ($value) => $value !== null && $value !== '');
+    }
+
+    /**
+     * @return array{
+     *     subject: string,
+     *     subject_type: string,
+     *     subject_id: int|string,
+     *     subject_code?: string
+     * }
+     */
+    private static function employeeSubject(Employee $employee, string $type): array
+    {
+        $key = $employee->getKey();
+        $code = trim((string) ($employee->code_employee ?: $employee->employee_id));
+        $name = trim((string) $employee->employee_name);
+
+        $label = match (true) {
+            $code !== '' && $name !== '' => $code.' · '.$name,
+            $code !== '' => $code,
+            $name !== '' => $name,
+            default => '',
+        };
+
+        return array_filter([
+            'subject' => $label !== '' ? '#'.$key.' ('.$label.')' : '#'.$key,
+            'subject_type' => $type,
+            'subject_id' => $key,
+            'subject_code' => $label !== '' ? $label : null,
+        ], static fn ($value) => $value !== null && $value !== '');
+    }
+
+    /**
+     * @return array{
+     *     subject: string,
+     *     subject_type: string,
+     *     subject_id: int|string,
+     *     subject_code?: string
+     * }
+     */
+    private static function prsItemSubject(PrsItem $prsItem, string $type): array
+    {
+        $prsItem->loadMissing([
+            'prs:id,prs_number',
+            'item:id,code',
+        ]);
+
+        $key = $prsItem->getKey();
+        $prsNumber = trim((string) ($prsItem->prs?->prs_number ?? ''));
+        $itemCode = trim((string) ($prsItem->item?->code ?? ''));
+
+        $label = match (true) {
+            $prsNumber !== '' && $itemCode !== '' => $prsNumber.' · '.$itemCode,
+            $prsNumber !== '' => $prsNumber,
+            $itemCode !== '' => $itemCode,
+            default => '',
+        };
+
+        return array_filter([
+            'subject' => $label !== '' ? '#'.$key.' ('.$label.')' : '#'.$key,
+            'subject_type' => $type,
+            'subject_id' => $key,
+            'subject_code' => $label !== '' ? $label : null,
+        ], static fn ($value) => $value !== null && $value !== '');
+    }
+
     private static function resolveModelForParameter(string $name, int|string $key, string $routeName): ?Model
     {
         $normalized = str_replace('-', '_', strtolower($name));
@@ -175,15 +342,20 @@ class UserActivitySubject
             'transfer_slip' => \App\Models\TransferSlip::class,
             'transferslip' => \App\Models\TransferSlip::class,
             'prs' => \App\Models\Prs::class,
+            'prs_item' => PrsItem::class,
+            'prsitem' => PrsItem::class,
             'supplier' => \App\Models\Supplier::class,
-            'buyer' => \App\Models\Buyer::class,
+            'buyer' => Buyer::class,
             'receiving_report' => \App\Models\ReceivingReport::class,
             'receivingreport' => \App\Models\ReceivingReport::class,
             'delivery' => \App\Models\Delivery::class,
-            'screen_message' => \App\Models\ScreenMessage::class,
-            'screenmessage' => \App\Models\ScreenMessage::class,
-            'store_withdrawal' => self::storeWithdrawalClass(),
-            'storewithdrawal' => self::storeWithdrawalClass(),
+            'screen_message' => ScreenMessage::class,
+            'screenmessage' => ScreenMessage::class,
+            'employee' => Employee::class,
+            'unit_of_measurement' => UnitOfMeasure::class,
+            'unitofmeasurement' => UnitOfMeasure::class,
+            'product_category' => ItemCategory::class,
+            'productcategory' => ItemCategory::class,
         ];
 
         if (str_starts_with($routeName, 'product.')) {
@@ -213,28 +385,14 @@ class UserActivitySubject
         return null;
     }
 
-    /**
-     * @return class-string<Model>|null
-     */
-    private static function storeWithdrawalClass(): ?string
-    {
-        foreach ([
-            'App\\Models\\StoreWithdrawal',
-            'App\\Models\\StoresWithdrawal',
-            'App\\Models\\StoreWithdrawalSlip',
-        ] as $class) {
-            if (class_exists($class) && is_subclass_of($class, Model::class)) {
-                return $class;
-            }
-        }
-
-        return null;
-    }
-
     private static function extractCode(Model $model): ?string
     {
         foreach (self::SUBJECT_CODE_ATTRIBUTES as $attribute) {
-            if ($attribute === 'name' && ! $model instanceof User) {
+            if ($attribute === 'name' && ! ($model instanceof User || $model instanceof Buyer)) {
+                continue;
+            }
+
+            if ($attribute === 'title' && ! $model instanceof ScreenMessage) {
                 continue;
             }
 
@@ -243,9 +401,61 @@ class UserActivitySubject
             if (is_string($value) && trim($value) !== '') {
                 return trim($value);
             }
+
+            if (is_numeric($value) && (string) $value !== '') {
+                return trim((string) $value);
+            }
         }
 
         return null;
+    }
+
+    private static function extractCreateInputCode(Request $request): ?string
+    {
+        $employeeId = trim((string) $request->input('employee_id', ''));
+        $employeeName = trim((string) $request->input('employee_name', ''));
+        $codeEmployee = trim((string) $request->input('code_employee', ''));
+
+        if ($employeeId !== '' || $codeEmployee !== '' || $employeeName !== '') {
+            $code = $codeEmployee !== '' ? $codeEmployee : $employeeId;
+
+            return match (true) {
+                $code !== '' && $employeeName !== '' => $code.' · '.$employeeName,
+                $code !== '' => $code,
+                $employeeName !== '' => $employeeName,
+                default => null,
+            };
+        }
+
+        foreach (self::CREATE_INPUT_CODE_KEYS as $key) {
+            if (in_array($key, ['employee_id', 'code_employee', 'employee_name'], true)) {
+                continue;
+            }
+
+            $value = $request->input($key);
+
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    private static function subjectTypeFromStoreRoute(string $routeName): ?string
+    {
+        if ($routeName === '' || ! str_ends_with($routeName, '.store')) {
+            return null;
+        }
+
+        $parts = explode('.', $routeName);
+        array_pop($parts);
+
+        if ($parts === []) {
+            return null;
+        }
+
+        return str_replace('-', '_', implode('.', $parts));
     }
 
     /**

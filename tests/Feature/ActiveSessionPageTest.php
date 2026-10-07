@@ -355,7 +355,7 @@ it('renders status data attributes for realtime client filtering', function () {
         ->assertSee('Force logout', false);
 });
 
-it('logs successful create activity without a subject id', function () {
+it('logs successful create activity with subject code from request input', function () {
     $this->actingAs($this->admin)
         ->post(route('currency.store'), [
             'code' => 'TST',
@@ -373,8 +373,126 @@ it('logs successful create activity without a subject id', function () {
     expect($log)->not->toBeNull()
         ->and($log->meta['route'] ?? null)->toBe('currency.store')
         ->and($log->meta['page'] ?? null)->toBe('Currencies')
-        ->and($log->meta['subject'] ?? null)->toBeNull()
-        ->and($log->meta['subject_id'] ?? null)->toBeNull();
+        ->and($log->meta['subject'] ?? null)->toBe('(TST)')
+        ->and($log->meta['subject_code'] ?? null)->toBe('TST')
+        ->and($log->meta['subject_id'] ?? null)->toBeNull()
+        ->and($log->summary())->toBe('Created currency (TST)');
+});
+
+it('enriches store withdrawal activity with sws number', function () {
+    $now = now();
+    $swsNumber = 'SWS-ACT-ENRICH-001';
+
+    $storeWithdrawalId = (int) DB::table('store_withdrawals')->insertGetId([
+        'sws_number' => $swsNumber,
+        'sws_date' => $now->toDateString(),
+        'department_id' => $this->admin->department_id,
+        'department_code' => '7056',
+        'type' => 'normal',
+        'info' => 'Activity enrichment fixture',
+        'created_by' => $this->admin->id,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get(route('stores-withdrawals.edit', $storeWithdrawalId))
+        ->assertSuccessful();
+
+    $visit = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_ACTIVE)
+        ->where('meta->route', 'stores-withdrawals.edit')
+        ->latest('id')
+        ->first();
+
+    expect($visit)->not->toBeNull()
+        ->and($visit->meta['subject_id'] ?? null)->toBe($storeWithdrawalId)
+        ->and($visit->meta['subject_code'] ?? null)->toBe($swsNumber)
+        ->and($visit->meta['subject'] ?? null)->toBe('#'.$storeWithdrawalId.' ('.$swsNumber.')')
+        ->and($visit->summary())->toContain($swsNumber);
+
+    $this->actingAs($this->admin)
+        ->get(route('stores-withdrawals.print', $storeWithdrawalId))
+        ->assertSuccessful();
+
+    $print = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_PRINTED)
+        ->where('meta->route', 'stores-withdrawals.print')
+        ->latest('id')
+        ->first();
+
+    expect($print)->not->toBeNull()
+        ->and($print->meta['subject_code'] ?? null)->toBe($swsNumber)
+        ->and($print->summary())->toContain($swsNumber);
+});
+
+it('enriches employee update activity with employee id and name', function () {
+    $department = \App\Models\EmployeeDepartment::query()->create([
+        'code' => '70999',
+        'old_code' => '7099',
+        'name' => 'Activity Enrichment Dept',
+    ]);
+
+    $employee = \App\Models\Employee::query()->create([
+        'employee_department_id' => $department->id,
+        'employee_id' => 'E-ACT-001',
+        'code_employee' => 'C-ACT-001',
+        'employee_name' => 'Maria Santos',
+        'gender' => 'F',
+        'position_name' => 'Staff',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->put(route('employees.update', $employee), [
+            'employee_department_id' => $department->id,
+            'employee_id' => 'E-ACT-001',
+            'code_employee' => 'C-ACT-001',
+            'employee_name' => 'Maria Santos Updated',
+            'gender' => 'F',
+            'position_name' => 'Supervisor',
+        ])
+        ->assertRedirect();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_UPDATED)
+        ->where('meta->route', 'employees.update')
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['subject_id'] ?? null)->toBe($employee->id)
+        ->and($log->meta['subject_code'] ?? null)->toBe('C-ACT-001 · Maria Santos Updated')
+        ->and($log->summary())->toBe('Edited employee #'.$employee->id.' (C-ACT-001 · Maria Santos Updated)');
+});
+
+it('enriches buyer update activity with buyer name', function () {
+    $buyer = \App\Models\Buyer::query()->create([
+        'name' => 'PT Sumber Makmur',
+        'address' => 'Manado',
+        'created_by' => $this->admin->id,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->put(route('buyer.update', $buyer), [
+            'name' => 'PT Sumber Makmur Updated',
+            'address' => 'Manado',
+        ])
+        ->assertRedirect();
+
+    $log = UserActivityLog::query()
+        ->where('user_id', $this->admin->id)
+        ->where('action', UserActivityLog::ACTION_UPDATED)
+        ->where('meta->route', 'buyer.update')
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->meta['subject_id'] ?? null)->toBe($buyer->id)
+        ->and($log->meta['subject_code'] ?? null)->toBe('PT Sumber Makmur Updated')
+        ->and($log->summary())->toBe('Edited buyer #'.$buyer->id.' (PT Sumber Makmur Updated)');
 });
 
 it('does not log crud activity for login or broadcasting auth posts', function () {
