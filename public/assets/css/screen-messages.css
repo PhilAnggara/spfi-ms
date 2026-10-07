@@ -462,14 +462,6 @@
     transform: translateY(-1px);
 }
 
-.sm-overlay__note {
-    margin: 0;
-    width: 100%;
-    text-align: center;
-    font-size: 0.85rem;
-    color: #64748b;
-}
-
 @media (prefers-reduced-motion: reduce) {
     .sm-overlay__backdrop,
     .sm-overlay__panel,

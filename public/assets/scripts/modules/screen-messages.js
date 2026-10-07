@@ -19,7 +19,6 @@
     const replySent = document.getElementById('sm-overlay-reply-sent');
     const replySentBody = document.getElementById('sm-overlay-reply-sent-body');
     const closeBtn = document.getElementById('sm-overlay-close');
-    const permanentNote = document.getElementById('sm-overlay-permanent-note');
 
     const IDLE_POLL_MS = 10000;
     const ACTIVE_POLL_MS = 2000;
@@ -292,7 +291,6 @@
         const isPermanent = message.display_mode === 'permanent';
         const canClose = message.display_mode === 'user_closable';
 
-        permanentNote.hidden = !isPermanent;
         closeBtn.hidden = !canClose;
 
         if (message.allow_reply) {

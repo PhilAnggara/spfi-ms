@@ -29,9 +29,6 @@
             <button type="button" id="sm-overlay-close" class="sm-overlay__btn sm-overlay__btn--primary" hidden>
                 Close
             </button>
-            <p id="sm-overlay-permanent-note" class="sm-overlay__note" hidden>
-                This message stays on screen until the sender deactivates it.
-            </p>
         </div>
     </div>
 </div>
