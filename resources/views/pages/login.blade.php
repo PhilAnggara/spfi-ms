@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>SPFI-MS | Login</title>
+    <title>{{ config('app.name', 'SPFI') }} | Login</title>
     @include('includes.icons')
     <link rel="stylesheet" href="{{ url('assets/styles/spfi-tokens.css') }}">
     <link rel="stylesheet" href="{{ url('assets/styles/spfi-scale.css') }}">
