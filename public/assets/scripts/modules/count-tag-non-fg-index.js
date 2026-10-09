@@ -96,6 +96,7 @@
             dateStart: document.getElementById('filter-ct-date-start'),
             dateEnd: document.getElementById('filter-ct-date-end'),
             location: document.getElementById('filter-ct-location'),
+            category: document.getElementById('filter-ct-category'),
             reset: document.getElementById('reset-ct-filter'),
         };
 
@@ -116,6 +117,7 @@
             setQueryParam(url.searchParams, 'date_start', filterElements.dateStart?.value);
             setQueryParam(url.searchParams, 'date_end', filterElements.dateEnd?.value);
             setQueryParam(url.searchParams, 'location_id', filterElements.location?.value);
+            setQueryParam(url.searchParams, 'category_id', filterElements.category?.value);
             url.searchParams.delete('page');
 
             return url.toString();
@@ -159,6 +161,10 @@
             filterElements.location.addEventListener('change', () => applyServerFilter(false));
         }
 
+        if (filterElements.category) {
+            filterElements.category.addEventListener('change', () => applyServerFilter(false));
+        }
+
         if (filterElements.reset) {
             filterElements.reset.addEventListener('click', function () {
                 if (filterElements.keyword) {
@@ -172,6 +178,9 @@
                 }
                 if (filterElements.location) {
                     filterElements.location.value = '';
+                }
+                if (filterElements.category) {
+                    filterElements.category.value = '';
                 }
 
                 applyServerFilter(false);
@@ -187,26 +196,52 @@
         return String(value);
     }
 
-    function setField(root, name, value) {
-        const el = root.querySelector(`[data-field="${name}"]`);
-        if (!el) {
+    function setField(root, name, value, { html = false } = {}) {
+        if (!root) {
             return;
         }
 
-        if (name === 'meta') {
+        root.querySelectorAll(`[data-field="${name}"]`).forEach((el) => {
+            if (html) {
+                el.innerHTML = value;
+                return;
+            }
+
             el.textContent = value;
-            return;
-        }
-
-        el.innerHTML = value;
+        });
     }
 
-    function matchBadge(matched, matchedLabel, unmatchedLabel) {
-        if (matched) {
-            return `<span class="badge bg-light-success text-success">${matchedLabel}</span>`;
+    function positionLine(data) {
+        const parts = [];
+
+        if (data.section_code) {
+            parts.push(`Sec ${data.section_code}`);
         }
 
-        return `<span class="badge bg-light-warning text-warning">${unmatchedLabel}</span>`;
+        const row = displayValue(data.row);
+        const col = displayValue(data.col);
+        const level = displayValue(data.level);
+        if (row !== '—' || col !== '—' || level !== '—') {
+            parts.push(`R${row}/C${col}/L${level}`);
+        }
+
+        return parts.length ? parts.join(' · ') : '—';
+    }
+
+    function conditionBadgeHtml(condition) {
+        if (!condition) {
+            return '—';
+        }
+
+        const map = {
+            Good: 'is-good',
+            Damaged: 'is-damaged',
+            Expired: 'is-expired',
+            Quarantine: 'is-quarantine',
+        };
+        const cls = map[condition] || 'is-good';
+
+        return `<span class="ct-condition-badge ${cls}">${condition}</span>`;
     }
 
     async function openDetailModal(url) {
@@ -240,43 +275,35 @@
             }
 
             const data = await response.json();
+            const qtyText = Number(data.qty ?? 0).toLocaleString(undefined, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 5,
+            });
+            const uom = data.uom_code || data.uom_name || '';
 
             if (titleEl) {
                 titleEl.textContent = data.count_tag_number
-                    ? `Count Tag ${data.count_tag_number}`
+                    ? data.count_tag_number
                     : 'Count Tag Detail';
             }
 
-            setField(contentEl, 'count_tag_number', displayValue(data.count_tag_number));
-            setField(contentEl, 'count_tag_date', displayValue(data.count_tag_date));
-            setField(contentEl, 'tran_date', displayValue(data.tran_date));
-            setField(contentEl, 'item_code', displayValue(data.item_code));
-            setField(contentEl, 'item_name', displayValue(data.item_name));
-            setField(contentEl, 'item_match_badge', matchBadge(data.item_matched, 'Item matched', 'Item unmatched'));
-            setField(contentEl, 'category_name', displayValue(data.category_name));
-            setField(
-                contentEl,
-                'uom',
-                displayValue(data.uom_name || data.uom_code)
-            );
-            setField(contentEl, 'qty', Number(data.qty ?? 0).toLocaleString(undefined, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 5,
-            }));
-            setField(contentEl, 'location_name', displayValue(data.location_name));
-            setField(contentEl, 'location_match_badge', matchBadge(data.location_matched, 'Location matched', 'Location unmatched'));
-            setField(contentEl, 'section_code', displayValue(data.section_code));
-            setField(
-                contentEl,
-                'position',
-                `R${displayValue(data.row)} / C${displayValue(data.col)} / L${displayValue(data.level)}`
-            );
-            setField(contentEl, 'size', displayValue(data.size));
-            setField(contentEl, 'condition', displayValue(data.condition));
-            setField(contentEl, 'created_by_name', displayValue(data.created_by_name));
-            setField(contentEl, 'group_name', displayValue(data.group_name));
-            setField(contentEl, 'legacy_id', displayValue(data.legacy_id));
-            setField(contentEl, 'meta', JSON.stringify(data.meta ?? {}, null, 2));
+            setField(modalEl, 'count_tag_number', displayValue(data.count_tag_number));
+            setField(modalEl, 'count_tag_date', displayValue(data.count_tag_date));
+            setField(modalEl, 'tran_date', displayValue(data.tran_date));
+            setField(modalEl, 'created_by_name', displayValue(data.created_by_name));
+            setField(modalEl, 'item_code', displayValue(data.item_code));
+            setField(modalEl, 'item_name', displayValue(data.item_name));
+            setField(modalEl, 'category_name', displayValue(data.category_name));
+            setField(modalEl, 'uom', displayValue(data.uom_name || data.uom_code));
+            setField(modalEl, 'qty_display', uom ? `${qtyText} ${uom}` : qtyText);
+            setField(modalEl, 'location_name', displayValue(data.location_name));
+            setField(modalEl, 'position_line', positionLine(data));
+            setField(modalEl, 'section_code', displayValue(data.section_code));
+            setField(modalEl, 'row', displayValue(data.row));
+            setField(modalEl, 'col', displayValue(data.col));
+            setField(modalEl, 'level', displayValue(data.level));
+            setField(modalEl, 'size', displayValue(data.size));
+            setField(modalEl, 'condition_html', conditionBadgeHtml(data.condition), { html: true });
 
             loadingEl?.classList.add('d-none');
             contentEl?.classList.remove('d-none');

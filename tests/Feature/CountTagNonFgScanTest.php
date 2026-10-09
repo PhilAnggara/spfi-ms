@@ -93,7 +93,7 @@ it('allows users with create permission to open the scan page', function () {
         ->assertSee('Count Tag Entry')
         ->assertSee('id="count-tag-result-card"', false)
         ->assertSee('role="button"', false)
-        ->assertSee('Tap to open');
+        ->assertSee('Tap to continue');
 });
 
 it('forbids users without permission from opening count tag pages', function () {

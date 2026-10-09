@@ -18,6 +18,12 @@ class DocumentNumberService
         'DR' => ['table' => 'deliveries', 'column' => 'dr_number', 'field' => 'dr_number'],
         'SA' => ['table' => 'stock_adjustments', 'column' => 'sa_number', 'field' => 'sa_number'],
         'OBC' => ['table' => 'opening_balance_corrections', 'column' => 'obc_number', 'field' => 'obc_number'],
+        'CT' => [
+            'table' => 'non_fg_count_tags',
+            'column' => 'count_tag_number',
+            'field' => 'count_tag_number',
+            'prefix' => 'CT',
+        ],
     ];
 
     public function previewNext(string $type): string
@@ -86,6 +92,7 @@ class DocumentNumberService
             'DR' => 'DR Number',
             'SA' => 'SA Number',
             'OBC' => 'OBC Number',
+            'CT' => 'Count Tag Number',
             default => $config['field'],
         };
         $fallbackMessage = "The {$label} {$number} has already been used.";
@@ -193,14 +200,19 @@ class DocumentNumberService
     private function lastNumberParts(string $type): array
     {
         $config = $this->config($type);
+        $prefix = (string) ($config['prefix'] ?? '');
         $best = [
-            'prefix' => '',
+            'prefix' => $prefix,
             'running_number' => 0,
             'padding' => self::DEFAULT_PADDING,
         ];
 
         $query = DB::table($config['table'])
             ->whereNotNull($config['column']);
+
+        if ($prefix !== '') {
+            $query->where($config['column'], 'like', $prefix.'%');
+        }
 
         if ($this->hasSoftDeleteColumn($config['table'])) {
             $query->whereNull('deleted_at');
@@ -294,7 +306,7 @@ class DocumentNumberService
     }
 
     /**
-     * @return array{table: string, column: string, field: string}
+     * @return array{table: string, column: string, field: string, prefix?: string}
      */
     private function config(string $type): array
     {

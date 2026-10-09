@@ -88,17 +88,24 @@ it('lists imported count tags for users with view permission', function () {
         ->assertSuccessful()
         ->assertSee('CT-501')
         ->assertSee('CTLIST01')
+        ->assertSee('PARTS')
         ->assertSee('BONITO')
+        ->assertSee('id="filter-ct-category"', false)
         ->assertSee('id="ct-detail-modal"', false)
         ->assertSee('1 records');
 });
 
-it('filters count tags by keyword and location', function () {
+it('filters count tags by keyword, location, and category', function () {
     $user = createCountTagListUser('ct-list-filter', ['view-count-tag-non-fg']);
 
     $otherLocation = CountTagLocation::query()->create([
         'name' => 'SKIPJACK',
         'legacy_id' => 2,
+    ]);
+
+    $otherCategory = ItemCategory::query()->create([
+        'name' => 'CAN',
+        'code' => 'CAN-CTL',
     ]);
 
     NonFgCountTag::query()->create([
@@ -107,6 +114,7 @@ it('filters count tags by keyword and location', function () {
         'count_tag_date' => '2024-07-01',
         'item_code' => $this->item->code,
         'item_id' => $this->item->id,
+        'item_category_id' => $this->category->id,
         'location_id' => $this->location->id,
         'location_name' => 'BONITO',
         'qty' => 1,
@@ -118,6 +126,7 @@ it('filters count tags by keyword and location', function () {
         'count_tag_number' => 'CT-HIDE',
         'count_tag_date' => '2024-07-01',
         'item_code' => 'OTHER99',
+        'item_category_id' => $otherCategory->id,
         'location_id' => $otherLocation->id,
         'location_name' => 'SKIPJACK',
         'qty' => 2,
@@ -128,6 +137,14 @@ it('filters count tags by keyword and location', function () {
         ->get(route('count-tags.non-fg.index', [
             'keyword' => 'CT-KEEP',
             'location_id' => $this->location->id,
+        ]))
+        ->assertSuccessful()
+        ->assertSee('CT-KEEP')
+        ->assertDontSee('CT-HIDE');
+
+    $this->actingAs($user)
+        ->get(route('count-tags.non-fg.index', [
+            'category_id' => $this->category->id,
         ]))
         ->assertSuccessful()
         ->assertSee('CT-KEEP')
@@ -167,12 +184,14 @@ it('returns count tag detail json for the modal', function () {
         ->assertJsonPath('count_tag_number', 'CT-701')
         ->assertJsonPath('item_code', 'CTLIST01')
         ->assertJsonPath('item_name', 'List Count Tag Item')
-        ->assertJsonPath('item_matched', true)
         ->assertJsonPath('category_name', 'PARTS')
         ->assertJsonPath('location_name', 'BONITO')
-        ->assertJsonPath('location_matched', true)
+        ->assertJsonPath('section_code', 'A')
         ->assertJsonPath('qty', 9)
-        ->assertJsonPath('meta.legacy.Id', 701);
+        ->assertJsonMissingPath('legacy_id')
+        ->assertJsonMissingPath('meta')
+        ->assertJsonMissingPath('item_matched')
+        ->assertJsonMissingPath('location_matched');
 });
 
 it('forbids users without view permission from list and detail', function () {
