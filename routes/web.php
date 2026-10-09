@@ -655,6 +655,9 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view-count-tag-non-fg')->prefix('count-tags/non-fg')->name('count-tags.non-fg.')->group(function () {
         Route::get('/', [CountTagNonFgController::class, 'index'])->name('index');
+        Route::get('/{nonFgCountTag}', [CountTagNonFgController::class, 'show'])
+            ->whereNumber('nonFgCountTag')
+            ->name('show');
     });
 
     Route::middleware('permission:create-count-tag-non-fg')->prefix('count-tags/non-fg')->name('count-tags.non-fg.')->group(function () {

@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\AccountingInventoryDocTran;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\NonFgCountTag;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -528,6 +529,63 @@ class AccountingInventoryReportService
             return collect();
         }
 
+        $source = (string) config('accounting_inventory.count_tag.source', 'legacy');
+
+        if ($source === 'local') {
+            return $this->countTagQtyByItemCodeFromLocal($asOfDate, $codes);
+        }
+
+        return $this->countTagQtyByItemCodeFromLegacy($asOfDate, $codes);
+    }
+
+    /**
+     * @param  list<string>  $codes
+     * @return Collection<string, float>
+     */
+    private function countTagQtyByItemCodeFromLocal(string $asOfDate, array $codes): Collection
+    {
+        if (! Schema::hasTable('non_fg_count_tags')) {
+            return collect();
+        }
+
+        $nextMonthStart = $asOfDate;
+        $nextMonthEnd = Carbon::parse($asOfDate)->endOfMonth()->toDateString();
+        $reportMonthEnd = Carbon::parse($asOfDate)->subDay()->toDateString();
+
+        $rows = NonFgCountTag::query()
+            ->whereDate('tran_date', '>=', $reportMonthEnd)
+            ->whereDate('tran_date', '<=', $nextMonthEnd)
+            ->whereIn('item_code', $codes)
+            ->get(['item_code', 'tran_date', 'qty']);
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $codeLookup = array_fill_keys($codes, true);
+
+        return $rows
+            ->groupBy(fn (NonFgCountTag $row): string => $this->normalizeItemCode($row->item_code))
+            ->filter(fn (Collection $itemRows, string $itemCode): bool => isset($codeLookup[$itemCode]))
+            ->map(function (Collection $itemRows) use ($nextMonthStart, $nextMonthEnd, $reportMonthEnd): float {
+                return $this->resolveCountTagQtyForPeriod(
+                    $itemRows->map(fn (NonFgCountTag $row): array => [
+                        'date' => $row->tran_date?->toDateString(),
+                        'qty' => (float) $row->qty,
+                    ]),
+                    $nextMonthStart,
+                    $nextMonthEnd,
+                    $reportMonthEnd,
+                );
+            });
+    }
+
+    /**
+     * @param  list<string>  $codes
+     * @return Collection<string, float>
+     */
+    private function countTagQtyByItemCodeFromLegacy(string $asOfDate, array $codes): Collection
+    {
         $connection = (string) config('accounting_inventory.count_tag.connection', 'legacy_sqlsrv_5');
         $table = (string) config('accounting_inventory.count_tag.table', 'tblNonFGCountTag');
         $nextMonthStart = $asOfDate;
@@ -535,7 +593,6 @@ class AccountingInventoryReportService
         $reportMonthEnd = Carbon::parse($asOfDate)->subDay()->toDateString();
 
         try {
-            // Include report month-end plus the whole next month (legacy tags ending stock on either side).
             $rows = DB::connection($connection)
                 ->table($table)
                 ->whereDate('Trandate', '>=', $reportMonthEnd)
@@ -552,35 +609,15 @@ class AccountingInventoryReportService
                 ->groupBy(fn (object $row): string => $this->normalizeItemCode($row->ItemCode))
                 ->filter(fn (Collection $itemRows, string $itemCode): bool => isset($codeLookup[$itemCode]))
                 ->map(function (Collection $itemRows) use ($nextMonthStart, $nextMonthEnd, $reportMonthEnd): float {
-                    $normalized = $itemRows->map(fn (object $row): array => [
-                        'date' => Carbon::parse($row->Trandate)->toDateString(),
-                        'qty' => (float) $row->QTY,
-                    ]);
-
-                    $sumOnDate = function (string $date) use ($normalized): float {
-                        return (float) $normalized->where('date', $date)->sum('qty');
-                    };
-
-                    $onFirstDayQty = $sumOnDate($nextMonthStart);
-                    if (abs($onFirstDayQty) > 1e-9) {
-                        return round($onFirstDayQty, 5);
-                    }
-
-                    $nextMonthDatesWithQty = $normalized
-                        ->filter(function (array $row) use ($nextMonthStart, $nextMonthEnd): bool {
-                            return $row['date'] >= $nextMonthStart
-                                && $row['date'] <= $nextMonthEnd
-                                && abs($row['qty']) > 1e-9;
-                        })
-                        ->groupBy('date');
-
-                    if ($nextMonthDatesWithQty->isNotEmpty()) {
-                        $earliestNext = $nextMonthDatesWithQty->keys()->sort()->first();
-
-                        return round($sumOnDate((string) $earliestNext), 5);
-                    }
-
-                    return round($sumOnDate($reportMonthEnd), 5);
+                    return $this->resolveCountTagQtyForPeriod(
+                        $itemRows->map(fn (object $row): array => [
+                            'date' => Carbon::parse($row->Trandate)->toDateString(),
+                            'qty' => (float) $row->QTY,
+                        ]),
+                        $nextMonthStart,
+                        $nextMonthEnd,
+                        $reportMonthEnd,
+                    );
                 });
         } catch (Throwable $e) {
             Log::warning('Accounting restatement counttag percount unavailable.', [
@@ -592,6 +629,42 @@ class AccountingInventoryReportService
 
             return collect();
         }
+    }
+
+    /**
+     * @param  Collection<int, array{date: ?string, qty: float}>  $normalized
+     */
+    private function resolveCountTagQtyForPeriod(
+        Collection $normalized,
+        string $nextMonthStart,
+        string $nextMonthEnd,
+        string $reportMonthEnd,
+    ): float {
+        $sumOnDate = function (string $date) use ($normalized): float {
+            return (float) $normalized->where('date', $date)->sum('qty');
+        };
+
+        $onFirstDayQty = $sumOnDate($nextMonthStart);
+        if (abs($onFirstDayQty) > 1e-9) {
+            return round($onFirstDayQty, 5);
+        }
+
+        $nextMonthDatesWithQty = $normalized
+            ->filter(function (array $row) use ($nextMonthStart, $nextMonthEnd): bool {
+                return $row['date'] !== null
+                    && $row['date'] >= $nextMonthStart
+                    && $row['date'] <= $nextMonthEnd
+                    && abs($row['qty']) > 1e-9;
+            })
+            ->groupBy('date');
+
+        if ($nextMonthDatesWithQty->isNotEmpty()) {
+            $earliestNext = $nextMonthDatesWithQty->keys()->sort()->first();
+
+            return round($sumOnDate((string) $earliestNext), 5);
+        }
+
+        return round($sumOnDate($reportMonthEnd), 5);
     }
 
     private function normalizeItemCode(mixed $code): string

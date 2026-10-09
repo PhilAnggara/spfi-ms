@@ -107,6 +107,7 @@ class UserActivityLog extends Model
         'receiving-reports.index' => 'Receiving Reports',
         'receiving-reports.print' => 'Receiving Reports',
         'count-tags.non-fg.index' => 'Count Tag Non-FG',
+        'count-tags.non-fg.show' => 'Count Tag Non-FG Detail',
         'count-tags.non-fg.scan' => 'Count Tag Non-FG Scan',
         'count-tags.non-fg.lookup' => 'Count Tag Non-FG Lookup',
         'stores-withdrawals.index' => 'Stores Withdrawals',
