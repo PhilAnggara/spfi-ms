@@ -74,7 +74,7 @@ function createCountTagStoreUser(string $username, array $permissions = []): Use
     return $user;
 }
 
-it('stores a count tag from scan with null legacy_id and auto number', function () {
+it('stores a count tag from scan with null number and month-end period', function () {
     $user = createCountTagStoreUser('ct-store-ok', [
         'view-count-tag-non-fg',
         'create-count-tag-non-fg',
@@ -91,19 +91,20 @@ it('stores a count tag from scan with null legacy_id and auto number', function 
             'level' => 1,
             'condition' => 'Good',
             'size' => 'M',
-            'count_tag_date' => '2026-10-09',
-            'tran_date' => '2026-10-09',
+            'count_tag_date' => now()->format('Y-m'),
         ]);
 
     $response->assertCreated()
         ->assertJsonPath('message', 'Count tag saved.')
         ->assertJsonPath('data.item_code', 'CTSTORE1')
-        ->assertJsonPath('data.qty', 12.5);
+        ->assertJsonPath('data.qty', 12.5)
+        ->assertJsonPath('data.count_tag_number', null);
 
     $tag = NonFgCountTag::query()->first();
     expect($tag)->not->toBeNull();
-    expect($tag->legacy_id)->toBeNull();
-    expect($tag->count_tag_number)->toStartWith('CT');
+    expect($tag->count_tag_number)->toBeNull();
+    expect($tag->tran_date?->toDateString())->toBe(now()->toDateString());
+    expect($tag->count_tag_date?->toDateString())->toBe(now()->endOfMonth()->toDateString());
     expect($tag->item_id)->toBe($this->item->id);
     expect($tag->item_category_id)->toBe($this->category->id);
     expect($tag->location_id)->toBe($this->location->id);
@@ -123,7 +124,7 @@ it('validates required fields and section bounds', function () {
     $this->actingAs($user)
         ->postJson(route('count-tags.non-fg.store'), [])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['item_id', 'location_id', 'section_id', 'qty', 'count_tag_date', 'tran_date']);
+        ->assertJsonValidationErrors(['item_id', 'location_id', 'section_id', 'qty', 'count_tag_date']);
 
     $this->actingAs($user)
         ->postJson(route('count-tags.non-fg.store'), [
@@ -133,8 +134,7 @@ it('validates required fields and section bounds', function () {
             'qty' => 1,
             'row' => 99,
             'col' => 99,
-            'count_tag_date' => '2026-10-09',
-            'tran_date' => '2026-10-09',
+            'count_tag_date' => now()->format('Y-m'),
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['row', 'col']);
@@ -165,8 +165,7 @@ it('rejects section from a different location', function () {
             'location_id' => $this->location->id,
             'section_id' => $otherSection->id,
             'qty' => 1,
-            'count_tag_date' => '2026-10-09',
-            'tran_date' => '2026-10-09',
+            'count_tag_date' => now()->format('Y-m'),
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['section_id']);
@@ -200,8 +199,7 @@ it('forbids store without create permission', function () {
             'location_id' => $this->location->id,
             'section_id' => $this->section->id,
             'qty' => 1,
-            'count_tag_date' => '2026-10-09',
-            'tran_date' => '2026-10-09',
+            'count_tag_date' => now()->format('Y-m'),
         ])
         ->assertForbidden();
 });
@@ -218,5 +216,7 @@ it('renders scan page with store form fields', function () {
         ->assertSee('id="count-tag-entry-form"', false)
         ->assertSee('id="count-tag-qty"', false)
         ->assertSee('id="count-tag-location"', false)
+        ->assertSee('<select id="count-tag-row"', false)
+        ->assertSee('<select id="count-tag-col"', false)
         ->assertSee('Save Count Tag');
 });

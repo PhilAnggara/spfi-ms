@@ -7,6 +7,7 @@ use App\Models\CountTagLocation;
 use App\Models\CountTagSection;
 use App\Models\NonFgCountTag;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Carbon;
 
 /**
  * @extends Factory<NonFgCountTag>
@@ -20,10 +21,11 @@ class NonFgCountTagFactory extends Factory
      */
     public function definition(): array
     {
+        $period = fake()->dateTimeBetween('-2 years', 'now');
+
         return [
-            'legacy_id' => fake()->unique()->numberBetween(1, 999999),
             'count_tag_number' => fake()->numerify('CT-#####'),
-            'count_tag_date' => fake()->date(),
+            'count_tag_date' => Carbon::instance($period)->endOfMonth()->toDateString(),
             'item_id' => null,
             'item_code' => strtoupper(fake()->bothify('??-####')),
             'item_category_id' => null,

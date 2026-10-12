@@ -658,14 +658,35 @@ Route::middleware('auth')->group(function () {
         Route::get('/{nonFgCountTag}', [CountTagNonFgController::class, 'show'])
             ->whereNumber('nonFgCountTag')
             ->name('show');
+        Route::match(['get', 'post'], '/{nonFgCountTag}/print', [CountTagNonFgController::class, 'print'])
+            ->whereNumber('nonFgCountTag')
+            ->name('print');
     });
 
     Route::middleware('permission:create-count-tag-non-fg')->prefix('count-tags/non-fg')->name('count-tags.non-fg.')->group(function () {
         Route::get('/scan', [CountTagNonFgController::class, 'scan'])->name('scan');
         Route::get('/lookup', [CountTagNonFgController::class, 'lookup'])->name('lookup');
-        Route::get('/locations', [CountTagNonFgController::class, 'locations'])->name('locations');
-        Route::get('/locations/{location}/sections', [CountTagNonFgController::class, 'sections'])->name('sections');
         Route::post('/', [CountTagNonFgController::class, 'store'])->name('store');
+    });
+
+    Route::middleware('permission:create-count-tag-non-fg|update-count-tag-non-fg')
+        ->prefix('count-tags/non-fg')
+        ->name('count-tags.non-fg.')
+        ->group(function () {
+            Route::get('/locations', [CountTagNonFgController::class, 'locations'])->name('locations');
+            Route::get('/locations/{location}/sections', [CountTagNonFgController::class, 'sections'])->name('sections');
+        });
+
+    Route::middleware('permission:update-count-tag-non-fg')->prefix('count-tags/non-fg')->name('count-tags.non-fg.')->group(function () {
+        Route::put('/{nonFgCountTag}', [CountTagNonFgController::class, 'update'])
+            ->whereNumber('nonFgCountTag')
+            ->name('update');
+    });
+
+    Route::middleware('permission:delete-count-tag-non-fg')->prefix('count-tags/non-fg')->name('count-tags.non-fg.')->group(function () {
+        Route::delete('/{nonFgCountTag}', [CountTagNonFgController::class, 'destroy'])
+            ->whereNumber('nonFgCountTag')
+            ->name('destroy');
     });
 
     Route::middleware('permission:create-opening-balance-correction')->prefix('opening-balance-corrections')->name('opening-balance-corrections.')->group(function () {

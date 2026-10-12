@@ -905,7 +905,7 @@ it('uses zero percount when item has no counttag for the period', function () {
         Schema::create('tblNonFGCountTag', function ($table): void {
             $table->string('ItemCode');
             $table->decimal('QTY', 20, 5);
-            $table->date('Trandate');
+            $table->date('CountTagDate');
         });
     }
 
@@ -1043,7 +1043,7 @@ it('does not add counttag-only items into restatement accounting columns', funct
     expect($rows->firstWhere(fn (array $row): bool => str_starts_with((string) $row['item_code'], 'ONLY-COUNT-TAG-')))->toBeNull();
 });
 
-it('uses counttag Trandate on the first day of the next month for ending percount', function () {
+it('uses counttag CountTagDate on the first day of the next month for ending percount', function () {
     AccountingInventoryMonthly::query()->create([
         'item_code' => $this->item->code,
         'doc_code' => 'RR',
@@ -1075,7 +1075,7 @@ it('uses counttag Trandate on the first day of the next month for ending percoun
     expect((float) $row['percount_amount'])->toBe(35.0);
 });
 
-it('falls back to earliest counttag Trandate in the next month when the first day is missing', function () {
+it('falls back to earliest counttag CountTagDate in the next month when the first day is missing', function () {
     AccountingInventoryMonthly::query()->create([
         'item_code' => $this->item->code,
         'doc_code' => 'RR',
@@ -1292,7 +1292,7 @@ it('rejects invalid restatement month ranges', function () {
 /**
  * Point counttag reader at the in-memory test DB and seed tblNonFGCountTag.
  */
-function seedLegacyCountTagFixture(string $itemCode, float $qty, ?string $tranDate = null): void
+function seedLegacyCountTagFixture(string $itemCode, float $qty, ?string $countTagDate = null): void
 {
     config(['accounting_inventory.count_tag.connection' => config('database.default')]);
 
@@ -1300,13 +1300,13 @@ function seedLegacyCountTagFixture(string $itemCode, float $qty, ?string $tranDa
         Schema::create('tblNonFGCountTag', function ($table): void {
             $table->string('ItemCode');
             $table->decimal('QTY', 20, 5);
-            $table->date('Trandate');
+            $table->date('CountTagDate');
         });
     }
 
     DB::table('tblNonFGCountTag')->insert([
         'ItemCode' => $itemCode,
         'QTY' => $qty,
-        'Trandate' => $tranDate ?? now()->copy()->addMonthNoOverflow()->startOfMonth()->toDateString(),
+        'CountTagDate' => $countTagDate ?? now()->copy()->addMonthNoOverflow()->startOfMonth()->toDateString(),
     ]);
 }

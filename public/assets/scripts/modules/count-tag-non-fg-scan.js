@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const storeUrl = page.dataset.storeUrl || '';
     const locationsUrl = page.dataset.locationsUrl || '';
     const today = page.dataset.today || '';
+    const currentMonth = page.dataset.currentMonth || '';
+    const canUpdate = page.dataset.canUpdate === '1';
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     const startButton = document.getElementById('count-tag-start-camera');
@@ -29,6 +31,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const entryForm = document.getElementById('count-tag-entry-form');
     const formError = document.getElementById('count-tag-form-error');
     const saveButton = document.getElementById('count-tag-save-btn');
+    const saveLabel = saveButton?.querySelector('.count-tag-save-label');
+    const modalTitle = document.getElementById('count-tag-entry-modal-title');
+    const modalSubtitle = document.getElementById('count-tag-entry-modal-subtitle');
     const modalCode = document.getElementById('count-tag-modal-code');
     const modalName = document.getElementById('count-tag-modal-name');
     const modalMeta = document.getElementById('count-tag-modal-meta');
@@ -42,8 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const qtyInput = document.getElementById('count-tag-qty');
     const conditionSelect = document.getElementById('count-tag-condition');
     const sizeInput = document.getElementById('count-tag-size');
-    const countTagDateInput = document.getElementById('count-tag-date');
-    const tranDateInput = document.getElementById('count-tag-tran-date');
+    const periodInput = document.getElementById('count-tag-period');
 
     const entryModal = entryModalEl && window.bootstrap?.Modal
         ? window.bootstrap.Modal.getOrCreateInstance(entryModalEl)
@@ -55,12 +59,15 @@ document.addEventListener('DOMContentLoaded', function () {
     let isLookingUp = false;
     let isSaving = false;
     let isEntryModalOpen = false;
+    let isRefreshingPeriod = false;
     let lastScannedCode = '';
     let lastScanAt = 0;
     let lastItem = null;
     let locationsLoaded = false;
     let sectionsByLocation = {};
     let selectedSection = null;
+    let mode = 'create';
+    let existingTag = null;
 
     const setCameraPill = (state) => {
         if (!cameraPill) {
@@ -208,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        saveButton.disabled = active;
+        saveButton.disabled = active || (mode === 'update' && !canUpdate);
         saveButton.querySelector('.count-tag-save-label')?.classList.toggle('d-none', active);
         saveButton.querySelector('.count-tag-save-spinner')?.classList.toggle('d-none', !active);
     };
@@ -248,6 +255,31 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
+    const rebuildPositionOptions = (select, max, selected = '') => {
+        if (!select) {
+            return;
+        }
+
+        const previous = selected !== '' && selected != null
+            ? String(selected)
+            : String(select.value || '');
+
+        select.innerHTML = '<option value="">—</option>';
+        const limit = Number(max || 0);
+        for (let value = 1; value <= limit; value += 1) {
+            const option = document.createElement('option');
+            option.value = String(value);
+            option.textContent = String(value);
+            select.appendChild(option);
+        }
+
+        if (previous !== '' && [...select.options].some((option) => option.value === previous)) {
+            select.value = previous;
+        } else {
+            select.value = '';
+        }
+    };
+
     const fillSectionOptions = (sections) => {
         if (!sectionSelect) {
             return;
@@ -265,14 +297,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         sectionSelect.disabled = sections.length === 0;
         selectedSection = null;
+        rebuildPositionOptions(rowInput, 0);
+        rebuildPositionOptions(colInput, 0);
         if (sectionHint) {
             sectionHint.textContent = sections.length
-                ? 'Choose a section to see row/column limits.'
+                ? 'Choose a section to see row/column options.'
                 : 'No sections for this location.';
         }
     };
 
-    const updateSectionHint = () => {
+    const updateSectionHint = (selectedRow = null, selectedCol = null) => {
         if (!sectionSelect || !sectionHint) {
             return;
         }
@@ -280,7 +314,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const option = sectionSelect.selectedOptions[0];
         if (!option || !option.value) {
             selectedSection = null;
-            sectionHint.textContent = 'Choose a section to see row/column limits.';
+            rebuildPositionOptions(rowInput, 0);
+            rebuildPositionOptions(colInput, 0);
+            sectionHint.textContent = 'Choose a section to see row/column options.';
             return;
         }
 
@@ -290,29 +326,20 @@ document.addEventListener('DOMContentLoaded', function () {
             max_column: Number(option.dataset.maxColumn || 0),
         };
 
+        rebuildPositionOptions(rowInput, selectedSection.max_row, selectedRow);
+        rebuildPositionOptions(colInput, selectedSection.max_column, selectedCol);
+
         const parts = [];
         if (selectedSection.max_row > 0) {
-            parts.push(`max row ${selectedSection.max_row}`);
+            parts.push(`rows 1–${selectedSection.max_row}`);
         }
         if (selectedSection.max_column > 0) {
-            parts.push(`max col ${selectedSection.max_column}`);
+            parts.push(`cols 1–${selectedSection.max_column}`);
         }
 
         sectionHint.textContent = parts.length
-            ? `Section limits: ${parts.join(', ')}.`
-            : 'No row/column limits configured for this section.';
-
-        if (rowInput && selectedSection.max_row > 0) {
-            rowInput.max = String(selectedSection.max_row);
-        } else if (rowInput) {
-            rowInput.removeAttribute('max');
-        }
-
-        if (colInput && selectedSection.max_column > 0) {
-            colInput.max = String(selectedSection.max_column);
-        } else if (colInput) {
-            colInput.removeAttribute('max');
-        }
+            ? `Section options: ${parts.join(', ')}.`
+            : 'No row/column options configured for this section.';
     };
 
     const loadLocations = async () => {
@@ -382,8 +409,76 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
+    const setMode = (nextMode, existing = null) => {
+        mode = nextMode;
+        existingTag = existing;
+
+        if (modalTitle) {
+            modalTitle.textContent = mode === 'update' ? 'Update Count Tag' : 'Count Tag Entry';
+        }
+        if (modalSubtitle) {
+            modalSubtitle.textContent = mode === 'update'
+                ? 'This item already has a count tag for the selected period.'
+                : 'Confirm location and quantity, then save.';
+        }
+        if (saveLabel) {
+            saveLabel.textContent = mode === 'update' ? 'Update Count Tag' : 'Save Count Tag';
+        }
+        if (saveButton) {
+            saveButton.disabled = mode === 'update' && !canUpdate;
+        }
+
+        if (mode === 'update' && !canUpdate && formError) {
+            formError.textContent = 'You do not have permission to update an existing count tag.';
+            formError.classList.remove('d-none');
+        }
+    };
+
+    const applyDefaults = async (defaults, { keepQtyBlank = true } = {}) => {
+        if (!defaults) {
+            return;
+        }
+
+        if (defaults.location_id) {
+            if (locationSelect) {
+                locationSelect.value = String(defaults.location_id);
+            }
+            await loadSections(String(defaults.location_id));
+        }
+
+        if (defaults.section_id && sectionSelect) {
+            sectionSelect.value = String(defaults.section_id);
+            updateSectionHint(defaults.row ?? '', defaults.col ?? '');
+        } else {
+            rebuildPositionOptions(rowInput, 0);
+            rebuildPositionOptions(colInput, 0);
+        }
+
+        if (levelInput) {
+            levelInput.value = defaults.level ?? '';
+        }
+        if (conditionSelect) {
+            conditionSelect.value = defaults.condition || '';
+        }
+        if (sizeInput) {
+            sizeInput.value = defaults.size || '';
+        }
+        if (periodInput) {
+            const month = defaults.count_tag_month
+                || (defaults.count_tag_date ? String(defaults.count_tag_date).slice(0, 7) : '');
+            if (month) {
+                periodInput.value = month;
+            }
+        }
+        if (qtyInput && !keepQtyBlank && defaults.qty != null) {
+            qtyInput.value = defaults.qty;
+        }
+    };
+
     const resetFormFields = () => {
         clearFieldErrors();
+        mode = 'create';
+        existingTag = null;
         if (itemIdInput) {
             itemIdInput.value = '';
         }
@@ -391,12 +486,8 @@ document.addEventListener('DOMContentLoaded', function () {
             locationSelect.value = '';
         }
         fillSectionOptions([]);
-        if (rowInput) {
-            rowInput.value = '';
-        }
-        if (colInput) {
-            colInput.value = '';
-        }
+        rebuildPositionOptions(rowInput, 0);
+        rebuildPositionOptions(colInput, 0);
         if (levelInput) {
             levelInput.value = '';
         }
@@ -409,12 +500,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (sizeInput) {
             sizeInput.value = '';
         }
-        if (countTagDateInput) {
-            countTagDateInput.value = today;
+        if (periodInput) {
+            periodInput.value = currentMonth;
         }
-        if (tranDateInput) {
-            tranDateInput.value = today;
-        }
+        setMode('create');
     };
 
     const fillModal = (item) => {
@@ -440,6 +529,15 @@ document.addEventListener('DOMContentLoaded', function () {
         resetFormFields();
         fillModal(item);
         await loadLocations();
+
+        if (item.existing) {
+            setMode('update', item.existing);
+            await applyDefaults(item.existing, { keepQtyBlank: true });
+        } else {
+            setMode('create');
+            await applyDefaults(item.defaults || null, { keepQtyBlank: true });
+        }
+
         entryModal?.show();
         window.setTimeout(() => qtyInput?.focus(), 250);
     };
@@ -473,33 +571,39 @@ document.addEventListener('DOMContentLoaded', function () {
         openEntryModal(item);
     };
 
-    const lookupCode = async (rawCode, { fromCamera = false } = {}) => {
+    const lookupCode = async (rawCode, { fromCamera = false, periodMonth = null } = {}) => {
         const code = String(rawCode || '').trim();
         if (!code || !lookupUrl) {
-            return;
+            return null;
         }
 
-        if (isEntryModalOpen) {
-            return;
+        if (isEntryModalOpen && !isRefreshingPeriod) {
+            return null;
         }
 
         const now = Date.now();
         if (fromCamera && code === lastScannedCode && now - lastScanAt < 2500) {
-            return;
+            return null;
         }
 
         if (isLookingUp) {
-            return;
+            return null;
         }
 
         isLookingUp = true;
-        lastScannedCode = code;
-        lastScanAt = now;
-        setResultState({ loading: true });
+        if (!isRefreshingPeriod) {
+            lastScannedCode = code;
+            lastScanAt = now;
+            setResultState({ loading: true });
+        }
 
         try {
             const url = new URL(lookupUrl, window.location.origin);
             url.searchParams.set('code', code);
+            const period = periodMonth || currentMonth;
+            if (period) {
+                url.searchParams.set('count_tag_date', period);
+            }
 
             const response = await fetch(url.toString(), {
                 headers: {
@@ -514,18 +618,68 @@ document.addEventListener('DOMContentLoaded', function () {
                 const message = payload.message
                     || (payload.errors?.code ? payload.errors.code[0] : null)
                     || 'Product lookup failed.';
-                showError(message);
+                if (!isRefreshingPeriod) {
+                    showError(message);
+                }
+                return null;
+            }
+
+            if (!isRefreshingPeriod) {
+                showItem(payload, { fromCamera });
+                if (manualInput && !fromCamera) {
+                    manualInput.value = payload.code || code;
+                }
+            }
+
+            return payload;
+        } catch (_) {
+            if (!isRefreshingPeriod) {
+                showError('Unable to reach the server. Check your connection and try again.');
+            }
+            return null;
+        } finally {
+            isLookingUp = false;
+        }
+    };
+
+    const refreshForPeriod = async () => {
+        if (!lastItem?.code || !periodInput?.value || isRefreshingPeriod) {
+            return;
+        }
+
+        isRefreshingPeriod = true;
+        clearFieldErrors();
+
+        try {
+            const payload = await lookupCode(lastItem.code, {
+                periodMonth: periodInput.value,
+            });
+
+            if (!payload) {
                 return;
             }
 
-            showItem(payload, { fromCamera });
-            if (manualInput && !fromCamera) {
-                manualInput.value = payload.code || code;
+            lastItem = {
+                ...lastItem,
+                existing: payload.existing || null,
+                defaults: payload.defaults || null,
+            };
+
+            const preserveQty = qtyInput?.value || '';
+
+            if (payload.existing) {
+                setMode('update', payload.existing);
+                await applyDefaults(payload.existing, { keepQtyBlank: true });
+            } else {
+                setMode('create');
+                await applyDefaults(payload.defaults || null, { keepQtyBlank: true });
             }
-        } catch (_) {
-            showError('Unable to reach the server. Check your connection and try again.');
+
+            if (qtyInput) {
+                qtyInput.value = preserveQty;
+            }
         } finally {
-            isLookingUp = false;
+            isRefreshingPeriod = false;
         }
     };
 
@@ -535,7 +689,23 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     const saveCountTag = async () => {
-        if (!storeUrl || isSaving) {
+        if (isSaving) {
+            return;
+        }
+
+        if (mode === 'update' && !canUpdate) {
+            if (formError) {
+                formError.textContent = 'You do not have permission to update an existing count tag.';
+                formError.classList.remove('d-none');
+            }
+            return;
+        }
+
+        const targetUrl = mode === 'update'
+            ? (existingTag?.id ? `${storeUrl.replace(/\/$/, '')}/${existingTag.id}` : null)
+            : storeUrl;
+
+        if (!targetUrl) {
             return;
         }
 
@@ -543,7 +713,6 @@ document.addEventListener('DOMContentLoaded', function () {
         setSaving(true);
 
         const payload = {
-            item_id: Number(itemIdInput?.value || 0) || null,
             location_id: Number(locationSelect?.value || 0) || null,
             section_id: Number(sectionSelect?.value || 0) || null,
             qty: optionalNumber(qtyInput?.value),
@@ -552,13 +721,16 @@ document.addEventListener('DOMContentLoaded', function () {
             level: optionalNumber(levelInput?.value),
             condition: conditionSelect?.value || null,
             size: sizeInput?.value?.trim() || null,
-            count_tag_date: countTagDateInput?.value || null,
-            tran_date: tranDateInput?.value || null,
+            count_tag_date: periodInput?.value || null,
         };
 
+        if (mode === 'create') {
+            payload.item_id = Number(itemIdInput?.value || 0) || null;
+        }
+
         try {
-            const response = await fetch(storeUrl, {
-                method: 'POST',
+            const response = await fetch(targetUrl, {
+                method: mode === 'update' ? 'PUT' : 'POST',
                 headers: {
                     Accept: 'application/json',
                     'Content-Type': 'application/json',
@@ -587,8 +759,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            const number = data.data?.count_tag_number || '';
-            toastSuccess(number ? `Saved ${number}` : 'Count tag saved.');
+            toastSuccess(data.message || (mode === 'update' ? 'Count tag updated.' : 'Count tag saved.'));
             entryModal?.hide();
         } catch (_) {
             if (formError) {
@@ -720,6 +891,10 @@ document.addEventListener('DOMContentLoaded', function () {
     sectionSelect?.addEventListener('change', () => {
         clearFieldErrors();
         updateSectionHint();
+    });
+
+    periodInput?.addEventListener('change', () => {
+        refreshForPeriod();
     });
 
     entryForm?.addEventListener('submit', (event) => {

@@ -157,6 +157,10 @@ it('seeds count tag permissions for administrator only by default', function () 
 
     expect($admin->can('view-count-tag-non-fg'))->toBeTrue()
         ->and($admin->can('create-count-tag-non-fg'))->toBeTrue()
+        ->and($admin->can('update-count-tag-non-fg'))->toBeTrue()
+        ->and($admin->can('delete-count-tag-non-fg'))->toBeTrue()
         ->and($staff->can('view-count-tag-non-fg'))->toBeFalse()
-        ->and($staff->can('create-count-tag-non-fg'))->toBeFalse();
+        ->and($staff->can('create-count-tag-non-fg'))->toBeFalse()
+        ->and($staff->can('update-count-tag-non-fg'))->toBeFalse()
+        ->and($staff->can('delete-count-tag-non-fg'))->toBeFalse();
 });

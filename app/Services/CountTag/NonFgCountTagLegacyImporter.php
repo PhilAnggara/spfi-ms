@@ -227,6 +227,7 @@ class NonFgCountTagLegacyImporter
         $groupName = trim((string) ($row->Grp ?? ''));
 
         $meta = [
+            'legacy_id' => $legacyId,
             'legacy' => (array) $row,
             'mapping' => [
                 'category_legacy_id' => $legacyCategoryId,
@@ -240,9 +241,14 @@ class NonFgCountTagLegacyImporter
             $meta['mapping']['category_unmapped'] = true;
         }
 
+        $tranDate = $this->parseDate($row->Trandate ?? null);
+        $inputAt = $tranDate !== null
+            ? Carbon::parse($tranDate)->startOfDay()
+            : null;
+
         $attributes = [
             'count_tag_number' => trim((string) ($row->CountTag ?? '')) ?: null,
-            'count_tag_date' => $this->parseDate($row->CountTagDate ?? null),
+            'count_tag_date' => $this->parsePeriodEndOfMonth($row->CountTagDate ?? null),
             'item_id' => $itemId,
             'item_code' => $itemCode !== '' ? $itemCode : trim((string) ($row->ItemCode ?? '')),
             'item_category_id' => $categoryId,
@@ -258,19 +264,32 @@ class NonFgCountTagLegacyImporter
             'size' => trim((string) ($row->Size ?? '')) ?: null,
             'condition' => $condition,
             'qty' => (float) ($row->QTY ?? 0),
-            'tran_date' => $this->parseDate($row->Trandate ?? null),
+            'tran_date' => $tranDate,
             'group_name' => $groupName !== '' ? $groupName : null,
             'created_by' => null,
             'created_by_name' => $groupName !== '' ? $groupName : null,
             'meta' => $meta,
         ];
 
-        $existing = NonFgCountTag::query()->where('legacy_id', $legacyId)->exists();
+        $existing = NonFgCountTag::query()
+            ->where('meta->legacy_id', $legacyId)
+            ->first();
 
-        NonFgCountTag::query()->updateOrCreate(
-            ['legacy_id' => $legacyId],
-            $attributes,
-        );
+        if ($existing !== null) {
+            $existing->fill($attributes);
+            if ($inputAt !== null) {
+                $existing->created_at = $inputAt;
+                $existing->updated_at = $inputAt;
+            }
+            $existing->save();
+        } else {
+            $tag = new NonFgCountTag($attributes);
+            if ($inputAt !== null) {
+                $tag->created_at = $inputAt;
+                $tag->updated_at = $inputAt;
+            }
+            $tag->save();
+        }
 
         return [
             'created' => ! $existing,
@@ -344,6 +363,19 @@ class NonFgCountTagLegacyImporter
 
         try {
             return Carbon::parse($value)->toDateString();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function parsePeriodEndOfMonth(mixed $value): ?string
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->endOfMonth()->toDateString();
         } catch (Throwable) {
             return null;
         }

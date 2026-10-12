@@ -107,7 +107,7 @@ it('imports locations sections and count tags from legacy tables', function () {
     expect($result['sections']['created'])->toBe(1);
     expect($result['tags']['created'])->toBe(2);
 
-    $matched = NonFgCountTag::query()->where('legacy_id', 1001)->first();
+    $matched = NonFgCountTag::query()->where('meta->legacy_id', 1001)->first();
     expect($matched)->not->toBeNull();
     expect($matched->item_id)->toBe($item->id);
     expect($matched->item_category_id)->toBe($partsCategory->id);
@@ -118,10 +118,14 @@ it('imports locations sections and count tags from legacy tables', function () {
     expect($matched->created_by_name)->toBe('STOREKEEPER');
     expect($matched->group_name)->toBe('STOREKEEPER');
     expect((float) $matched->qty)->toBe(12.5);
+    expect($matched->count_tag_date?->toDateString())->toBe('2024-01-31');
+    expect($matched->tran_date?->toDateString())->toBe('2024-01-31');
+    expect($matched->created_at?->toDateString())->toBe('2024-01-31');
+    expect($matched->meta['legacy_id'])->toBe(1001);
     expect($matched->meta['legacy']['Id'])->toBe(1001);
     expect($matched->meta['mapping']['location']['raw_location'])->toBe('BONTIO');
 
-    $unmatched = NonFgCountTag::query()->where('legacy_id', 1002)->first();
+    $unmatched = NonFgCountTag::query()->where('meta->legacy_id', 1002)->first();
     expect($unmatched)->not->toBeNull();
     expect($unmatched->item_id)->toBeNull();
     expect($unmatched->item_code)->toBe('UNKNOWN999');
@@ -191,7 +195,7 @@ it('runs via artisan count-tag:import-non-fg command', function () {
     Artisan::call('count-tag:import-non-fg', ['--chunk' => 100]);
 
     expect(Artisan::output())->toContain('Import completed');
-    expect(NonFgCountTag::query()->where('legacy_id', 3001)->exists())->toBeTrue();
+    expect(NonFgCountTag::query()->where('meta->legacy_id', 3001)->exists())->toBeTrue();
 });
 
 function seedLegacyCountTagImportTables(): void

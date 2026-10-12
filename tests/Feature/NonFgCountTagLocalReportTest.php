@@ -49,15 +49,15 @@ it('reads percount qty from local non_fg_count_tags when source is local', funct
     ]);
 
     NonFgCountTag::query()->create([
-        'legacy_id' => 90001,
         'count_tag_number' => 'CT-90001',
-        'count_tag_date' => $nextMonthStart->toDateString(),
+        'count_tag_date' => $nextMonthStart->copy()->endOfMonth()->toDateString(),
         'item_id' => $this->item->id,
         'item_code' => $this->item->code,
         'item_category_id' => $this->category->id,
         'qty' => 7,
-        'tran_date' => $nextMonthStart->toDateString(),
+        'tran_date' => now()->toDateString(),
         'created_by_name' => 'TEST',
+        'meta' => ['legacy_id' => 90001],
     ]);
 
     $row = app(AccountingInventoryReportService::class)->restatementRows(
@@ -86,13 +86,14 @@ it('falls back to report month-end local count tag when next month has no tag', 
     ]);
 
     NonFgCountTag::query()->create([
-        'legacy_id' => 90002,
         'item_id' => $this->item->id,
         'item_code' => $this->item->code,
         'item_category_id' => $this->category->id,
         'qty' => 9,
-        'tran_date' => now()->endOfMonth()->toDateString(),
+        'count_tag_date' => now()->endOfMonth()->toDateString(),
+        'tran_date' => now()->toDateString(),
         'created_by_name' => 'TEST',
+        'meta' => ['legacy_id' => 90002],
     ]);
 
     $row = app(AccountingInventoryReportService::class)->restatementRows(

@@ -3,6 +3,7 @@
         'poPrintConfirm-',
         'tsPrintConfirm-',
         'rrPrintConfirm-',
+        'ctPrintConfirm-',
     ];
 
     function isPrintConfirmModal(modalEl) {

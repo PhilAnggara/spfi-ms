@@ -9,6 +9,8 @@
     data-store-url="{{ $storeUrl }}"
     data-locations-url="{{ $locationsUrl }}"
     data-today="{{ $today }}"
+    data-current-month="{{ $currentMonth }}"
+    data-can-update="{{ auth()->user()->can('update-count-tag-non-fg') ? '1' : '0' }}"
 >
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
@@ -126,7 +128,7 @@
                 <div class="modal-header border-0 pb-0">
                     <div>
                         <h5 class="modal-title mb-1" id="count-tag-entry-modal-title">Count Tag Entry</h5>
-                        <small class="text-muted">Confirm location and quantity, then save.</small>
+                        <small class="text-muted" id="count-tag-entry-modal-subtitle">Confirm location and quantity, then save.</small>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -166,12 +168,16 @@
                         <div class="row g-3">
                             <div class="col-4">
                                 <label for="count-tag-row" class="form-label">Row</label>
-                                <input type="number" min="1" id="count-tag-row" name="row" class="form-control" inputmode="numeric">
+                                <select id="count-tag-row" name="row" class="form-select">
+                                    <option value="">—</option>
+                                </select>
                                 <div class="invalid-feedback" data-error-for="row"></div>
                             </div>
                             <div class="col-4">
                                 <label for="count-tag-col" class="form-label">Col</label>
-                                <input type="number" min="1" id="count-tag-col" name="col" class="form-control" inputmode="numeric">
+                                <select id="count-tag-col" name="col" class="form-select">
+                                    <option value="">—</option>
+                                </select>
                                 <div class="invalid-feedback" data-error-for="col"></div>
                             </div>
                             <div class="col-4">
@@ -210,17 +216,12 @@
                     </div>
 
                     <div class="count-tag-form-section is-secondary">
-                        <div class="count-tag-form-section-title">Dates</div>
+                        <div class="count-tag-form-section-title">Period</div>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="count-tag-date" class="form-label">Count Tag Date <span class="text-danger">*</span></label>
-                                <input type="date" id="count-tag-date" name="count_tag_date" class="form-control" value="{{ $today }}" required>
+                                <label for="count-tag-period" class="form-label">Period Month <span class="text-danger">*</span></label>
+                                <input type="month" id="count-tag-period" name="count_tag_date" class="form-control" value="{{ $currentMonth }}" max="{{ $currentMonth }}" required>
                                 <div class="invalid-feedback" data-error-for="count_tag_date"></div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="count-tag-tran-date" class="form-label">Tran Date <span class="text-danger">*</span></label>
-                                <input type="date" id="count-tag-tran-date" name="tran_date" class="form-control" value="{{ $today }}" required>
-                                <div class="invalid-feedback" data-error-for="tran_date"></div>
                             </div>
                         </div>
                     </div>

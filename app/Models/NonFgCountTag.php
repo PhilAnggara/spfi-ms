@@ -18,7 +18,6 @@ class NonFgCountTag extends Model
     protected $table = 'non_fg_count_tags';
 
     protected $fillable = [
-        'legacy_id',
         'count_tag_number',
         'count_tag_date',
         'item_id',
@@ -47,7 +46,6 @@ class NonFgCountTag extends Model
     {
         return [
             'id' => 'integer',
-            'legacy_id' => 'integer',
             'count_tag_date' => 'date',
             'item_id' => 'integer',
             'item_category_id' => 'integer',

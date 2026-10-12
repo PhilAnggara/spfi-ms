@@ -2,6 +2,30 @@
     let isLoading = false;
     let pendingReplaceRequest = null;
 
+    function initPageTooltips(scope = document) {
+        const tooltipElements = scope.querySelectorAll('[data-bstooltip-toggle="tooltip"]');
+
+        tooltipElements.forEach((el) => {
+            if (window.bootstrap && window.bootstrap.Tooltip) {
+                if (window.bootstrap.Tooltip.getInstance(el)) {
+                    return;
+                }
+
+                new window.bootstrap.Tooltip(el);
+            }
+        });
+    }
+
+    function disposePageTooltips(scope) {
+        if (!window.bootstrap?.Tooltip || !scope) {
+            return;
+        }
+
+        scope.querySelectorAll('[data-bstooltip-toggle="tooltip"]').forEach((el) => {
+            window.bootstrap.Tooltip.getInstance(el)?.dispose();
+        });
+    }
+
     function setLoading(active) {
         const loadingEl = document.getElementById('ct-page-loading');
         if (!loadingEl) {
@@ -59,6 +83,7 @@
                 return;
             }
 
+            disposePageTooltips(currentResults);
             currentResults.replaceWith(newResults);
 
             if (pushState) {
@@ -288,7 +313,7 @@
             }
 
             setField(modalEl, 'count_tag_number', displayValue(data.count_tag_number));
-            setField(modalEl, 'count_tag_date', displayValue(data.count_tag_date));
+            setField(modalEl, 'count_tag_month', displayValue(data.count_tag_month || (data.count_tag_date ? String(data.count_tag_date).slice(0, 7) : '')));
             setField(modalEl, 'tran_date', displayValue(data.tran_date));
             setField(modalEl, 'created_by_name', displayValue(data.created_by_name));
             setField(modalEl, 'item_code', displayValue(data.item_code));
@@ -334,9 +359,532 @@
         });
     }
 
+    function csrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
+    function toastSuccess(message) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: message,
+                showConfirmButton: false,
+                timer: 2500,
+            });
+            return;
+        }
+
+        window.alert(message);
+    }
+
+    function optionalNumber(value) {
+        const trimmed = String(value || '').trim();
+        return trimmed === '' ? null : Number(trimmed);
+    }
+
+    const editState = {
+        updateUrl: null,
+        locationsLoaded: false,
+        sectionsByLocation: {},
+        selectedSection: null,
+        isSaving: false,
+    };
+
+    function editElements() {
+        return {
+            form: document.getElementById('ct-edit-form'),
+            modalEl: document.getElementById('ct-edit-modal'),
+            formError: document.getElementById('ct-edit-form-error'),
+            saveButton: document.getElementById('ct-edit-save-btn'),
+            itemCode: document.getElementById('ct-edit-item-code'),
+            itemName: document.getElementById('ct-edit-item-name'),
+            itemMeta: document.getElementById('ct-edit-item-meta'),
+            locationSelect: document.getElementById('ct-edit-location'),
+            sectionSelect: document.getElementById('ct-edit-section'),
+            sectionHint: document.getElementById('ct-edit-section-hint'),
+            rowInput: document.getElementById('ct-edit-row'),
+            colInput: document.getElementById('ct-edit-col'),
+            levelInput: document.getElementById('ct-edit-level'),
+            qtyInput: document.getElementById('ct-edit-qty'),
+            conditionSelect: document.getElementById('ct-edit-condition'),
+            sizeInput: document.getElementById('ct-edit-size'),
+            periodInput: document.getElementById('ct-edit-period'),
+            subtitle: document.getElementById('ct-edit-modal-subtitle'),
+        };
+    }
+
+    function clearEditErrors() {
+        const els = editElements();
+        els.form?.querySelectorAll('.is-invalid').forEach((el) => el.classList.remove('is-invalid'));
+        els.form?.querySelectorAll('[data-error-for]').forEach((el) => {
+            el.textContent = '';
+        });
+        els.formError?.classList.add('d-none');
+        if (els.formError) {
+            els.formError.textContent = '';
+        }
+    }
+
+    function showEditErrors(errors = {}) {
+        const els = editElements();
+        Object.entries(errors).forEach(([field, messages]) => {
+            const input = els.form?.querySelector(`[name="${field}"]`);
+            const feedback = els.form?.querySelector(`[data-error-for="${field}"]`);
+            const message = Array.isArray(messages) ? messages[0] : String(messages || '');
+
+            if (input) {
+                input.classList.add('is-invalid');
+            }
+            if (feedback) {
+                feedback.textContent = message;
+            }
+        });
+    }
+
+    function setEditSaving(active) {
+        const els = editElements();
+        editState.isSaving = active;
+        if (!els.saveButton) {
+            return;
+        }
+
+        els.saveButton.disabled = active;
+        els.saveButton.querySelector('.ct-edit-save-label')?.classList.toggle('d-none', active);
+        els.saveButton.querySelector('.ct-edit-save-spinner')?.classList.toggle('d-none', !active);
+    }
+
+    function fillEditLocationOptions(locations) {
+        const els = editElements();
+        if (!els.locationSelect) {
+            return;
+        }
+
+        const previous = els.locationSelect.value;
+        els.locationSelect.innerHTML = '<option value="">Select location</option>';
+        locations.forEach((location) => {
+            const option = document.createElement('option');
+            option.value = String(location.id);
+            option.textContent = location.name;
+            els.locationSelect.appendChild(option);
+        });
+
+        if (previous && locations.some((location) => String(location.id) === previous)) {
+            els.locationSelect.value = previous;
+        }
+    }
+
+    function rebuildEditPositionOptions(select, max, selected = '') {
+        if (!select) {
+            return;
+        }
+
+        const previous = selected !== '' && selected != null
+            ? String(selected)
+            : String(select.value || '');
+
+        select.innerHTML = '<option value="">—</option>';
+        const limit = Number(max || 0);
+        for (let value = 1; value <= limit; value += 1) {
+            const option = document.createElement('option');
+            option.value = String(value);
+            option.textContent = String(value);
+            select.appendChild(option);
+        }
+
+        if (previous !== '' && [...select.options].some((option) => option.value === previous)) {
+            select.value = previous;
+        } else {
+            select.value = '';
+        }
+    }
+
+    function fillEditSectionOptions(sections) {
+        const els = editElements();
+        if (!els.sectionSelect) {
+            return;
+        }
+
+        els.sectionSelect.innerHTML = '<option value="">Select section</option>';
+        sections.forEach((section) => {
+            const option = document.createElement('option');
+            option.value = String(section.id);
+            option.textContent = section.code;
+            option.dataset.maxRow = String(section.max_row ?? 0);
+            option.dataset.maxColumn = String(section.max_column ?? 0);
+            els.sectionSelect.appendChild(option);
+        });
+
+        els.sectionSelect.disabled = sections.length === 0;
+        editState.selectedSection = null;
+        rebuildEditPositionOptions(els.rowInput, 0);
+        rebuildEditPositionOptions(els.colInput, 0);
+        if (els.sectionHint) {
+            els.sectionHint.textContent = sections.length
+                ? 'Choose a section to see row/column options.'
+                : 'No sections for this location.';
+        }
+    }
+
+    function updateEditSectionHint(selectedRow = null, selectedCol = null) {
+        const els = editElements();
+        if (!els.sectionSelect || !els.sectionHint) {
+            return;
+        }
+
+        const option = els.sectionSelect.selectedOptions[0];
+        if (!option || !option.value) {
+            editState.selectedSection = null;
+            rebuildEditPositionOptions(els.rowInput, 0);
+            rebuildEditPositionOptions(els.colInput, 0);
+            els.sectionHint.textContent = 'Choose a section to see row/column options.';
+            return;
+        }
+
+        editState.selectedSection = {
+            id: option.value,
+            max_row: Number(option.dataset.maxRow || 0),
+            max_column: Number(option.dataset.maxColumn || 0),
+        };
+
+        rebuildEditPositionOptions(els.rowInput, editState.selectedSection.max_row, selectedRow);
+        rebuildEditPositionOptions(els.colInput, editState.selectedSection.max_column, selectedCol);
+
+        const parts = [];
+        if (editState.selectedSection.max_row > 0) {
+            parts.push(`rows 1–${editState.selectedSection.max_row}`);
+        }
+        if (editState.selectedSection.max_column > 0) {
+            parts.push(`cols 1–${editState.selectedSection.max_column}`);
+        }
+
+        els.sectionHint.textContent = parts.length
+            ? `Section options: ${parts.join(', ')}.`
+            : 'No row/column options configured for this section.';
+    }
+
+    async function loadEditLocations() {
+        const page = document.getElementById('count-tag-non-fg-page-container');
+        const locationsUrl = page?.dataset.locationsUrl || '';
+        if (!locationsUrl || editState.locationsLoaded) {
+            return;
+        }
+
+        const response = await fetch(locationsUrl, {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Unable to load locations.');
+        }
+
+        const payload = await response.json();
+        fillEditLocationOptions(payload.data || []);
+        editState.locationsLoaded = true;
+    }
+
+    async function loadEditSections(locationId) {
+        const page = document.getElementById('count-tag-non-fg-page-container');
+        const locationsUrl = page?.dataset.locationsUrl || '';
+        if (!locationId) {
+            fillEditSectionOptions([]);
+            return;
+        }
+
+        if (editState.sectionsByLocation[locationId]) {
+            fillEditSectionOptions(editState.sectionsByLocation[locationId]);
+            return;
+        }
+
+        const url = `${locationsUrl.replace(/\/$/, '')}/${encodeURIComponent(locationId)}/sections`;
+        const els = editElements();
+        els.sectionSelect.disabled = true;
+
+        const response = await fetch(url, {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (!response.ok) {
+            fillEditSectionOptions([]);
+            throw new Error('Unable to load sections.');
+        }
+
+        const payload = await response.json();
+        const sections = payload.data || [];
+        editState.sectionsByLocation[locationId] = sections;
+        fillEditSectionOptions(sections);
+    }
+
+    async function openEditModal(detailUrl) {
+        const els = editElements();
+        if (!els.modalEl || !window.bootstrap || !detailUrl) {
+            return;
+        }
+
+        clearEditErrors();
+        editState.updateUrl = null;
+
+        const modal = bootstrap.Modal.getOrCreateInstance(els.modalEl);
+        modal.show();
+
+        try {
+            await loadEditLocations();
+
+            const response = await fetch(detailUrl, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Unable to load count tag for editing.');
+            }
+
+            const data = await response.json();
+            editState.updateUrl = data.update_url || null;
+
+            if (els.itemCode) {
+                els.itemCode.textContent = data.item_code || '-';
+            }
+            if (els.itemName) {
+                els.itemName.textContent = data.item_name || '-';
+            }
+            if (els.itemMeta) {
+                els.itemMeta.textContent = data.count_tag_number || 'Unassigned number';
+            }
+            if (els.subtitle) {
+                els.subtitle.textContent = data.tran_date
+                    ? `Input ${data.tran_date}`
+                    : 'Update location, quantity, and period.';
+            }
+
+            if (els.locationSelect && data.location_id) {
+                els.locationSelect.value = String(data.location_id);
+                await loadEditSections(String(data.location_id));
+            } else {
+                fillEditSectionOptions([]);
+            }
+
+            if (els.sectionSelect && data.section_id) {
+                els.sectionSelect.value = String(data.section_id);
+                updateEditSectionHint(data.row ?? '', data.col ?? '');
+            } else {
+                rebuildEditPositionOptions(els.rowInput, 0);
+                rebuildEditPositionOptions(els.colInput, 0);
+            }
+
+            if (els.levelInput) {
+                els.levelInput.value = data.level ?? '';
+            }
+            if (els.qtyInput) {
+                els.qtyInput.value = data.qty ?? '';
+            }
+            if (els.conditionSelect) {
+                els.conditionSelect.value = data.condition || '';
+            }
+            if (els.sizeInput) {
+                els.sizeInput.value = data.size || '';
+            }
+            if (els.periodInput) {
+                els.periodInput.value = data.count_tag_month
+                    || (data.count_tag_date ? String(data.count_tag_date).slice(0, 7) : '')
+                    || pageCurrentMonth();
+            }
+        } catch (error) {
+            if (els.formError) {
+                els.formError.textContent = error.message || 'Unable to open editor.';
+                els.formError.classList.remove('d-none');
+            }
+        }
+    }
+
+    function pageToday() {
+        return document.getElementById('count-tag-non-fg-page-container')?.dataset.today || '';
+    }
+
+    function pageCurrentMonth() {
+        return document.getElementById('count-tag-non-fg-page-container')?.dataset.currentMonth || '';
+    }
+
+    async function saveEditForm() {
+        const els = editElements();
+        if (!editState.updateUrl || editState.isSaving) {
+            return;
+        }
+
+        clearEditErrors();
+        setEditSaving(true);
+
+        const payload = {
+            location_id: Number(els.locationSelect?.value || 0) || null,
+            section_id: Number(els.sectionSelect?.value || 0) || null,
+            qty: optionalNumber(els.qtyInput?.value),
+            row: optionalNumber(els.rowInput?.value),
+            col: optionalNumber(els.colInput?.value),
+            level: optionalNumber(els.levelInput?.value),
+            condition: els.conditionSelect?.value || null,
+            size: els.sizeInput?.value?.trim() || null,
+            count_tag_date: els.periodInput?.value || null,
+        };
+
+        try {
+            const response = await fetch(editState.updateUrl, {
+                method: 'PUT',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (response.status === 422) {
+                showEditErrors(data.errors || {});
+                if (els.formError && data.message) {
+                    els.formError.textContent = data.message;
+                    els.formError.classList.remove('d-none');
+                }
+                return;
+            }
+
+            if (!response.ok) {
+                if (els.formError) {
+                    els.formError.textContent = data.message || 'Unable to update count tag.';
+                    els.formError.classList.remove('d-none');
+                }
+                return;
+            }
+
+            toastSuccess(data.message || 'Count tag updated.');
+            bootstrap.Modal.getInstance(els.modalEl)?.hide();
+            replacePageContent(window.location.href, false);
+        } catch (_) {
+            if (els.formError) {
+                els.formError.textContent = 'Unable to reach the server. Check your connection and try again.';
+                els.formError.classList.remove('d-none');
+            }
+        } finally {
+            setEditSaving(false);
+        }
+    }
+
+    function initCountTagNonFgEdit() {
+        const els = editElements();
+        if (!els.form || els.form.dataset.bound === '1') {
+            return;
+        }
+        els.form.dataset.bound = '1';
+
+        els.locationSelect?.addEventListener('change', () => {
+            clearEditErrors();
+            loadEditSections(els.locationSelect.value).catch(() => {});
+        });
+
+        els.sectionSelect?.addEventListener('change', () => {
+            clearEditErrors();
+            updateEditSectionHint();
+        });
+
+        els.form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            saveEditForm();
+        });
+    }
+
+    function initCountTagNonFgEditButtons() {
+        document.querySelectorAll('.ct-edit-btn').forEach(function (button) {
+            if (button.dataset.bound === '1') {
+                return;
+            }
+            button.dataset.bound = '1';
+
+            button.addEventListener('click', function () {
+                const url = button.dataset.detailUrl;
+                if (!url) {
+                    return;
+                }
+
+                openEditModal(url);
+            });
+        });
+    }
+
+    function initCountTagNonFgDeleteButtons() {
+        document.querySelectorAll('.ct-delete-btn').forEach(function (button) {
+            if (button.dataset.bound === '1') {
+                return;
+            }
+            button.dataset.bound = '1';
+
+            button.addEventListener('click', async function () {
+                const destroyUrl = button.dataset.destroyUrl;
+                const label = button.dataset.label || 'this count tag';
+                if (!destroyUrl) {
+                    return;
+                }
+
+                let confirmed = false;
+                if (typeof Swal !== 'undefined') {
+                    const result = await Swal.fire({
+                        title: 'Delete count tag?',
+                        text: `Delete ${label}? This cannot be undone.`,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Delete',
+                        confirmButtonColor: '#dc3545',
+                    });
+                    confirmed = Boolean(result.isConfirmed);
+                } else {
+                    confirmed = window.confirm(`Delete ${label}?`);
+                }
+
+                if (!confirmed) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(destroyUrl, {
+                        method: 'DELETE',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-CSRF-TOKEN': csrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        window.alert(data.message || 'Unable to delete count tag.');
+                        return;
+                    }
+
+                    toastSuccess(data.message || 'Count tag deleted.');
+                    replacePageContent(window.location.href, false);
+                } catch (_) {
+                    window.alert('Unable to reach the server. Check your connection and try again.');
+                }
+            });
+        });
+    }
+
     function initCountTagNonFgPage() {
         initCountTagNonFgFilters();
         initCountTagNonFgDetailButtons();
+        initCountTagNonFgEdit();
+        initCountTagNonFgEditButtons();
+        initCountTagNonFgDeleteButtons();
+        initPageTooltips(document.getElementById('count-tag-non-fg-page-container') || document);
     }
 
     window.initCountTagNonFgPage = initCountTagNonFgPage;

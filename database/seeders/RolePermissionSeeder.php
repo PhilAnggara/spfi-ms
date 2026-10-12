@@ -100,6 +100,8 @@ class RolePermissionSeeder extends Seeder
         $permissionsCountTagNonFg = [
             'view-count-tag-non-fg',
             'create-count-tag-non-fg',
+            'update-count-tag-non-fg',
+            'delete-count-tag-non-fg',
         ];
 
         $permissionsOpeningBalance = [

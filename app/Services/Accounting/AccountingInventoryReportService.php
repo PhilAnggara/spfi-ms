@@ -553,10 +553,10 @@ class AccountingInventoryReportService
         $reportMonthEnd = Carbon::parse($asOfDate)->subDay()->toDateString();
 
         $rows = NonFgCountTag::query()
-            ->whereDate('tran_date', '>=', $reportMonthEnd)
-            ->whereDate('tran_date', '<=', $nextMonthEnd)
+            ->whereDate('count_tag_date', '>=', $reportMonthEnd)
+            ->whereDate('count_tag_date', '<=', $nextMonthEnd)
             ->whereIn('item_code', $codes)
-            ->get(['item_code', 'tran_date', 'qty']);
+            ->get(['item_code', 'count_tag_date', 'qty']);
 
         if ($rows->isEmpty()) {
             return collect();
@@ -570,7 +570,7 @@ class AccountingInventoryReportService
             ->map(function (Collection $itemRows) use ($nextMonthStart, $nextMonthEnd, $reportMonthEnd): float {
                 return $this->resolveCountTagQtyForPeriod(
                     $itemRows->map(fn (NonFgCountTag $row): array => [
-                        'date' => $row->tran_date?->toDateString(),
+                        'date' => $row->count_tag_date?->toDateString(),
                         'qty' => (float) $row->qty,
                     ]),
                     $nextMonthStart,
@@ -595,9 +595,9 @@ class AccountingInventoryReportService
         try {
             $rows = DB::connection($connection)
                 ->table($table)
-                ->whereDate('Trandate', '>=', $reportMonthEnd)
-                ->whereDate('Trandate', '<=', $nextMonthEnd)
-                ->get(['ItemCode', 'Trandate', 'QTY']);
+                ->whereDate('CountTagDate', '>=', $reportMonthEnd)
+                ->whereDate('CountTagDate', '<=', $nextMonthEnd)
+                ->get(['ItemCode', 'CountTagDate', 'QTY']);
 
             if ($rows->isEmpty()) {
                 return collect();
@@ -611,7 +611,7 @@ class AccountingInventoryReportService
                 ->map(function (Collection $itemRows) use ($nextMonthStart, $nextMonthEnd, $reportMonthEnd): float {
                     return $this->resolveCountTagQtyForPeriod(
                         $itemRows->map(fn (object $row): array => [
-                            'date' => Carbon::parse($row->Trandate)->toDateString(),
+                            'date' => Carbon::parse($row->CountTagDate)->toDateString(),
                             'qty' => (float) $row->QTY,
                         ]),
                         $nextMonthStart,
