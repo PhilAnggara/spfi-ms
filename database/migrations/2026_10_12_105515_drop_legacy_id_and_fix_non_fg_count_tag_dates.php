@@ -18,20 +18,24 @@ return new class extends Migration
         $this->swapAppCreatedDates();
         $this->normalizeCountTagDatesToMonthEnd();
 
-        Schema::table('non_fg_count_tags', function (Blueprint $table) {
-            if (Schema::hasColumn('non_fg_count_tags', 'legacy_id')) {
+        if (Schema::hasColumn('non_fg_count_tags', 'legacy_id')) {
+            Schema::table('non_fg_count_tags', function (Blueprint $table) {
                 $table->dropUnique(['legacy_id']);
                 $table->dropColumn('legacy_id');
-            }
+            });
+        }
 
-            if (Schema::hasIndex('non_fg_count_tags', 'non_fg_ct_item_tran_idx')) {
+        if ($this->hasIndex('non_fg_count_tags', 'non_fg_ct_item_tran_idx')) {
+            Schema::table('non_fg_count_tags', function (Blueprint $table) {
                 $table->dropIndex('non_fg_ct_item_tran_idx');
-            }
+            });
+        }
 
-            if (! Schema::hasIndex('non_fg_count_tags', 'non_fg_ct_item_period_idx')) {
+        if (! $this->hasIndex('non_fg_count_tags', 'non_fg_ct_item_period_idx')) {
+            Schema::table('non_fg_count_tags', function (Blueprint $table) {
                 $table->index(['item_code', 'count_tag_date'], 'non_fg_ct_item_period_idx');
-            }
-        });
+            });
+        }
     }
 
     public function down(): void
@@ -40,19 +44,23 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('non_fg_count_tags', function (Blueprint $table) {
-            if (Schema::hasIndex('non_fg_count_tags', 'non_fg_ct_item_period_idx')) {
+        if ($this->hasIndex('non_fg_count_tags', 'non_fg_ct_item_period_idx')) {
+            Schema::table('non_fg_count_tags', function (Blueprint $table) {
                 $table->dropIndex('non_fg_ct_item_period_idx');
-            }
+            });
+        }
 
-            if (! Schema::hasIndex('non_fg_count_tags', 'non_fg_ct_item_tran_idx')) {
+        if (! $this->hasIndex('non_fg_count_tags', 'non_fg_ct_item_tran_idx')) {
+            Schema::table('non_fg_count_tags', function (Blueprint $table) {
                 $table->index(['item_code', 'tran_date'], 'non_fg_ct_item_tran_idx');
-            }
+            });
+        }
 
-            if (! Schema::hasColumn('non_fg_count_tags', 'legacy_id')) {
+        if (! Schema::hasColumn('non_fg_count_tags', 'legacy_id')) {
+            Schema::table('non_fg_count_tags', function (Blueprint $table) {
                 $table->unsignedBigInteger('legacy_id')->nullable()->unique();
-            }
-        });
+            });
+        }
 
         $this->restoreLegacyIdsFromMeta();
     }
@@ -90,7 +98,18 @@ return new class extends Migration
                     $legacyId = $hasLegacyId ? ($row->legacy_id ?? null) : ($meta['legacy_id'] ?? null);
                     $isAppCreated = $legacyId === null || (($meta['source'] ?? null) === 'scan');
 
-                    if (! $isAppCreated) {
+                    if (! $isAppCreated || $row->count_tag_date === null) {
+                        continue;
+                    }
+
+                    // Already period-style (end of month) or previously migrated — skip to stay idempotent.
+                    try {
+                        $countTagDate = Carbon::parse($row->count_tag_date);
+                    } catch (\Throwable) {
+                        continue;
+                    }
+
+                    if ($countTagDate->toDateString() === $countTagDate->copy()->endOfMonth()->toDateString()) {
                         continue;
                     }
 
@@ -146,6 +165,26 @@ return new class extends Migration
                         ->update(['legacy_id' => (int) $legacyId]);
                 }
             });
+    }
+
+    private function hasIndex(string $tableName, string $indexName): bool
+    {
+        if (Schema::getConnection()->getDriverName() === 'sqlsrv') {
+            $result = DB::selectOne(
+                'SELECT TOP 1 1 AS [found]
+                 FROM sys.indexes i
+                 INNER JOIN sys.tables t ON i.object_id = t.object_id
+                 INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+                 WHERE t.name = ?
+                   AND i.name = ?
+                   AND s.name = SCHEMA_NAME()',
+                [$tableName, $indexName]
+            );
+
+            return $result !== null;
+        }
+
+        return Schema::hasIndex($tableName, $indexName);
     }
 
     /**
