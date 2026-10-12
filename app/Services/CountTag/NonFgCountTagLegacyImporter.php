@@ -36,6 +36,9 @@ class NonFgCountTagLegacyImporter
     /** @var Collection<int, string> */
     private Collection $legacyCategories;
 
+    /** @var Collection<int, int> legacy_id => local non_fg_count_tags.id */
+    private Collection $tagsByLegacyId;
+
     public function __construct(
         private readonly NonFgCountTagCategoryMapper $categoryMapper,
         private readonly NonFgCountTagLocationResolver $locationResolver,
@@ -47,6 +50,7 @@ class NonFgCountTagLegacyImporter
         $this->localCategoriesByName = collect();
         $this->uomsByCode = collect();
         $this->legacyCategories = collect();
+        $this->tagsByLegacyId = collect();
     }
 
     /**
@@ -56,6 +60,7 @@ class NonFgCountTagLegacyImporter
     public function import(int $chunkSize = 500, ?callable $onChunkProgress = null): array
     {
         $this->warmLocalLookups();
+        $this->warmExistingTagLookups();
 
         $locationStats = $this->importLocations();
         $sectionStats = $this->importSections();
@@ -271,9 +276,10 @@ class NonFgCountTagLegacyImporter
             'meta' => $meta,
         ];
 
-        $existing = NonFgCountTag::query()
-            ->where('meta->legacy_id', $legacyId)
-            ->first();
+        $existingId = $this->tagsByLegacyId->get($legacyId);
+        $existing = $existingId !== null
+            ? NonFgCountTag::query()->find($existingId)
+            : null;
 
         if ($existing !== null) {
             $existing->fill($attributes);
@@ -289,14 +295,35 @@ class NonFgCountTagLegacyImporter
                 $tag->updated_at = $inputAt;
             }
             $tag->save();
+            $this->tagsByLegacyId->put($legacyId, $tag->id);
         }
 
         return [
-            'created' => ! $existing,
+            'created' => $existing === null,
             'item_matched' => $itemId !== null,
             'category_matched' => $categoryId !== null || $legacyCategoryId < 0,
             'location_matched' => $locationId !== null || trim((string) ($row->Location ?? '')) === '',
         ];
+    }
+
+    private function warmExistingTagLookups(): void
+    {
+        $this->tagsByLegacyId = collect();
+
+        NonFgCountTag::query()
+            ->whereNotNull('meta')
+            ->orderBy('id')
+            ->chunkById(500, function ($tags): void {
+                foreach ($tags as $tag) {
+                    $legacyId = $tag->meta['legacy_id'] ?? null;
+
+                    if ($legacyId === null) {
+                        continue;
+                    }
+
+                    $this->tagsByLegacyId->put((int) $legacyId, $tag->id);
+                }
+            });
     }
 
     private function warmLocalLookups(): void

@@ -107,7 +107,7 @@ it('imports locations sections and count tags from legacy tables', function () {
     expect($result['sections']['created'])->toBe(1);
     expect($result['tags']['created'])->toBe(2);
 
-    $matched = NonFgCountTag::query()->where('meta->legacy_id', 1001)->first();
+    $matched = findNonFgCountTagByLegacyId(1001);
     expect($matched)->not->toBeNull();
     expect($matched->item_id)->toBe($item->id);
     expect($matched->item_category_id)->toBe($partsCategory->id);
@@ -125,7 +125,7 @@ it('imports locations sections and count tags from legacy tables', function () {
     expect($matched->meta['legacy']['Id'])->toBe(1001);
     expect($matched->meta['mapping']['location']['raw_location'])->toBe('BONTIO');
 
-    $unmatched = NonFgCountTag::query()->where('meta->legacy_id', 1002)->first();
+    $unmatched = findNonFgCountTagByLegacyId(1002);
     expect($unmatched)->not->toBeNull();
     expect($unmatched->item_id)->toBeNull();
     expect($unmatched->item_code)->toBe('UNKNOWN999');
@@ -195,8 +195,15 @@ it('runs via artisan count-tag:import-non-fg command', function () {
     Artisan::call('count-tag:import-non-fg', ['--chunk' => 100]);
 
     expect(Artisan::output())->toContain('Import completed');
-    expect(NonFgCountTag::query()->where('meta->legacy_id', 3001)->exists())->toBeTrue();
+    expect(findNonFgCountTagByLegacyId(3001))->not->toBeNull();
 });
+
+function findNonFgCountTagByLegacyId(int $legacyId): ?NonFgCountTag
+{
+    return NonFgCountTag::query()
+        ->get()
+        ->first(fn (NonFgCountTag $tag): bool => (int) ($tag->meta['legacy_id'] ?? 0) === $legacyId);
+}
 
 function seedLegacyCountTagImportTables(): void
 {
