@@ -80,35 +80,30 @@
 .sm-overlay[data-theme="info"] .sm-overlay__accent { background: linear-gradient(90deg, #0284c7, #2563eb); }
 .sm-overlay[data-theme="info"] .sm-overlay__body { border-left-color: #0ea5e9; background: rgba(14, 165, 233, 0.08); }
 .sm-overlay[data-theme="info"] .sm-overlay__timer-bar { background: linear-gradient(90deg, #0284c7, #2563eb); }
-.sm-overlay[data-theme="info"] .sm-overlay__btn--primary { background: linear-gradient(135deg, #0284c7, #1d4ed8); box-shadow: 0 10px 24px rgba(2, 132, 199, 0.28); }
 .sm-overlay[data-theme="info"] .sm-overlay__reply-card { border-color: #bae6fd; }
 .sm-overlay[data-theme="info"] .sm-overlay__reply-card--sent { background: #f0f9ff; }
 
 .sm-overlay[data-theme="success"] .sm-overlay__accent { background: linear-gradient(90deg, #059669, #0d9488); }
 .sm-overlay[data-theme="success"] .sm-overlay__body { border-left-color: #10b981; background: rgba(16, 185, 129, 0.08); }
 .sm-overlay[data-theme="success"] .sm-overlay__timer-bar { background: linear-gradient(90deg, #059669, #0d9488); }
-.sm-overlay[data-theme="success"] .sm-overlay__btn--primary { background: linear-gradient(135deg, #059669, #0f766e); box-shadow: 0 10px 24px rgba(5, 150, 105, 0.28); }
 .sm-overlay[data-theme="success"] .sm-overlay__reply-card { border-color: #a7f3d0; }
 .sm-overlay[data-theme="success"] .sm-overlay__reply-card--sent { background: #ecfdf5; }
 
 .sm-overlay[data-theme="warning"] .sm-overlay__accent { background: linear-gradient(90deg, #d97706, #ea580c); }
 .sm-overlay[data-theme="warning"] .sm-overlay__body { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
 .sm-overlay[data-theme="warning"] .sm-overlay__timer-bar { background: linear-gradient(90deg, #d97706, #ea580c); }
-.sm-overlay[data-theme="warning"] .sm-overlay__btn--primary { background: linear-gradient(135deg, #d97706, #c2410c); box-shadow: 0 10px 24px rgba(217, 119, 6, 0.28); }
 .sm-overlay[data-theme="warning"] .sm-overlay__reply-card { border-color: #fde68a; }
 .sm-overlay[data-theme="warning"] .sm-overlay__reply-card--sent { background: #fffbeb; }
 
 .sm-overlay[data-theme="danger"] .sm-overlay__accent { background: linear-gradient(90deg, #dc2626, #b91c1c); }
 .sm-overlay[data-theme="danger"] .sm-overlay__body { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
 .sm-overlay[data-theme="danger"] .sm-overlay__timer-bar { background: linear-gradient(90deg, #dc2626, #b91c1c); }
-.sm-overlay[data-theme="danger"] .sm-overlay__btn--primary { background: linear-gradient(135deg, #dc2626, #991b1b); box-shadow: 0 10px 24px rgba(220, 38, 38, 0.28); }
 .sm-overlay[data-theme="danger"] .sm-overlay__reply-card { border-color: #fecaca; }
 .sm-overlay[data-theme="danger"] .sm-overlay__reply-card--sent { background: #fef2f2; }
 
 .sm-overlay[data-theme="default"] .sm-overlay__accent { background: linear-gradient(90deg, #0f766e, #2563eb, #7c3aed); }
 .sm-overlay[data-theme="default"] .sm-overlay__body { border-left-color: #1f7a8c; background: rgba(31, 122, 140, 0.06); }
 .sm-overlay[data-theme="default"] .sm-overlay__timer-bar { background: linear-gradient(90deg, #0f766e, #2563eb); }
-.sm-overlay[data-theme="default"] .sm-overlay__btn--primary { background: linear-gradient(135deg, #0f766e, #1d4ed8); box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28); }
 
 .sm-overlay[hidden] {
     display: none !important;
@@ -167,8 +162,48 @@
     background: var(--sm-accent);
 }
 
+.sm-overlay__close {
+    appearance: none;
+    position: absolute;
+    top: 0.8rem;
+    right: 0.8rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.sm-overlay__close:hover {
+    background: #fff;
+    border-color: rgba(100, 116, 139, 0.45);
+    color: #0f172a;
+    transform: scale(1.06);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+.sm-overlay__close:focus-visible {
+    outline: none;
+    border-color: var(--sm-body-border);
+    box-shadow: 0 0 0 3px var(--sm-focus);
+}
+
 .sm-overlay__header {
     margin-bottom: 1rem;
+    padding-right: 2.5rem;
 }
 
 .sm-overlay__badge {
@@ -376,27 +411,52 @@
 }
 
 .sm-overlay__reply {
-    margin-bottom: 1rem;
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
 }
 
 .sm-overlay__reply-card {
     border: 1px solid var(--sm-reply-border);
-    border-radius: 14px;
-    padding: 0.9rem 1rem;
-    background: #fff;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    border-radius: 16px;
+    padding: 0.95rem 1rem 0.9rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 .sm-overlay__reply-card--sent {
     background: var(--sm-reply-sent-bg);
 }
 
+.sm-overlay__reply-head {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.7rem;
+}
+
+.sm-overlay__reply-icon {
+    flex: 0 0 auto;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.05);
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.sm-overlay__reply-icon--sent {
+    background: rgba(16, 185, 129, 0.14);
+    color: #059669;
+}
+
 .sm-overlay__reply-label {
-    display: block;
-    margin-bottom: 0.45rem;
+    margin: 0;
     font-size: 0.78rem;
     font-weight: 700;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: #64748b;
 }
@@ -405,12 +465,14 @@
     width: 100%;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 0.8rem 0.95rem;
+    padding: 0.85rem 0.95rem;
     resize: vertical;
-    min-height: 88px;
-    background: #f8fafc;
+    min-height: calc(2 * 1.55em + 1.7rem);
+    max-height: min(40vh, 280px);
+    background: #fff;
     color: #0f172a;
-    line-height: 1.5;
+    line-height: 1.55;
+    transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
 
 .sm-overlay__reply-input:focus {
@@ -420,12 +482,10 @@
     box-shadow: 0 0 0 3px var(--sm-focus);
 }
 
-.sm-overlay__actions {
+.sm-overlay__reply-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    align-items: center;
     justify-content: flex-end;
+    margin-top: 0.75rem;
 }
 
 .sm-overlay__btn {
@@ -435,7 +495,27 @@
     padding: 0.7rem 1.2rem;
     font-weight: 600;
     cursor: pointer;
-    transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+    transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, opacity 150ms ease;
+}
+
+.sm-overlay__btn--send {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1rem;
+    color: #fff;
+    background: var(--sm-btn);
+    box-shadow: 0 8px 18px var(--sm-btn-shadow);
+    font-size: 0.9rem;
+}
+
+.sm-overlay__btn--send:hover {
+    transform: translateY(-1px);
+}
+
+.sm-overlay__btn--send:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--sm-focus), 0 8px 18px var(--sm-btn-shadow);
 }
 
 .sm-overlay__reply-sent {
@@ -444,22 +524,7 @@
     line-height: 1.6;
     overflow-wrap: anywhere;
     word-break: break-word;
-}
-
-.sm-overlay__btn--primary {
-    color: #fff;
-    background: var(--sm-btn);
-    box-shadow: 0 10px 24px var(--sm-btn-shadow);
-}
-
-.sm-overlay__btn--secondary {
-    margin-top: 0.7rem;
-    color: #0f172a;
-    background: #e2e8f0;
-}
-
-.sm-overlay__btn--primary:hover {
-    transform: translateY(-1px);
+    padding: 0.15rem 0.15rem 0.1rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -914,17 +979,18 @@
         padding: 0.75rem 0.85rem;
     }
 
-    .sm-overlay__actions {
+    .sm-overlay__close {
+        top: 0.7rem;
+        right: 0.7rem;
+    }
+
+    .sm-overlay__reply-actions {
         justify-content: stretch;
     }
 
-    .sm-overlay__btn--primary,
-    .sm-overlay__btn--secondary {
+    .sm-overlay__btn--send {
         width: 100%;
-    }
-
-    .sm-overlay__btn--secondary {
-        margin-top: 0.5rem;
+        justify-content: center;
     }
 }
 

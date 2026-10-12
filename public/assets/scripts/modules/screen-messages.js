@@ -251,12 +251,40 @@
         timerId = setInterval(updateTimerUi, 200);
     }
 
+    function syncReplyInputHeight() {
+        if (!replyInput) {
+            return;
+        }
+
+        replyInput.style.height = 'auto';
+        replyInput.style.height = `${replyInput.scrollHeight}px`;
+    }
+
+    function focusReplyInput() {
+        if (!replyInput || replyWrap.hidden || replyForm.hidden) {
+            return;
+        }
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                try {
+                    replyInput.focus({ preventScroll: true });
+                } catch (e) {
+                    replyInput.focus();
+                }
+            });
+        });
+    }
+
     function showReplyForm() {
         replyWrap.hidden = false;
         replyForm.hidden = false;
         replySent.hidden = true;
         replyInput.value = '';
+        replyInput.style.height = '';
         replySubmitBtn.hidden = false;
+        syncReplyInputHeight();
+        focusReplyInput();
     }
 
     function showSentReply(body) {
@@ -318,6 +346,7 @@
         requestAnimationFrame(() => {
             root.classList.add('is-visible');
             root.classList.remove('is-leaving');
+            focusReplyInput();
         });
         document.body.style.overflow = 'hidden';
         schedulePoll();
@@ -423,6 +452,8 @@
     closeBtn.addEventListener('click', () => {
         dismissCurrent();
     });
+
+    replyInput.addEventListener('input', syncReplyInputHeight);
 
     replySubmitBtn.addEventListener('click', async () => {
         if (!current?.allow_reply || current.my_reply) {
