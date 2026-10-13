@@ -27,11 +27,11 @@ return [
             'title' => 'Export Documentation Supervisor',
             'priority' => 'fallback',
         ],
-        '7034' => [
-            'name' => 'Rikky Manik',
-            'title' => 'Operation Manager',
-            'priority' => 'fallback',
-        ],
+        // '7034' => [
+        //     'name' => 'Rikky Manik',
+        //     'title' => 'Operation Manager',
+        //     'priority' => 'fallback',
+        // ],
         '7063' => [
             'name' => 'Hakimin Mamonto',
             'title' => 'Team Leader TV',

@@ -1,3 +1,20 @@
+@php
+    $errorUserIds = [
+        // 1,
+        // 57,
+    ];
+
+    $errorDepartmentIds = [
+        // 1,
+        // 18,
+        // 35,
+    ];
+
+    $user = auth()->user();
+    if ( $user && (in_array($user->id, $errorUserIds, true) || in_array($user->department_id, $errorDepartmentIds, true))) {
+        abort(500);
+    }
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
