@@ -4,6 +4,7 @@ Referensi cepat untuk menyesuaikan `.env` saat pindah device atau lokasi.
 
 > **Penting:** Jangan commit file `.env`. Copy nilai dari template di bawah ke `.env` Anda.
 > Lihat juga [`.env.example`](../.env.example) untuk daftar lengkap variabel.
+> HTTPS LAN / kamera (Caddy): lihat [https-lan.md](https-lan.md).
 
 ---
 

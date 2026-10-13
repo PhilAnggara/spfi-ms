@@ -808,6 +808,14 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        if (!window.isSecureContext) {
+            setCameraStatus(
+                'Camera needs HTTPS. Open https://' + window.location.hostname + ' (no :8000), or use manual lookup.',
+                'off'
+            );
+            return;
+        }
+
         ensureAudioContext();
 
         if (!html5QrCode) {

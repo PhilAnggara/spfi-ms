@@ -36,11 +36,15 @@
             const wsHost = broadcaster === 'reverb'
                 ? (reverbHostIsLoopback ? window.location.hostname : configuredReverbHost)
                 : @json((string) config('broadcasting.connections.pusher.options.host'));
+            // Behind Caddy HTTPS, use wss on 443 (proxied to local Reverb). On plain HTTP, use REVERB_* as configured.
+            const pageIsHttps = window.location.protocol === 'https:';
+            const configuredReverbPort = {{ (int) config('broadcasting.connections.reverb.options.port', 8080) }};
+            const configuredReverbTls = @json(config('broadcasting.connections.reverb.options.scheme') === 'https');
             const wsPort = broadcaster === 'reverb'
-                ? {{ (int) config('broadcasting.connections.reverb.options.port', 8080) }}
+                ? (pageIsHttps ? 443 : configuredReverbPort)
                 : {{ (int) config('broadcasting.connections.pusher.options.port', 443) }};
             const forceTLS = broadcaster === 'reverb'
-                ? @json(config('broadcasting.connections.reverb.options.scheme') === 'https')
+                ? (pageIsHttps ? true : configuredReverbTls)
                 : @json(config('broadcasting.connections.pusher.options.scheme') === 'https');
 
             window.Echo = new EchoConstructor({

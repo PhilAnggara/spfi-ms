@@ -96,6 +96,14 @@ it('allows users with create permission to open the scan page', function () {
         ->assertSee('Tap to continue');
 });
 
+it('requires a secure context before starting the count tag camera', function () {
+    $scanJs = file_get_contents(public_path('assets/scripts/modules/count-tag-non-fg-scan.js'));
+
+    expect($scanJs)
+        ->toContain('window.isSecureContext')
+        ->toContain('Camera needs HTTPS');
+});
+
 it('forbids users without permission from opening count tag pages', function () {
     $user = createCountTagUser('ct-denied');
 

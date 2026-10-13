@@ -683,10 +683,11 @@ it('boots laravel echo from config values on authenticated pages', function () {
         ->getContent();
 
     expect($html)
-        ->toContain('const wsPort = broadcaster === \'reverb\'')
+        ->toContain('const pageIsHttps = window.location.protocol === \'https:\'')
+        ->toContain('const configuredReverbPort = 8081')
         ->toContain('window.SpfiRealtime')
-        ->toMatch('/\?\s*8081/')
-        ->toMatch('/forceTLS = broadcaster === \'reverb\'[\s\S]*?\?\s*false/');
+        ->toContain('(pageIsHttps ? 443 : configuredReverbPort)')
+        ->toContain('(pageIsHttps ? true : configuredReverbTls)');
 });
 
 it('keeps notification and chat poll fallback helpers when echo boots', function () {

@@ -1,0 +1,25 @@
+# HTTPS reverse proxy for production LAN access (camera / secure context).
+# Keep `php artisan serve --host=0.0.0.0 --port=8000` running as usual.
+# Development on :8001 is intentionally not proxied.
+#
+# Usage (from project root, as Administrator the first time for tls internal CA):
+#   caddy run --config Caddyfile
+#
+# Users:
+#   http://192.168.11.16:8000  — existing HTTP access (no camera)
+#   https://192.168.11.16      — HTTPS via Caddy (camera works)
+#
+# Change the IP below if the server LAN address changes.
+
+https://192.168.11.16 {
+	tls internal
+
+	# Laravel Reverb / Echo WebSocket (default local port 8080)
+	handle /app/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8000
+	}
+}
