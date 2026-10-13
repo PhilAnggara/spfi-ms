@@ -52,7 +52,8 @@ Development on `:8001` does not need Caddy.
 ## Notes
 
 - First HTTPS visit may show a certificate warning (internal CA). Clients can proceed once, or install Caddy’s root CA.
-- Leave `SESSION_SECURE_COOKIE` unset so login still works on HTTP `:8000`.
+- Keep `SESSION_SECURE_COOKIE=false` so login works on both `http://IP:8000` and `https://IP`. If this is missing/`null`, opening HTTPS first then `:8000` often shows **419 Page Expired** (Secure cookie not sent on HTTP).
+- After changing session cookie settings, clear site cookies for that IP (or use a private window) once.
 - Echo/Reverb on HTTPS uses port **443** through Caddy (`/app/*`); on HTTP it still uses Reverb’s direct port (e.g. `8080`).
 - Optional: set `APP_URL=https://YOUR_LAN_IP` if generated links should prefer HTTPS.
 

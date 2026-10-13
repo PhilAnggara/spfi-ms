@@ -169,7 +169,9 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // Default false so HTTP :8000 and HTTPS (Caddy) can share the same session cookie.
+    // null would auto-set Secure on HTTPS responses and break login on :8000 afterward.
+    'secure' => env('SESSION_SECURE_COOKIE', false),
 
     /*
     |--------------------------------------------------------------------------
