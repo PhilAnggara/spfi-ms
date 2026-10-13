@@ -16,6 +16,11 @@
 #   Laptop  → 192.168.11.15
 #   PC prod → 192.168.11.16
 
+{
+	# Don't bind :80 (XAMPP/Apache often owns it). HTTP :8000 stays for artisan serve.
+	auto_https disable_redirects
+}
+
 https://YOUR_LAN_IP {
 	tls internal
 

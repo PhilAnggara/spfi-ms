@@ -25,7 +25,8 @@ Enable camera / QR scan from phones and other PCs on the office LAN. No domain r
 1. Install [Caddy](https://caddyserver.com/download) (or `winget install caddy`).
 2. Create local `Caddyfile` from `Caddyfile.example` (see above).
 3. Open Windows Firewall inbound **TCP 443**.
-4. Run Caddy **as Administrator once** so `tls internal` can install the local CA:
+4. The template sets `auto_https disable_redirects` so Caddy does **not** bind port **80** (XAMPP Apache often uses it). If you still see `listen tcp :80: bind: ... access permissions`, confirm that block is in your local `Caddyfile`.
+5. Run Caddy **as Administrator once** so `tls internal` can install the local CA (port **443** may also need Admin on Windows):
    ```bat
    cd C:\xampp\htdocs\laravel\spfi-ms
    caddy run --config Caddyfile
