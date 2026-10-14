@@ -2,6 +2,12 @@
     width: 100%;
 }
 
+.count-tag-hero-lead {
+    color: #334155;
+    font-size: 0.98rem;
+    line-height: 1.45;
+}
+
 .count-tag-scan-layout {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
@@ -14,41 +20,75 @@
     border-radius: 1rem;
 }
 
+.count-tag-camera-btn {
+    min-height: 2.75rem;
+    min-width: 5.5rem;
+    font-weight: 700;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.count-tag-jump-manual {
+    min-height: 2.75rem;
+    font-weight: 700;
+}
+
 .count-tag-status-pill {
     display: inline-flex;
     align-items: center;
-    padding: 0.18rem 0.55rem;
+    padding: 0.35rem 0.7rem;
     border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     border: 1px solid transparent;
 }
 
 .count-tag-status-pill.is-off {
     background: #f1f5f9;
-    color: #64748b;
-    border-color: #e2e8f0;
+    color: #475569;
+    border-color: #cbd5e1;
 }
 
 .count-tag-status-pill.is-ready {
-    background: #ecfdf5;
-    color: #047857;
-    border-color: #a7f3d0;
+    background: #d1fae5;
+    color: #065f46;
+    border-color: #34d399;
 }
 
 .count-tag-status-pill.is-paused {
-    background: #fffbeb;
-    color: #b45309;
-    border-color: #fde68a;
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #f59e0b;
 }
 
 .count-tag-qr-frame {
+    position: relative;
     border-radius: 0.9rem;
     padding: 0.35rem;
     background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
     box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.25);
+}
+
+.count-tag-qr-frame.is-looking-up {
+    box-shadow: inset 0 0 0 2px #38bdf8, 0 0 0 3px rgba(56, 189, 248, 0.25);
+}
+
+.count-tag-camera-overlay {
+    position: absolute;
+    inset: 0.35rem;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    border-radius: 0.7rem;
+    background: rgba(15, 23, 42, 0.72);
+    color: #f8fafc;
+    font-weight: 700;
+    letter-spacing: 0.02em;
 }
 
 .count-tag-qr-reader {
@@ -65,7 +105,46 @@
 }
 
 .count-tag-scan-status {
-    font-size: 0.88rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #334155;
+    line-height: 1.4;
+}
+
+.count-tag-result-empty.is-ready-next {
+    color: #065f46;
+}
+
+.count-tag-result-empty.is-ready-next .count-tag-result-empty-icon {
+    opacity: 0.85;
+    color: #059669;
+}
+
+.count-tag-entry-modal-content .form-select-lg,
+.count-tag-entry-modal-content .form-control-lg {
+    min-height: 3rem;
+}
+
+.count-tag-period-panel {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #f8fafc;
+    padding: 0.85rem 1rem;
+}
+
+.count-tag-period-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.count-tag-period-display {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: 0.02em;
 }
 
 .count-tag-manual-group .form-control-lg {
@@ -221,12 +300,117 @@
     border-radius: 1rem;
 }
 
+.count-tag-entry-modal-content.is-update-mode .modal-header {
+    border-top: 4px solid #f59e0b;
+}
+
+.count-tag-entry-modal-content.is-update-mode .modal-title {
+    color: #92400e;
+}
+
+.count-tag-mode-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid #fcd34d;
+    background: #fffbeb;
+    color: #78350f;
+}
+
+.count-tag-mode-banner.is-update {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.count-tag-mode-banner-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.55rem;
+    background: #f59e0b;
+    color: #fff;
+    font-size: 0.95rem;
+}
+
+.count-tag-mode-banner-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.count-tag-mode-banner-label {
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+}
+
+.count-tag-mode-banner-meta {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #92400e;
+    word-break: break-word;
+}
+
+#count-tag-save-btn.is-update-mode,
+#count-tag-save-btn.btn-warning {
+    color: #1f2937;
+    font-weight: 700;
+    border: 0;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    box-shadow: 0 0.45rem 1rem rgba(217, 119, 6, 0.28);
+}
+
+#count-tag-save-btn.is-update-mode:hover,
+#count-tag-save-btn.btn-warning:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    color: #111827;
+}
+
+#count-tag-save-btn.is-update-mode:disabled,
+#count-tag-save-btn.btn-warning:disabled {
+    opacity: 0.65;
+    box-shadow: none;
+}
+
+/*
+ * Form wraps header/body/footer inside .modal-content, so Bootstrap's
+ * modal-dialog-scrollable flex targeting is broken. Mirror the PO master-form
+ * pattern: form fills height, body scrolls, footer stays pinned.
+ */
+.modal-dialog-scrollable .modal-content.count-tag-entry-modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+}
+
+.modal-dialog-scrollable .modal-content.count-tag-entry-modal-content > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.modal-dialog-scrollable .modal-content.count-tag-entry-modal-content .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.modal-dialog-scrollable .modal-content.count-tag-entry-modal-content .modal-header,
+.modal-dialog-scrollable .modal-content.count-tag-entry-modal-content .modal-footer {
+    flex-shrink: 0;
+}
+
 .count-tag-entry-footer {
-    position: sticky;
-    bottom: 0;
     background: #fff;
     border-top: 1px solid #eef2f7;
-    z-index: 2;
 }
 
 @media (max-width: 991.98px) {
@@ -260,5 +444,38 @@
 
     .count-tag-result-code {
         font-size: 1.2rem;
+    }
+
+    .count-tag-entry-modal-content {
+        border-radius: 0;
+    }
+
+    .count-tag-entry-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+
+    .count-tag-entry-footer .btn {
+        width: 100%;
+        margin: 0;
+    }
+
+    .count-tag-manual-group {
+        flex-wrap: wrap;
+    }
+
+    .count-tag-manual-group .form-control {
+        flex: 1 1 100%;
+        width: 100%;
+        border-radius: var(--bs-border-radius) !important;
+    }
+
+    .count-tag-manual-group .btn {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+        margin-top: 0.5rem;
+        border-radius: var(--bs-border-radius) !important;
     }
 }

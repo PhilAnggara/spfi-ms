@@ -20,17 +20,23 @@ class StoreNonFgCountTagRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $period = trim((string) $this->input('count_tag_date', ''));
-        if ($period === '') {
-            return;
+        $merged = [];
+
+        if ($this->input('section_id') === '' || $this->input('section_id') === null) {
+            $merged['section_id'] = null;
         }
 
-        try {
-            $this->merge([
-                'count_tag_date' => CountTagPeriod::toEndOfMonth($period),
-            ]);
-        } catch (\Throwable) {
-            // Leave as-is; validation will fail.
+        $period = trim((string) $this->input('count_tag_date', ''));
+        if ($period !== '') {
+            try {
+                $merged['count_tag_date'] = CountTagPeriod::toEndOfMonth($period);
+            } catch (\Throwable) {
+                // Leave as-is; validation will fail.
+            }
+        }
+
+        if ($merged !== []) {
+            $this->merge($merged);
         }
     }
 
@@ -47,7 +53,7 @@ class StoreNonFgCountTagRequest extends FormRequest
             ],
             'location_id' => ['required', 'integer', 'exists:count_tag_locations,id'],
             'section_id' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('count_tag_sections', 'id')->where(
                     fn ($query) => $query->where('location_id', (int) $this->input('location_id'))
@@ -71,7 +77,6 @@ class StoreNonFgCountTagRequest extends FormRequest
         return [
             'item_id.required' => 'Scan or look up a product first.',
             'location_id.required' => 'Select a location.',
-            'section_id.required' => 'Select a section.',
             'section_id.exists' => 'The selected section does not belong to the chosen location.',
             'qty.gt' => 'Quantity must be greater than zero.',
             'count_tag_date.required' => 'Select a period month.',

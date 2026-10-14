@@ -173,10 +173,13 @@ class CountTagNonFgController extends Controller
             ->firstOrFail();
 
         $location = CountTagLocation::query()->findOrFail((int) $validated['location_id']);
-        $section = CountTagSection::query()
-            ->whereKey((int) $validated['section_id'])
-            ->where('location_id', $location->id)
-            ->firstOrFail();
+        $section = null;
+        if (! empty($validated['section_id'])) {
+            $section = CountTagSection::query()
+                ->whereKey((int) $validated['section_id'])
+                ->where('location_id', $location->id)
+                ->firstOrFail();
+        }
 
         $condition = isset($validated['condition'])
             ? CountTagCondition::from($validated['condition'])
@@ -192,8 +195,8 @@ class CountTagNonFgController extends Controller
             'uom_code' => $item->unit?->code ?? $item->unit?->name,
             'location_id' => $location->id,
             'location_name' => $location->name,
-            'section_id' => $section->id,
-            'section_code' => $section->code,
+            'section_id' => $section?->id,
+            'section_code' => $section?->code,
             'row' => $validated['row'] ?? null,
             'col' => $validated['col'] ?? null,
             'level' => $validated['level'] ?? null,
@@ -227,10 +230,13 @@ class CountTagNonFgController extends Controller
         $validated = $request->validated();
 
         $location = CountTagLocation::query()->findOrFail((int) $validated['location_id']);
-        $section = CountTagSection::query()
-            ->whereKey((int) $validated['section_id'])
-            ->where('location_id', $location->id)
-            ->firstOrFail();
+        $section = null;
+        if (! empty($validated['section_id'])) {
+            $section = CountTagSection::query()
+                ->whereKey((int) $validated['section_id'])
+                ->where('location_id', $location->id)
+                ->firstOrFail();
+        }
 
         $condition = isset($validated['condition'])
             ? CountTagCondition::from($validated['condition'])
@@ -239,8 +245,8 @@ class CountTagNonFgController extends Controller
         $nonFgCountTag->update([
             'location_id' => $location->id,
             'location_name' => $location->name,
-            'section_id' => $section->id,
-            'section_code' => $section->code,
+            'section_id' => $section?->id,
+            'section_code' => $section?->code,
             'row' => $validated['row'] ?? null,
             'col' => $validated['col'] ?? null,
             'level' => $validated['level'] ?? null,

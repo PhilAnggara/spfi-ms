@@ -335,11 +335,11 @@
 
 @can('update-count-tag-non-fg')
 <div class="modal fade" id="ct-edit-modal" tabindex="-1" aria-labelledby="ct-edit-modal-title" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content count-tag-entry-modal-content">
             <form id="ct-edit-form" novalidate>
                 <div class="modal-header border-0 pb-0">
-                    <div>
+                    <div class="me-2 flex-grow-1 min-w-0">
                         <h5 class="modal-title mb-1" id="ct-edit-modal-title">Edit Count Tag</h5>
                         <small class="text-muted" id="ct-edit-modal-subtitle">Update location, quantity, and period.</small>
                     </div>
@@ -365,9 +365,9 @@
                                 <div class="invalid-feedback" data-error-for="location_id"></div>
                             </div>
                             <div class="col-md-6">
-                                <label for="ct-edit-section" class="form-label">Section <span class="text-danger">*</span></label>
-                                <select id="ct-edit-section" name="section_id" class="form-select" required disabled>
-                                    <option value="">Select section</option>
+                                <label for="ct-edit-section" class="form-label">Section</label>
+                                <select id="ct-edit-section" name="section_id" class="form-select" disabled>
+                                    <option value="">—</option>
                                 </select>
                                 <div class="invalid-feedback" data-error-for="section_id"></div>
                             </div>
@@ -377,21 +377,21 @@
                     <div class="count-tag-form-section">
                         <div class="count-tag-form-section-title">Position</div>
                         <div class="row g-3">
-                            <div class="col-4">
+                            <div class="col-12 col-sm-4">
                                 <label for="ct-edit-row" class="form-label">Row</label>
                                 <select id="ct-edit-row" name="row" class="form-select">
                                     <option value="">—</option>
                                 </select>
                                 <div class="invalid-feedback" data-error-for="row"></div>
                             </div>
-                            <div class="col-4">
+                            <div class="col-12 col-sm-4">
                                 <label for="ct-edit-col" class="form-label">Col</label>
                                 <select id="ct-edit-col" name="col" class="form-select">
                                     <option value="">—</option>
                                 </select>
                                 <div class="invalid-feedback" data-error-for="col"></div>
                             </div>
-                            <div class="col-4">
+                            <div class="col-12 col-sm-4">
                                 <label for="ct-edit-level" class="form-label">Level</label>
                                 <input type="number" min="1" id="ct-edit-level" name="level" class="form-control" inputmode="numeric">
                                 <div class="invalid-feedback" data-error-for="level"></div>

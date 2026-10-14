@@ -16,16 +16,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const stopButton = document.getElementById('count-tag-stop-camera');
     const cameraStatus = document.getElementById('count-tag-camera-status');
     const cameraPill = document.getElementById('count-tag-camera-pill');
+    const cameraOverlay = document.getElementById('count-tag-camera-overlay');
+    const qrFrame = document.getElementById('count-tag-qr-frame');
     const manualInput = document.getElementById('count-tag-manual-code');
     const manualLookupButton = document.getElementById('count-tag-manual-lookup');
 
     const resultEmpty = document.getElementById('count-tag-result-empty');
+    const resultEmptyTitle = document.getElementById('count-tag-result-empty-title');
+    const resultEmptyHint = document.getElementById('count-tag-result-empty-hint');
     const resultLoading = document.getElementById('count-tag-result-loading');
     const resultError = document.getElementById('count-tag-result-error');
     const resultCard = document.getElementById('count-tag-result-card');
     const resultCode = document.getElementById('count-tag-result-code');
     const resultName = document.getElementById('count-tag-result-name');
     const resultMeta = document.getElementById('count-tag-result-meta');
+    const periodDisplay = document.getElementById('count-tag-period-display');
+    const periodUnlock = document.getElementById('count-tag-period-unlock');
+    const periodEditor = document.getElementById('count-tag-period-editor');
 
     const entryModalEl = document.getElementById('count-tag-entry-modal');
     const entryForm = document.getElementById('count-tag-entry-form');
@@ -34,6 +41,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveLabel = saveButton?.querySelector('.count-tag-save-label');
     const modalTitle = document.getElementById('count-tag-entry-modal-title');
     const modalSubtitle = document.getElementById('count-tag-entry-modal-subtitle');
+    const modalContent = entryModalEl?.querySelector('.count-tag-entry-modal-content');
+    const modeBanner = document.getElementById('count-tag-mode-banner');
+    const modeBannerLabel = document.getElementById('count-tag-mode-banner-label');
+    const modeBannerMeta = document.getElementById('count-tag-mode-banner-meta');
     const modalCode = document.getElementById('count-tag-modal-code');
     const modalName = document.getElementById('count-tag-modal-name');
     const modalMeta = document.getElementById('count-tag-modal-meta');
@@ -154,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return audioContext;
     };
 
-    const playSuccessSound = () => {
+    const playToneBurst = (tones) => {
         const ctx = ensureAudioContext();
         if (!ctx) {
             return;
@@ -162,25 +173,85 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const now = ctx.currentTime;
 
-        const playTone = (frequency, startAt, duration) => {
+        tones.forEach(({ frequency, startAt, duration, type = 'triangle', volume = 0.12 }) => {
             const oscillator = ctx.createOscillator();
             const gain = ctx.createGain();
 
-            oscillator.type = 'triangle';
-            oscillator.frequency.setValueAtTime(frequency, startAt);
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, now + startAt);
 
-            gain.gain.setValueAtTime(0.0001, startAt);
-            gain.gain.exponentialRampToValueAtTime(0.12, startAt + 0.015);
-            gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+            gain.gain.setValueAtTime(0.0001, now + startAt);
+            gain.gain.exponentialRampToValueAtTime(volume, now + startAt + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + startAt + duration);
 
             oscillator.connect(gain);
             gain.connect(ctx.destination);
-            oscillator.start(startAt);
-            oscillator.stop(startAt + duration + 0.02);
-        };
+            oscillator.start(now + startAt);
+            oscillator.stop(now + startAt + duration + 0.02);
+        });
+    };
 
-        playTone(880, now, 0.14);
-        playTone(1318.51, now + 0.11, 0.22);
+    const vibrateBrief = (pattern = 40) => {
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            navigator.vibrate(pattern);
+        }
+    };
+
+    const playSuccessSound = () => {
+        playToneBurst([
+            { frequency: 880, startAt: 0, duration: 0.14 },
+            { frequency: 1318.51, startAt: 0.11, duration: 0.22 },
+        ]);
+        vibrateBrief(30);
+    };
+
+    const playErrorSound = () => {
+        playToneBurst([
+            { frequency: 220, startAt: 0, duration: 0.18, type: 'square', volume: 0.08 },
+            { frequency: 180, startAt: 0.16, duration: 0.2, type: 'square', volume: 0.07 },
+        ]);
+        vibrateBrief([40, 40, 40]);
+    };
+
+    const setLookupOverlay = (active) => {
+        cameraOverlay?.classList.toggle('d-none', !active);
+        qrFrame?.classList.toggle('is-looking-up', active);
+    };
+
+    const setReadyForNextScan = (saved = false) => {
+        if (resultEmptyTitle) {
+            resultEmptyTitle.textContent = saved ? 'Saved — ready for next scan' : 'No item scanned yet';
+        }
+        if (resultEmptyHint) {
+            resultEmptyHint.textContent = saved
+                ? 'Point the camera at the next label, or enter another code.'
+                : 'Scan a label or look up a code to continue.';
+        }
+        resultEmpty?.classList.toggle('is-ready-next', saved);
+        setResultState({ empty: true });
+    };
+
+    const syncPeriodDisplay = () => {
+        if (periodDisplay) {
+            periodDisplay.textContent = periodInput?.value || currentMonth || '—';
+        }
+    };
+
+    const lockPeriodEditor = () => {
+        periodEditor?.classList.add('d-none');
+        if (periodUnlock) {
+            periodUnlock.textContent = 'Change';
+            periodUnlock.setAttribute('aria-expanded', 'false');
+        }
+    };
+
+    const unlockPeriodEditor = () => {
+        periodEditor?.classList.remove('d-none');
+        if (periodUnlock) {
+            periodUnlock.textContent = 'Hide';
+            periodUnlock.setAttribute('aria-expanded', 'true');
+        }
+        periodInput?.focus();
     };
 
     const clearFieldErrors = () => {
@@ -191,6 +262,19 @@ document.addEventListener('DOMContentLoaded', function () {
         formError?.classList.add('d-none');
         if (formError) {
             formError.textContent = '';
+        }
+    };
+
+    const focusFirstInvalid = () => {
+        const firstInvalid = entryForm?.querySelector('.is-invalid');
+        if (formError && !formError.classList.contains('d-none')) {
+            formError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        if (firstInvalid) {
+            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (typeof firstInvalid.focus === 'function') {
+                firstInvalid.focus({ preventScroll: true });
+            }
         }
     };
 
@@ -207,6 +291,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 feedback.textContent = message;
             }
         });
+
+        focusFirstInvalid();
     };
 
     const setSaving = (active) => {
@@ -222,9 +308,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const toastSuccess = (message) => {
         if (typeof Swal !== 'undefined') {
+            const isNarrow = window.matchMedia('(max-width: 576px)').matches;
+
             Swal.fire({
                 toast: true,
-                position: 'top-end',
+                position: isNarrow ? 'top' : 'top-end',
                 icon: 'success',
                 title: message,
                 showConfirmButton: false,
@@ -285,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        sectionSelect.innerHTML = '<option value="">Select section</option>';
+        sectionSelect.innerHTML = '<option value="">—</option>';
         sections.forEach((section) => {
             const option = document.createElement('option');
             option.value = String(section.id);
@@ -409,29 +497,73 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
+    const formatExistingModeMeta = (existing) => {
+        const period = existing?.count_tag_month
+            || (existing?.count_tag_date ? String(existing.count_tag_date).slice(0, 7) : '')
+            || (periodInput?.value || currentMonth || '');
+        const tagNumber = existing?.count_tag_number
+            ? String(existing.count_tag_number)
+            : 'No tag number yet';
+        const parts = [];
+
+        if (period) {
+            parts.push(`Period ${period}`);
+        }
+        parts.push(tagNumber);
+
+        return parts.join(' · ');
+    };
+
     const setMode = (nextMode, existing = null) => {
         mode = nextMode;
         existingTag = existing;
+        const isUpdate = mode === 'update';
+
+        modalContent?.classList.toggle('is-update-mode', isUpdate);
 
         if (modalTitle) {
-            modalTitle.textContent = mode === 'update' ? 'Update Count Tag' : 'Count Tag Entry';
+            modalTitle.textContent = isUpdate ? 'Update Count Tag' : 'Count Tag Entry';
         }
         if (modalSubtitle) {
-            modalSubtitle.textContent = mode === 'update'
-                ? 'This item already has a count tag for the selected period.'
+            modalSubtitle.textContent = isUpdate
+                ? 'Saving will update the existing count tag for this period (not create a new one).'
                 : 'Confirm location and quantity, then save.';
         }
-        if (saveLabel) {
-            saveLabel.textContent = mode === 'update' ? 'Update Count Tag' : 'Save Count Tag';
+
+        if (modeBanner) {
+            modeBanner.classList.toggle('d-none', !isUpdate);
+            modeBanner.classList.toggle('is-update', isUpdate);
         }
-        if (saveButton) {
-            saveButton.disabled = mode === 'update' && !canUpdate;
+        if (modeBannerLabel) {
+            modeBannerLabel.textContent = isUpdate ? 'Already counted this period' : '';
+        }
+        if (modeBannerMeta) {
+            modeBannerMeta.textContent = isUpdate ? formatExistingModeMeta(existing) : '';
         }
 
-        if (mode === 'update' && !canUpdate && formError) {
+        if (saveLabel) {
+            saveLabel.textContent = isUpdate ? 'Update existing' : 'Save & scan next';
+        }
+        if (saveButton) {
+            saveButton.classList.toggle('is-update-mode', isUpdate);
+            saveButton.classList.toggle('btn-primary', !isUpdate);
+            saveButton.classList.toggle('btn-warning', isUpdate);
+            saveButton.disabled = isUpdate && !canUpdate;
+        }
+
+        if (isUpdate && !canUpdate && formError) {
             formError.textContent = 'You do not have permission to update an existing count tag.';
             formError.classList.remove('d-none');
         }
+    };
+
+    const focusPrimaryField = () => {
+        if (locationSelect && !locationSelect.value) {
+            locationSelect.focus();
+            return;
+        }
+
+        qtyInput?.focus();
     };
 
     const applyDefaults = async (defaults, { keepQtyBlank = true } = {}) => {
@@ -503,6 +635,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (periodInput) {
             periodInput.value = currentMonth;
         }
+        syncPeriodDisplay();
+        lockPeriodEditor();
         setMode('create');
     };
 
@@ -538,15 +672,22 @@ document.addEventListener('DOMContentLoaded', function () {
             await applyDefaults(item.defaults || null, { keepQtyBlank: true });
         }
 
+        syncPeriodDisplay();
+        lockPeriodEditor();
         entryModal?.show();
-        window.setTimeout(() => qtyInput?.focus(), 250);
+        window.setTimeout(() => focusPrimaryField(), 280);
     };
 
-    const showError = (message) => {
+    const showError = (message, { fromCamera = false } = {}) => {
         if (resultError) {
             resultError.textContent = message;
         }
         setResultState({ error: true });
+
+        if (fromCamera) {
+            playErrorSound();
+            setCameraStatus(message, isScanning ? 'ready' : 'off');
+        }
     };
 
     const showItem = (item, { fromCamera = false } = {}) => {
@@ -583,10 +724,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const now = Date.now();
         if (fromCamera && code === lastScannedCode && now - lastScanAt < 2500) {
+            setCameraStatus('Already scanned — adjust the label or scan the next item.', isScanning ? 'ready' : 'paused');
             return null;
         }
 
         if (isLookingUp) {
+            if (fromCamera) {
+                setCameraStatus('Still looking up the last scan…', isScanning ? 'ready' : 'paused');
+            }
             return null;
         }
 
@@ -595,12 +740,15 @@ document.addEventListener('DOMContentLoaded', function () {
             lastScannedCode = code;
             lastScanAt = now;
             setResultState({ loading: true });
+            if (fromCamera) {
+                setLookupOverlay(true);
+            }
         }
 
         try {
             const url = new URL(lookupUrl, window.location.origin);
             url.searchParams.set('code', code);
-            const period = periodMonth || currentMonth;
+            const period = periodMonth || periodInput?.value || currentMonth;
             if (period) {
                 url.searchParams.set('count_tag_date', period);
             }
@@ -619,7 +767,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     || (payload.errors?.code ? payload.errors.code[0] : null)
                     || 'Product lookup failed.';
                 if (!isRefreshingPeriod) {
-                    showError(message);
+                    showError(message, { fromCamera });
                 }
                 return null;
             }
@@ -634,11 +782,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return payload;
         } catch (_) {
             if (!isRefreshingPeriod) {
-                showError('Unable to reach the server. Check your connection and try again.');
+                showError('Unable to reach the server. Check your connection and try again.', { fromCamera });
             }
             return null;
         } finally {
             isLookingUp = false;
+            setLookupOverlay(false);
         }
     };
 
@@ -678,6 +827,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (qtyInput) {
                 qtyInput.value = preserveQty;
             }
+
+            syncPeriodDisplay();
         } finally {
             isRefreshingPeriod = false;
         }
@@ -710,7 +861,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         clearFieldErrors();
-        setSaving(true);
 
         const payload = {
             location_id: Number(locationSelect?.value || 0) || null,
@@ -728,6 +878,32 @@ document.addEventListener('DOMContentLoaded', function () {
             payload.item_id = Number(itemIdInput?.value || 0) || null;
         }
 
+        const clientErrors = {};
+        if (mode === 'create' && !payload.item_id) {
+            clientErrors.item_id = ['Scan or look up a product first.'];
+        }
+        if (!payload.location_id) {
+            clientErrors.location_id = ['Select a location.'];
+        }
+        if (payload.qty === null || Number(payload.qty) <= 0) {
+            clientErrors.qty = ['Enter a quantity greater than zero.'];
+        }
+        if (!payload.count_tag_date) {
+            clientErrors.count_tag_date = ['Select a period month.'];
+            unlockPeriodEditor();
+        }
+
+        if (Object.keys(clientErrors).length > 0) {
+            if (formError) {
+                formError.textContent = 'Check the highlighted fields, then try again.';
+                formError.classList.remove('d-none');
+            }
+            showFieldErrors(clientErrors);
+            return;
+        }
+
+        setSaving(true);
+
         try {
             const response = await fetch(targetUrl, {
                 method: mode === 'update' ? 'PUT' : 'POST',
@@ -744,9 +920,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (response.status === 422) {
                 showFieldErrors(data.errors || {});
-                if (formError && data.message) {
-                    formError.textContent = data.message;
+                if (formError) {
+                    formError.textContent = data.message || 'Check the highlighted fields, then try again.';
                     formError.classList.remove('d-none');
+                }
+                if (data.errors?.count_tag_date) {
+                    unlockPeriodEditor();
                 }
                 return;
             }
@@ -756,16 +935,28 @@ document.addEventListener('DOMContentLoaded', function () {
                     formError.textContent = data.message || 'Unable to save count tag.';
                     formError.classList.remove('d-none');
                 }
+                focusFirstInvalid();
                 return;
             }
 
-            toastSuccess(data.message || (mode === 'update' ? 'Count tag updated.' : 'Count tag saved.'));
+            const successMessage = data.message
+                || (mode === 'update' ? 'Count tag updated.' : 'Count tag saved.');
+            toastSuccess(successMessage);
+            lastItem = null;
+            setReadyForNextScan(true);
+            setCameraStatus(
+                isScanning
+                    ? 'Saved. Camera ready for the next label.'
+                    : 'Saved. Tap Start or enter the next product code.',
+                isScanning ? 'ready' : 'off'
+            );
             entryModal?.hide();
         } catch (_) {
             if (formError) {
                 formError.textContent = 'Unable to reach the server. Check your connection and try again.';
                 formError.classList.remove('d-none');
             }
+            focusFirstInvalid();
         } finally {
             setSaving(false);
         }
@@ -830,7 +1021,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 {
                     fps: 10,
                     qrbox: function (viewfinderWidth, viewfinderHeight) {
-                        const edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
+                        const ratio = window.matchMedia('(max-width: 576px)').matches ? 0.82 : 0.72;
+                        const edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * ratio);
                         return { width: edge, height: edge };
                     },
                     aspectRatio: 1.0,
@@ -847,10 +1039,17 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             isScanning = false;
             syncCameraButtons();
-            const message = error && error.message
-                ? error.message
-                : 'Unable to access the camera. Allow camera permission or use manual lookup.';
+            const raw = error && error.message ? String(error.message) : '';
+            let message = 'Unable to access the camera. Allow camera permission or use manual lookup below.';
+            if (/NotAllowedError|Permission/i.test(raw)) {
+                message = 'Camera permission blocked. Allow camera access, or use manual lookup below.';
+            } else if (/NotFoundError|DevicesNotFound/i.test(raw)) {
+                message = 'No camera found on this device. Use manual lookup below.';
+            } else if (/NotReadableError|TrackStartError/i.test(raw)) {
+                message = 'Camera is busy in another app. Close it, then tap Start again.';
+            }
             setCameraStatus(message, 'off');
+            playErrorSound();
         }
     };
 
@@ -902,7 +1101,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     periodInput?.addEventListener('change', () => {
+        syncPeriodDisplay();
         refreshForPeriod();
+    });
+
+    periodUnlock?.addEventListener('click', () => {
+        if (periodEditor?.classList.contains('d-none')) {
+            unlockPeriodEditor();
+        } else {
+            lockPeriodEditor();
+        }
     });
 
     entryForm?.addEventListener('submit', (event) => {
@@ -919,6 +1127,7 @@ document.addEventListener('DOMContentLoaded', function () {
         isEntryModalOpen = false;
         setSaving(false);
         clearFieldErrors();
+        lockPeriodEditor();
         resumeCameraAfterModal();
     });
 
@@ -928,7 +1137,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    setResultState({ empty: true });
+    setReadyForNextScan(false);
+    syncPeriodDisplay();
+    lockPeriodEditor();
     syncCameraButtons();
     setCameraPill('off');
 });

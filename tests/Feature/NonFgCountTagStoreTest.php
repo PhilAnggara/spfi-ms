@@ -124,7 +124,8 @@ it('validates required fields and section bounds', function () {
     $this->actingAs($user)
         ->postJson(route('count-tags.non-fg.store'), [])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['item_id', 'location_id', 'section_id', 'qty', 'count_tag_date']);
+        ->assertJsonValidationErrors(['item_id', 'location_id', 'qty', 'count_tag_date'])
+        ->assertJsonMissingValidationErrors(['section_id']);
 
     $this->actingAs($user)
         ->postJson(route('count-tags.non-fg.store'), [
@@ -138,6 +139,30 @@ it('validates required fields and section bounds', function () {
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['row', 'col']);
+});
+
+it('allows storing a count tag without a section', function () {
+    $user = createCountTagStoreUser('ct-store-no-sec', [
+        'view-count-tag-non-fg',
+        'create-count-tag-non-fg',
+    ]);
+
+    $this->actingAs($user)
+        ->postJson(route('count-tags.non-fg.store'), [
+            'item_id' => $this->item->id,
+            'location_id' => $this->location->id,
+            'section_id' => null,
+            'qty' => 4,
+            'count_tag_date' => now()->format('Y-m'),
+        ])
+        ->assertCreated()
+        ->assertJsonPath('message', 'Count tag saved.');
+
+    $tag = NonFgCountTag::query()->first();
+    expect($tag)->not->toBeNull();
+    expect($tag->section_id)->toBeNull();
+    expect($tag->section_code)->toBeNull();
+    expect($tag->location_id)->toBe($this->location->id);
 });
 
 it('rejects section from a different location', function () {
@@ -214,9 +239,13 @@ it('renders scan page with store form fields', function () {
         ->get(route('count-tags.non-fg.scan'))
         ->assertSuccessful()
         ->assertSee('id="count-tag-entry-form"', false)
+        ->assertSee('modal-fullscreen-sm-down', false)
+        ->assertSee('id="count-tag-mode-banner"', false)
         ->assertSee('id="count-tag-qty"', false)
         ->assertSee('id="count-tag-location"', false)
+        ->assertSee('col-12 col-sm-4', false)
         ->assertSee('<select id="count-tag-row"', false)
         ->assertSee('<select id="count-tag-col"', false)
-        ->assertSee('Save Count Tag');
+        ->assertSee('id="count-tag-period-unlock"', false)
+        ->assertSee('Save &amp; scan next', false);
 });

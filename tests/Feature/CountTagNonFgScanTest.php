@@ -90,10 +90,16 @@ it('allows users with create permission to open the scan page', function () {
         ->assertSee('Scan Product QR')
         ->assertSee('Manual Lookup')
         ->assertSee('id="count-tag-entry-modal"', false)
+        ->assertSee('modal-fullscreen-sm-down', false)
+        ->assertSee('id="count-tag-mode-banner"', false)
+        ->assertSee('id="count-tag-mode-banner-label"', false)
         ->assertSee('Count Tag Entry')
         ->assertSee('id="count-tag-result-card"', false)
         ->assertSee('role="button"', false)
-        ->assertSee('Tap to continue');
+        ->assertSee('Reopen entry form')
+        ->assertSee('id="count-tag-period-unlock"', false)
+        ->assertSee('Enter product code')
+        ->assertSee('Save &amp; scan next', false);
 });
 
 it('requires a secure context before starting the count tag camera', function () {
@@ -101,7 +107,16 @@ it('requires a secure context before starting the count tag camera', function ()
 
     expect($scanJs)
         ->toContain('window.isSecureContext')
-        ->toContain('Camera needs HTTPS');
+        ->toContain('Camera needs HTTPS')
+        ->toContain("isNarrow ? 'top' : 'top-end'")
+        ->toContain('Already counted this period')
+        ->toContain('Update existing')
+        ->toContain('Save & scan next')
+        ->toContain('is-update-mode')
+        ->toContain('not create a new one')
+        ->toContain('playErrorSound')
+        ->toContain('focusFirstInvalid')
+        ->toContain('setReadyForNextScan');
 });
 
 it('forbids users without permission from opening count tag pages', function () {

@@ -506,7 +506,7 @@
             return;
         }
 
-        els.sectionSelect.innerHTML = '<option value="">Select section</option>';
+        els.sectionSelect.innerHTML = '<option value="">—</option>';
         sections.forEach((section) => {
             const option = document.createElement('option');
             option.value = String(section.id);

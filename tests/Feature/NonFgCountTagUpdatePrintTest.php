@@ -240,6 +240,33 @@ it('updates a count tag period without changing tran_date', function () {
     expect($tag->condition?->value)->toBe('Damaged');
 });
 
+it('allows clearing section on update', function () {
+    $user = createCountTagUpdateUser('ct-upd-clear-sec', [
+        'update-count-tag-non-fg',
+    ]);
+
+    $tag = createCountTagForUpdateTests([
+        'count_tag_date' => '2026-09-30',
+        'qty' => 5,
+    ]);
+
+    expect($tag->section_id)->not->toBeNull();
+
+    $this->actingAs($user)
+        ->putJson(route('count-tags.non-fg.update', $tag), [
+            'location_id' => $this->location->id,
+            'section_id' => null,
+            'qty' => 5,
+            'count_tag_date' => '2026-09',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message', 'Count tag updated.');
+
+    $tag->refresh();
+    expect($tag->section_id)->toBeNull();
+    expect($tag->section_code)->toBeNull();
+});
+
 it('rejects update that collides with another tag in the target period', function () {
     $user = createCountTagUpdateUser('ct-upd-collide', [
         'update-count-tag-non-fg',
@@ -351,7 +378,9 @@ it('shows print confirm controls and period column on the list page', function (
         ->assertSee('name="count_tag_date"', false)
         ->assertSee('id="ct-edit-row"', false)
         ->assertSee('<select id="ct-edit-row"', false)
-        ->assertSee('<select id="ct-edit-col"', false);
+        ->assertSee('<select id="ct-edit-col"', false)
+        ->assertSee('modal-fullscreen-sm-down', false)
+        ->assertSee('col-12 col-sm-4', false);
 });
 
 it('filters the list by count_tag_date period month', function () {
@@ -393,6 +422,8 @@ it('renders scan form with month period input', function () {
         ->assertSee('name="count_tag_date"', false)
         ->assertSee('type="month"', false)
         ->assertDontSee('name="tran_date"', false)
+        ->assertSee('modal-fullscreen-sm-down', false)
+        ->assertSee('col-12 col-sm-4', false)
         ->assertSee('<select id="count-tag-row"', false)
         ->assertSee('<select id="count-tag-col"', false)
         ->assertSee('id="count-tag-level"', false)
