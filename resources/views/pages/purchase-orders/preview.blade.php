@@ -188,7 +188,8 @@
                                                 class="form-control discount-input text-end"
                                                 min="0"
                                                 step="0.00001"
-                                                value="{{ format_po_decimal($item['discount_rate'] ?? 0, true) }}"
+                                                value="{{ ((float) ($item['discount_rate'] ?? 0)) > 0 ? format_po_decimal($item['discount_rate'], true) : '' }}"
+                                                placeholder="0.00000"
                                                 data-row="{{ $index }}"
                                             >
                                             <span class="input-group-text">%</span>
@@ -203,7 +204,8 @@
                                                 class="form-control ppn-input text-end"
                                                 min="0"
                                                 step="0.00001"
-                                                value="{{ format_po_decimal($item['ppn_rate'] ?? 0, true) }}"
+                                                value="{{ ((float) ($item['ppn_rate'] ?? 0)) > 0 ? format_po_decimal($item['ppn_rate'], true) : '' }}"
+                                                placeholder="0.00000"
                                                 data-row="{{ $index }}"
                                             >
                                             <span class="input-group-text">%</span>
@@ -218,7 +220,8 @@
                                                 class="form-control pph-input text-end"
                                                 min="0"
                                                 step="0.00001"
-                                                value="{{ format_po_decimal($item['pph_rate'] ?? 0, true) }}"
+                                                value="{{ ((float) ($item['pph_rate'] ?? 0)) > 0 ? format_po_decimal($item['pph_rate'], true) : '' }}"
+                                                placeholder="0.00000"
                                                 data-row="{{ $index }}"
                                             >
                                             <span class="input-group-text">%</span>
@@ -232,6 +235,61 @@
                             </div>
                         @endforeach
                     </div>
+
+                    @if (count($lineItems) > 1)
+                        <div class="po-preview-bulk-rates" id="po-preview-bulk-rates">
+                            <div class="po-preview-section-head">
+                                <div>
+                                    <div class="po-preview-section-title mb-0">Apply to all items</div>
+                                    <small class="text-muted">Fill a rate here to copy it to every line item. You can still edit individual rows after.</small>
+                                </div>
+                            </div>
+                            <div class="po-preview-bulk-rates-grid">
+                                <div class="po-preview-field">
+                                    <label class="form-label" for="bulk-discount-input">Discount %</label>
+                                    <div class="input-group">
+                                        <input
+                                            type="number"
+                                            id="bulk-discount-input"
+                                            class="form-control bulk-discount-input text-end"
+                                            min="0"
+                                            step="0.00001"
+                                            placeholder="0.00000"
+                                        >
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <div class="po-preview-field">
+                                    <label class="form-label" for="bulk-ppn-input">VAT (PPN) %</label>
+                                    <div class="input-group">
+                                        <input
+                                            type="number"
+                                            id="bulk-ppn-input"
+                                            class="form-control bulk-ppn-input text-end"
+                                            min="0"
+                                            step="0.00001"
+                                            placeholder="0.00000"
+                                        >
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <div class="po-preview-field">
+                                    <label class="form-label" for="bulk-pph-input">Withholding (PPh) %</label>
+                                    <div class="input-group">
+                                        <input
+                                            type="number"
+                                            id="bulk-pph-input"
+                                            class="form-control bulk-pph-input text-end"
+                                            min="0"
+                                            step="0.00001"
+                                            placeholder="0.00000"
+                                        >
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="po-preview-bottom">

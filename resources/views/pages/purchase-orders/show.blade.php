@@ -189,13 +189,13 @@
                                                 <input type="number" name="items[{{ $index }}][unit_price]" class="form-control form-control-sm text-end" min="0" step="0.00001" value="{{ format_po_decimal($item->unit_price, true) }}" required style="min-width: 9rem;">
                                             </td>
                                             <td class="text-end">
-                                                <input type="number" name="items[{{ $index }}][discount_rate]" class="form-control form-control-sm text-end" min="0" step="0.00001" value="{{ format_po_decimal($item->discount_rate ?? 0, true) }}" style="min-width: 7rem;">
+                                                <input type="number" name="items[{{ $index }}][discount_rate]" class="form-control form-control-sm text-end discount-input" min="0" step="0.00001" value="{{ ((float) ($item->discount_rate ?? 0)) > 0 ? format_po_decimal($item->discount_rate, true) : '' }}" placeholder="0.00000" style="min-width: 7rem;">
                                             </td>
                                             <td class="text-end">
-                                                <input type="number" name="items[{{ $index }}][ppn_rate]" class="form-control form-control-sm text-end" min="0" step="0.00001" value="{{ format_po_decimal($item->ppn_rate ?? 0, true) }}" style="min-width: 7rem;">
+                                                <input type="number" name="items[{{ $index }}][ppn_rate]" class="form-control form-control-sm text-end ppn-input" min="0" step="0.00001" value="{{ ((float) ($item->ppn_rate ?? 0)) > 0 ? format_po_decimal($item->ppn_rate, true) : '' }}" placeholder="0.00000" style="min-width: 7rem;">
                                             </td>
                                             <td class="text-end">
-                                                <input type="number" name="items[{{ $index }}][pph_rate]" class="form-control form-control-sm text-end" min="0" step="0.00001" value="{{ format_po_decimal($item->pph_rate ?? 0, true) }}" style="min-width: 7rem;">
+                                                <input type="number" name="items[{{ $index }}][pph_rate]" class="form-control form-control-sm text-end pph-input" min="0" step="0.00001" value="{{ ((float) ($item->pph_rate ?? 0)) > 0 ? format_po_decimal($item->pph_rate, true) : '' }}" placeholder="0.00000" style="min-width: 7rem;">
                                             </td>
                                             <td class="text-end text-nowrap">{{ $currencyCode }} {{ format_po_decimal($item->total) }}</td>
                                             <td>
@@ -227,6 +227,59 @@
                                 </tbody>
                             </table>
                         </div>
+
+                        @if ($canEdit && $purchaseOrder->items->count() > 1)
+                            <div class="border rounded p-3 mt-3 bg-light" id="po-show-bulk-rates">
+                                <div class="mb-2">
+                                    <div class="fw-semibold">Apply to all items</div>
+                                    <small class="text-muted">Fill a rate here to copy it to every line item. You can still edit individual rows after.</small>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label form-label-sm mb-1" for="bulk-discount-input">Discount %</label>
+                                        <div class="input-group input-group-sm">
+                                            <input
+                                                type="number"
+                                                id="bulk-discount-input"
+                                                class="form-control text-end bulk-discount-input"
+                                                min="0"
+                                                step="0.00001"
+                                                placeholder="0.00000"
+                                            >
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label form-label-sm mb-1" for="bulk-ppn-input">VAT (PPN) %</label>
+                                        <div class="input-group input-group-sm">
+                                            <input
+                                                type="number"
+                                                id="bulk-ppn-input"
+                                                class="form-control text-end bulk-ppn-input"
+                                                min="0"
+                                                step="0.00001"
+                                                placeholder="0.00000"
+                                            >
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label form-label-sm mb-1" for="bulk-pph-input">Withholding (PPh) %</label>
+                                        <div class="input-group input-group-sm">
+                                            <input
+                                                type="number"
+                                                id="bulk-pph-input"
+                                                class="form-control text-end bulk-pph-input"
+                                                min="0"
+                                                step="0.00001"
+                                                placeholder="0.00000"
+                                            >
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
 
                         <div class="row mt-4">
                             <div class="col-12 col-md-6"></div>
@@ -443,6 +496,64 @@
     @enderror
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const normalizeRateValue = (value) => String(value ?? '').trim();
+
+            const isMeaningfulRate = (value) => {
+                const normalized = normalizeRateValue(value);
+
+                return normalized !== '' && Number(normalized) !== 0;
+            };
+
+            const syncBulkRateFromRows = (bulkInput, lineSelector) => {
+                if (!bulkInput) {
+                    return;
+                }
+
+                const rowValues = Array.from(document.querySelectorAll(lineSelector)).map((input) => {
+                    return normalizeRateValue(input.value);
+                });
+
+                if (rowValues.length === 0) {
+                    bulkInput.value = '';
+                    return;
+                }
+
+                const firstValue = rowValues[0];
+                const allSame = isMeaningfulRate(firstValue)
+                    && rowValues.every((value) => value === firstValue);
+
+                bulkInput.value = allSame ? firstValue : '';
+            };
+
+            const wireBulkRate = (bulkInput, lineSelector) => {
+                if (!bulkInput) {
+                    return;
+                }
+
+                bulkInput.addEventListener('input', function () {
+                    const value = normalizeRateValue(bulkInput.value);
+                    if (value === '') {
+                        return;
+                    }
+
+                    document.querySelectorAll(lineSelector).forEach((input) => {
+                        input.value = value;
+                    });
+                });
+
+                document.querySelectorAll(lineSelector).forEach((input) => {
+                    input.addEventListener('input', function () {
+                        syncBulkRateFromRows(bulkInput, lineSelector);
+                    });
+                });
+
+                syncBulkRateFromRows(bulkInput, lineSelector);
+            };
+
+            wireBulkRate(document.querySelector('.bulk-discount-input'), '.discount-input');
+            wireBulkRate(document.querySelector('.bulk-ppn-input'), '.ppn-input');
+            wireBulkRate(document.querySelector('.bulk-pph-input'), '.pph-input');
+
             const container = document.getElementById('po-fee-items-container');
             const addBtn = document.getElementById('add-po-fee-btn');
 

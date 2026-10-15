@@ -302,6 +302,7 @@ it('shows withdraw button for pending approval and remove controls after withdra
     $pendingPage->assertSuccessful();
     $pendingPage->assertSee('Withdraw to Draft');
     $pendingPage->assertDontSee(route('purchase-orders.items.destroy', [$this->purchaseOrder, $this->poItemA]), false);
+    $pendingPage->assertDontSee('po-show-bulk-rates', false);
 
     $this->actingAs($this->canvasser)
         ->post(route('purchase-orders.withdraw', $this->purchaseOrder));
@@ -312,4 +313,9 @@ it('shows withdraw button for pending approval and remove controls after withdra
     $draftPage->assertSuccessful();
     $draftPage->assertSee('Save Changes');
     $draftPage->assertSee(route('purchase-orders.items.destroy', [$this->purchaseOrder, $this->poItemA]), false);
+    $draftPage->assertSee('Apply to all items');
+    $draftPage->assertSee('po-show-bulk-rates', false);
+    $draftPage->assertSee('bulk-discount-input', false);
+    $draftPage->assertSee('bulk-ppn-input', false);
+    $draftPage->assertSee('bulk-pph-input', false);
 });

@@ -176,6 +176,66 @@ document.addEventListener('DOMContentLoaded', function () {
         input.addEventListener('input', updateTotals);
     });
 
+    const normalizeRateValue = (value) => String(value ?? '').trim();
+
+    const isMeaningfulRate = (value) => {
+        const normalized = normalizeRateValue(value);
+
+        return normalized !== '' && Number(normalized) !== 0;
+    };
+
+    const syncBulkRateFromRows = (bulkInput, lineSelector) => {
+        if (!bulkInput) {
+            return;
+        }
+
+        const rowValues = Array.from(document.querySelectorAll(lineSelector)).map((input) => {
+            return normalizeRateValue(input.value);
+        });
+
+        if (rowValues.length === 0) {
+            bulkInput.value = '';
+            return;
+        }
+
+        const firstValue = rowValues[0];
+        const allSame = isMeaningfulRate(firstValue)
+            && rowValues.every((value) => value === firstValue);
+
+        bulkInput.value = allSame ? firstValue : '';
+    };
+
+    const wireBulkRate = (bulkInput, lineSelector) => {
+        if (!bulkInput) {
+            return;
+        }
+
+        bulkInput.addEventListener('input', function () {
+            const value = normalizeRateValue(bulkInput.value);
+            if (value === '') {
+                return;
+            }
+
+            document.querySelectorAll(lineSelector).forEach((input) => {
+                input.value = value;
+            });
+
+            updateTotals();
+        });
+
+        document.querySelectorAll(lineSelector).forEach((input) => {
+            input.addEventListener('input', function () {
+                syncBulkRateFromRows(bulkInput, lineSelector);
+            });
+        });
+
+        syncBulkRateFromRows(bulkInput, lineSelector);
+    };
+
+    wireBulkRate(document.querySelector('.bulk-discount-input'), '.discount-input');
+    wireBulkRate(document.querySelector('.bulk-ppn-input'), '.ppn-input');
+    wireBulkRate(document.querySelector('.bulk-pph-input'), '.pph-input');
+
     if (feeItemsContainer) {
         feeItemsContainer.addEventListener('input', function (event) {
             if (event.target instanceof HTMLElement && event.target.classList.contains('fee-amount-input')) {
