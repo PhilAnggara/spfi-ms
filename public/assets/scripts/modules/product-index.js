@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const canvassingHistoryExportRouteTemplate = table.data('canvassingHistoryExportRouteTemplate');
     const barcodeShowRouteTemplate = table.data('barcodeShowRouteTemplate');
     const barcodePrintRoute = table.data('barcodePrintRoute');
+    const historyExportRoute = table.data('historyExportRoute');
     const poShowRouteTemplate = table.data('poShowRouteTemplate');
     const prsShowRouteTemplate = table.data('prsShowRouteTemplate');
     const canManage = table.data('canManage') === 1 || table.data('canManage') === '1';
@@ -679,6 +680,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const total = selectionState.filteredTotal;
         const selectedBadge = document.getElementById('product-selected-count');
         const printSelectedButton = document.getElementById('product-print-selected-btn');
+        const exportHistoryButton = document.getElementById('product-export-history-btn');
         const headerCheckbox = document.getElementById('product-select-all-checkbox');
 
         if (selectedBadge) {
@@ -687,6 +689,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (printSelectedButton) {
             printSelectedButton.disabled = selectedCount === 0 || selectionState.selectingAll;
+        }
+
+        if (exportHistoryButton) {
+            exportHistoryButton.disabled = selectedCount === 0 || selectionState.selectingAll;
         }
 
         document.querySelectorAll('.product-select-checkbox').forEach((input) => {
@@ -736,6 +742,37 @@ document.addEventListener('DOMContentLoaded', function () {
             ? window.bootstrap.Modal.getOrCreateInstance(printModalEl)
             : null;
         printModal?.show();
+    };
+
+    const openProductHistoryExportModal = (itemIds) => {
+        const exportForm = document.getElementById('product-history-export-form');
+        const hiddenInputs = document.getElementById('product-history-export-hidden-inputs');
+        const summary = document.getElementById('product-history-export-summary');
+        const exportModalEl = document.getElementById('product-history-export-modal');
+
+        if (!exportForm || !hiddenInputs || !summary || !exportModalEl || !itemIds.length) {
+            return;
+        }
+
+        if (historyExportRoute) {
+            exportForm.setAttribute('action', historyExportRoute);
+        }
+
+        hiddenInputs.innerHTML = '';
+        itemIds.forEach((itemId) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'item_ids[]';
+            input.value = String(itemId);
+            hiddenInputs.appendChild(input);
+        });
+
+        summary.textContent = `Selected products: ${itemIds.length}`;
+
+        const exportModal = window.bootstrap?.Modal
+            ? window.bootstrap.Modal.getOrCreateInstance(exportModalEl)
+            : null;
+        exportModal?.show();
     };
 
     const fetchAllFilteredProductIds = async () => {
@@ -1080,6 +1117,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const selectAllButton = document.getElementById('product-select-all-btn');
     const clearSelectionButton = document.getElementById('product-clear-selection-btn');
     const printSelectedButton = document.getElementById('product-print-selected-btn');
+    const exportHistoryButton = document.getElementById('product-export-history-btn');
 
     headerCheckbox?.addEventListener('change', async function () {
         if (selectionState.selectingAll) {
@@ -1133,6 +1171,11 @@ document.addEventListener('DOMContentLoaded', function () {
     printSelectedButton?.addEventListener('click', function () {
         const itemIds = Array.from(selectionState.selectedIds.values()).sort((left, right) => left - right);
         openProductPrintModal(itemIds);
+    });
+
+    exportHistoryButton?.addEventListener('click', function () {
+        const itemIds = Array.from(selectionState.selectedIds.values()).sort((left, right) => left - right);
+        openProductHistoryExportModal(itemIds);
     });
 
     const barcodePreviewModalEl = document.getElementById('product-barcode-preview-modal');

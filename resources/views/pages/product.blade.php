@@ -111,6 +111,12 @@
                                 <i class="fa-light fa-qrcode me-1"></i>
                                 Print Selected Labels
                             </button>
+                            @if ($canViewPurchaseHistory || $canViewCanvassingHistory)
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="product-export-history-btn" disabled>
+                                    <i class="fa-light fa-file-export me-1"></i>
+                                    Export History
+                                </button>
+                            @endif
                             <span class="badge bg-light-primary" id="product-filter-result">0 records</span>
                         </div>
                     </div>
@@ -122,6 +128,7 @@
                             data-source="{{ route('product.datatables') }}"
                             data-barcode-show-route-template="{{ route('product.barcode.show', '__ID__') }}"
                             data-barcode-print-route="{{ route('product.barcodes.print') }}"
+                            data-history-export-route="{{ ($canViewPurchaseHistory || $canViewCanvassingHistory) ? route('product.history.export') : '' }}"
                             data-csrf-token="{{ csrf_token() }}"
                             data-update-route-template="{{ route('product.update', '__ID__') }}"
                             data-destroy-route-template="{{ route('product.destroy', '__ID__') }}"
@@ -174,6 +181,9 @@
 @endif
 @if ($canViewCanvassingHistory)
     @include('includes.modals.product-canvassing-history-modal')
+@endif
+@if ($canViewPurchaseHistory || $canViewCanvassingHistory)
+    @include('includes.modals.product-history-export-modal')
 @endif
 
 <div class="modal fade" id="product-barcode-preview-modal" tabindex="-1" aria-hidden="true">

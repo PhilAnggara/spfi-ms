@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Exports\CanvassingHistorySpreadsheet;
+use App\Exports\ProductCanvassingHistorySpreadsheet;
+use App\Exports\ProductPurchaseHistorySpreadsheet;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\PrsCanvassingItem;
@@ -12,6 +14,7 @@ use App\Support\Concerns\PaginatesLegacySqlServer;
 use App\Support\PdfReport;
 use App\Support\QrCodeImage;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -317,27 +320,7 @@ class ProductController extends Controller
             'canvasser',
         ];
 
-        $baseQuery = PurchaseOrderItem::query()
-            ->where('purchase_order_items.item_id', $item->id)
-            ->join('purchase_orders as po', 'po.id', '=', 'purchase_order_items.purchase_order_id')
-            ->whereNull('po.deleted_at')
-            ->leftJoin('prs_items as pi', 'pi.id', '=', 'purchase_order_items.prs_item_id')
-            ->leftJoin('suppliers', 'suppliers.id', '=', 'po.supplier_id')
-            ->leftJoin('currencies', 'currencies.id', '=', 'po.currency_id')
-            ->leftJoin('users as prs_canvasser', 'prs_canvasser.id', '=', 'pi.canvasser_id')
-            ->leftJoin('users as po_creator', 'po_creator.id', '=', 'po.created_by')
-            ->select([
-                'purchase_order_items.id',
-                'po.id as purchase_order_id',
-                'po.po_number',
-                'po.created_at as po_date',
-                'currencies.code as currency',
-                'suppliers.code as supplier_code',
-                'suppliers.name as supplier_name',
-                'purchase_order_items.quantity',
-                'purchase_order_items.unit_price',
-                DB::raw('COALESCE(prs_canvasser.name, po_creator.name) as canvasser'),
-            ]);
+        $baseQuery = $this->purchaseHistoryBaseQuery([$item->id]);
 
         $recordsTotal = PurchaseOrderItem::query()
             ->where('purchase_order_items.item_id', $item->id)
@@ -440,7 +423,7 @@ class ProductController extends Controller
             'prs_canvassing_items.notes',
         ];
 
-        $baseQuery = $this->canvassingHistoryBaseQuery($item);
+        $baseQuery = $this->canvassingHistoryBaseQuery([$item->id]);
 
         $recordsTotal = PrsCanvassingItem::query()
             ->join('prs_items', 'prs_items.id', '=', 'prs_canvassing_items.prs_item_id')
@@ -535,7 +518,7 @@ class ProductController extends Controller
 
         $item->loadMissing(['unit', 'category']);
 
-        $baseQuery = $this->canvassingHistoryBaseQuery($item);
+        $baseQuery = $this->canvassingHistoryBaseQuery([$item->id]);
         $summary = $this->canvassingHistorySummary((clone $baseQuery));
         $quoteCount = max(0, $summary['quote_count']);
 
@@ -588,13 +571,248 @@ class ProductController extends Controller
         return PdfReport::analytical('pdf.reports.canvassing-history', $data, $filename);
     }
 
-    private function canvassingHistoryBaseQuery(Item $item): EloquentBuilder
+    public function exportHistory(Request $request): Response|StreamedResponse
+    {
+        $validated = $request->validate([
+            'item_ids' => ['required', 'array', 'min:1'],
+            'item_ids.*' => ['required', 'integer', 'exists:items,id'],
+            'history_type' => ['required', 'in:purchase,canvassing'],
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+            'format' => ['required', 'in:pdf,excel'],
+        ]);
+
+        $user = $request->user();
+        $historyType = $validated['history_type'];
+
+        if ($historyType === 'purchase') {
+            abort_unless($user?->can('view-purchase-history'), 403);
+        } else {
+            abort_unless($user?->can('view-canvassing-history'), 403);
+        }
+
+        $itemIds = collect($validated['item_ids'])
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $dateFrom = Carbon::parse($validated['date_from'])->startOfDay();
+        $dateTo = Carbon::parse($validated['date_to'])->endOfDay();
+
+        if ($historyType === 'purchase') {
+            return $this->exportPurchaseHistoryForItems(
+                $itemIds,
+                $dateFrom,
+                $dateTo,
+                $validated['format']
+            );
+        }
+
+        return $this->exportCanvassingHistoryForItems(
+            $itemIds,
+            $dateFrom,
+            $dateTo,
+            $validated['format']
+        );
+    }
+
+    /**
+     * @param  list<int>  $itemIds
+     */
+    private function exportPurchaseHistoryForItems(
+        array $itemIds,
+        Carbon $dateFrom,
+        Carbon $dateTo,
+        string $format,
+    ): Response|StreamedResponse {
+        $baseQuery = $this->purchaseHistoryBaseQuery($itemIds)
+            ->whereBetween('po.created_at', [$dateFrom, $dateTo]);
+
+        $orderBySql = 'items.code ASC, po.created_at DESC, purchase_order_items.id DESC';
+
+        if (! $this->isSqlServerConnection()) {
+            $baseQuery->orderBy('items.code')
+                ->orderBy('po.created_at', 'desc')
+                ->orderBy('purchase_order_items.id', 'desc');
+        }
+
+        $rowCount = (clone $baseQuery)->count();
+        $rows = $rowCount === 0
+            ? collect()
+            : $this->sliceEloquentQueryForDataTables(
+                $baseQuery,
+                'purchase_order_items.id',
+                $orderBySql,
+                0,
+                $rowCount
+            );
+
+        $mappedRows = $rows
+            ->map(fn ($row) => $this->mapPurchaseHistoryExportRow($row))
+            ->values()
+            ->all();
+
+        $data = [
+            'company' => PdfReport::DEFAULT_COMPANY,
+            'title' => 'Product Purchase History',
+            'date_from' => $dateFrom->toDateString(),
+            'date_to' => $dateTo->toDateString(),
+            'selected_count' => count($itemIds),
+            'printed_at' => now()->format('d-m-Y H:i'),
+            'groups' => $this->groupHistoryRowsByItem($mappedRows),
+        ];
+
+        if ($format === 'excel') {
+            $filename = sprintf('purchase-history-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new ProductPurchaseHistorySpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('purchase-history-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.product-purchase-history', $data, $filename);
+    }
+
+    /**
+     * @param  list<int>  $itemIds
+     */
+    private function exportCanvassingHistoryForItems(
+        array $itemIds,
+        Carbon $dateFrom,
+        Carbon $dateTo,
+        string $format,
+    ): Response|StreamedResponse {
+        $poCurrencySubquery = DB::query()
+            ->from('purchase_order_items as poi_curr')
+            ->join('purchase_orders as po_curr', 'po_curr.id', '=', 'poi_curr.purchase_order_id')
+            ->leftJoin('currencies as curr_po', 'curr_po.id', '=', 'po_curr.currency_id')
+            ->whereNull('po_curr.deleted_at')
+            ->whereNotNull('poi_curr.prs_item_id')
+            ->groupBy('poi_curr.prs_item_id', 'po_curr.supplier_id')
+            ->select([
+                'poi_curr.prs_item_id',
+                'po_curr.supplier_id',
+                DB::raw('MAX(curr_po.code) as currency'),
+            ]);
+
+        $baseQuery = $this->canvassingHistoryBaseQuery($itemIds)
+            ->whereBetween('prs_canvassing_items.created_at', [$dateFrom, $dateTo])
+            ->leftJoinSub($poCurrencySubquery, 'po_currency', function ($join) {
+                $join->on('po_currency.prs_item_id', '=', 'prs_canvassing_items.prs_item_id')
+                    ->on('po_currency.supplier_id', '=', 'prs_canvassing_items.supplier_id');
+            })
+            ->addSelect('po_currency.currency as currency');
+
+        $orderBySql = 'items.code ASC, prs_canvassing_items.created_at DESC, prs_canvassing_items.id DESC';
+
+        if (! $this->isSqlServerConnection()) {
+            $baseQuery->orderBy('items.code')
+                ->orderBy('prs_canvassing_items.created_at', 'desc')
+                ->orderBy('prs_canvassing_items.id', 'desc');
+        }
+
+        $rowCount = (clone $baseQuery)->count();
+        $rows = $rowCount === 0
+            ? collect()
+            : $this->sliceEloquentQueryForDataTables(
+                $baseQuery,
+                'prs_canvassing_items.id',
+                $orderBySql,
+                0,
+                $rowCount
+            );
+
+        $mappedRows = $rows
+            ->map(fn ($row) => $this->mapCanvassingHistoryRow($row))
+            ->values()
+            ->all();
+
+        $data = [
+            'company' => PdfReport::DEFAULT_COMPANY,
+            'title' => 'Product Canvassing History',
+            'date_from' => $dateFrom->toDateString(),
+            'date_to' => $dateTo->toDateString(),
+            'selected_count' => count($itemIds),
+            'printed_at' => now()->format('d-m-Y H:i'),
+            'groups' => $this->groupHistoryRowsByItem($mappedRows),
+        ];
+
+        if ($format === 'excel') {
+            $filename = sprintf('canvassing-history-%s.xlsx', now()->format('Ymd-His'));
+
+            return (new ProductCanvassingHistorySpreadsheet($data))->download($filename);
+        }
+
+        $filename = sprintf('canvassing-history-%s.pdf', now()->format('Ymd-His'));
+
+        return PdfReport::analytical('pdf.reports.product-canvassing-history', $data, $filename);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $mappedRows
+     * @return list<array{item_code: string, item_name: string, rows: list<array<string, mixed>>}>
+     */
+    private function groupHistoryRowsByItem(array $mappedRows): array
+    {
+        return collect($mappedRows)
+            ->groupBy(fn (array $row): string => (string) ($row['item_code'] ?? '').'|'.(string) ($row['item_name'] ?? ''))
+            ->map(function ($rows): array {
+                $first = $rows->first() ?? [];
+
+                return [
+                    'item_code' => (string) ($first['item_code'] ?? ''),
+                    'item_name' => (string) ($first['item_name'] ?? ''),
+                    'rows' => $rows->values()->all(),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<int>  $itemIds
+     */
+    private function purchaseHistoryBaseQuery(array $itemIds): EloquentBuilder
+    {
+        return PurchaseOrderItem::query()
+            ->whereIn('purchase_order_items.item_id', $itemIds)
+            ->join('purchase_orders as po', 'po.id', '=', 'purchase_order_items.purchase_order_id')
+            ->whereNull('po.deleted_at')
+            ->join('items', 'items.id', '=', 'purchase_order_items.item_id')
+            ->leftJoin('prs_items as pi', 'pi.id', '=', 'purchase_order_items.prs_item_id')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'po.supplier_id')
+            ->leftJoin('currencies', 'currencies.id', '=', 'po.currency_id')
+            ->leftJoin('users as prs_canvasser', 'prs_canvasser.id', '=', 'pi.canvasser_id')
+            ->leftJoin('users as po_creator', 'po_creator.id', '=', 'po.created_by')
+            ->select([
+                'purchase_order_items.id',
+                'purchase_order_items.item_id',
+                'items.code as item_code',
+                'items.name as item_name',
+                'po.id as purchase_order_id',
+                'po.po_number',
+                'po.created_at as po_date',
+                'currencies.code as currency',
+                'suppliers.code as supplier_code',
+                'suppliers.name as supplier_name',
+                'purchase_order_items.quantity',
+                'purchase_order_items.unit_price',
+                DB::raw('COALESCE(prs_canvasser.name, po_creator.name) as canvasser'),
+            ]);
+    }
+
+    /**
+     * @param  list<int>  $itemIds
+     */
+    private function canvassingHistoryBaseQuery(array $itemIds): EloquentBuilder
     {
         return PrsCanvassingItem::query()
             ->join('prs_items', 'prs_items.id', '=', 'prs_canvassing_items.prs_item_id')
-            ->where('prs_items.item_id', $item->id)
+            ->whereIn('prs_items.item_id', $itemIds)
             ->whereNull('prs_canvassing_items.deleted_at')
             ->whereNull('prs_items.deleted_at')
+            ->join('items', 'items.id', '=', 'prs_items.item_id')
             ->join('prs', 'prs.id', '=', 'prs_canvassing_items.prs_id')
             ->whereNull('prs.deleted_at')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'prs_canvassing_items.supplier_id')
@@ -605,6 +823,8 @@ class ProductController extends Controller
                 'prs_canvassing_items.created_at as canvass_date',
                 'prs.id as prs_id',
                 'prs.prs_number',
+                'items.code as item_code',
+                'items.name as item_name',
                 'suppliers.code as supplier_code',
                 'suppliers.name as supplier_name',
                 'prs_canvassing_items.unit_price',
@@ -643,6 +863,27 @@ class ProductController extends Controller
     /**
      * @return array<string, mixed>
      */
+    private function mapPurchaseHistoryExportRow(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'item_code' => $row->item_code,
+            'item_name' => $row->item_name,
+            'purchase_order_id' => $row->purchase_order_id,
+            'po_number' => $row->po_number,
+            'po_date' => $row->po_date,
+            'currency' => $row->currency,
+            'supplier_code' => $row->supplier_code,
+            'supplier_name' => $row->supplier_name,
+            'quantity' => $row->quantity,
+            'unit_price' => $row->unit_price,
+            'canvasser' => $row->canvasser,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function mapCanvassingHistoryRow(object $row): array
     {
         $topParts = array_filter([
@@ -652,12 +893,15 @@ class ProductController extends Controller
 
         return [
             'id' => $row->id,
+            'item_code' => $row->item_code ?? null,
+            'item_name' => $row->item_name ?? null,
             'canvass_date' => $row->canvass_date,
             'prs_id' => $row->prs_id,
             'prs_number' => $row->prs_number,
             'supplier_code' => $row->supplier_code,
             'supplier_name' => $row->supplier_name,
             'unit_price' => $row->unit_price,
+            'currency' => $row->currency ?? null,
             'is_selected' => (bool) $row->is_selected_quote,
             'term_of_payment' => $topParts !== [] ? implode(' / ', $topParts) : null,
             'term_of_delivery' => $row->term_of_delivery,

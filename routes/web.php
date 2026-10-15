@@ -76,6 +76,10 @@ Route::middleware('auth')->group(function () {
         Route::post('product/{item}/canvassing-history/export', [ProductController::class, 'exportCanvassingHistory'])->name('product.canvassing-history.export');
     });
 
+    Route::prefix('master')->group(function () {
+        Route::post('product/history/export', [ProductController::class, 'exportHistory'])->name('product.history.export');
+    });
+
     Route::middleware('permission:create-products')->prefix('master')->group(function () {
         Route::get('product/check-code', [ProductController::class, 'checkCode'])->name('product.check-code');
         Route::post('product', [ProductController::class, 'store'])->name('product.store');
