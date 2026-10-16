@@ -6,18 +6,10 @@
 <div class="page-heading po-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
-            <div class="col-12 col-lg-7">
+            <div class="col-12">
                 <div class="po-hero">
                     <h3 class="mb-1">Purchase Order</h3>
                     <p class="text-muted mb-0">Track PO status quickly with instant search, dynamic filters, and real-time pagination.</p>
-                </div>
-            </div>
-            <div class="col-12 col-lg-5">
-                <div class="po-top-actions">
-                    <a href="{{ route('purchase-orders.draft') }}" class="btn btn-success icon icon-left">
-                        <i class="fa-duotone fa-solid fa-bag-shopping-plus"></i>
-                        Create PO
-                    </a>
                 </div>
             </div>
         </div>
@@ -234,7 +226,6 @@
                                         ])
                                     </div>
                                     <div class="modal-footer po-detail-modal-footer">
-                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
                                         <a href="{{ route('purchase-orders.show', $po) }}" class="btn btn-outline-primary">
                                             <i class="fa-light fa-arrow-up-right-from-square me-1"></i>
                                             Open

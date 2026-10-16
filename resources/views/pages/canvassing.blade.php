@@ -6,18 +6,10 @@
         <div class="page-heading po-page">
             <div class="page-title mb-4">
                 <div class="row g-3 align-items-center">
-                <div class="col-12 col-lg-7">
+                <div class="col-12">
                     <div class="po-hero">
                         <h3 class="mb-1">Canvassing</h3>
                         <p class="text-muted mb-0">Manage supplier quotes quickly with unified filters, clean table view, and dynamic pagination.</p>
-                    </div>
-                </div>
-                <div class="col-12 col-lg-5">
-                    <div class="po-top-actions">
-                        <a href="{{ route('canvassing.index') }}" class="btn btn-light-secondary icon icon-left" id="reset-canvassing-top">
-                            <i class="fa-light fa-rotate-left"></i>
-                            Reset View
-                        </a>
                     </div>
                 </div>
             </div>

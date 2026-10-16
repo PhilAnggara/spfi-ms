@@ -16,18 +16,10 @@
 <div class="page-heading po-page po-draft-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
-            <div class="col-12 col-lg-7">
+            <div class="col-12">
                 <div class="po-hero">
                     <h3 class="mb-1">Draft Purchase Order</h3>
                     <p class="text-muted mb-0">Select supplier items, review pricing, and prepare purchase orders from canvassing results.</p>
-                </div>
-            </div>
-            <div class="col-12 col-lg-5">
-                <div class="po-top-actions">
-                    <a href="{{ route('purchase-orders.index') }}" class="btn btn-outline-primary icon icon-left">
-                        <i class="fa-duotone fa-solid fa-list-check"></i>
-                        Open PO List
-                    </a>
                 </div>
             </div>
         </div>

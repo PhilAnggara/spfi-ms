@@ -27,7 +27,6 @@
             dateStart: document.getElementById('filter-canvassing-date-start'),
             dateEnd: document.getElementById('filter-canvassing-date-end'),
             reset: document.getElementById('reset-canvassing-filter'),
-            resetTop: document.getElementById('reset-canvassing-top'),
         };
 
         if (!filterElements.keyword || !filterElements.department || !filterElements.dateStart || !filterElements.dateEnd) {
@@ -99,18 +98,6 @@
                 if (filterElements.canvasser) {
                     filterElements.canvasser.value = '';
                 }
-                filterElements.dateStart.value = '';
-                filterElements.dateEnd.value = '';
-                applyServerFilter(false);
-            });
-        }
-
-        if (filterElements.resetTop) {
-            filterElements.resetTop.addEventListener('click', function (event) {
-                event.preventDefault();
-
-                filterElements.keyword.value = '';
-                filterElements.department.value = '';
                 filterElements.dateStart.value = '';
                 filterElements.dateEnd.value = '';
                 applyServerFilter(false);

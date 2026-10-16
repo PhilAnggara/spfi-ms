@@ -6,18 +6,10 @@
 <div class="page-heading po-page">
     <div class="page-title mb-4">
         <div class="row g-3 align-items-center">
-            <div class="col-12 col-lg-7">
+            <div class="col-12">
                 <div class="po-hero">
                     <h3 class="mb-1">Purchase Order Approval</h3>
                     <p class="text-muted mb-0">Review and process pending purchase orders with instant filtering and clean navigation.</p>
-                </div>
-            </div>
-            <div class="col-12 col-lg-5">
-                <div class="po-top-actions">
-                    <a href="{{ route('purchase-orders.index') }}" class="btn btn-outline-primary icon icon-left">
-                        <i class="fa-duotone fa-solid fa-list-check"></i>
-                        Open PO List
-                    </a>
                 </div>
             </div>
         </div>
@@ -205,9 +197,6 @@
                                             'purchaseOrder' => $po,
                                             'showHeaderMeta' => true,
                                         ])
-                                    </div>
-                                    <div class="modal-footer po-detail-modal-footer">
-                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
                                     </div>
                                 </div>
                             </div>
