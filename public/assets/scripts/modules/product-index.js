@@ -191,7 +191,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const applyFilters = (useDebounce = false) => {
         const reload = () => {
-            clearProductSelection();
             syncFilterUrl(true);
             if (productDataTable) {
                 productDataTable.ajax.reload();
@@ -677,11 +676,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const syncProductSelectionUi = () => {
         const selectedCount = selectionState.selectedIds.size;
-        const total = selectionState.filteredTotal;
         const selectedBadge = document.getElementById('product-selected-count');
         const printSelectedButton = document.getElementById('product-print-selected-btn');
         const exportHistoryButton = document.getElementById('product-export-history-btn');
         const headerCheckbox = document.getElementById('product-select-all-checkbox');
+        const rowCheckboxes = Array.from(document.querySelectorAll('.product-select-checkbox'));
 
         if (selectedBadge) {
             selectedBadge.textContent = `${selectedCount} selected`;
@@ -695,13 +694,16 @@ document.addEventListener('DOMContentLoaded', function () {
             exportHistoryButton.disabled = selectedCount === 0 || selectionState.selectingAll;
         }
 
-        document.querySelectorAll('.product-select-checkbox').forEach((input) => {
+        rowCheckboxes.forEach((input) => {
             input.checked = selectionState.selectedIds.has(Number(input.value));
         });
 
+        const pageSelectedCount = rowCheckboxes.filter((input) => input.checked).length;
+        const pageTotal = rowCheckboxes.length;
+
         if (headerCheckbox) {
-            headerCheckbox.checked = total > 0 && selectedCount === total;
-            headerCheckbox.indeterminate = selectedCount > 0 && selectedCount < total;
+            headerCheckbox.checked = pageTotal > 0 && pageSelectedCount === pageTotal;
+            headerCheckbox.indeterminate = pageSelectedCount > 0 && pageSelectedCount < pageTotal;
             headerCheckbox.disabled = selectionState.selectingAll;
         }
     };

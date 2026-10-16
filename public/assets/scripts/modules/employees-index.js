@@ -66,13 +66,7 @@
 
     function syncEmployeeSelectionScope(url) {
         const selectionState = getEmployeeSelectionState();
-        const nextFilterKey = buildEmployeeFilterKey(url);
-
-        if (selectionState.filterKey !== null && selectionState.filterKey !== nextFilterKey) {
-            selectionState.selectedIds.clear();
-        }
-
-        selectionState.filterKey = nextFilterKey;
+        selectionState.filterKey = buildEmployeeFilterKey(url);
 
         return selectionState;
     }
@@ -563,12 +557,6 @@
 
         const selectedIds = () => Array.from(selectionState.selectedIds.values()).sort((left, right) => left - right);
 
-        const getFilteredTotal = () => {
-            const total = Number(pageContainer?.dataset.filteredTotal || 0);
-
-            return Number.isFinite(total) ? total : 0;
-        };
-
         const syncCurrentPageCheckboxes = () => {
             rowCheckboxes.forEach((input) => {
                 input.checked = selectionState.selectedIds.has(Number(input.value));
@@ -587,7 +575,8 @@
             syncCurrentPageCheckboxes();
 
             const selectedCount = selectionState.selectedIds.size;
-            const total = getFilteredTotal();
+            const pageSelectedCount = rowCheckboxes.filter((input) => input.checked).length;
+            const pageTotal = rowCheckboxes.length;
 
             if (selectedBadge) {
                 selectedBadge.textContent = `${selectedCount} selected`;
@@ -598,8 +587,8 @@
             }
 
             if (headerCheckbox) {
-                headerCheckbox.checked = total > 0 && selectedCount === total;
-                headerCheckbox.indeterminate = selectedCount > 0 && selectedCount < total;
+                headerCheckbox.checked = pageTotal > 0 && pageSelectedCount === pageTotal;
+                headerCheckbox.indeterminate = pageSelectedCount > 0 && pageSelectedCount < pageTotal;
             }
         };
 
