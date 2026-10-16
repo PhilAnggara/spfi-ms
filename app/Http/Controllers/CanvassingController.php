@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\PrsCanvassingItem;
 use App\Models\PrsItem;
 use App\Models\Supplier;
+use App\Models\User;
 use App\Services\NotificationRecipientService;
 use App\Services\PrsHoldService;
 use App\Support\Concerns\PaginatesLegacySqlServer;
@@ -20,27 +21,37 @@ class CanvassingController extends Controller
     use PaginatesLegacySqlServer;
 
     /**
-     * List items assigned to the current canvasser.
+     * List items assigned to the current canvasser (or all when acting as canvasser).
      */
     public function index(Request $request)
     {
-        $userId = $request->user()->id;
+        $user = $request->user();
+        $userId = $user->id;
+        $canActAsCanvasser = $user->can('act-as-canvasser');
 
         $filters = [
             'keyword' => trim((string) $request->query('keyword', '')),
             'date_needed_start' => trim((string) $request->query('date_needed_start', '')),
             'date_needed_end' => trim((string) $request->query('date_needed_end', '')),
             'department' => trim((string) $request->query('department', '')),
+            'canvasser_id' => trim((string) $request->query('canvasser_id', '')),
         ];
 
         $prsItemsQuery = PrsItem::with([
             'prs',
             'prs.department',
             'item.unit',
+            'canvasser',
             'canvassingItems.supplier',
             'selectedCanvassingItem.supplier',
         ])
-            ->where('canvasser_id', $userId)
+            ->when(! $canActAsCanvasser, function ($query) use ($userId) {
+                $query->where('canvasser_id', $userId);
+            })
+            ->when($canActAsCanvasser && $filters['canvasser_id'] !== '', function ($query) use ($filters) {
+                $query->where('canvasser_id', (int) $filters['canvasser_id']);
+            })
+            ->whereNotNull('canvasser_id')
             ->whereNull('purchase_order_id')
             ->whereHas('prs', function ($prsQuery) {
                 $prsQuery->whereIn('status', ['CANVASSING', 'PO_CREATED']);
@@ -87,9 +98,19 @@ class CanvassingController extends Controller
             ->orderBy('name')
             ->get();
 
+        $canvasserOptions = collect();
+        if ($canActAsCanvasser) {
+            $canvasserOptions = User::query()
+                ->role('purchasing-staff')
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
         return view('pages.canvassing', [
             'prsItems' => $prsItems,
             'departmentOptions' => $departmentOptions,
+            'canvasserOptions' => $canvasserOptions,
+            'canActAsCanvasser' => $canActAsCanvasser,
             'filters' => $filters,
         ]);
     }
@@ -99,7 +120,7 @@ class CanvassingController extends Controller
      */
     public function show(PrsItem $prsItem, Request $request)
     {
-        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
+        if (! $this->canViewCanvassingItem($prsItem, $request)) {
             abort(403);
         }
 
@@ -107,6 +128,7 @@ class CanvassingController extends Controller
             'prs.department',
             'prs.user',
             'item',
+            'canvasser',
             'canvassingItems.supplier',
             'selectedCanvassingItem.supplier',
         ]);
@@ -118,10 +140,12 @@ class CanvassingController extends Controller
         }
 
         $suppliers = Supplier::orderBy('name')->get();
+        $canEditCanvassing = $this->canMutateCanvassingItem($prsItem, $request);
 
         return view('pages.canvassing-detail', [
             'prsItem' => $prsItem,
             'suppliers' => $suppliers,
+            'canEditCanvassing' => $canEditCanvassing,
         ]);
     }
 
@@ -130,7 +154,7 @@ class CanvassingController extends Controller
      */
     public function store(Request $request, PrsItem $prsItem)
     {
-        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
+        if (! $this->canMutateCanvassingItem($prsItem, $request)) {
             abort(403);
         }
 
@@ -240,7 +264,7 @@ class CanvassingController extends Controller
                 'PRS #%s item %s saved by %s (%d supplier quote%s).',
                 $prsItem->prs?->prs_number ?? $prsItem->prs_id,
                 $prsItem->item?->code ?? $prsItem->id,
-                $prsItem->canvasser?->name ?? $request->user()->name,
+                $this->canvassingActorLabel($prsItem, $request),
                 $supplierCount,
                 $supplierCount === 1 ? '' : 's'
             ),
@@ -263,7 +287,7 @@ class CanvassingController extends Controller
      */
     public function report(PrsItem $prsItem, Request $request)
     {
-        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
+        if (! $this->canViewCanvassingItem($prsItem, $request)) {
             abort(403);
         }
 
@@ -334,7 +358,7 @@ class CanvassingController extends Controller
             /** @var PrsItem $prsItem */
             $prsItem = $prsItems->get($prsItemId);
 
-            if (! $this->canAccessCanvassingItem($prsItem, $request) || ! $this->isPrsItemOpenForCanvassing($prsItem)) {
+            if (! $this->canViewCanvassingItem($prsItem, $request) || ! $this->isPrsItemOpenForCanvassing($prsItem)) {
                 return redirect()
                     ->route('canvassing.index')
                     ->withErrors(['message' => 'One or more selected items are not available for canvassing report printing.']);
@@ -402,7 +426,7 @@ class CanvassingController extends Controller
      */
     public function toggleDirectPurchase(Request $request, PrsItem $prsItem)
     {
-        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
+        if (! $this->canMutateCanvassingItem($prsItem, $request)) {
             abort(403);
         }
 
@@ -449,7 +473,7 @@ class CanvassingController extends Controller
      */
     public function hold(Request $request, PrsItem $prsItem, PrsHoldService $prsHoldService)
     {
-        if (! $this->canAccessCanvassingItem($prsItem, $request)) {
+        if (! $this->canMutateCanvassingItem($prsItem, $request)) {
             abort(403);
         }
 
@@ -472,9 +496,33 @@ class CanvassingController extends Controller
         return redirect()->back()->with('success', 'PRS has been held for quantity revision.');
     }
 
-    private function canAccessCanvassingItem(PrsItem $prsItem, Request $request): bool
+    private function canViewCanvassingItem(PrsItem $prsItem, Request $request): bool
+    {
+        return $this->isAssignedCanvasser($prsItem, $request)
+            || $request->user()->can('act-as-canvasser');
+    }
+
+    private function canMutateCanvassingItem(PrsItem $prsItem, Request $request): bool
+    {
+        return $this->isAssignedCanvasser($prsItem, $request)
+            || $request->user()->can('act-as-canvasser');
+    }
+
+    private function isAssignedCanvasser(PrsItem $prsItem, Request $request): bool
     {
         return (int) $prsItem->canvasser_id === (int) $request->user()->id;
+    }
+
+    private function canvassingActorLabel(PrsItem $prsItem, Request $request): string
+    {
+        $actorName = $request->user()->name;
+        $assignedName = $prsItem->canvasser?->name;
+
+        if ($assignedName && (int) $prsItem->canvasser_id !== (int) $request->user()->id) {
+            return $actorName.' (assigned: '.$assignedName.')';
+        }
+
+        return $assignedName ?? $actorName;
     }
 
     private function isPrsItemOpenForCanvassing(PrsItem $prsItem): bool

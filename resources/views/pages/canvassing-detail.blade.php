@@ -44,7 +44,7 @@
                             <i class="fa-duotone fa-solid fa-arrow-left"></i>
                             Back to list
                         </a>
-                        @if (!$prsItem->purchase_order_id && $prsItem->prs?->isAvailableForCanvassing())
+                        @if (($canEditCanvassing ?? true) && !$prsItem->purchase_order_id && $prsItem->prs?->isAvailableForCanvassing())
                             <button type="button" class="btn btn-sm icon icon-left btn-outline-warning" data-bs-toggle="modal" data-bs-target="#canvasser-hold-modal-{{ $prsItem->id }}">
                                 <i class="fa-light fa-circle-pause"></i>
                                 Request Quantity Revision
@@ -91,6 +91,11 @@
                                 <span class="badge bg-light-info text-uppercase">{{ $prsItem->item->code }}</span>
                                 <span class="fw-semibold">{{ $prsItem->item->name }}</span>
                                 <span class="badge bg-light-secondary">Qty {{ \App\Support\PdfFormatters::qty($prsItem->quantity) }} {{ $prsItem->item->unit?->name ?? 'PCS' }}</span>
+                                @if ($prsItem->canvasser)
+                                    <span class="badge bg-light-warning text-warning-emphasis">
+                                        Assigned to {{ $prsItem->canvasser->name }}
+                                    </span>
+                                @endif
                                 @if ($prsItem->is_direct_purchase)
                                     <span class="badge bg-light-info">
                                         <i class="fa-duotone fa-solid fa-basket-shopping"></i>
@@ -98,7 +103,7 @@
                                     </span>
                                 @endif
                             </div>
-                            @if (!$prsItem->purchase_order_id)
+                            @if (($canEditCanvassing ?? true) && !$prsItem->purchase_order_id)
                                 <form action="{{ route('canvassing.toggle-direct-purchase', $prsItem->id) }}" method="POST" class="d-inline">
                                     @csrf
                                     <input type="hidden" name="is_direct_purchase" value="{{ $prsItem->is_direct_purchase ? '0' : '1' }}">

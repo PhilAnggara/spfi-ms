@@ -261,6 +261,8 @@ it('seeds renamed crud permissions and drops legacy names', function () {
     expect(Permission::findByName('delete-all-stores-withdrawal'))->not->toBeNull();
     expect(Permission::findByName('delete-rr'))->not->toBeNull();
     expect(Permission::findByName('update-all-po'))->not->toBeNull();
+    expect(Permission::findByName('act-as-canvasser'))->not->toBeNull();
+    expect(Permission::findByName('view-fish-system'))->not->toBeNull();
     expect(Permission::findByName('assign-canvasser'))->not->toBeNull();
     expect(Permission::findByName('create-uom'))->not->toBeNull();
     expect(Permission::findByName('assign-user-access'))->not->toBeNull();
@@ -288,6 +290,10 @@ it('seeds renamed crud permissions and drops legacy names', function () {
     expect(Role::findByName('im-staff')->hasPermissionTo('update-all-stores-withdrawal'))->toBeTrue();
     expect(Role::findByName('im-staff')->hasPermissionTo('delete-all-stores-withdrawal'))->toBeTrue();
     expect(Role::findByName('administrator')->hasPermissionTo('update-all-po'))->toBeTrue();
+    expect(Role::findByName('administrator')->hasPermissionTo('act-as-canvasser'))->toBeTrue();
+    expect(Role::findByName('administrator')->hasPermissionTo('view-fish-system'))->toBeTrue();
+    expect(Role::findByName('purchasing-staff')->hasPermissionTo('act-as-canvasser'))->toBeFalse();
+    expect(Role::findByName('purchasing-staff')->hasPermissionTo('view-fish-system'))->toBeFalse();
     expect(Role::findByName('production-manager')->hasPermissionTo('assign-canvasser'))->toBeFalse();
     expect(Role::findByName('engineering-manager')->hasPermissionTo('assign-canvasser'))->toBeFalse();
 });

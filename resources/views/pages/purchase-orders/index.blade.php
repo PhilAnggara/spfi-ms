@@ -35,7 +35,6 @@
                         <label for="filter-po-status" class="form-label mb-1">Status</label>
                         <select id="filter-po-status" class="form-select">
                             <option value="" @selected(request('status') === null || request('status') === '')>All Status</option>
-                            <option value="DRAFT" @selected(request('status') === 'DRAFT')>DRAFT</option>
                             <option value="PENDING_APPROVAL" @selected(request('status') === 'PENDING_APPROVAL')>PENDING_APPROVAL</option>
                             <option value="APPROVED" @selected(request('status') === 'APPROVED')>APPROVED</option>
                             <option value="CHANGES_REQUESTED" @selected(request('status') === 'CHANGES_REQUESTED')>CHANGES_REQUESTED</option>
@@ -91,10 +90,6 @@
                     <button type="button" class="po-status-chip {{ request('status') === 'CHANGES_REQUESTED' ? 'active' : '' }}" data-status-value="CHANGES_REQUESTED">
                         <i class="fa-light fa-arrows-rotate"></i>
                         Changes Requested
-                    </button>
-                    <button type="button" class="po-status-chip {{ request('status') === 'DRAFT' ? 'active' : '' }}" data-status-value="DRAFT">
-                        <i class="fa-light fa-file-pen"></i>
-                        Draft
                     </button>
                 </div>
 
@@ -211,9 +206,14 @@
                             $authUser = auth()->user();
                             $canEdit = in_array($po->status, ['DRAFT', 'CHANGES_REQUESTED'], true);
                             $canCancel = $authUser
-                                && $po->status === 'APPROVED'
+                                && $authUser->can('cancel-po')
                                 && (int) ($po->receiving_reports_count ?? 0) === 0
-                                && $authUser->can('cancel-po');
+                                && in_array($po->status, ['DRAFT', 'CHANGES_REQUESTED', 'PENDING_APPROVAL', 'APPROVED'], true)
+                                && (
+                                    (int) $po->created_by === (int) $authUser->id
+                                    || $authUser->can('update-all-po')
+                                    || $authUser->can('approve-po')
+                                );
                         @endphp
                         <div class="modal fade" id="poDetail-{{ $po->id }}" tabindex="-1" aria-labelledby="poDetailLabel-{{ $po->id }}" aria-hidden="true">
                             <div class="modal-dialog modal-xl modal-dialog-scrollable">

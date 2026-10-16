@@ -41,9 +41,14 @@
                     $canWithdraw = $canMutatePo
                         && $purchaseOrder->status === 'PENDING_APPROVAL';
                     $canCancel = $user
-                        && $purchaseOrder->status === 'APPROVED'
+                        && $user->can('cancel-po')
                         && $purchaseOrder->receivingReports->isEmpty()
-                        && $user->can('cancel-po');
+                        && in_array($purchaseOrder->status, ['DRAFT', 'CHANGES_REQUESTED', 'PENDING_APPROVAL', 'APPROVED'], true)
+                        && (
+                            (int) $purchaseOrder->created_by === (int) $user->id
+                            || $user->can('update-all-po')
+                            || $user->can('approve-po')
+                        );
                     $canRemoveItems = $canEdit && $purchaseOrder->items->count() > 1;
                     $feeItemsForForm = old('fee_items', $purchaseOrder->fees_breakdown ?? []);
 
@@ -413,7 +418,7 @@
                                 </form>
                                 <button type="button" class="btn btn-warning" onclick="confirmWithdrawPo('withdraw-po-{{ $purchaseOrder->id }}')">
                                     <i class="fa-duotone fa-solid fa-rotate-left"></i>
-                                    Withdraw to Draft
+                                    Withdraw
                                 </button>
                             @endif
                             @if ($canCancel)

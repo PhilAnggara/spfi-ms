@@ -252,7 +252,7 @@ it('releases the po number so it can be reused on a new po', function () {
         ->post(route('purchase-orders.store'), [
             'supplier_id' => $this->supplier->id,
             'currency_id' => $this->currency->id,
-            'action' => 'draft',
+            'action' => 'submit',
             'po_number' => $this->releasedPoNumber,
             'remark_type' => 'Normal',
             'remark_text' => null,
@@ -293,15 +293,31 @@ it('blocks cancel when a receiving report already exists', function () {
         ->and($this->prsItemA->fresh()->purchase_order_id)->toBe($this->purchaseOrder->id);
 });
 
-it('rejects cancel when po is not approved', function () {
+it('lets the creator cancel a draft po', function () {
     $this->purchaseOrder->update(['status' => 'DRAFT']);
 
-    $response = $this->actingAs($this->canvasser)
-        ->from(route('purchase-orders.show', $this->purchaseOrder))
-        ->post(route('purchase-orders.cancel', $this->purchaseOrder));
+    $this->actingAs($this->canvasser)
+        ->post(route('purchase-orders.cancel', $this->purchaseOrder))
+        ->assertRedirect(route('purchase-orders.index'))
+        ->assertSessionHas('success');
 
-    $response->assertRedirect(route('purchase-orders.show', $this->purchaseOrder));
-    $response->assertSessionHasErrors('message');
+    expect(PurchaseOrder::withTrashed()->find($this->purchaseOrder->id)?->trashed())->toBeTrue()
+        ->and($this->prsItemA->fresh()->purchase_order_id)->toBeNull();
+});
+
+it('lets the creator cancel a pending approval po', function () {
+    $this->purchaseOrder->update([
+        'status' => 'PENDING_APPROVAL',
+        'submitted_at' => now(),
+    ]);
+
+    $this->actingAs($this->canvasser)
+        ->post(route('purchase-orders.cancel', $this->purchaseOrder))
+        ->assertRedirect(route('purchase-orders.index'))
+        ->assertSessionHas('success');
+
+    expect(PurchaseOrder::withTrashed()->find($this->purchaseOrder->id)?->trashed())->toBeTrue()
+        ->and($this->prsItemA->fresh()->purchase_order_id)->toBeNull();
 });
 
 it('forbids another staff from cancelling a po they did not create', function () {

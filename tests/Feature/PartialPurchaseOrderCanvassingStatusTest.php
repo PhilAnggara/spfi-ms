@@ -133,7 +133,7 @@ it('keeps prs status canvassing when only some items get a purchase order', func
         ->post(route('purchase-orders.store'), [
             'supplier_id' => $this->supplier->id,
             'currency_id' => $this->currency->id,
-            'action' => 'draft',
+            'action' => 'submit',
             'remark_type' => 'Normal',
             'remark_text' => null,
             'term_of_payment_type' => 'materials_in_transit',
@@ -167,7 +167,7 @@ it('sets prs status to po_created when all open items have purchase orders', fun
         ->post(route('purchase-orders.store'), [
             'supplier_id' => $this->supplier->id,
             'currency_id' => $this->currency->id,
-            'action' => 'draft',
+            'action' => 'submit',
             'remark_type' => 'Normal',
             'remark_text' => null,
             'term_of_payment_type' => 'materials_in_transit',

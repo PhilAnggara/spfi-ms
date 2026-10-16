@@ -58,6 +58,7 @@ class RolePermissionSeeder extends Seeder
             'view-canvassing',
             'update-canvassing',
             'view-canvassing-history',
+            'act-as-canvasser',
         ];
 
         $permissionsPo = [
@@ -158,6 +159,7 @@ class RolePermissionSeeder extends Seeder
             'create-exchange-rates',
             'view-supplier-comparison',
             'select-supplier-comparison',
+            'view-fish-system',
         ];
 
         $permissionsRbac = [

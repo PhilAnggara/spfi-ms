@@ -181,17 +181,28 @@ beforeEach(function () {
     $this->prsItemB->update(['purchase_order_id' => $this->purchaseOrder->id]);
 });
 
-it('lets the creator withdraw a pending approval po to draft', function () {
+it('lets the creator withdraw a pending approval po back to the draft queue', function () {
     $response = $this->actingAs($this->canvasser)
         ->post(route('purchase-orders.withdraw', $this->purchaseOrder));
 
-    $response->assertRedirect(route('purchase-orders.show', $this->purchaseOrder));
+    $response->assertRedirect(route('purchase-orders.draft'));
     $response->assertSessionHas('success');
 
-    $this->purchaseOrder->refresh();
+    $withdrawn = PurchaseOrder::withTrashed()->find($this->purchaseOrder->id);
 
-    expect($this->purchaseOrder->status)->toBe('DRAFT')
-        ->and($this->purchaseOrder->submitted_at)->toBeNull();
+    expect($withdrawn)->not->toBeNull()
+        ->and($withdrawn->trashed())->toBeTrue()
+        ->and($withdrawn->status)->toBe('WITHDRAWN')
+        ->and($withdrawn->po_number)->toBe('WITHDRAWN-'.$this->purchaseOrder->id)
+        ->and($withdrawn->submitted_at)->toBeNull()
+        ->and($this->prsItemA->fresh()->purchase_order_id)->toBeNull()
+        ->and($this->prsItemB->fresh()->purchase_order_id)->toBeNull();
+
+    $this->actingAs($this->canvasser)
+        ->get(route('purchase-orders.draft'))
+        ->assertSuccessful()
+        ->assertSee('Withdraw Item A')
+        ->assertSee('Withdraw Item B');
 });
 
 it('forbids another staff from withdrawing a po', function () {
@@ -295,27 +306,24 @@ it('rejects removing an item while po is pending approval', function () {
     expect(PurchaseOrderItem::query()->find($this->poItemB->id))->not->toBeNull();
 });
 
-it('shows withdraw button for pending approval and remove controls after withdraw', function () {
+it('shows withdraw button for pending approval and returns items to draft queue after withdraw', function () {
     $pendingPage = $this->actingAs($this->canvasser)
         ->get(route('purchase-orders.show', $this->purchaseOrder));
 
     $pendingPage->assertSuccessful();
-    $pendingPage->assertSee('Withdraw to Draft');
+    $pendingPage->assertSee('Withdraw');
     $pendingPage->assertDontSee(route('purchase-orders.items.destroy', [$this->purchaseOrder, $this->poItemA]), false);
     $pendingPage->assertDontSee('po-show-bulk-rates', false);
 
     $this->actingAs($this->canvasser)
-        ->post(route('purchase-orders.withdraw', $this->purchaseOrder));
+        ->post(route('purchase-orders.withdraw', $this->purchaseOrder))
+        ->assertRedirect(route('purchase-orders.draft'));
 
-    $draftPage = $this->actingAs($this->canvasser)
-        ->get(route('purchase-orders.show', $this->purchaseOrder));
+    expect(PurchaseOrder::withTrashed()->find($this->purchaseOrder->id)?->trashed())->toBeTrue();
 
-    $draftPage->assertSuccessful();
-    $draftPage->assertSee('Save Changes');
-    $draftPage->assertSee(route('purchase-orders.items.destroy', [$this->purchaseOrder, $this->poItemA]), false);
-    $draftPage->assertSee('Apply to all items');
-    $draftPage->assertSee('po-show-bulk-rates', false);
-    $draftPage->assertSee('bulk-discount-input', false);
-    $draftPage->assertSee('bulk-ppn-input', false);
-    $draftPage->assertSee('bulk-pph-input', false);
+    $this->actingAs($this->canvasser)
+        ->get(route('purchase-orders.draft'))
+        ->assertSuccessful()
+        ->assertSee('Withdraw Item A')
+        ->assertSee('Withdraw Item B');
 });

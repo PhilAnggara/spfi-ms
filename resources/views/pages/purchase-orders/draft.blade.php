@@ -166,6 +166,9 @@
                                                         <tr>
                                                             <th class="spfi-col-check"></th>
                                                             <th>PRS</th>
+                                                            @if (!empty($canActAsCanvasser))
+                                                                <th>Canvasser</th>
+                                                            @endif
                                                             <th>Item</th>
                                                             <th>Qty</th>
                                                             <th>Unit</th>
@@ -197,6 +200,11 @@
                                                                         <div class="mt-1"><span class="badge bg-light-primary">CAPEX</span></div>
                                                                     @endif
                                                                 </td>
+                                                                @if (!empty($canActAsCanvasser))
+                                                                    <td>
+                                                                        <span class="small">{{ $prsItem->canvasser?->name ?? '-' }}</span>
+                                                                    </td>
+                                                                @endif
                                                                 <td>
                                                                     <div class="fw-semibold">{{ $item?->name ?? 'Item not found' }}</div>
                                                                     <small class="text-muted">{{ $item?->code ?? '-' }}</small>

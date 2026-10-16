@@ -36,7 +36,7 @@
                                 value="{{ $filters['keyword'] ?? '' }}"
                                 placeholder="PRS number / item code / item name">
                         </div>
-                        <div class="col-6 col-md-3 col-xl-3">
+                        <div class="col-6 col-md-3 col-xl-{{ !empty($canActAsCanvasser) ? '2' : '3' }}">
                             <label for="filter-canvassing-department" class="form-label mb-1">Department</label>
                             <select id="filter-canvassing-department" class="form-select">
                                 <option value="">All Department</option>
@@ -47,11 +47,24 @@
                                 @endforeach
                             </select>
                         </div>
+                        @if (!empty($canActAsCanvasser))
+                            <div class="col-6 col-md-3 col-xl-2">
+                                <label for="filter-canvassing-canvasser" class="form-label mb-1">Canvasser</label>
+                                <select id="filter-canvassing-canvasser" class="form-select">
+                                    <option value="">All Canvassers</option>
+                                    @foreach ($canvasserOptions as $canvasser)
+                                        <option value="{{ $canvasser->id }}" @selected(($filters['canvasser_id'] ?? '') == (string) $canvasser->id)>
+                                            {{ $canvasser->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
                         <div class="col-6 col-md-3 col-xl-2">
                             <label for="filter-canvassing-date-start" class="form-label mb-1">Date Needed (from)</label>
                             <input type="date" id="filter-canvassing-date-start" class="form-control" value="{{ $filters['date_needed_start'] ?? '' }}">
                         </div>
-                        <div class="col-6 col-md-3 col-xl-2">
+                        <div class="col-6 col-md-3 col-xl-{{ !empty($canActAsCanvasser) ? '1' : '2' }}">
                             <label for="filter-canvassing-date-end" class="form-label mb-1">Date Needed (to)</label>
                             <input type="date" id="filter-canvassing-date-end" class="form-control" value="{{ $filters['date_needed_end'] ?? '' }}">
                         </div>
@@ -104,6 +117,9 @@
                                             </th>
                                             <th>PRS Number</th>
                                             <th>Department</th>
+                                            @if (!empty($canActAsCanvasser))
+                                                <th>Canvasser</th>
+                                            @endif
                                             <th>Item Code</th>
                                             <th>Item Name</th>
                                             <th>Quantity</th>
@@ -154,6 +170,11 @@
                                                 <td>
                                                     <span class="badge bg-light-primary" data-bstooltip-toggle="tooltip" data-bs-placement="top" title="{{ $departmentName }}">{{ $departmentCode }}</span>
                                                 </td>
+                                                @if (!empty($canActAsCanvasser))
+                                                    <td>
+                                                        <span class="small">{{ $prsItem->canvasser?->name ?? '-' }}</span>
+                                                    </td>
+                                                @endif
                                                 <td>
                                                     <span class="badge bg-light-secondary" role="button" onclick="copyToClipboard('{{ $itemCode }}')">{{ $itemCode }}</span>
                                                 </td>

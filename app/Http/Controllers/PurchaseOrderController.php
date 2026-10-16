@@ -13,11 +13,13 @@ use App\Models\User;
 use App\Notifications\PoSubmittedNotification;
 use App\Services\DocumentNumberService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderController extends Controller
 {
@@ -170,19 +172,25 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Draft PO list grouped by supplier for canvasser.
+     * Draft PO list grouped by supplier for canvasser (or all when acting as canvasser).
      */
     public function draft(Request $request)
     {
-        $userId = $request->user()->id;
+        $user = $request->user();
+        $userId = $user->id;
+        $canActAsCanvasser = $user->can('act-as-canvasser');
         $keyword = trim((string) $request->query('keyword', ''));
 
         $prsItems = PrsItem::with([
             'prs',
             'item.unit',
+            'canvasser',
             'selectedCanvassingItem.supplier',
         ])
-            ->where('canvasser_id', $userId)
+            ->when(! $canActAsCanvasser, function ($query) use ($userId) {
+                $query->where('canvasser_id', $userId);
+            })
+            ->whereNotNull('canvasser_id')
             ->whereNull('purchase_order_id')
             ->where('is_direct_purchase', false)
             ->whereNotNull('selected_canvassing_item_id')
@@ -217,6 +225,7 @@ class PurchaseOrderController extends Controller
             'itemsBySupplier' => $itemsBySupplier,
             'suppliers' => $suppliers,
             'keyword' => $keyword,
+            'canActAsCanvasser' => $canActAsCanvasser,
         ]);
     }
 
@@ -247,14 +256,11 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['items' => 'A purchase order can contain a maximum of '.self::MAX_ITEMS_PER_PO.' items.']);
         }
 
-        $userId = $request->user()->id;
         $checkedItemIds = array_map('intval', array_column($checkedItems, 'prs_item_id'));
 
-        $prsItems = PrsItem::with(['prs', 'item.unit', 'selectedCanvassingItem'])
+        $prsItems = $this->eligibleDraftPrsItemsQuery($request)
+            ->with(['prs', 'item.unit', 'selectedCanvassingItem'])
             ->whereIn('id', $checkedItemIds)
-            ->where('canvasser_id', $userId)
-            ->whereNull('purchase_order_id')
-            ->whereNotNull('selected_canvassing_item_id')
             ->get()
             ->sortBy(fn (PrsItem $item) => array_search($item->id, $checkedItemIds, true))
             ->values();
@@ -323,14 +329,14 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Store a PO as draft or submit for approval.
+     * Submit a purchase order for approval.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'currency_id' => ['required', 'exists:currencies,id'],
-            'action' => ['required', 'in:draft,submit'],
+            'action' => ['required', 'in:submit'],
             'po_number' => ['nullable', 'string', 'max:50'],
             'po_number_suggested' => ['nullable', 'string', 'max:50'],
             'fee_items' => ['nullable', 'array'],
@@ -355,36 +361,7 @@ class PurchaseOrderController extends Controller
         $fees = $feePayload['fees'];
         $feesBreakdown = $feePayload['fee_breakdown'];
 
-        $prsItemIds = collect($validated['items'])->pluck('prs_item_id');
-
-        $prsItems = PrsItem::with(['prs', 'item', 'selectedCanvassingItem'])
-            ->whereIn('id', $prsItemIds)
-            ->where('canvasser_id', $request->user()->id)
-            ->whereNull('purchase_order_id')
-            ->whereNotNull('selected_canvassing_item_id')
-            ->get();
-
-        if ($prsItems->count() !== count($prsItemIds)) {
-            return redirect()->back()->withErrors(['items' => 'One or more PR items are invalid or already assigned.']);
-        }
-
-        if ($prsItems->contains(fn ($item) => ! $item->item)) {
-            return redirect()->back()->withErrors(['items' => 'One or more selected PR items no longer have item master data.']);
-        }
-
-        $invalidSupplierItems = $prsItems->filter(function ($item) use ($validated) {
-            return $item->selectedCanvassingItem?->supplier_id !== (int) $validated['supplier_id'];
-        });
-
-        if ($invalidSupplierItems->isNotEmpty()) {
-            return redirect()->back()->withErrors(['items' => 'Selected items must belong to the same supplier.']);
-        }
-
-        if ($this->containsMixedCapexStatus($prsItems)) {
-            return redirect()->back()->withErrors(['items' => 'Selected items cannot mix CAPEX and Non-CAPEX in one purchase order.']);
-        }
-
-        $itemsById = $prsItems->keyBy('id');
+        $prsItemIds = collect($validated['items'])->pluck('prs_item_id')->map(fn ($id) => (int) $id)->values();
 
         $numberService = app(DocumentNumberService::class);
         $purchaseOrder = null;
@@ -396,13 +373,49 @@ class PurchaseOrderController extends Controller
 
             try {
                 // Atomic create: PO header, items, and PR item marking.
-                $purchaseOrder = DB::transaction(function () use ($validated, $itemsById, $fees, $feesBreakdown, $request, $resolvedNumber) {
+                $purchaseOrder = DB::transaction(function () use ($validated, $prsItemIds, $fees, $feesBreakdown, $request, $resolvedNumber) {
+                    $prsItems = $this->eligibleDraftPrsItemsQuery($request)
+                        ->with(['prs', 'item', 'selectedCanvassingItem'])
+                        ->whereIn('id', $prsItemIds->all())
+                        ->lockForUpdate()
+                        ->get();
+
+                    if ($prsItems->count() !== $prsItemIds->count()) {
+                        throw ValidationException::withMessages([
+                            'items' => 'One or more PR items are invalid or already assigned.',
+                        ]);
+                    }
+
+                    if ($prsItems->contains(fn ($item) => ! $item->item)) {
+                        throw ValidationException::withMessages([
+                            'items' => 'One or more selected PR items no longer have item master data.',
+                        ]);
+                    }
+
+                    $invalidSupplierItems = $prsItems->filter(function ($item) use ($validated) {
+                        return $item->selectedCanvassingItem?->supplier_id !== (int) $validated['supplier_id'];
+                    });
+
+                    if ($invalidSupplierItems->isNotEmpty()) {
+                        throw ValidationException::withMessages([
+                            'items' => 'Selected items must belong to the same supplier.',
+                        ]);
+                    }
+
+                    if ($this->containsMixedCapexStatus($prsItems)) {
+                        throw ValidationException::withMessages([
+                            'items' => 'Selected items cannot mix CAPEX and Non-CAPEX in one purchase order.',
+                        ]);
+                    }
+
+                    $itemsById = $prsItems->keyBy('id');
+
                     $purchaseOrder = PurchaseOrder::create([
                         'po_number' => $resolvedNumber['number'],
                         'supplier_id' => $validated['supplier_id'],
                         'currency_id' => $validated['currency_id'],
                         'created_by' => $request->user()->id,
-                        'status' => $validated['action'] === 'submit' ? 'PENDING_APPROVAL' : 'DRAFT',
+                        'status' => 'PENDING_APPROVAL',
                         'tax_rate' => 0,
                         'fees' => $fees,
                         'fees_breakdown' => $feesBreakdown,
@@ -414,7 +427,7 @@ class PurchaseOrderController extends Controller
                         'term_of_payment_type' => $validated['term_of_payment_type'],
                         'term_of_payment' => $validated['term_of_payment'],
                         'term_of_delivery' => $validated['term_of_delivery'] ?? null,
-                        'submitted_at' => $validated['action'] === 'submit' ? now() : null,
+                        'submitted_at' => now(),
                     ]);
 
                     $subtotal = 0;
@@ -502,6 +515,8 @@ class PurchaseOrderController extends Controller
                     return $purchaseOrder;
                 });
                 break;
+            } catch (ValidationException $exception) {
+                return redirect()->back()->withErrors($exception->errors())->withInput();
             } catch (QueryException $exception) {
                 $canRetry = $resolvedNumber['source'] === 'auto'
                     && $attempt < $maxAttempts
@@ -519,21 +534,19 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors(['po_number' => 'Unable to generate PO number. Please try again.']);
         }
 
-        if ($validated['action'] === 'submit') {
-            $purchasingManagers = User::role('purchasing-manager')->get();
+        $purchasingManagers = User::role('purchasing-manager')->get();
 
-            if ($purchasingManagers->isEmpty()) {
-                $purchasingManagers = User::permission('approve-po')->get();
-            }
+        if ($purchasingManagers->isEmpty()) {
+            $purchasingManagers = User::permission('approve-po')->get();
+        }
 
-            foreach ($purchasingManagers as $manager) {
-                $manager->notify(new PoSubmittedNotification($purchaseOrder));
-            }
+        foreach ($purchasingManagers as $manager) {
+            $manager->notify(new PoSubmittedNotification($purchaseOrder));
         }
 
         return redirect()
             ->route('purchase-orders.show', $purchaseOrder)
-            ->with('success', 'Purchase order has been created.');
+            ->with('success', 'Purchase order has been submitted for approval.');
     }
 
     /**
@@ -584,17 +597,25 @@ class PurchaseOrderController extends Controller
             abort(403);
         }
 
-        $purchaseOrder->update([
-            'status' => 'DRAFT',
-            'submitted_at' => null,
-        ]);
+        $releasedNumber = $purchaseOrder->po_number;
+        $notes = 'Withdrawn before approval. Released PO number: '.($releasedNumber ?: '-').'.';
 
-        return redirect()->route('purchase-orders.show', $purchaseOrder)
-            ->with('success', 'Purchase order withdrawn to draft.');
+        DB::transaction(function () use ($purchaseOrder, $notes) {
+            $this->dissolvePurchaseOrderAndReturnItemsToDraftQueue(
+                $purchaseOrder,
+                'WITHDRAWN',
+                $notes,
+                'WITHDRAWN-'.$purchaseOrder->id
+            );
+        });
+
+        return redirect()
+            ->route('purchase-orders.draft')
+            ->with('success', 'Purchase order withdrawn. Items returned to the draft PO queue and the PO number was released for reuse.');
     }
 
     /**
-     * Cancel an approved PO, release its number, and return items to the draft queue.
+     * Cancel a PO (including pre-approval), release its number, and return items to the draft queue.
      */
     public function cancel(Request $request, PurchaseOrder $purchaseOrder)
     {
@@ -603,8 +624,13 @@ class PurchaseOrderController extends Controller
             abort(403);
         }
 
-        if ($purchaseOrder->status !== 'APPROVED') {
-            return redirect()->back()->withErrors(['message' => 'Only approved purchase orders can be cancelled.']);
+        $cancellableStatuses = ['DRAFT', 'CHANGES_REQUESTED', 'PENDING_APPROVAL', 'APPROVED'];
+        if (! in_array($purchaseOrder->status, $cancellableStatuses, true)) {
+            return redirect()->back()->withErrors(['message' => 'This purchase order cannot be cancelled.']);
+        }
+
+        if (! $this->canCancelPurchaseOrder($user, $purchaseOrder)) {
+            abort(403);
         }
 
         if ($purchaseOrder->receivingReports()->exists()) {
@@ -623,33 +649,80 @@ class PurchaseOrderController extends Controller
         }
 
         DB::transaction(function () use ($purchaseOrder, $notes) {
-            $prsItems = PrsItem::query()
-                ->with('prs')
-                ->where('purchase_order_id', $purchaseOrder->id)
-                ->get();
-
-            PrsItem::query()
-                ->where('purchase_order_id', $purchaseOrder->id)
-                ->update(['purchase_order_id' => null]);
-
-            $prsItems
-                ->pluck('prs')
-                ->filter()
-                ->unique('id')
-                ->each(fn (Prs $prs) => $prs->syncCanvassingPurchaseOrderStatus());
-
-            $purchaseOrder->update([
-                'status' => 'CANCELLED',
-                'approval_notes' => $notes,
-                'po_number' => 'CANCELLED-'.$purchaseOrder->id,
-            ]);
-
-            $purchaseOrder->delete();
+            $this->dissolvePurchaseOrderAndReturnItemsToDraftQueue(
+                $purchaseOrder,
+                'CANCELLED',
+                $notes,
+                'CANCELLED-'.$purchaseOrder->id
+            );
         });
 
         return redirect()
             ->route('purchase-orders.index')
             ->with('success', 'Purchase order cancelled. Items returned to draft PO and the PO number was released for reuse.');
+    }
+
+    /**
+     * Soft-delete a PO and return its PRS items to the draft PO queue.
+     */
+    private function dissolvePurchaseOrderAndReturnItemsToDraftQueue(
+        PurchaseOrder $purchaseOrder,
+        string $status,
+        string $notes,
+        string $releasedPoNumber
+    ): void {
+        $prsItems = PrsItem::query()
+            ->with('prs')
+            ->where('purchase_order_id', $purchaseOrder->id)
+            ->get();
+
+        PrsItem::query()
+            ->where('purchase_order_id', $purchaseOrder->id)
+            ->update(['purchase_order_id' => null]);
+
+        $prsItems
+            ->pluck('prs')
+            ->filter()
+            ->unique('id')
+            ->each(fn (Prs $prs) => $prs->syncCanvassingPurchaseOrderStatus());
+
+        $purchaseOrder->update([
+            'status' => $status,
+            'approval_notes' => $notes,
+            'po_number' => $releasedPoNumber,
+            'submitted_at' => null,
+        ]);
+
+        $purchaseOrder->delete();
+    }
+
+    private function canCancelPurchaseOrder(User $user, PurchaseOrder $purchaseOrder): bool
+    {
+        if ((int) $purchaseOrder->created_by === (int) $user->id) {
+            return true;
+        }
+
+        if ($user->can('update-all-po') || $user->can('approve-po')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * PRS items eligible for draft / preview / create PO for the current actor.
+     */
+    private function eligibleDraftPrsItemsQuery(Request $request): Builder
+    {
+        $user = $request->user();
+
+        return PrsItem::query()
+            ->when(! $user->can('act-as-canvasser'), function ($query) use ($user) {
+                $query->where('canvasser_id', $user->id);
+            })
+            ->whereNotNull('canvasser_id')
+            ->whereNull('purchase_order_id')
+            ->whereNotNull('selected_canvassing_item_id');
     }
 
     /**

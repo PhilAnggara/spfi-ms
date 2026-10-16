@@ -2,20 +2,44 @@
 
 use App\Models\Department;
 use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\PermissionRegistrar;
 
-it('shows the fish system link on the login page', function () {
-    $this->get(route('login'))
-        ->assertOk()
-        ->assertSee(config('services.fish_system.url'), false)
-        ->assertSee('Separate module · opens in a new tab', false)
-        ->assertSee('Fish Module', false);
+beforeEach(function () {
+    $this->seed(RolePermissionSeeder::class);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
 });
 
-it('shows the fish system link in the sidebar', function () {
+it('hides the production sidebar link without view-fish-system', function () {
     $department = Department::query()->create([
         'name' => 'General',
         'code' => '1000',
+        'alias' => 'GEN',
+    ]);
+
+    $user = User::query()->create([
+        'name' => 'No Fish Sidebar User',
+        'username' => 'no-fish-sidebar',
+        'email' => 'no-fish-sidebar@example.test',
+        'password' => Hash::make('password'),
+        'department_id' => $department->id,
+        'role' => 'Staff',
+    ]);
+
+    $this->actingAs($user);
+
+    $html = view('includes.sidebar')->render();
+
+    expect($html)
+        ->not->toContain(config('services.fish_system.url'))
+        ->not->toContain('>Production</span>');
+});
+
+it('shows the production sidebar link with view-fish-system', function () {
+    $department = Department::query()->create([
+        'name' => 'General',
+        'code' => '1001',
         'alias' => 'GEN',
     ]);
 
@@ -27,6 +51,7 @@ it('shows the fish system link in the sidebar', function () {
         'department_id' => $department->id,
         'role' => 'Staff',
     ]);
+    $user->givePermissionTo('view-fish-system');
 
     $this->actingAs($user);
 
@@ -35,5 +60,5 @@ it('shows the fish system link in the sidebar', function () {
     expect($html)
         ->toContain(config('services.fish_system.url'))
         ->toContain('target="_blank"')
-        ->toContain('>Fish</span>');
+        ->toContain('>Production</span>');
 });

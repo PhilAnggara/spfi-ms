@@ -25,6 +25,9 @@ it('places special actions in the other column', function () {
     expect(PermissionModuleGroups::parse('update-all-prs')['resource'])->toBe('prs');
     expect(PermissionModuleGroups::parse('delete-all-stores-withdrawal')['column'])->toBe('other');
     expect(PermissionModuleGroups::parse('update-all-po')['resource'])->toBe('po');
+    expect(PermissionModuleGroups::parse('act-as-canvasser')['resource'])->toBe('canvassing');
+    expect(PermissionModuleGroups::parse('act-as-canvasser')['column'])->toBe('other');
+    expect(PermissionModuleGroups::parse('view-fish-system')['resource'])->toBe('general');
     expect(PermissionModuleGroups::parse('assign-canvasser')['column'])->toBe('other');
     expect(PermissionModuleGroups::parse('force-logout-users')['resource'])->toBe('active-sessions');
     expect(PermissionModuleGroups::parse('assign-user-access')['resource'])->toBe('users');
@@ -39,6 +42,8 @@ it('groups elevated prs and stores withdrawal permissions into modules', functio
     expect(PermissionModuleGroups::resolveGroup('update-all-stores-withdrawal'))->toBe('stores_withdrawal');
     expect(PermissionModuleGroups::resolveGroup('delete-rr'))->toBe('rr');
     expect(PermissionModuleGroups::resolveGroup('update-all-po'))->toBe('po');
+    expect(PermissionModuleGroups::resolveGroup('act-as-canvasser'))->toBe('canvassing');
+    expect(PermissionModuleGroups::resolveGroup('view-fish-system'))->toBe('general');
     expect(PermissionModuleGroups::resolveGroup('view-own-screen-messages'))->toBe('screen_messages');
     expect(PermissionModuleGroups::resolveGroup('create-permanent-screen-messages'))->toBe('screen_messages');
     expect(PermissionModuleGroups::resolveGroup('view-all-screen-message-replies'))->toBe('screen_messages');

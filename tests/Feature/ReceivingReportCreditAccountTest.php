@@ -194,7 +194,7 @@ it('stores cash advance on purchase order and item meta', function () {
         ->post(route('purchase-orders.store'), [
             'supplier_id' => $this->supplier->id,
             'currency_id' => $this->currency->id,
-            'action' => 'draft',
+            'action' => 'submit',
             'remark_type' => 'Normal',
             'remark_text' => null,
             'term_of_payment_type' => 'cash_advance',
@@ -254,7 +254,7 @@ it('rejects legacy cash value on purchase order store', function () {
         ->post(route('purchase-orders.store'), [
             'supplier_id' => $this->supplier->id,
             'currency_id' => $this->currency->id,
-            'action' => 'draft',
+            'action' => 'submit',
             'remark_type' => 'Normal',
             'term_of_payment_type' => 'cash',
             'items' => [

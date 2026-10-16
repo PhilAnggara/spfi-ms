@@ -46,8 +46,8 @@ function confirmCancelPo(formId) {
 
 function confirmWithdrawPo(formId) {
   Swal.fire({
-    title: 'Withdraw to Draft?',
-    text: 'This purchase order will return to draft so you can edit it again.',
+    title: 'Withdraw Purchase Order?',
+    text: 'This purchase order will be discarded. Items will return to the Draft PO queue so you can create a new PO.',
     icon: 'question',
     showCancelButton: true,
     confirmButtonColor: '#ffc107',

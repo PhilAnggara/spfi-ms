@@ -60,12 +60,14 @@
                         </li>
                         @endcanany
 
+                        @can('view-fish-system')
                         <li class="sidebar-item">
                             <a href="{{ config('services.fish_system.url') }}" class="sidebar-link" target="_blank" rel="noopener noreferrer">
                                 <i class="fa-duotone fa-solid fa-fish"></i>
                                 <span>Production</span>
                             </a>
                         </li>
+                        @endcan
 
                         @canany(['view-users', 'view-active-sessions', 'view-employees', 'view-roles', 'view-permissions', 'view-products', 'view-suppliers', 'view-product-categories', 'view-uom', 'view-buyers', 'view-currencies', 'view-batches', 'view-fish-suppliers', 'view-vessels', 'view-fish', 'view-accounting-master', 'view-print-calibration'])
                             <li class="sidebar-item {{ is_active_menu(['master/*']) }} has-sub">

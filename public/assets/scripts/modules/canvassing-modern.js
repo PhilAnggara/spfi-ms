@@ -23,6 +23,7 @@
         const filterElements = {
             keyword: document.getElementById('filter-canvassing-keyword'),
             department: document.getElementById('filter-canvassing-department'),
+            canvasser: document.getElementById('filter-canvassing-canvasser'),
             dateStart: document.getElementById('filter-canvassing-date-start'),
             dateEnd: document.getElementById('filter-canvassing-date-end'),
             reset: document.getElementById('reset-canvassing-filter'),
@@ -38,6 +39,7 @@
 
             setQueryParam(url.searchParams, 'keyword', filterElements.keyword.value);
             setQueryParam(url.searchParams, 'department', filterElements.department.value);
+            setQueryParam(url.searchParams, 'canvasser_id', filterElements.canvasser ? filterElements.canvasser.value : '');
             setQueryParam(url.searchParams, 'date_needed_start', filterElements.dateStart.value);
             setQueryParam(url.searchParams, 'date_needed_end', filterElements.dateEnd.value);
             url.searchParams.delete('page');
@@ -76,6 +78,12 @@
             applyServerFilter(false);
         });
 
+        if (filterElements.canvasser) {
+            filterElements.canvasser.addEventListener('change', function () {
+                applyServerFilter(false);
+            });
+        }
+
         filterElements.dateStart.addEventListener('change', function () {
             applyServerFilter(false);
         });
@@ -88,6 +96,9 @@
             filterElements.reset.addEventListener('click', function () {
                 filterElements.keyword.value = '';
                 filterElements.department.value = '';
+                if (filterElements.canvasser) {
+                    filterElements.canvasser.value = '';
+                }
                 filterElements.dateStart.value = '';
                 filterElements.dateEnd.value = '';
                 applyServerFilter(false);

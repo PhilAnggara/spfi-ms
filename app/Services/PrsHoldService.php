@@ -82,7 +82,10 @@ class PrsHoldService
 
     public function holdByCanvasser(Prs $prs, PrsItem $prsItem, User $actor, string $message): void
     {
-        if ($prsItem->canvasser_id !== $actor->id) {
+        $isAssignedCanvasser = (int) $prsItem->canvasser_id === (int) $actor->id;
+        $canActAsCanvasser = $actor->can('act-as-canvasser');
+
+        if (! $isAssignedCanvasser && ! $canActAsCanvasser) {
             abort(403);
         }
 
@@ -104,9 +107,11 @@ class PrsHoldService
             'message' => $message,
             'meta' => [
                 'previous_status' => $previousStatus,
-                'held_by' => 'canvasser',
+                'held_by' => $isAssignedCanvasser ? 'canvasser' : 'canvasser_proxy',
                 'prs_item_id' => $prsItem->id,
-                'canvasser_id' => $actor->id,
+                'assigned_canvasser_id' => $prsItem->canvasser_id,
+                'actor_id' => $actor->id,
+                'canvasser_id' => $prsItem->canvasser_id,
             ],
         ]);
 
